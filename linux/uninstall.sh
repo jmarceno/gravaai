@@ -34,10 +34,11 @@ fi
 
 # ── 4. Desktop entry ─────────────────────────────────────────────────────────
 # Current entry is named after the app id; also remove the legacy names.
-APP_ID="io.github.dipakmdhrm.MeetingRecorder"
+APP_ID="io.github.jmarceno.Gravaai"
 info "Removing desktop entry…"
 rm -f "$APPS_DIR/$APP_ID.desktop" \
       "$APPS_DIR/$APP_NAME.desktop" \
+      "$APPS_DIR/io.github.dipakmdhrm.MeetingRecorder.desktop" \
       "$APPS_DIR/com.github.mint-meeting-recorder.desktop"
 update-desktop-database "$APPS_DIR" 2>/dev/null || true
 

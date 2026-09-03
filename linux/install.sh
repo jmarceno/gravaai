@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# install.sh — Install Meeting Recorder on Debian, Fedora, or Arch-based Linux.
+# install.sh — Install Meeting Recorder on Arch Linux (Arch-only hard fork).
 set -euo pipefail
 
 APP_NAME="meeting-recorder"
 # The desktop file is named after the GTK application id so the GNOME/Wayland
 # shell (and Dash to Panel) can map a running window back to it and show the app
 # icon instead of a generic one.
-APP_ID="io.github.dipakmdhrm.MeetingRecorder"
+APP_ID="io.github.jmarceno.Gravaai"
 INSTALL_DIR="$HOME/.local/share/$APP_NAME"
 VENV_DIR="$INSTALL_DIR/venv"
 BIN_DIR="$HOME/.local/bin"
@@ -21,37 +21,17 @@ info()    { echo -e "${GREEN}[info]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[warn]${NC} $*"; }
 err()     { echo -e "${RED}[error]${NC} $*" >&2; }
 
-# ── 1. System dependencies ──────────────────────────────────────────────────
-install_deps_apt() {
-    info "Installing system dependencies (apt)..."
-    sudo apt-get update -qq
-    sudo apt-get install -y python3 python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0 libnotify4 libnotify-bin ffmpeg pulseaudio-utils pipewire-pulse curl 2>/dev/null || true
-
-}
-
-install_deps_dnf() {
-    info "Installing system dependencies (dnf)..."
-    sudo dnf install -y python3 python3-devel python3-gobject gtk4 libadwaita libnotify pulseaudio-utils pipewire-pulseaudio curl
-    # Stock Fedora has no ffmpeg (RPM Fusion only); ffmpeg-free covers the
-    # recorder's needs (pulse input, amerge/highpass, libmp3lame).
-    sudo dnf install -y ffmpeg 2>/dev/null || sudo dnf install -y ffmpeg-free
-
-}
-
+# ── 1. System dependencies (Arch only) ─────────────────────────────────────────
 install_deps_pacman() {
     info "Installing system dependencies (pacman)..."
     sudo pacman -Syu --noconfirm python python-gobject gtk4 libadwaita libnotify libpulse pipewire-pulse ffmpeg curl
 
 }
 
-if command -v apt-get &>/dev/null; then
-    install_deps_apt
-elif command -v dnf &>/dev/null; then
-    install_deps_dnf
-elif command -v pacman &>/dev/null; then
+if command -v pacman &>/dev/null; then
     install_deps_pacman
 else
-    err "Unsupported package manager. Please install dependencies manually."
+    err "Arch Linux (pacman) is required. This fork supports Arch only."
     exit 1
 fi
 
@@ -61,13 +41,7 @@ fi
 install_gnome_extensions() {
     if [[ "${XDG_CURRENT_DESKTOP:-}" == *GNOME* ]]; then
         info "GNOME detected. Installing AppIndicator/KStatusNotifierItem extension (SNI host)..."
-        if command -v apt-get &>/dev/null; then
-            sudo apt-get install -y gnome-shell-extension-appindicator
-        elif command -v dnf &>/dev/null; then
-            sudo dnf install -y gnome-shell-extension-appindicator
-        elif command -v pacman &>/dev/null; then
-            sudo pacman -S --noconfirm gnome-shell-extension-appindicator
-        fi
+        sudo pacman -S --noconfirm gnome-shell-extension-appindicator
         warn "Please enable the 'AppIndicator and KStatusNotifierItem Support' extension in the GNOME Extensions app, and then log out and log back in."
     fi
 }

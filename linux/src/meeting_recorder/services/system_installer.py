@@ -1,12 +1,13 @@
 """
-Testable services for installing Ollama and GPU runtimes on the host system.
+Testable services for installing Ollama and GPU runtimes on Arch Linux.
+
+Arch-only hard fork: pacman is the only supported package manager.
 
 Security posture (see audit P1-L9):
 
 - No ``os.system``: every command is an argv list executed without a shell,
-  logged verbatim before it runs. Where a package manager genuinely needs a
-  compound command it is a *fixed string* handed to ``sh -c`` with no user
-  input interpolated (the Fedora version is validated as numeric first).
+  logged verbatim before it runs. Pacman snippets are fixed strings handed to
+  ``sh -c`` with no user input interpolated.
 - No bare ``sudo``: privilege elevation goes through ``pkexec`` so a polkit
   authentication dialog appears — correct for a GUI app, where ``sudo``
   would fail silently without a terminal. ``sudo`` remains a fallback for
@@ -31,7 +32,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import platform
 import shlex
 import shutil
 import subprocess
@@ -209,41 +209,14 @@ class CudaInstaller:
         return self._which("nvidia-smi") is not None
 
     def install(self) -> bool:
-        """Install CUDA libraries for the detected package manager.  Returns ``True`` on success."""
+        """Install CUDA libraries via pacman (Arch only). Returns ``True`` on success."""
         try:
-            if self._which("apt-get"):
-                code = self._run(
-                    build_privileged_command(
-                        "apt-get update -qq && apt-get install -y libcublas12 libcudart12",
-                        self._which,
-                    )
-                )
-            elif self._which("dnf"):
-                fedora_version = self._capture(["rpm", "-E", "%fedora"]).strip()
-                if not fedora_version.isdigit():
-                    logger.error(
-                        "Could not determine Fedora version (rpm -E %%fedora returned %r)",
-                        fedora_version,
-                    )
-                    return False
-                arch = platform.machine()
-                repo_url = (
-                    "https://developer.download.nvidia.com/compute/cuda/repos/"
-                    f"fedora{fedora_version}/{arch}/cuda-fedora{fedora_version}.repo"
-                )
-                code = self._run(
-                    build_privileged_command(
-                        f"dnf config-manager --add-repo '{repo_url}'"
-                        " && dnf install -y libcublas-12-x cuda-cudart-12-x",
-                        self._which,
-                    )
-                )
-            elif self._which("pacman"):
+            if self._which("pacman"):
                 code = self._run(
                     build_privileged_command("pacman -Syu --noconfirm cuda", self._which)
                 )
             else:
-                logger.warning("No supported package manager found for CUDA installation")
+                logger.warning("pacman not found — Arch Linux is required for CUDA installation")
                 return False
             return code == 0
         except Exception as exc:
@@ -270,27 +243,16 @@ class RocmInstaller:
         return self._which("rocminfo") is not None or os.path.exists("/dev/kfd")
 
     def install(self) -> bool:
-        """Install ROCm runtime libraries for the detected package manager."""
+        """Install ROCm runtime libraries via pacman (Arch only)."""
         try:
-            if self._which("apt-get"):
-                code = self._run(
-                    build_privileged_command(
-                        "apt-get update -qq && apt-get install -y rocm-hip-runtime rocblas",
-                        self._which,
-                    )
-                )
-            elif self._which("dnf"):
-                code = self._run(
-                    build_privileged_command("dnf install -y rocm-hip rocblas", self._which)
-                )
-            elif self._which("pacman"):
+            if self._which("pacman"):
                 code = self._run(
                     build_privileged_command(
                         "pacman -Syu --noconfirm rocm-hip-runtime rocblas", self._which
                     )
                 )
             else:
-                logger.warning("No supported package manager found for ROCm installation")
+                logger.warning("pacman not found — Arch Linux is required for ROCm installation")
                 return False
             return code == 0
         except Exception as exc:

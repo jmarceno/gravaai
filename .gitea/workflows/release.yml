@@ -1,0 +1,105 @@
+name: Release
+
+# Arch-only hard fork: manual dispatch only. Provide a version (without the
+# leading v, e.g. 1.2.3) or, when called via workflow_call, pass it as input.
+# Original deb/rpm/apt-repo steps were removed — only the pacman artifact ships.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (without v prefix, e.g. 1.2.3)'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: 'Release version (without v prefix, e.g. 1.2.3)'
+        required: true
+        type: string
+
+jobs:
+  # ── Extract version from input ───────────────────────────────────────────────
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.VERSION }}
+    steps:
+      - id: v
+        run: |
+          echo "VERSION=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+  # ── Build pacman .pkg.tar.zst ─────────────────────────────────────────────────
+  build-arch:
+    needs: get-version
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+      - name: Install build tools
+        run: pacman -Syu --noconfirm git base-devel
+
+      - uses: actions/checkout@v6
+
+      - name: Build pacman package
+        run: |
+          mkdir -p arch-build
+
+          # Source tarball
+          SRCDIR=$(mktemp -d)
+          mkdir "${SRCDIR}/meeting-recorder-${VERSION}"
+          cp -r linux "${SRCDIR}/meeting-recorder-${VERSION}/"
+          tar -czf "arch-build/meeting-recorder-${VERSION}.tar.gz" \
+            -C "${SRCDIR}" "meeting-recorder-${VERSION}"
+
+          # Inject version into PKGBUILD
+          sed "s/@VERSION@/${VERSION}/g" linux/packaging/arch/PKGBUILD > arch-build/PKGBUILD
+          cp linux/packaging/arch/meeting-recorder.install arch-build/
+
+          # makepkg refuses to run as root
+          useradd -m builder
+          chown -R builder:builder arch-build
+          su builder -c "cd arch-build && makepkg --noconfirm --skipinteg --nodeps"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch
+          path: arch-build/*.pkg.tar.zst
+
+  # ── Create source tarball and Release with the Arch artifact ─────────────────
+  release:
+    needs: [get-version, build-arch]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download all package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create source tarball
+        run: |
+          SRC=$(mktemp -d)
+          cp -r . "${SRC}/meeting-recorder-${VERSION}"
+          rm -rf \
+            "${SRC}/meeting-recorder-${VERSION}/.git" \
+            "${SRC}/meeting-recorder-${VERSION}/.claude" \
+            "${SRC}/meeting-recorder-${VERSION}/gh-pages-dir"
+          find "${SRC}" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+          find "${SRC}" -name '*.pyc' -delete 2>/dev/null || true
+          tar -czf "meeting-recorder_${VERSION}.tar.gz" -C "${SRC}" "meeting-recorder-${VERSION}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.get-version.outputs.version }}
+          files: |
+            *.pkg.tar.zst
+            meeting-recorder_*.tar.gz
+          generate_release_notes: true

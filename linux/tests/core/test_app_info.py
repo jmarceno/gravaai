@@ -1,4 +1,4 @@
-"""Tests for the pure version resolver in core.app_info."""
+"""Tests for the pure version resolver in core.app_info (Arch-only: pacman)."""
 
 from __future__ import annotations
 
@@ -14,37 +14,21 @@ def _runner(responses: dict[str, str | None]):
     return run
 
 
-def test_resolves_dpkg_version():
-    run = _runner({"dpkg-query": "1.1.35"})
-    assert app_info.resolve_version(run) == "1.1.35"
-
-
-def test_resolves_rpm_when_dpkg_missing():
-    run = _runner({"dpkg-query": None, "rpm": "1.1.35"})
-    assert app_info.resolve_version(run) == "1.1.35"
-
-
 def test_resolves_pacman_name_and_version():
-    run = _runner({"dpkg-query": None, "rpm": None, "pacman": "meeting-recorder 1.1.35"})
+    run = _runner({"pacman": "meeting-recorder 1.1.35"})
     assert app_info.resolve_version(run) == "1.1.35"
 
 
-def test_returns_none_when_no_package_manager_knows_it():
-    run = _runner({})  # every query returns None (source checkout)
+def test_returns_none_when_pacman_does_not_know_it():
+    run = _runner({})  # pacman returns None (source checkout)
     assert app_info.resolve_version(run) is None
-
-
-def test_blank_dpkg_output_is_treated_as_unknown():
-    run = _runner({"dpkg-query": "  \n", "rpm": None, "pacman": None})
-    assert app_info.resolve_version(run) is None
-
-
-def test_first_matching_package_manager_wins():
-    # dpkg answers first, so rpm/pacman are never consulted.
-    run = _runner({"dpkg-query": "2.0.0", "rpm": "9.9.9", "pacman": "meeting-recorder 9.9.9"})
-    assert app_info.resolve_version(run) == "2.0.0"
 
 
 def test_pacman_malformed_output_is_unknown():
-    run = _runner({"dpkg-query": None, "rpm": None, "pacman": "meeting-recorder"})
+    run = _runner({"pacman": "meeting-recorder"})
+    assert app_info.resolve_version(run) is None
+
+
+def test_blank_pacman_output_is_treated_as_unknown():
+    run = _runner({"pacman": "  \n"})
     assert app_info.resolve_version(run) is None

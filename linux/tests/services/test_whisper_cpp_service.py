@@ -3,8 +3,8 @@ Tests for the whisper.cpp engine service: GPU backend detection, the cmake
 build-command builder, the from-source builder, and GGML model status/download.
 
 All tests inject which_fn / shell_fn / downloader / cache_root so no compiler,
-GPU, or network is touched.  The per-backend and cross-distro branch-isolation
-tests are the important regression guards.
+GPU, or network is touched. Arch-only fork: the build toolchain is installed
+via pacman.
 """
 
 import os
@@ -135,7 +135,7 @@ class TestWhisperCppBuilderIsBuilt:
 
 
 class TestWhisperCppBuilderBuild:
-    def _make(self, pm: str = "apt-get", rc: int = 0, home=None):
+    def _make(self, pm: str = "pacman", rc: int = 0, home=None):
         cmds, shell = _recording_shell(rc)
         builder = WhisperCppBuilder(
             binary_path=(home / "x") if home else None,
@@ -187,7 +187,7 @@ class TestWhisperCppBuilderBuild:
         def boom(_):
             raise RuntimeError("disk full")
 
-        builder = WhisperCppBuilder(home=tmp_path, which_fn=_which_only("apt-get"), shell_fn=boom)
+        builder = WhisperCppBuilder(home=tmp_path, which_fn=_which_only("pacman"), shell_fn=boom)
         assert builder.build("cpu") is False
 
 

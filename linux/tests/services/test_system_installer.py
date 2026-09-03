@@ -1,10 +1,9 @@
 """
-Tests for OllamaInstaller, CudaInstaller, and RocmInstaller.
+Tests for OllamaInstaller, CudaInstaller, and RocmInstaller (Arch-only).
 
 All tests use the injected which_fn / run_fn / capture_fn / fetch_fn hooks so
-no real commands are executed.  The cross-distro branch isolation tests are
-the most important ones: they ensure that changing the apt-get path cannot
-silently break the dnf or pacman path and vice-versa.
+no real commands are executed. Arch-only fork: pacman is the sole supported
+package manager.
 
 Commands are argv lists; the recording helper joins them to strings so the
 assertions can check for package names regardless of elevation prefix
@@ -26,7 +25,7 @@ from meeting_recorder.services.system_installer import (
 
 
 def _which_only(pm: str):
-    """Return a which_fn that only recognises one package manager."""
+    """Return a which_fn that only recognises one binary."""
     return lambda cmd: f"/usr/bin/{cmd}" if cmd == pm else None
 
 
@@ -41,12 +40,12 @@ def _recording_run(rc: int = 0):
 
 class TestBuildPrivilegedCommand:
     def test_uses_pkexec_when_available(self):
-        cmd = build_privileged_command("apt-get install -y foo", which_fn=_which_only("pkexec"))
-        assert cmd == ["pkexec", "sh", "-c", "apt-get install -y foo"]
+        cmd = build_privileged_command("pacman -S foo", which_fn=_which_only("pkexec"))
+        assert cmd == ["pkexec", "sh", "-c", "pacman -S foo"]
 
     def test_falls_back_to_sudo_without_polkit(self):
-        cmd = build_privileged_command("apt-get install -y foo", which_fn=lambda _: None)
-        assert cmd == ["sudo", "sh", "-c", "apt-get install -y foo"]
+        cmd = build_privileged_command("pacman -S foo", which_fn=lambda _: None)
+        assert cmd == ["sudo", "sh", "-c", "pacman -S foo"]
 
     def test_snippet_is_single_argv_element(self):
         # The snippet must never be split/interpolated into separate args.
@@ -129,102 +128,7 @@ class TestCudaInstallerIsAvailable:
         assert inst.is_available() is False
 
 
-# ── CudaInstaller – apt-get branch ───────────────────────────────────────────
-
-
-class TestCudaInstallerAptBranch:
-    def _make(self, rc: int = 0):
-        cmds, run = _recording_run(rc)
-        return CudaInstaller(which_fn=_which_only("apt-get"), run_fn=run), cmds
-
-    def test_runs_exactly_one_command(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert len(cmds) == 1
-
-    def test_command_uses_apt_get(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "apt-get" in cmds[0]
-
-    def test_command_is_privilege_elevated(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert cmds[0].startswith(("pkexec ", "sudo "))
-
-    def test_installs_libcublas12(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "libcublas12" in cmds[0]
-
-    def test_installs_libcudart12(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "libcudart12" in cmds[0]
-
-    def test_returns_true_on_success(self):
-        inst, _ = self._make(rc=0)
-        assert inst.install() is True
-
-    def test_returns_false_on_failure(self):
-        inst, _ = self._make(rc=1)
-        assert inst.install() is False
-
-
-# ── CudaInstaller – dnf branch ────────────────────────────────────────────────
-
-
-class TestCudaInstallerDnfBranch:
-    def _make(self, fedora_ver: str = "41", rc: int = 0):
-        cmds, run = _recording_run(rc)
-        inst = CudaInstaller(
-            which_fn=_which_only("dnf"),
-            run_fn=run,
-            capture_fn=lambda _cmd: fedora_ver + "\n",
-        )
-        return inst, cmds
-
-    def test_runs_exactly_one_command(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert len(cmds) == 1
-
-    def test_command_uses_dnf(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "dnf" in cmds[0]
-
-    def test_includes_detected_fedora_version_in_repo_url(self):
-        inst, cmds = self._make(fedora_ver="41")
-        inst.install()
-        assert "fedora41" in cmds[0]
-
-    def test_installs_libcublas(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "libcublas-12-x" in cmds[0]
-
-    def test_installs_cuda_cudart(self):
-        inst, cmds = self._make()
-        inst.install()
-        assert "cuda-cudart-12-x" in cmds[0]
-
-    def test_returns_true_on_success(self):
-        inst, _ = self._make(rc=0)
-        assert inst.install() is True
-
-    def test_returns_false_on_failure(self):
-        inst, _ = self._make(rc=1)
-        assert inst.install() is False
-
-    def test_rejects_non_numeric_fedora_version(self):
-        # A garbage rpm answer must not be interpolated into the repo URL.
-        inst, cmds = self._make(fedora_ver="41; rm -rf /")
-        assert inst.install() is False
-        assert cmds == []
-
-
-# ── CudaInstaller – pacman branch ─────────────────────────────────────────────
+# ── CudaInstaller – pacman (Arch only) ────────────────────────────────────────
 
 
 class TestCudaInstallerPacmanBranch:
@@ -256,11 +160,11 @@ class TestCudaInstallerPacmanBranch:
         assert inst.install() is False
 
 
-# ── CudaInstaller – no supported PM ──────────────────────────────────────────
+# ── CudaInstaller – no pacman ─────────────────────────────────────────────────
 
 
 class TestCudaInstallerNoPM:
-    def test_returns_false_when_no_known_pm(self):
+    def test_returns_false_when_pacman_missing(self):
         inst = CudaInstaller(which_fn=lambda _: None)
         assert inst.install() is False
 
@@ -271,42 +175,10 @@ class TestCudaInstallerNoPM:
         assert cmds == []
 
 
-# ── CudaInstaller – cross-distro branch isolation ────────────────────────────
-#
-# These are the regression tests that prevent a change in one distro's path
-# from silently affecting another.  If someone edits the apt-get block and
-# accidentally references "dnf", these tests will catch it.
+# ── CudaInstaller – Arch-only isolation ───────────────────────────────────────
 
 
 class TestCudaInstallerBranchIsolation:
-    def test_apt_branch_never_runs_dnf(self):
-        cmds, run = _recording_run()
-        CudaInstaller(which_fn=_which_only("apt-get"), run_fn=run).install()
-        assert not any("dnf" in c for c in cmds)
-
-    def test_apt_branch_never_runs_pacman(self):
-        cmds, run = _recording_run()
-        CudaInstaller(which_fn=_which_only("apt-get"), run_fn=run).install()
-        assert not any("pacman" in c for c in cmds)
-
-    def test_dnf_branch_never_runs_apt_get(self):
-        cmds, run = _recording_run()
-        CudaInstaller(
-            which_fn=_which_only("dnf"),
-            run_fn=run,
-            capture_fn=lambda _cmd: "41",
-        ).install()
-        assert not any("apt-get" in c for c in cmds)
-
-    def test_dnf_branch_never_runs_pacman(self):
-        cmds, run = _recording_run()
-        CudaInstaller(
-            which_fn=_which_only("dnf"),
-            run_fn=run,
-            capture_fn=lambda _cmd: "41",
-        ).install()
-        assert not any("pacman" in c for c in cmds)
-
     def test_pacman_branch_never_runs_apt_get(self):
         cmds, run = _recording_run()
         CudaInstaller(which_fn=_which_only("pacman"), run_fn=run).install()
@@ -326,18 +198,7 @@ class TestCudaInstallerExceptionHandling:
         def boom(_):
             raise RuntimeError("disk full")
 
-        inst = CudaInstaller(which_fn=_which_only("apt-get"), run_fn=boom)
-        assert inst.install() is False
-
-    def test_returns_false_when_capture_raises(self):
-        def boom(_):
-            raise OSError("rpm failed")
-
-        inst = CudaInstaller(
-            which_fn=_which_only("dnf"),
-            run_fn=lambda _: 0,
-            capture_fn=boom,
-        )
+        inst = CudaInstaller(which_fn=_which_only("pacman"), run_fn=boom)
         assert inst.install() is False
 
 
@@ -355,20 +216,20 @@ class TestRocmInstallerIsAvailable:
         assert inst.is_available() is False
 
 
-class TestRocmInstallerAptBranch:
+class TestRocmInstallerPacmanBranch:
     def _make(self, rc: int = 0):
         cmds, run = _recording_run(rc)
-        return RocmInstaller(which_fn=_which_only("apt-get"), run_fn=run), cmds
+        return RocmInstaller(which_fn=_which_only("pacman"), run_fn=run), cmds
 
     def test_runs_exactly_one_command(self):
         inst, cmds = self._make()
         inst.install()
         assert len(cmds) == 1
 
-    def test_command_uses_apt_get(self):
+    def test_command_uses_pacman(self):
         inst, cmds = self._make()
         inst.install()
-        assert "apt-get" in cmds[0]
+        assert "pacman" in cmds[0]
 
     def test_command_is_privilege_elevated(self):
         inst, cmds = self._make()
@@ -386,30 +247,20 @@ class TestRocmInstallerAptBranch:
 
 
 class TestRocmInstallerNoPM:
-    def test_returns_false_when_no_known_pm(self):
+    def test_returns_false_when_pacman_missing(self):
         inst = RocmInstaller(which_fn=lambda _: None)
         assert inst.install() is False
 
 
 class TestRocmInstallerBranchIsolation:
-    def test_apt_branch_never_runs_dnf_or_pacman(self):
-        cmds, run = _recording_run()
-        RocmInstaller(which_fn=_which_only("apt-get"), run_fn=run).install()
-        assert not any("dnf" in c or "pacman" in c for c in cmds)
-
-    def test_dnf_branch_never_runs_apt_get_or_pacman(self):
-        cmds, run = _recording_run()
-        RocmInstaller(which_fn=_which_only("dnf"), run_fn=run).install()
-        assert not any("apt-get" in c or "pacman" in c for c in cmds)
-
     def test_pacman_branch_never_runs_apt_get_or_dnf(self):
         cmds, run = _recording_run()
         RocmInstaller(which_fn=_which_only("pacman"), run_fn=run).install()
         assert not any("apt-get" in c or "dnf" in c for c in cmds)
 
-    def test_rocm_apt_branch_never_installs_cuda_libs(self):
+    def test_pacman_branch_never_installs_cuda_libs(self):
         cmds, run = _recording_run()
-        RocmInstaller(which_fn=_which_only("apt-get"), run_fn=run).install()
+        RocmInstaller(which_fn=_which_only("pacman"), run_fn=run).install()
         assert not any("libcublas" in c or "libcudart" in c for c in cmds)
 
 
@@ -418,7 +269,7 @@ class TestRocmInstallerExceptionHandling:
         def boom(_):
             raise RuntimeError("disk full")
 
-        inst = RocmInstaller(which_fn=_which_only("apt-get"), run_fn=boom)
+        inst = RocmInstaller(which_fn=_which_only("pacman"), run_fn=boom)
         assert inst.install() is False
 
 

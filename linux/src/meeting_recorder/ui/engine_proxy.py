@@ -1,7 +1,7 @@
 """
 Client-side proxy to the daemon's Engine (the window process talks through this).
 
-Wraps the ``io.github.dipakmdhrm.MeetingRecorder.Engine`` D-Bus interface: the
+Wraps the ``io.github.jmarceno.Gravaai.Engine`` D-Bus interface: the
 window issues commands as method calls and receives state as ``SnapshotChanged``
 (and Error/Output/OpenUseExisting/PresentWindow) signals. Command calls are
 fire-and-forget (async); the few that need a value (snapshot, job folder,

@@ -5,7 +5,7 @@ Dev-only helpers to compare Gemini models for meeting **transcription** and
 Linux app's *real* processing pipeline headlessly (no GTK, no daemon), so the output matches
 what the applet would produce — only the model is swappable per run.
 
-These live outside `linux/` and `android/` on purpose: changes here never trigger an
+These live outside `linux/` on purpose: changes here never trigger an
 auto-release.
 
 ## Scripts

@@ -78,11 +78,7 @@ def build_cmake_command(backend: str) -> str:
 
 def _toolchain_install_command(which_fn: Callable[[str], str | None]) -> str | None:
     """Return a command that installs the build toolchain (git/cmake/compiler)
-    for the detected package manager, or ``None`` if unsupported."""
-    if which_fn("apt-get"):
-        return "sudo apt-get update -qq && sudo apt-get install -y git cmake build-essential"
-    if which_fn("dnf"):
-        return "sudo dnf install -y git cmake gcc-c++ make"
+    via pacman, or ``None`` if pacman is unavailable (Arch-only fork)."""
     if which_fn("pacman"):
         return "sudo pacman -Syu --noconfirm git cmake base-devel"
     return None

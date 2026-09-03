@@ -6,7 +6,7 @@ always-on daemon through an ``EngineProxy``. It is launched as a child of the
 daemon and exits when the window closes — so GTK/libadwaita memory is loaded
 only while a window is visible and fully reclaimed by the OS afterwards.
 
-Uses ``NON_UNIQUE`` so it does not try to own the ``io.github.dipakmdhrm...``
+Uses ``NON_UNIQUE`` so it does not try to own the ``io.github.jmarceno...``
 bus name (the daemon owns it); the daemon guarantees a single window by tracking
 the child and emitting PresentWindow instead of spawning a second one. The app
 id is still APP_ID so the shell maps the window to the app icon via StartupWMClass.

@@ -1,7 +1,7 @@
 """
 The D-Bus Engine service: the daemon<->window boundary.
 
-Exposes ``io.github.dipakmdhrm.MeetingRecorder.Engine`` on the session bus.
+Exposes ``io.github.jmarceno.Gravaai.Engine`` on the session bus.
 Method calls from the window process are routed to the in-daemon ``Engine``;
 state changes are pushed back as ``SnapshotChanged`` signals (plus ``Error`` /
 ``Output`` / ``OpenUseExisting`` / ``PresentWindow``). Also owns the window

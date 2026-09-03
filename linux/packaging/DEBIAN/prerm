@@ -1,8 +1,0 @@
-#!/bin/bash
-set -e
-
-# Stop any running instance before removal
-if pgrep -f "meeting_recorder" >/dev/null 2>&1; then
-    pkill -f "meeting_recorder" || true
-    sleep 1
-fi

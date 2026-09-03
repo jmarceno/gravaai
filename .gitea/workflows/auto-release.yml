@@ -1,0 +1,63 @@
+name: Auto Release
+
+# Arch-only hard fork: manual dispatch only (was: push to main).
+# Creates a v* tag for the Linux app, then calls the Arch release workflow.
+# Android support was removed with the android/ directory.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (major, minor, patch)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      linux-version: ${{ steps.linux-tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Create Linux tag
+        id: linux-tag
+        run: |
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v1.0.0"
+          else
+            VERSION="${LATEST#v}"
+            IFS='.' read -r major minor patch <<< "$VERSION"
+            case "${{ inputs.bump }}" in
+              major) NEW_TAG="v$((major + 1)).0.0" ;;
+              minor) NEW_TAG="v${major}.$((minor + 1)).0" ;;
+              patch) NEW_TAG="v${major}.${minor}.$((patch + 1))" ;;
+            esac
+          fi
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "version=${NEW_TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "### Linux release: $NEW_TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  # Call the release workflow directly — tag pushes from a token
+  # do not trigger other workflows, so we use workflow_call instead.
+  release-linux:
+    needs: auto-release
+    if: needs.auto-release.outputs.linux-version != ''
+    uses: ./.gitea/workflows/release.yml
+    with:
+      version: ${{ needs.auto-release.outputs.linux-version }}
+    secrets: inherit
+    permissions:
+      contents: write

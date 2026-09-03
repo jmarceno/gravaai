@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-APP_ID = "io.github.dipakmdhrm.MeetingRecorder"
+APP_ID = "io.github.jmarceno.Gravaai"
 APP_NAME = "Meeting Recorder"
 CONFIG_DIR = "~/.config/meeting-recorder"
 CONFIG_FILE = "~/.config/meeting-recorder/config.json"

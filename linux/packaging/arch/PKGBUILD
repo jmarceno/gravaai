@@ -1,9 +1,10 @@
-# Maintainer: Meeting Recorder <noreply@github.com>
+# Maintainer: jmarceno <https://github.com/jmarceno/gravaai>
 pkgname=meeting-recorder
 pkgver=@VERSION@
 pkgrel=1
 pkgdesc="Meeting recorder with AI transcription and summarization"
 arch=('any')
+url="https://github.com/jmarceno/gravaai"
 license=('MIT')
 depends=(
     'python'
@@ -30,8 +31,8 @@ package() {
 
     install -Dm 755 linux/packaging/usr/bin/meeting-recorder \
         "${pkgdir}/usr/bin/meeting-recorder"
-    install -Dm 644 linux/packaging/usr/share/applications/io.github.dipakmdhrm.MeetingRecorder.desktop \
-        "${pkgdir}/usr/share/applications/io.github.dipakmdhrm.MeetingRecorder.desktop"
+    install -Dm 644 linux/packaging/usr/share/applications/io.github.jmarceno.Gravaai.desktop \
+        "${pkgdir}/usr/share/applications/io.github.jmarceno.Gravaai.desktop"
 
     # Application icon (hicolor theme) under the Icon=meeting-recorder name the
     # desktop file references, so the shell renders it for the matched window.

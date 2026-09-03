@@ -9,4 +9,4 @@ Terminal=false
 Categories=AudioVideo;Audio;Recorder;
 Keywords=meeting;record;transcribe;notes;audio;
 StartupNotify=true
-StartupWMClass=io.github.dipakmdhrm.MeetingRecorder
+StartupWMClass=io.github.jmarceno.Gravaai

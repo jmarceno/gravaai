@@ -5,8 +5,7 @@ Memory (Graphiti): at session end, register an episode via the `graphiti-memory`
 Repository: https://github.com/jmarceno/gravaai
 Hard fork: no upstream, no links back to the original repo.
 Arch-only: `linux/` (Rust/GTK4) only. Android, Debian, Fedora, and all
-non-Arch packaging were removed. CI lives in `.gitea/` and runs on manual
-dispatch only.
+non-Arch packaging were removed.
 
 > **Rust port (2026-09):** the app was migrated one-shot from Python/GTK4 to
 > Rust/GTK4, keeping the daemon/UI architecture and all features. The cloud
@@ -59,39 +58,12 @@ natively via gtk-rs, so no Qt port was needed and the layout is unchanged.)
 
 ## Git workflow — IMPORTANT
 
-**Never push directly to `main`.** Always work on a feature branch and open a
-pull request. CI does NOT run automatically — all `.gitea/` workflows are
-`workflow_dispatch` (manual) only.
+**Local commits only: never push, never merge.** There is
+exactly one branch. Commit directly on it.
 
-1. Create a branch from the latest `main`:
-   ```bash
-   git checkout main && git pull
-   git checkout -b <descriptive-branch-name>
-   ```
-2. Commit changes on the branch.
-3. Push the branch and open a PR targeting `main`:
-   ```bash
-   git push -u origin <descriptive-branch-name>
-   ```
-4. Manually dispatch the CI workflow from Gitea and wait for it to pass. If
-   the run surfaces failures, or reviewers leave comments, validate each
-   against the actual code — reviewers can be stale or wrong. Address the
-   valid ones with commits on the same branch; reply to invalid/stale ones
-   explaining why.
-5. **Never merge a PR — merging is always the user's decision and action**,
-   even when CI is green and all review comments are addressed. Stop when the
-   PR is ready and report its URL.
-6. After the user merges, releases are cut manually via the `Release` /
-   `Auto Release` workflows in `.gitea/workflows/` (manual dispatch with a
-   version input; Arch `v*` tags only — no Android tags).
-
-**One PR per prompt:** create exactly one pull request per user request, even
-when the work is large. Use multiple commits on the same branch for
-reviewability instead of fanning out into many small PRs — only split when the
-user explicitly asks.
-
-This applies to all agents — no direct pushes to `main`, and no merges, under
-any circumstances.
+1. Commit changes locally.
+2. Releases are cut manually via the `Release` / `Auto Release` workflows in
+   `.gitea/workflows/` (version input; Arch `v*` tags only — no Android tags).
 
 ---
 
@@ -99,13 +71,13 @@ any circumstances.
 
 Whenever a change affects user-facing behavior, features, architecture,
 commands, conventions, or test boundaries, update the relevant docs **in the
-same PR** so they never drift from the code:
+same commit** so they never drift from the code:
 
 - `README.md` — user-facing features, setup, and workflows (Linux/Arch only)
 - `AGENTS.md` — architecture, commands, conventions, and test-coverage
   boundaries (this file; the only agent guide)
 
-Before opening a PR, re-read these two files and reconcile anything the change
+Before committing, re-read these two files and reconcile anything the change
 made inaccurate (new screens/services, renamed flows, new settings, new tests,
 changed defaults). Treat doc updates as part of "done," not a follow-up.
 
@@ -126,9 +98,8 @@ catch a regression in the behavior you changed:
   UI, D-Bus wiring), **extract the pure logic into a standalone function and
   test that** (e.g. `tray_model`, `settings_visibility`,
   `parse_whisper_cpp_output`, `render_prompt`).
-- Run the relevant suite before opening a PR: `cargo test --manifest-path
-  linux/Cargo.toml` (and `cargo clippy --all-targets -- -D warnings`, which CI
-  enforces).
+- Run the relevant suite before committing: `cargo test --manifest-path
+  linux/Cargo.toml` (and `cargo clippy --all-targets -- -D warnings`).
 
 Skip new tests only when a change genuinely has no testable behavior (docs,
 comments, pure formatting, trivial constant tweaks) — and say so briefly
@@ -160,8 +131,8 @@ Arch-only Linux desktop app (Rust, GTK4 + libadwaita) that records audio,
 transcribes it, and generates structured notes.
 
 - `linux/` — GTK4 + libadwaita desktop app (Rust), Arch Linux only
-  (x86_64 + arm64 via the Arch Linux ARM container image in CI)
-- `.gitea/` — CI/release workflows (manual dispatch only)
+  (x86_64 + arm64 via the Arch Linux ARM container image)
+- `.gitea/` — release workflows
 - `scripts/` — dev-only OpenAI-compatible pipeline test helper (headless, no GTK)
 
 On-disk recording format:
@@ -192,7 +163,7 @@ cargo test --manifest-path linux/Cargo.toml
 # Single test (substring filter)
 cargo test --manifest-path linux/Cargo.toml whisper_cpp
 
-# Lint + format (CI enforces both)
+# Lint + format
 cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo fmt --check --manifest-path linux/Cargo.toml
 
@@ -476,7 +447,7 @@ The app supports any OpenAI-compatible endpoint for transcription/
 summarization, local whisper.cpp (built from source) for transcription, and
 local Ollama for summarization. Local engines are not in the base install —
 they are installed on demand from Settings → Models. Arch x86_64 and arm64
-(via Arch Linux ARM) are covered by CI.
+(via Arch Linux ARM) are supported.
 
 ---
 
@@ -516,24 +487,9 @@ linux/uninstall.sh
 
 ## Development conventions
 
-### Continuous integration (Gitea, manual dispatch only)
-
-CI lives in `.gitea/workflows/`. Nothing runs on push/PR — every workflow is
-`workflow_dispatch`:
-
-- `ci.yml` — manually dispatched: Rust fmt + clippy (`--all-targets`,
-  `-D warnings`), unit tests (`cargo test`), pacman build smoke tests
-  (x86_64 on `archlinux:latest`, arm64 on `menci/archlinuxarm:latest`, then an
-  install + binary smoke test).
-- `release.yml` — manually dispatched with a `version` input (also callable
-  via `workflow_call`): builds the pacman `.pkg.tar.zst` in an Arch container
-  and creates a Release with the Arch artifact + source tarball.
-- `auto-release.yml` — manually dispatched with a `bump` input
-  (patch/minor/major): tags `v*` and calls `release.yml` via `workflow_call`.
-
 ### Release process (Arch only)
 
-Manual dispatch with a version input:
+Releases are manual with a version input:
 
 | Trigger | Workflow | Output |
 |---|---|---|
@@ -551,7 +507,7 @@ linux/
 │   └── usr/               # io.github.jmarceno.Gravaai.desktop
 ├── install.sh / uninstall.sh  # Arch/pacman only
 └── Cargo.toml / Cargo.lock
-.gitea/workflows/          # CI + release (manual dispatch only)
+.gitea/workflows/          # release workflows
 scripts/                   # headless OpenAI-compatible pipeline test helper
 ```
 

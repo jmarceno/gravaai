@@ -72,7 +72,7 @@ pub fn run_processor_child(args: &[String]) -> i32 {
         // Keep the child honest: without a key the provider calls would fail
         // deep inside with confusing errors.
         emit(
-            "ERROR",
+            CHILD_ERROR_PREFIX,
             "OpenAI-compatible API key is not configured. Please open Settings.",
         );
         return 1;

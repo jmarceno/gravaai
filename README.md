@@ -375,12 +375,7 @@ cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path linux/Cargo.toml
 ```
 
-### CI
-
-CI workflows are `workflow_dispatch` (manual) only:
-
-- **Rust checks** — `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
-- **Package build smoke tests** — builds `.pkg.tar.zst` (x86_64 on `archlinux:latest`, arm64 on `menci/archlinuxarm:latest`) and install-runs the binary
+### Release
 
 Pushing a tag triggers the release workflows:
 

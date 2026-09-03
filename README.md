@@ -1,13 +1,16 @@
 # Meeting Recorder
 
-A meeting recorder that transcribes audio and generates structured notes using Google Gemini.
+A meeting recorder that transcribes audio and generates structured notes using
+any OpenAI-compatible API, fully local Whisper/Ollama engines, or a mix of both.
 
-This repository is a monorepo with two independent apps — a Linux desktop applet and a native Android app — that share the same storage format so recordings are accessible from both.
+This repository holds the Arch-only Linux desktop app (Rust, GTK4 + libadwaita):
 
 | Path | Contents |
 |---|---|
-| `linux/` | GTK4 + libadwaita desktop applet (Debian / Ubuntu / Fedora / Arch) |
-| `android/` | Native Android app (Kotlin + Jetpack Compose) |
+| `linux/` | GTK4 + libadwaita desktop app (Rust, Arch Linux only) |
+| `linux/assets/` | Tray artwork + hicolor app icons |
+| `linux/packaging/` | Arch PKGBUILD + launcher/icon assets only |
+| `scripts/` | Dev-only OpenAI-compatible pipeline test helper (headless, no GTK) |
 
 ---
 
@@ -16,8 +19,8 @@ This repository is a monorepo with two independent apps — a Linux desktop appl
 ### Features
 
 - **Record** system audio + microphone simultaneously, or microphone only
-- **Transcribe** with Google Gemini or local Whisper (timestamped, speaker-labeled transcript)
-- **Summarize** into structured Markdown notes with Google Gemini or local Ollama
+- **Transcribe** with any OpenAI-compatible endpoint or local whisper.cpp (timestamped transcript)
+- **Summarize** into structured Markdown notes with any OpenAI-compatible endpoint or local Ollama
 - **Summarize from the library** — re-run summarization for any past meeting from the meetings browser
 - **Local models** — run fully offline with no API key required
 - **Customizable prompts** — edit transcription and summarization prompts in Settings
@@ -44,43 +47,27 @@ Each recording session creates a folder:
 
 ### Requirements
 
-- Linux with a supported package manager: **apt** (Debian/Ubuntu/Mint), **dnf** (Fedora/RHEL), or **pacman** (Arch/Manjaro). Works on both **x86_64** and **arm64/aarch64**.
-- System packages installed by `linux/install.sh`: `ffmpeg`, `pulseaudio-utils`, `pipewire-pulse`, Python 3 with GTK4 + libadwaita bindings
+- Arch Linux (pacman), x86_64 or arm64 (via Arch Linux ARM).
+- System packages installed by `linux/install.sh`: `gtk4`, `libadwaita`, `libnotify`, `libpulse`, `pipewire-pulse`, `ffmpeg`, `curl` (all binary packages — no compiler needed; the Rust toolchain is only required to build from source, see below).
 
 > **Look & theming:** the app uses **libadwaita**, so it follows your system **light/dark** preference and renders in the Adwaita style. On non-GNOME desktops (KDE, XFCE, Cinnamon, …) it still runs perfectly but keeps the Adwaita look rather than matching a custom desktop theme — this is libadwaita's intended behavior.
-- Python packages (installed into a venv): see `linux/requirements.txt`
+- No runtime beyond system libraries: the app ships as a single static-ish binary (`meeting-recorder`).
 
-The base install is **Gemini-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
+The base install is **cloud-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
 
 | Service | Requirement |
 |---|---|
-| **Gemini** (transcription or summarization) | Free API key from [aistudio.google.com](https://aistudio.google.com) — no local install |
+| **OpenAI-compatible** (transcription + summarization) | Base URL + API key for any `/v1`-style endpoint (OpenAI, Azure OpenAI, LiteLLM, llama.cpp server, …) — no local install |
 
 > Your API key is stored in the system keyring (GNOME Keyring / KWallet) when one is available, falling back to a permission-restricted config file otherwise.
-| **Whisper** (local transcription) | Engine (`faster-whisper`) installed on opt-in; model downloaded from HuggingFace (~500 MB – 3 GB); **NVIDIA GPU or CPU** |
-| **whisper.cpp** (local transcription, GPU) | Engine built from source on opt-in with the detected backend — **AMD (ROCm/Vulkan), Apple (Metal), NVIDIA (CUDA), or CPU**; GGML model downloaded from HuggingFace |
-| **Ollama** (local summarization) | [Ollama](https://ollama.com) installed and running (`ollama serve`); uses NVIDIA/AMD/Apple GPU automatically |
+| **whisper.cpp** (local transcription, GPU) | Engine downloaded as an official prebuilt binary on opt-in — CPU everywhere, CUDA build for NVIDIA GPUs; GGML model downloaded from HuggingFace. No compiler or system packages needed |
+| **Ollama** (local summarization) | [Ollama](https://ollama.com) installed and running (`ollama serve`); uses NVIDIA/AMD GPU automatically |
 
 ### Installation
 
 #### Option 1: native package (recommended)
 
-Download the package for your distro from the [Releases](../../releases) page.
-
-**Debian / Ubuntu / Mint (.deb)**
-```bash
-sudo dpkg -i meeting-recorder_*.deb
-sudo apt-get install -f   # installs any missing dependencies
-# To uninstall:
-sudo apt remove meeting-recorder
-```
-
-**Fedora / RHEL / openSUSE (.rpm)**
-```bash
-sudo dnf install ./meeting-recorder-*.rpm
-# To uninstall:
-sudo dnf remove meeting-recorder
-```
+Download the package from the [Releases](../../releases) page.
 
 **Arch / Manjaro (.pkg.tar.zst)**
 ```bash
@@ -89,7 +76,10 @@ sudo pacman -U meeting-recorder-*.pkg.tar.zst
 sudo pacman -R meeting-recorder
 ```
 
-All packages set up a Python venv at `/opt/meeting-recorder/venv` on first install with **only the Gemini-ready essentials**. The local transcription engines (Whisper / whisper.cpp), Ollama, and GPU runtimes (CUDA / ROCm) are installed later, on demand, from **Settings → Models**. The `.deb` and apt repository are architecture-independent (`all`) and work on both amd64 and arm64.
+All packages install a single `meeting-recorder` binary (no virtualenv) with
+**only the OpenAI-compatible essentials**. The local transcription engine
+(whisper.cpp, prebuilt download) and Ollama are installed later, on
+demand, from **Settings → Models** — no compiler ever required.
 
 #### Option 2: install.sh (from source)
 
@@ -99,7 +89,11 @@ cd meeting-recorder
 linux/install.sh
 ```
 
-`linux/install.sh` detects your package manager (apt / dnf / pacman) and installs all system dependencies, then creates a Python venv with all required packages.
+`linux/install.sh` installs all system dependencies via pacman, then downloads
+the prebuilt release binary and installs it to `~/.local/bin` with artwork,
+icons and the desktop entry. No compiler is required — nothing is built from
+source, neither the app nor its optional engines. (To install a specific
+release: `MEETING_RECORDER_VERSION=1.2.3 linux/install.sh`.)
 
 To uninstall:
 
@@ -116,30 +110,27 @@ meeting-recorder
 
 > **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. `install.sh` installs it automatically; if you installed via a native package, install it manually:
 > ```bash
-> # Debian/Ubuntu
-> sudo apt install gnome-shell-extension-appindicator
-> # Fedora
-> sudo dnf install gnome-shell-extension-appindicator
-> # Arch
 > sudo pacman -S gnome-shell-extension-appindicator
 > ```
 > Then enable it in the GNOME Extensions app and log out/in.
 >
 > Whether **left-click focuses the window** or **opens the menu** is decided by the SNI host: hosts that deliver the `Activate` action (e.g. KDE Plasma) focus the window, while the GNOME extension typically opens the menu on any click. KStatusNotifierItem-capable panels on XFCE, MATE, Cinnamon, KDE, LXQt, … show the icon natively without an extension.
 
-### Running from Source
+### Running from Source (developers)
+
+Building from source requires the Rust toolchain and is only needed for
+development — regular installs never compile anything:
 
 ```bash
 cd meeting-recorder
-python3 -m venv .venv --system-site-packages
-.venv/bin/pip install -r linux/requirements.txt
-PYTHONPATH=linux/src python3 -m meeting_recorder
+cargo build --manifest-path linux/Cargo.toml
+./linux/target/debug/meeting-recorder
 ```
 
-`python3 -m meeting_recorder` (no flag) is **client** mode: it starts the background
+`meeting-recorder` (no flag) is **client** mode: it starts the background
 daemon if needed and opens a window. To run the pieces directly, use
-`python3 -m meeting_recorder --daemon` (the GTK-free tray daemon) and
-`python3 -m meeting_recorder --window` (the GTK window, normally spawned by the daemon).
+`meeting-recorder --daemon` (the GTK-free tray daemon) and
+`meeting-recorder --window` (the GTK window, normally spawned by the daemon).
 
 ### Recording Modes
 
@@ -154,18 +145,17 @@ daemon if needed and opens a window. To run the pieces directly, use
 
 | Service | How it works | Requires |
 |---|---|---|
-| **Google Gemini** | Audio sent to Gemini API | API key |
-| **Whisper** | Runs locally via `faster-whisper` | Engine installed + model downloaded in Settings → Models; NVIDIA GPU or CPU |
-| **whisper.cpp** | Runs locally via a from-source whisper.cpp build | Engine built + GGML model downloaded in Settings → Models; **GPU on AMD / Apple / NVIDIA / Vulkan**, or CPU |
+| **OpenAI-compatible** | Audio sent to `/audio/transcriptions` | Base URL + API key |
+| **whisper.cpp** | Runs locally via a from-source whisper.cpp build | Engine built + GGML model downloaded in Settings → Models |
 
 #### Summarization
 
 | Service | How it works | Requires |
 |---|---|---|
-| **Google Gemini** | Text sent to Gemini API | API key |
+| **OpenAI-compatible** | Text sent to `/chat/completions` | Base URL + API key |
 | **Ollama** | Runs locally via Ollama | Ollama running (`ollama serve`), model pulled in Settings → Models |
 
-Mix and match freely — e.g. Whisper for transcription + Ollama for summarization runs fully offline with no API key.
+Mix and match freely — e.g. whisper.cpp for transcription + Ollama for summarization runs fully offline with no API key.
 
 ### First-Time Setup
 
@@ -173,9 +163,8 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 1. **General tab** — choose your transcription and summarization services; set output folder and recording quality
 2. **Models tab** — configure the selected services:
-   - *Gemini*: paste your API key and choose a model
-   - *Whisper*: install the engine (first time), then select a model and click Download
-   - *whisper.cpp*: pick an acceleration backend and build the engine (first time), then download a GGML model
+   - *OpenAI-compatible*: set the base URL, paste your API key and choose models
+   - *whisper.cpp*: pick an acceleration backend and install the engine (first time), then download a GGML model
    - *Ollama*: set host and click Download next to your preferred model
 3. **Prompts tab** — optionally customize the transcription or summarization prompt
 
@@ -185,8 +174,8 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 | Setting | Description |
 |---|---|
-| Transcription service | Gemini (cloud), Whisper (local), or whisper.cpp (local, GPU) |
-| Summarization service | Gemini (cloud) or Ollama (local) |
+| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local, GPU) |
+| Summarization service | OpenAI-compatible (cloud) or Ollama (local) |
 | Start at system startup | Launch automatically on login |
 | Enable call detection | Monitor for active calls and notify you to start recording |
 | Low memory mode | Unload the window from memory when you close it (~20 MB vs. ~100 MB idle in the tray) at the cost of a brief delay when reopening. Off by default — enable on low-memory systems |
@@ -195,50 +184,30 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 #### Models tab
 
-**Gemini**
+**OpenAI-compatible**
 
 | Setting | Description |
 |---|---|
-| API key | Required when Gemini is selected for transcription or summarization |
-| Model | Gemini model to use (`gemini-flash-latest` recommended) |
-| Processing timeout | Max time to wait for a Gemini response (1–10 min) |
-
-**Whisper**
-
-The Whisper engine (`faster-whisper`) is **not in the base install**. When Whisper is selected and the engine is missing, the section shows an **Install Whisper engine** button; once installed, the model controls appear.
-
-| Setting | Description |
-|---|---|
-| Whisper model | Model to use for local transcription |
-| Model list | Download status and one-click download for each available model |
-
-Available Whisper models:
-
-| Model | Size | Notes |
-|---|---|---|
-| `large-v3-turbo` | ~1.6 GB | High quality, 8× faster than large-v3 — recommended |
-| `distil-large-v3` | ~1.5 GB | Fast, near-large quality |
-| `large-v3` | ~3 GB | Best accuracy, slow on CPU |
-| `medium` | ~1.5 GB | Good balance |
-| `small` | ~500 MB | Fast, lower accuracy |
-
-The `faster-whisper` engine accelerates on **NVIDIA (CUDA)** and otherwise runs on CPU. For **AMD or Apple GPU** acceleration, use the whisper.cpp engine below.
+| API key | Required when an OpenAI-compatible service is selected |
+| Base URL | `https://api.openai.com/v1` by default; point it at any compatible endpoint |
+| Transcription model | Speech-to-text model (`whisper-1` default; custom names are preserved) |
+| Summarization model | Chat model (`gpt-4o-mini` default; custom names are preserved) |
+| Processing timeout | Max time to wait for a response (1–10 min) |
 
 **whisper.cpp (GPU-accelerated)**
 
-A local engine that supports a wider range of GPUs. The engine is **built from source on opt-in** (a build toolchain is installed automatically); until then the section shows a **Build whisper.cpp engine** button.
+A local transcription engine for NVIDIA (CUDA) and CPU machines. The engine is
+**downloaded as an official prebuilt binary on opt-in** — no compiler, no
+build toolchain, no system packages; until then the section shows an
+**Install whisper.cpp engine** button.
 
 | Setting | Description |
 |---|---|
-| Acceleration backend | `auto` (detect), or force `cuda` / `rocm` / `vulkan` / `metal` / `cpu`. Used for both the build and at runtime. The detected backend is shown next to the selector. |
+| Acceleration backend | `auto` (detect: CUDA when an NVIDIA GPU is present, else CPU), or force `cuda` / `cpu`. Picks which prebuilt binary to download. The detected backend is shown next to the selector. Note: the CUDA bundle is ~670 MB and needs the NVIDIA driver; the CPU build runs anywhere. |
 | Model | GGML model to use for local transcription |
 | Model list | Download status and one-click download for each available GGML model |
 
 Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 GB), `medium` (~1.5 GB), `small` (~470 MB).
-
-**GPU Acceleration**
-
-This section detects your GPU vendor and offers the matching runtime install: **CUDA** for NVIDIA, **ROCm** for AMD, built-in **Metal** for Apple Silicon, or a note that only CPU is available (in which case Gemini is recommended for speed).
 
 **Ollama**
 
@@ -262,7 +231,7 @@ Available Ollama models:
 
 Customize the transcription and summarization prompts. Each has a **Reset to default** button. The `{transcript}` placeholder in the summarization prompt is replaced with the transcript text.
 
-Note: transcription prompts apply to Gemini only — the local Whisper and whisper.cpp engines do not use a prompt.
+Note: transcription prompts apply to the OpenAI-compatible service only — the local whisper.cpp engine does not use a prompt.
 
 ### Workflow
 
@@ -379,49 +348,45 @@ set -x KEY_PASSWORD your_key_pass
 
 ```
 linux/
-├── src/meeting_recorder/  # GTK4 + libadwaita desktop app (Python)
-├── tests/                 # Unit tests
-├── packaging/             # .deb / .rpm / PKGBUILD / launcher scripts
+├── src/                   # Rust app (single `meeting-recorder` binary)
+│   ├── main.rs            # role dispatch: --daemon / --window / --process / --install / client
+│   ├── config/            # defaults + settings + keyring
+│   ├── core/              # state machine, jobs, recording controller, retry, wire format
+│   ├── audio/             # ffmpeg recorder + mixer + pactl devices
+│   ├── detection/         # call detection
+│   ├── processing/        # pipeline + OpenAI-compatible / whisper.cpp / Ollama providers
+│   ├── services/          # opt-in installers (pacman-only) + model clients
+│   ├── daemon/            # engine + D-Bus service + children + tray loop
+│   ├── ui/                # GTK4 + libadwaita window + ksni tray + D-Bus proxy
+│   └── utils/             # autostart, logging, meetings, filenames
+├── assets/                # tray artwork + hicolor app icons
+├── packaging/             # Arch PKGBUILD + desktop entry only
 ├── install.sh / uninstall.sh
-└── requirements.txt
-android/
-├── app/src/main/
-│   ├── java/com/github/meetingrecorder/
-│   │   ├── audio/         # MediaRecorder wrapper + foreground recording service
-│   │   ├── data/          # Config, Meeting, MeetingRepository, GeminiClient
-│   │   └── ui/            # Compose screens + ViewModels
-│   └── res/
-├── app/src/test/          # Unit tests (no device required)
-└── build.gradle.kts / settings.gradle.kts
+└── Cargo.toml / Cargo.lock
+scripts/
+└── test-openai-compatible.sh  # headless pipeline runs against any endpoint
 ```
 
-### Running Linux tests
+### Running Linux checks
 
 ```bash
-pip install pytest
-pytest
-```
-
-### Running Android unit tests
-
-```bash
-cd android && ./gradlew test
+cargo fmt --check --manifest-path linux/Cargo.toml
+cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path linux/Cargo.toml
 ```
 
 ### CI
 
-Every pull request to `main` runs:
+CI workflows are `workflow_dispatch` (manual) only:
 
-- **Unit tests** — Python 3.10 and 3.12
-- **Package build smoke tests** — builds `.deb` (ubuntu:24.04), `.rpm` (fedora:41), and `.pkg.tar.zst` (archlinux) in distro containers
-- **Android debug build** — compiles the Kotlin app with `./gradlew assembleDebug`
+- **Rust checks** — `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
+- **Package build smoke tests** — builds `.pkg.tar.zst` (x86_64 on `archlinux:latest`, arm64 on `menci/archlinuxarm:latest`) and install-runs the binary
 
 Pushing a tag triggers the release workflows:
 
 | Tag pattern | Workflow | Output |
 |---|---|---|
-| `v*` (e.g. `v1.2.0`) | `release.yml` | `.deb`, `.rpm`, `.pkg.tar.zst` attached to GitHub Release; apt repo on `gh-pages` updated |
-| `android-*` (e.g. `android-1.0.0`) | `release-android.yml` | Signed `.apk` attached to GitHub Release |
+| `v*` (e.g. `v1.2.0`) | `release.yml` | `.pkg.tar.zst` + source tarball attached to the Release |
 
 ## License
 

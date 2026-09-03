@@ -144,18 +144,6 @@ fn write_value(value: &Value) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Hard pre-flight check: an OpenAI-compatible service is selected but no key is set.
-pub fn api_key_error(cfg: &Config) -> Option<String> {
-    let uses_openai =
-        cfg.transcription_service == "openai" || cfg.summarization_service == "openai";
-    if uses_openai && cfg.openai_api_key.is_empty() {
-        return Some(
-            "OpenAI-compatible API key is not configured. Please open Settings.".to_string(),
-        );
-    }
-    None
-}
-
 /// Soft format check at Settings-save time. Pure and unit-testable.
 /// Unlike the old Google `AIza` prefix check, any non-blank key is accepted —
 /// OpenAI-compatible endpoints (Ollama, vLLM, LiteLLM, ...) use arbitrary tokens.
@@ -196,14 +184,12 @@ mod tests {
             ..Config::default()
         };
         assert_eq!(api_key_warning(&c), None);
-        assert_eq!(api_key_error(&c), None);
     }
 
     #[test]
     fn warns_on_missing_key() {
         let c = Config::default();
         assert!(api_key_warning(&c).is_some());
-        assert!(api_key_error(&c).is_some());
     }
 
     #[test]
@@ -213,7 +199,6 @@ mod tests {
             ..Config::default()
         };
         assert_eq!(api_key_warning(&c), None);
-        assert_eq!(api_key_error(&c), None);
     }
 
     #[test]

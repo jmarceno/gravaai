@@ -24,6 +24,7 @@ use crate::daemon::installer::InstallEvent;
 use crate::daemon::processor::{ChildEvent, ProcessorHandle, ProcessorLauncher};
 use crate::daemon::window_supervisor::WindowSupervisor;
 use crate::detection::call_detector::CallDetector;
+use crate::ui::notifications::notify;
 use crate::ui::tray::{update_tray, AppTray};
 use ksni::TrayMethods as _;
 
@@ -37,6 +38,7 @@ enum DaemonMsg {
     TimerTick(u64),
     RecorderError(String),
     EmitPresent,
+    EmitUseExisting,
     WindowExited,
     ConfigReloaded,
     Quit,
@@ -217,7 +219,9 @@ async fn async_main() {
                 let tx2 = tx_clone.clone();
                 std::thread::Builder::new()
                     .name("window-reaper".into())
-                    .spawn(move || loop {
+                    .spawn(move || {
+                        let born = std::time::Instant::now();
+                        loop {
                         std::thread::sleep(Duration::from_millis(500));
                         let exited = slot2
                             .lock()
@@ -230,9 +234,18 @@ async fn async_main() {
                             if let Some(mut c) = slot2.lock().unwrap().take() {
                                 let _ = c.wait();
                             }
+                            // A window that dies within seconds of spawning
+                            // never showed anything — say so instead of
+                            // leaving the user staring at a dead menu.
+                            if born.elapsed() < Duration::from_secs(10) {
+                                let _ = tx2.send(DaemonMsg::EngineError(
+                                    "The window closed unexpectedly. Run with logging and check error.log, or report the issue.".to_string(),
+                                ));
+                            }
                             let _ = tx2.send(DaemonMsg::WindowExited);
                             break;
                         }
+                    }
                     })
                     .ok();
             }
@@ -337,6 +350,13 @@ async fn async_main() {
 
     log::info!("Daemon started");
 
+    // Not tied to any distro: never install anything here — tell the user
+    // what is missing instead (tray-only users would otherwise get silence).
+    if let Some(msg) = crate::utils::dependencies::describe_missing_required() {
+        log::error!("{msg}");
+        notify("Meeting Recorder", &msg);
+    }
+
     // Initial paint.
     refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
 
@@ -385,16 +405,35 @@ async fn async_main() {
             }
             Wake::Msg(DaemonMsg::EngineError(m)) => {
                 use dbus_service::EngineIfaceSignals as _;
-                let _ = iface_ref.error(m).await;
+                let _ = iface_ref.error(m.clone()).await;
+                // Tray-only users have no window to show the error in —
+                // surface it as a desktop notification instead of silence.
+                notify("Meeting Recorder", &m);
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
             Wake::Msg(DaemonMsg::EngineOutput(t)) => {
                 use dbus_service::EngineIfaceSignals as _;
-                let _ = iface_ref.output(t).await;
+                let _ = iface_ref.output(t.clone()).await;
+                notify("Meeting Recorder", &t);
             }
             Wake::Msg(DaemonMsg::TrayCommand(cmd)) => {
                 if handle_tray_command(&ctx, &cmd).await {
                     break;
+                }
+                if cmd == crate::core::commands::USE_EXISTING {
+                    // The window may still be spawning; give it a moment to
+                    // subscribe before asking it to open the file picker.
+                    let tx = msg_tx.clone();
+                    let alive = ctx.supervisor.lock().unwrap().is_alive();
+                    std::thread::Builder::new()
+                        .name("use-existing-delay".into())
+                        .spawn(move || {
+                            if !alive {
+                                std::thread::sleep(Duration::from_secs(2));
+                            }
+                            let _ = tx.send(DaemonMsg::EmitUseExisting);
+                        })
+                        .ok();
                 }
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
@@ -409,12 +448,17 @@ async fn async_main() {
             Wake::Msg(DaemonMsg::RecorderError(m)) => {
                 ctx.engine.lock().await.recorder_error(&m);
                 use dbus_service::EngineIfaceSignals as _;
-                let _ = iface_ref.error(m).await;
+                let _ = iface_ref.error(m.clone()).await;
+                notify("Meeting Recorder", &m);
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
             Wake::Msg(DaemonMsg::EmitPresent) => {
                 use dbus_service::EngineIfaceSignals as _;
                 let _ = iface_ref.present_window().await;
+            }
+            Wake::Msg(DaemonMsg::EmitUseExisting) => {
+                use dbus_service::EngineIfaceSignals as _;
+                let _ = iface_ref.open_use_existing().await;
             }
             Wake::Msg(DaemonMsg::WindowExited) => {
                 ctx.supervisor.lock().unwrap().on_child_exit();

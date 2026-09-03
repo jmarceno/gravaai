@@ -4,8 +4,9 @@ Memory (Graphiti): at session end, register an episode via the `graphiti-memory`
 
 Repository: https://github.com/jmarceno/gravaai
 Hard fork: no upstream, no links back to the original repo.
-Arch-only: `linux/` (Rust/GTK4) only. Android, Debian, Fedora, and all
-non-Arch packaging were removed.
+Linux desktop app: `linux/` (Rust/GTK4). The app is not tied to any distro —
+it never installs system packages; when a helper program is missing it tells
+the user (see `utils/dependencies.rs`).
 
 > **Rust port (2026-09):** the app was migrated one-shot from Python/GTK4 to
 > Rust/GTK4, keeping the daemon/UI architecture and all features. The cloud
@@ -50,7 +51,7 @@ G. Workflow:
 4. User clicks start recording at the tray icon context menu, or press a configured shortcut
 5. When done, User clicks stop recording at the tray icon context menu, or press a configured shortcut
 
-Current code is the Arch-only Rust/GTK4 app described below — not yet the
+Current code is the Rust/GTK4 app described below — not yet the
 Rust/Tauri target above. (The GTK UI stays: Rust binds GTK4/libadwaita
 natively via gtk-rs, so no Qt port was needed and the layout is unchanged.)
 
@@ -73,7 +74,7 @@ Whenever a change affects user-facing behavior, features, architecture,
 commands, conventions, or test boundaries, update the relevant docs **in the
 same commit** so they never drift from the code:
 
-- `README.md` — user-facing features, setup, and workflows (Linux/Arch only)
+- `README.md` — user-facing features, setup, and workflows (Linux only)
 - `AGENTS.md` — architecture, commands, conventions, and test-coverage
   boundaries (this file; the only agent guide)
 
@@ -118,7 +119,7 @@ these:
   packaging state. When a format or default has to change, ship a migration or
   a compatible fallback rather than a breaking change.
 - **Clean installs still work.** The change must also install and run
-  correctly on a fresh Arch system with no prior version present.
+  correctly on a fresh Linux system with no prior version present.
 
 If a change genuinely cannot preserve compatibility, call it out explicitly and
 provide a migration path — never silently break an existing installation.
@@ -127,13 +128,15 @@ provide a migration path — never silently break an existing installation.
 
 ## What this repo is
 
-Arch-only Linux desktop app (Rust, GTK4 + libadwaita) that records audio,
-transcribes it, and generates structured notes.
+Linux desktop app (Rust, GTK4 + libadwaita) that records audio,
+transcribes it, and generates structured notes. It always runs as the
+graphical daemon/window pair — headless use is forbidden (the internal
+`--process` / `--install` child roles refuse to run outside the daemon, see
+`core/run_mode.rs::child_allowed`).
 
-- `linux/` — GTK4 + libadwaita desktop app (Rust), Arch Linux only
-  (x86_64 + arm64 via the Arch Linux ARM container image)
+- `linux/` — GTK4 + libadwaita desktop app (Rust, Linux)
+  (x86_64 + arm64)
 - `.gitea/` — release workflows
-- `scripts/` — dev-only OpenAI-compatible pipeline test helper (headless, no GTK)
 
 On-disk recording format:
 `<output>/YYYY-MM-DD_HH-MM[_title]/recording.mp3 + transcript.md + notes.md`.
@@ -166,27 +169,22 @@ cargo test --manifest-path linux/Cargo.toml whisper_cpp
 # Lint + format
 cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo fmt --check --manifest-path linux/Cargo.toml
-
-# Headless pipeline run (same --process child the daemon spawns)
-OPENAI_API_KEY=sk-... ./scripts/test-openai-compatible.sh <audio> [out-dir]
 ```
 
 `linux/Cargo.toml` is the crate root (`src/main.rs` single binary). The `ui`
 cargo feature (default) pulls in GTK4/libadwaita; `cargo check
 --no-default-features` builds the headless daemon/client stack without GTK.
 
-### Install (Arch only, no compiler needed)
+### Install / uninstall (no compiler needed, no scripts)
+
+Users run a single `meeting-recorder` binary (release artifact
+`meeting-recorder-v<version>-<arch>`). Uninstall is built in — it removes the
+binary copy, desktop entries, icons, autostart entry, engines, models, logs,
+config and the stored API key, and keeps recordings:
 
 ```bash
-linux/install.sh     # pacman only; fails on non-Arch (downloads the prebuilt release binary)
-linux/uninstall.sh
+meeting-recorder --uninstall   # see utils/self_uninstall.rs for the full target list
 ```
-
-`install.sh` installs system deps via pacman, downloads the prebuilt release
-binary for the machine arch, copies it to `~/.local/bin`, installs tray
-artwork + hicolor icons, and writes the launcher desktop entry
-(`io.github.jmarceno.Gravaai.desktop`). Use `MEETING_RECORDER_VERSION=x.y.z`
-to pin a release. Developers build from source with cargo (see below).
 
 ---
 
@@ -326,7 +324,7 @@ its own thread and calls back on new mic-capture streams (pure matcher
 backoff** (1 s → 60 s cap, reset after a healthy minute). `CallDetector`
 wraps it with a notification dedup window.
 
-**Bare-bones, opt-in local engines (Arch only):** The base install is
+**Bare-bones, opt-in local engines:** The base install is
 **cloud-only** — the binary carries no local-engine runtimes, and installing
 one never needs a compiler: everything arrives prebuilt. Local capabilities
 are installed on demand from **Settings → Models**:
@@ -375,7 +373,8 @@ failures get a toast; `present_window()` re-shows + `unminimize()` +
 `present()`; the header-bar gear is a `Gtk.MenuButton` offering
 **Preferences** → settings dialog and **About Meeting Recorder** → an
 `Adw.AboutDialog` — app identity lives in `core/app_info.rs` plus a
-`resolve_version()` that reads the installed pacman package version, returning
+`resolve_version()` that reads the installed distro package version (pacman
+today, others later), returning
 `None` on a source checkout), `settings_dialog.rs` (thin `Adw.Window` shell —
 Cancel/ViewSwitcher/Save header, page instantiation, save flow; each tab lives
 in its own module under `settings_pages/`:
@@ -391,7 +390,7 @@ double-click-to-rename via `GestureClick`, AI re-summarize per meeting),
 `tray.rs` (ksni StatusNotifierItem; branded per-state `IconPixmap` artwork
 from `assets/tray/`, decoded with the `png` crate). The app/launcher/window
 icon ships in `assets/icons/hicolor/` and is installed into the hicolor theme
-by the install script and the Arch packaging; at startup
+by the Arch packaging; at startup
 `ui/window_app.rs:setup_app_icon()` also adds the bundled tree to the GTK
 icon-theme search path and sets it as the default icon so it resolves from
 source. `MainWindow` import-existing delegates its in-tree-reuse vs. copy
@@ -405,7 +404,7 @@ decision to the pure `utils/recording_import.rs`.
 
 ## Project overview
 
-Linux desktop app (Arch only) plus shared headless pieces:
+Linux desktop app:
 
 - **Language:** Rust (single binary crate, edition 2021)
 - **UI:** GTK4 + libadwaita via gtk-rs (`adw::Application`/
@@ -428,7 +427,7 @@ Linux desktop app (Arch only) plus shared headless pieces:
   it renders on every host and from source.
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
   (scalable SVG + PNG sizes, named `meeting-recorder` — the `Icon=` key) and
-  is installed into the hicolor theme by `install.sh` and the Arch packaging;
+  is installed into the hicolor theme by the Arch packaging;
   `setup_app_icon()` also registers the bundled tree on the GTK icon-theme
   search path and sets it as the default icon so it resolves from source.
 
@@ -446,21 +445,21 @@ survive the window closing and don't bloat the daemon.
 The app supports any OpenAI-compatible endpoint for transcription/
 summarization, local whisper.cpp (built from source) for transcription, and
 local Ollama for summarization. Local engines are not in the base install —
-they are installed on demand from Settings → Models. Arch x86_64 and arm64
-(via Arch Linux ARM) are supported.
+they are installed on demand from Settings → Models. x86_64 and arm64
+are supported.
 
 ---
 
 ## Building and running
 
-### Linux app (Arch)
+### Linux app
 
 **Running from source (developers only — regular installs never compile):**
 
-1. Install the toolchain + system dependencies:
-   ```bash
-   sudo pacman -Syu --noconfirm base-devel rust gtk4 libadwaita libnotify libpulse pipewire-pulse ffmpeg curl
-   ```
+1. Install the toolchain + dependencies with your distro's packages:
+   Rust (`rust`/`cargo`), GTK4 + libadwaita dev files (`gtk4`, `libadwaita`,
+   `libnotify`), audio tools (`ffmpeg`, `pactl` via PipeWire/PulseAudio),
+   `curl`, `tar`.
 2. Build and run:
    ```bash
    cargo run --manifest-path linux/Cargo.toml
@@ -476,18 +475,19 @@ cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path linux/Cargo.toml
 ```
 
-**Install / uninstall (Arch only):**
+**Install / uninstall (single binary, no scripts):**
+
+Users run the release binary directly. Uninstall is built in:
 
 ```bash
-linux/install.sh
-linux/uninstall.sh
+meeting-recorder --uninstall
 ```
 
 ---
 
 ## Development conventions
 
-### Release process (Arch only)
+### Release process
 
 Releases are manual with a version input:
 
@@ -496,7 +496,7 @@ Releases are manual with a version input:
 | Manual (`version`, e.g. `1.2.0`) | `release.yml` | `.pkg.tar.zst` + source tarball attached to Release |
 | Manual (`bump`) | `auto-release.yml` → `release.yml` | `v*` tag, then same as above |
 
-### Repository layout (Arch-only)
+### Repository layout
 
 ```
 linux/
@@ -505,10 +505,8 @@ linux/
 ├── packaging/             # Arch PKGBUILD + desktop entry only
 │   ├── arch/              # PKGBUILD + install hook
 │   └── usr/               # io.github.jmarceno.Gravaai.desktop
-├── install.sh / uninstall.sh  # Arch/pacman only
 └── Cargo.toml / Cargo.lock
 .gitea/workflows/          # release workflows
-scripts/                   # headless OpenAI-compatible pipeline test helper
 ```
 
 ---
@@ -549,7 +547,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
   autostart entry management (`autostart`), scan/rename/metadata
-  (`meeting_scanner`), in-tree-reuse vs. copy (`recording_import`).
+  (`meeting_scanner`), in-tree-reuse vs. copy (`recording_import`),
+  uninstall target plan + removal (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +
   backend detection + verified download/extract/smoke-test
   (`whisper_cpp_service`), Ollama prefix-match + unreachable
@@ -557,7 +556,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `daemon/` — child protocol parsing (`processor`), stderr tail buffer
   (`child_io`), window spawn-vs-present (`window_supervisor`), install
   dedup/progress/finished routing (`install_manager`), headless `Engine`
-  snapshot/lifecycle/child-event handling with a fake backend (`engine`).
+  snapshot/lifecycle/child-event handling with a fake backend (`engine`,
+  including recording without an API key).
 - `ui/` — pure tray policy (`tray_model`: icon priority, per-state menus,
   never-reused menu ids), Models-tab visibility (`settings_visibility`),
   bundled artwork PNG decoding (`tray`).

@@ -34,7 +34,6 @@ impl WindowSupervisor {
         self.alive = false;
     }
 
-    #[cfg(test)]
     pub fn is_alive(&self) -> bool {
         self.alive
     }

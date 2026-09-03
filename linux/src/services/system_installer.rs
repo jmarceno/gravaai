@@ -1,10 +1,12 @@
-//! Arch-only install services.
+//! Opt-in install services (distro-neutral).
 //!
 //! Security posture: no shell execution — every command is an argv list run
 //! without a shell and logged before it runs. Downloads are verified
 //! (pinned SHA-256 for the engine; size + logged SHA-256 for the Ollama
 //! script) — never `curl | sh`. Nothing here needs privilege escalation or
-//! a compiler: installs land in the user data dir.
+//! a compiler: installs land in the user data dir. System programs are never
+//! installed — when one is missing the app tells the user (see
+//! `utils::dependencies`).
 
 use std::process::Command;
 

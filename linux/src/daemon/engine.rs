@@ -227,13 +227,12 @@ impl<R: RecorderBackend + Send> Engine<R> {
         if self.controller.state() != State::Idle {
             return;
         }
-        // NOTE: the daemon reloads config from disk before calling (startup,
+        // NOTE: recording is pure local audio capture and must never be gated
+        // on an API key — a missing key only blocks transcription, which fails
+        // later inside the `--process` child with an actionable error. The
+        // daemon reloads config from disk before calling (startup,
         // ReloadConfig, and before start/stop); the engine itself keeps the
         // in-memory copy so headless tests stay hermetic.
-        if let Some(err) = settings::api_key_error(&self.config) {
-            self.emit_error(&err);
-            return;
-        }
         let title = self.pending_title.clone();
         let cfg = self.config.clone();
         self.controller.start(&cfg, mode, title.as_deref());
@@ -819,7 +818,9 @@ mod tests {
     }
 
     #[test]
-    fn api_key_guard_blocks_start() {
+    fn missing_key_does_not_block_recording() {
+        // Recording is local audio capture; a missing API key only blocks
+        // transcription inside the `--process` child — never the recording.
         let mut f = fixture();
         let cfg = Config {
             transcription_service: "openai".into(),
@@ -829,8 +830,10 @@ mod tests {
         };
         f.engine.set_config(cfg);
         f.engine.start_recording("headphones");
-        assert_eq!(f.engine.state(), State::Idle);
-        let err = f.errors.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert!(err.contains("API key"));
+        assert_eq!(f.engine.state(), State::Recording);
+        assert!(
+            f.errors.recv_timeout(Duration::from_millis(200)).is_err(),
+            "no key error may be emitted at record time"
+        );
     }
 }

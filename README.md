@@ -3,14 +3,13 @@
 A meeting recorder that transcribes audio and generates structured notes using
 any OpenAI-compatible API, fully local Whisper/Ollama engines, or a mix of both.
 
-This repository holds the Arch-only Linux desktop app (Rust, GTK4 + libadwaita):
+This repository holds the Linux desktop app (Rust, GTK4 + libadwaita):
 
 | Path | Contents |
 |---|---|
-| `linux/` | GTK4 + libadwaita desktop app (Rust, Arch Linux only) |
+| `linux/` | GTK4 + libadwaita desktop app (Rust, Linux) |
 | `linux/assets/` | Tray artwork + hicolor app icons |
 | `linux/packaging/` | Arch PKGBUILD + launcher/icon assets only |
-| `scripts/` | Dev-only OpenAI-compatible pipeline test helper (headless, no GTK) |
 
 ---
 
@@ -47,8 +46,13 @@ Each recording session creates a folder:
 
 ### Requirements
 
-- Arch Linux (pacman), x86_64 or arm64 (via Arch Linux ARM).
-- System packages installed by `linux/install.sh`: `gtk4`, `libadwaita`, `libnotify`, `libpulse`, `pipewire-pulse`, `ffmpeg`, `curl` (all binary packages — no compiler needed; the Rust toolchain is only required to build from source, see below).
+- Linux, x86_64 or arm64, with a system tray (or an AppIndicator extension) for the tray icon.
+- These programs on your `PATH` (install them with your distro's packages —
+  the app never installs system software, it tells you what is missing):
+  `ffmpeg` (audio recording), `pactl` (audio device detection, PipeWire/PulseAudio),
+  `curl` (engine/model downloads), `tar` (engine unpacking),
+  plus the GTK4 + libadwaita runtime (`gtk4`, `libadwaita`, `libnotify`).
+  The Rust toolchain is only required to build from source (see below).
 
 > **Look & theming:** the app uses **libadwaita**, so it follows your system **light/dark** preference and renders in the Adwaita style. On non-GNOME desktops (KDE, XFCE, Cinnamon, …) it still runs perfectly but keeps the Adwaita look rather than matching a custom desktop theme — this is libadwaita's intended behavior.
 - No runtime beyond system libraries: the app ships as a single static-ish binary (`meeting-recorder`).
@@ -65,7 +69,7 @@ The base install is **cloud-only and minimal** — no local engines or GPU libra
 
 ### Installation
 
-#### Option 1: native package (recommended)
+#### Option 1: native package
 
 Download the package from the [Releases](../../releases) page.
 
@@ -76,29 +80,28 @@ sudo pacman -U meeting-recorder-*.pkg.tar.zst
 sudo pacman -R meeting-recorder
 ```
 
-All packages install a single `meeting-recorder` binary (no virtualenv) with
+The package installs a single `meeting-recorder` binary with
 **only the OpenAI-compatible essentials**. The local transcription engine
 (whisper.cpp, prebuilt download) and Ollama are installed later, on
 demand, from **Settings → Models** — no compiler ever required.
 
-#### Option 2: install.sh (from source)
+#### Option 2: standalone binary
+
+Download `meeting-recorder-v<version>-<arch>` from the
+[Releases](../../releases) page, make it executable and put it on your
+`PATH` — that single file is the whole app (daemon, window, tray):
 
 ```bash
-git clone <repo-url>
-cd meeting-recorder
-linux/install.sh
+chmod +x meeting-recorder-v*-x86_64
+mkdir -p ~/.local/bin
+cp meeting-recorder-v*-x86_64 ~/.local/bin/meeting-recorder
 ```
 
-`linux/install.sh` installs all system dependencies via pacman, then downloads
-the prebuilt release binary and installs it to `~/.local/bin` with artwork,
-icons and the desktop entry. No compiler is required — nothing is built from
-source, neither the app nor its optional engines. (To install a specific
-release: `MEETING_RECORDER_VERSION=1.2.3 linux/install.sh`.)
-
-To uninstall:
+To uninstall (removes the binary, desktop entries, icons, autostart entry,
+engines, models, logs, config and the stored API key — recordings are kept):
 
 ```bash
-linux/uninstall.sh
+meeting-recorder --uninstall
 ```
 
 Then launch either way:
@@ -108,11 +111,7 @@ meeting-recorder
 # or from your application menu: "Meeting Recorder"
 ```
 
-> **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. `install.sh` installs it automatically; if you installed via a native package, install it manually:
-> ```bash
-> sudo pacman -S gnome-shell-extension-appindicator
-> ```
-> Then enable it in the GNOME Extensions app and log out/in.
+> **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. Install your distro's package for it (e.g. on Arch `sudo pacman -S gnome-shell-extension-appindicator`), then enable it in the GNOME Extensions app and log out/in.
 >
 > Whether **left-click focuses the window** or **opens the menu** is decided by the SNI host: hosts that deliver the `Activate` action (e.g. KDE Plasma) focus the window, while the GNOME extension typically opens the menu on any click. KStatusNotifierItem-capable panels on XFCE, MATE, Cinnamon, KDE, LXQt, … show the icon natively without an extension.
 
@@ -349,22 +348,19 @@ set -x KEY_PASSWORD your_key_pass
 ```
 linux/
 ├── src/                   # Rust app (single `meeting-recorder` binary)
-│   ├── main.rs            # role dispatch: --daemon / --window / --process / --install / client
+│   ├── main.rs            # role dispatch: --daemon / --window / --process / --install / --uninstall / client
 │   ├── config/            # defaults + settings + keyring
 │   ├── core/              # state machine, jobs, recording controller, retry, wire format
 │   ├── audio/             # ffmpeg recorder + mixer + pactl devices
 │   ├── detection/         # call detection
 │   ├── processing/        # pipeline + OpenAI-compatible / whisper.cpp / Ollama providers
-│   ├── services/          # opt-in installers (pacman-only) + model clients
+│   ├── services/          # opt-in engine/model installers + model clients
 │   ├── daemon/            # engine + D-Bus service + children + tray loop
 │   ├── ui/                # GTK4 + libadwaita window + ksni tray + D-Bus proxy
-│   └── utils/             # autostart, logging, meetings, filenames
+│   └── utils/             # autostart, logging, meetings, filenames, self-uninstall
 ├── assets/                # tray artwork + hicolor app icons
 ├── packaging/             # Arch PKGBUILD + desktop entry only
-├── install.sh / uninstall.sh
 └── Cargo.toml / Cargo.lock
-scripts/
-└── test-openai-compatible.sh  # headless pipeline runs against any endpoint
 ```
 
 ### Running Linux checks

@@ -53,9 +53,15 @@ fn emit(prefix: &str, text: &str) {
 }
 
 /// Entry for `meeting-recorder --process <audio> <transcript> <notes>`.
-/// Returns the process exit code.
+/// Internal daemon plumbing only: refuses to run unless spawned by the
+/// daemon (see `core::run_mode::CHILD_ENV`). Returns the process exit code.
 pub fn run_processor_child(args: &[String]) -> i32 {
     crate::utils::logging::setup_logging("process");
+    if !crate::core::run_mode::child_allowed() {
+        eprintln!("--process is internal daemon plumbing, not a user command.");
+        eprintln!("Run the app normally (no flags) to open the graphical UI.");
+        return 2;
+    }
     if args.len() < 3 {
         emit(
             CHILD_ERROR_PREFIX,
@@ -139,6 +145,7 @@ impl ProcessorLauncher {
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("meeting-recorder"));
         let mut child = Command::new(&exe)
             .args(["--process", audio, transcript, notes])
+            .env(crate::core::run_mode::CHILD_ENV, "1")
             // Capture stderr too: provider tooling (whisper-cli, TLS, ...) can
             // fail on stderr, so keep a tail to surface the real reason.
             .stdout(Stdio::piped())

@@ -29,7 +29,7 @@ jobs:
         run: |
           echo "VERSION=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
 
-  # ── Build pacman .pkg.tar.zst (+ bare binary for install.sh) ──────────────────
+  # ── Build pacman .pkg.tar.zst (+ standalone binary) ──────────────────────────
   build-arch:
     needs: get-version
     runs-on: ${{ matrix.runner }}
@@ -75,7 +75,7 @@ jobs:
           chown -R builder:builder arch-build
           su builder -c "cd arch-build && makepkg --noconfirm --skipinteg --nodeps"
 
-      - name: Extract bare binary for install.sh
+      - name: Extract standalone binary
         run: |
           bsdtar -xOf arch-build/*.pkg.tar.zst usr/bin/meeting-recorder \
             > "arch-build/meeting-recorder-v${VERSION}-${{ matrix.arch }}"

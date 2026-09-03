@@ -1,7 +1,7 @@
 //! Desktop notifications.
 //!
 //! The daemon is GTK-free, so notifications go through `notify-send`
-//! (libnotify, installed by `install.sh`) with a log fallback — no display
+//! (libnotify system package) with a log fallback — no display
 //! or GTK required, works from every process role.
 
 /// Show a transient desktop notification (best-effort, never fails).

@@ -1,11 +1,12 @@
 // Meeting Recorder — single binary, dispatched by CLI flag (see core::run_mode).
 //
 // Single binary, dispatched by CLI flag (see core::run_mode):
-//   --daemon   GTK-free background daemon (engine + tray + D-Bus service)
-//   --window   GTK/libadwaita window child (spawned by the daemon)
-//   --process  one-shot AI processing child (audio transcript notes)
-//   --install  one-shot model/engine install child (spec json)
-//   (no flag)  client mode: ensure the daemon runs, then open a window.
+//   --daemon    GTK-free background daemon (engine + tray + D-Bus service)
+//   --window    GTK/libadwaita window child (spawned by the daemon)
+//   --process   one-shot AI processing child (audio transcript notes)
+//   --install   one-shot model/engine install child (spec json)
+//   --uninstall remove everything the app installed or created, then exit
+//   (no flag)   client mode: ensure the daemon runs, then open a window.
 
 mod audio;
 mod client;
@@ -54,6 +55,9 @@ fn main() {
             std::process::exit(daemon::installer::run_install_child(
                 args.first().map(|s| s.as_str()).unwrap_or(""),
             ));
+        }
+        core::run_mode::RunMode::Uninstall => {
+            std::process::exit(crate::utils::self_uninstall::run_uninstall());
         }
         core::run_mode::RunMode::Client => client::run_client(),
     }

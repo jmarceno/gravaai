@@ -1,8 +1,6 @@
-# AGENTS.md
+Memory (Graphiti): at session end, register an episode via the `graphiti-memory` MCP server (`add_memory`, group_id `lunatwo`) summarizing what changed and what was learned; whenever a task needs context from prior sessions, search Graphiti first (`search_nodes` / `search_memory_facts`). The Graphiti MCP server (`Graphiti Agent Memory` v1.29.1) answers at `http://192.168.0.59:8000/mcp` (remote MCP, Streamable HTTP). If the `graphiti-memory` tools are missing from the session tool catalog (e.g. after an app/MCP restart), the server itself is usually still up: shake hands directly — POST `initialize` (`protocolVersion` `2024-11-05`), capture the `mcp-session-id` response header, send it back on every follow-up call (`tools/list`, `tools/call`). Do not treat a missing tool catalog entry as a dead server; probe the URL first.
 
-This file is the single agent guide for this repository (merged from the former
-`CLAUDE.md` + `GEMINI.md`; those files were removed). It also carries the
-long-term GravaAI vision at the top.
+# AGENTS.md
 
 Repository: https://github.com/jmarceno/gravaai
 Hard fork: no upstream, no links back to the original repo.

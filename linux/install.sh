@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
-# install.sh — Install Meeting Recorder on Arch Linux (Arch-only hard fork).
+# install.sh — Install Meeting Recorder on Arch Linux (user-local, no compiler).
+#
+# The app binary is fetched as a prebuilt release asset — installing never
+# builds anything, so no Rust toolchain, base-devel, or any other compiler is
+# required on this machine. Developers who want to build from source: see
+# README.md ("Building from source").
+
 set -euo pipefail
 
 APP_NAME="meeting-recorder"
-# The desktop file is named after the GTK application id so the GNOME/Wayland
+# The desktop file is named after the application id so the GNOME/Wayland
 # shell (and Dash to Panel) can map a running window back to it and show the app
 # icon instead of a generic one.
 APP_ID="io.github.jmarceno.Gravaai"
+REPO="jmarceno/gravaai"
+# Release version to install, e.g. MEETING_RECORDER_VERSION=1.2.3 ./install.sh.
+# Defaults to the latest published release.
+APP_VERSION="${MEETING_RECORDER_VERSION:-latest}"
 INSTALL_DIR="$HOME/.local/share/$APP_NAME"
-VENV_DIR="$INSTALL_DIR/venv"
 BIN_DIR="$HOME/.local/bin"
 APPS_DIR="$HOME/.local/share/applications"
-LAUNCHER="$BIN_DIR/$APP_NAME"
+ICON_THEME_DIR="$HOME/.local/share/icons/hicolor"
+BIN_PATH="$BIN_DIR/$APP_NAME"
 DESKTOP="$APPS_DIR/$APP_ID.desktop"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -21,17 +31,18 @@ info()    { echo -e "${GREEN}[info]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[warn]${NC} $*"; }
 err()     { echo -e "${RED}[error]${NC} $*" >&2; }
 
-# ── 1. System dependencies (Arch only) ─────────────────────────────────────────
+# ── 1. System dependencies (Arch only, binary packages — no compiler) ─────────
 install_deps_pacman() {
     info "Installing system dependencies (pacman)..."
-    sudo pacman -Syu --noconfirm python python-gobject gtk4 libadwaita libnotify libpulse pipewire-pulse ffmpeg curl
-
+    sudo pacman -Syu --noconfirm \
+        gtk4 libadwaita libnotify libpulse pipewire-pulse \
+        ffmpeg curl tar
 }
 
 if command -v pacman &>/dev/null; then
     install_deps_pacman
 else
-    err "Arch Linux (pacman) is required. This fork supports Arch only."
+    err "Arch Linux (pacman) is required. This project supports Arch only."
     exit 1
 fi
 
@@ -48,50 +59,78 @@ install_gnome_extensions() {
 
 install_gnome_extensions
 
-# ── 4. Virtual environment ───────────────────────────────────────────────────
-info "Creating virtual environment at $VENV_DIR…"
-mkdir -p "$INSTALL_DIR"
-python3 -m venv "$VENV_DIR" --system-site-packages
+# ── 2. Prebuilt binary (no source builds) ─────────────────────────────────────
+arch_suffix() {
+    case "$(uname -m)" in
+        x86_64)  echo "x86_64" ;;
+        aarch64) echo "aarch64" ;;
+        *)
+            err "Unsupported architecture: $(uname -m) (x86_64 and aarch64 only)."
+            exit 1
+            ;;
+    esac
+}
 
-# ── 5. Python dependencies ───────────────────────────────────────────────────
-info "Installing Python dependencies…"
-"$VENV_DIR/bin/pip" install --quiet --upgrade pip
-# Prefer the pinned lock file for reproducible installs; requirements.txt
-# stays as the human-readable, loosely-pinned source of truth.
-if [[ -f "$SCRIPT_DIR/requirements.lock" ]]; then
-    "$VENV_DIR/bin/pip" install --quiet -r "$SCRIPT_DIR/requirements.lock"
-else
-    "$VENV_DIR/bin/pip" install --quiet -r "$SCRIPT_DIR/requirements.txt"
+resolve_version() {
+    if [[ "$APP_VERSION" != "latest" ]]; then
+        echo "v${APP_VERSION#v}"
+        return
+    fi
+    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+        | grep -m1 '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/'
+}
+
+VERSION="$(resolve_version)"
+if [[ -z "${VERSION:-}" ]]; then
+    err "Could not determine the latest release (network issue?)."
+    err "Set MEETING_RECORDER_VERSION explicitly, e.g.:"
+    err "  MEETING_RECORDER_VERSION=1.2.3 linux/install.sh"
+    exit 1
 fi
 
-# ── 6. Copy source ───────────────────────────────────────────────────────────
-info "Copying application source…"
-mkdir -p "$INSTALL_DIR/linux"
-cp -r "$SCRIPT_DIR/src" "$INSTALL_DIR/linux/"
+ASSET="$APP_NAME-$VERSION-$(arch_suffix)"
+URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET"
+TMP_BIN="$(mktemp)"
+info "Downloading prebuilt $APP_NAME $VERSION ($(arch_suffix))…"
+if ! curl -fsSL -o "$TMP_BIN" "$URL"; then
+    err "Download failed: $URL"
+    err "Check that release $VERSION publishes a $(arch_suffix) binary,"
+    err "or install the pacman package instead (see README.md)."
+    rm -f "$TMP_BIN"
+    exit 1
+fi
 
-# ── 7. System log directory ──────────────────────────────────────────────────
+# ── 3. Install binary + assets ────────────────────────────────────────────────
+info "Installing binary to $BIN_PATH…"
+mkdir -p "$BIN_DIR" "$INSTALL_DIR"
+install -m 755 "$TMP_BIN" "$BIN_PATH"
+rm -f "$TMP_BIN"
+
+info "Installing tray artwork and icons…"
+mkdir -p "$INSTALL_DIR/tray" "$INSTALL_DIR/icons"
+cp -r "$SCRIPT_DIR/assets/tray/." "$INSTALL_DIR/tray/"
+cp -r "$SCRIPT_DIR/assets/icons/." "$INSTALL_DIR/icons/"
+for size in 16 24 32 48 64 128 256; do
+    mkdir -p "$ICON_THEME_DIR/${size}x${size}/apps"
+    install -m 644 "$SCRIPT_DIR/assets/icons/hicolor/${size}x${size}/apps/$APP_NAME.png" \
+        "$ICON_THEME_DIR/${size}x${size}/apps/$APP_NAME.png"
+done
+mkdir -p "$ICON_THEME_DIR/scalable/apps"
+install -m 644 "$SCRIPT_DIR/assets/icons/hicolor/scalable/apps/$APP_NAME.svg" \
+    "$ICON_THEME_DIR/scalable/apps/$APP_NAME.svg"
+gtk-update-icon-cache -f -t "$ICON_THEME_DIR" 2>/dev/null || true
+
+# ── 4. System log directory ───────────────────────────────────────────────────
 SYSTEM_LOG_DIR="/var/log/meeting-recorder"
 info "Creating system log directory at $SYSTEM_LOG_DIR…"
 sudo mkdir -p "$SYSTEM_LOG_DIR"
 sudo chown "$USER:$USER" "$SYSTEM_LOG_DIR"
 sudo chmod 755 "$SYSTEM_LOG_DIR"
 
-# ── 8. Launcher script ───────────────────────────────────────────────────────
-mkdir -p "$BIN_DIR"
-cat > "$LAUNCHER" << LAUNCHER_EOF
-#!/usr/bin/env bash
-export PYTHONPATH="$INSTALL_DIR/linux/src"
-export MEETING_RECORDER_INSTALLED=1
-exec "$VENV_DIR/bin/python" -m meeting_recorder "\$@"
-LAUNCHER_EOF
-chmod +x "$LAUNCHER"
-info "Launcher created at $LAUNCHER"
-
-# ── 9. Desktop entry ─────────────────────────────────────────────────────────
+# ── 5. Desktop entry ─────────────────────────────────────────────────────────
 mkdir -p "$APPS_DIR"
-# Remove legacy (pre-rename) entries so the app isn't listed twice.
-rm -f "$APPS_DIR/$APP_NAME.desktop" "$APPS_DIR/com.github.mint-meeting-recorder.desktop"
-sed "s|LAUNCHER_PATH|$LAUNCHER|g" "$SCRIPT_DIR/meeting-recorder.desktop.template" \
+rm -f "$APPS_DIR/$APP_NAME.desktop"
+sed "s|LAUNCHER_PATH|$BIN_PATH|g" "$SCRIPT_DIR/meeting-recorder.desktop.template" \
     > "$DESKTOP"
 chmod +x "$DESKTOP"
 info "Desktop entry created at $DESKTOP"
@@ -99,33 +138,7 @@ info "Desktop entry created at $DESKTOP"
 # Update desktop database if available
 update-desktop-database "$APPS_DIR" 2>/dev/null || true
 
-# ── 9b. Application icon (hicolor theme) ─────────────────────────────────────
-# The desktop file's Icon=meeting-recorder key is what the shell uses to render
-# the window/launcher icon, so we install under that single themed name.
-ICONS_SRC="$SCRIPT_DIR/src/meeting_recorder/assets/icons/hicolor"
-ICON_THEME_DIR="$HOME/.local/share/icons/hicolor"
-info "Installing application icons…"
-for size in 16 24 32 48 64 128 256; do
-    dest_dir="$ICON_THEME_DIR/${size}x${size}/apps"
-    mkdir -p "$dest_dir"
-    install -m 644 "$ICONS_SRC/${size}x${size}/apps/meeting-recorder.png" \
-        "$dest_dir/meeting-recorder.png"
-done
-mkdir -p "$ICON_THEME_DIR/scalable/apps"
-install -m 644 "$ICONS_SRC/scalable/apps/meeting-recorder.svg" \
-    "$ICON_THEME_DIR/scalable/apps/meeting-recorder.svg"
-# Clean up the icon installed under the previous (malformed) app id, if present.
-rm -f "$ICON_THEME_DIR"/*/apps/com.github.mint-meeting-recorder.png \
-      "$ICON_THEME_DIR/scalable/apps/com.github.mint-meeting-recorder.svg"
-gtk-update-icon-cache -f -t "$ICON_THEME_DIR" 2>/dev/null || true
-
-# ── 10. Add ~/.local/bin to PATH hint ────────────────────────────────────────
-if ! echo "$PATH" | grep -q "$BIN_DIR"; then
-    warn "$BIN_DIR is not in your PATH."
-    warn "Add it to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
-fi
-
 echo
-info "Installation complete!"
-info "Run:  $APP_NAME"
-info "Or launch from your application menu: Meeting Recorder"
+info "Install complete ($VERSION). Launch with: $APP_NAME"
+info "Configure an OpenAI-compatible endpoint in Settings (gear icon → Preferences),"
+info "or install local engines there — everything arrives prebuilt, no compiler needed."

@@ -1,74 +1,31 @@
 name: CI
 
-# Arch-only hard fork: all jobs run on manual dispatch only.
+# Arch-only Rust port: all jobs run on manual dispatch only.
 on:
   workflow_dispatch:
 
 jobs:
-  # ── Python lint + type check ────────────────────────────────────────────────
-  #
-  # ruff enforces lint + formatting repo-wide; mypy runs in strict mode on the
-  # headless packages (processing/, services/, config/ — see pyproject.toml).
-  lint-python:
-    name: Python lint + type check
+  # ── Rust fmt + clippy + tests ───────────────────────────────────────────────
+  rust-checks:
+    name: fmt + clippy + tests
     runs-on: ubuntu-latest
+    container: archlinux:latest
     steps:
+      - name: Install toolchain + system deps
+        run: |
+          pacman -Syu --noconfirm git base-devel rust \
+            gtk4 libadwaita libnotify libpulse pipewire-pulse ffmpeg curl
+
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
+      - name: cargo fmt check
+        run: cargo fmt --check --manifest-path linux/Cargo.toml
 
-      - name: Install ruff and mypy
-        run: pip install ruff mypy
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 
-      - name: ruff lint
-        run: ruff check linux/
-
-      - name: ruff format check
-        run: ruff format --check linux/
-
-      - name: mypy (strict packages)
-        run: >-
-          mypy
-          linux/src/meeting_recorder/processing
-          linux/src/meeting_recorder/services
-          linux/src/meeting_recorder/config
-
-  # ── Unit tests ──────────────────────────────────────────────────────────────
-  #
-  # Manual run only. No system dependencies required — all shell/network
-  # calls are replaced with fakes via the services' dependency-injection hooks.
-  unit-tests:
-    name: Unit tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.12"]
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install pytest
-        run: pip install pytest pytest-cov
-
-      - name: Run tests (with coverage)
-        run: >-
-          pytest --tb=short
-          --cov=meeting_recorder
-          --cov-report=term
-          --cov-report=xml:coverage.xml
-
-      # Report-only for now — no threshold gate. The artifact makes coverage
-      # visible per manual run so regressions in the extracted core/ modules show up.
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-coverage-${{ matrix.python-version }}
-          path: coverage.xml
+      - name: cargo test
+        run: cargo test --manifest-path linux/Cargo.toml
 
   # ── Pacman package build smoke test (Arch only) ─────────────────────────────
   #
@@ -79,7 +36,7 @@ jobs:
   package-build:
     name: ${{ matrix.arch }} Build pacman package + install smoke test
     runs-on: ${{ matrix.runner }}
-    needs: unit-tests
+    needs: rust-checks
     strategy:
       fail-fast: false
       matrix:
@@ -111,6 +68,7 @@ jobs:
           SRCDIR=$(mktemp -d)
           mkdir "${SRCDIR}/meeting-recorder-0.0.0"
           cp -r linux "${SRCDIR}/meeting-recorder-0.0.0/"
+          cp Cargo.lock "${SRCDIR}/meeting-recorder-0.0.0/Cargo.lock" 2>/dev/null || true
           tar -czf arch-build/meeting-recorder-0.0.0.tar.gz \
             -C "${SRCDIR}" meeting-recorder-0.0.0
 
@@ -124,25 +82,15 @@ jobs:
       - name: Verify pacman package structure
         run: |
           bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/bin/meeting-recorder
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q opt/meeting-recorder/linux/src
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q opt/meeting-recorder/requirements.lock
+          bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/meeting-recorder/tray/meeting-recorder-48.png
           bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/applications/io.github.jmarceno.Gravaai.desktop
           bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/icons/hicolor/256x256/apps/meeting-recorder.png
           echo "All required paths present in pacman package"
 
-      # Install with the real depends array (pacman -U resolves them), which
-      # runs post_install (venv + pip from the lock), then import the app the
-      # way the launcher does.
-      - name: Install pacman package and import smoke test
+      # Install with the real depends array (pacman -U resolves them), then
+      # exercise the installed binary the way the launcher does.
+      - name: Install pacman package and binary smoke test
         run: |
           pacman -U --noconfirm arch-build/*.pkg.tar.*
-          PYTHONPATH=/opt/meeting-recorder/linux/src \
-            /opt/meeting-recorder/venv/bin/python - <<'EOF'
-          import gi
-          gi.require_version("Gtk", "4.0")
-          gi.require_version("Adw", "1")
-          from gi.repository import Gtk, Adw
-          import google.genai
-          import meeting_recorder
-          print("GTK4 + Adw typelibs, venv deps, and app package all import OK")
-          EOF
+          meeting-recorder --install 'garbage' || test $? -eq 2
+          echo "Installed binary runs OK"

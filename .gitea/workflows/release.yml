@@ -29,16 +29,28 @@ jobs:
         run: |
           echo "VERSION=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
 
-  # ── Build pacman .pkg.tar.zst ─────────────────────────────────────────────────
+  # ── Build pacman .pkg.tar.zst (+ bare binary for install.sh) ──────────────────
   build-arch:
     needs: get-version
-    runs-on: ubuntu-latest
-    container: archlinux:latest
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - container: archlinux:latest
+            runner: ubuntu-latest
+            arch: x86_64
+          - container: menci/archlinuxarm:latest
+            arch: aarch64
+            runner: ubuntu-24.04-arm
     env:
       VERSION: ${{ needs.get-version.outputs.version }}
     steps:
       - name: Install build tools
-        run: pacman -Syu --noconfirm git base-devel
+        run: |
+          sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf
+          pacman -Syu --noconfirm git base-devel
 
       - uses: actions/checkout@v6
 
@@ -50,6 +62,7 @@ jobs:
           SRCDIR=$(mktemp -d)
           mkdir "${SRCDIR}/meeting-recorder-${VERSION}"
           cp -r linux "${SRCDIR}/meeting-recorder-${VERSION}/"
+          cp Cargo.lock "${SRCDIR}/meeting-recorder-${VERSION}/Cargo.lock" 2>/dev/null || true
           tar -czf "arch-build/meeting-recorder-${VERSION}.tar.gz" \
             -C "${SRCDIR}" "meeting-recorder-${VERSION}"
 
@@ -62,10 +75,18 @@ jobs:
           chown -R builder:builder arch-build
           su builder -c "cd arch-build && makepkg --noconfirm --skipinteg --nodeps"
 
+      - name: Extract bare binary for install.sh
+        run: |
+          bsdtar -xOf arch-build/*.pkg.tar.zst usr/bin/meeting-recorder \
+            > "arch-build/meeting-recorder-v${VERSION}-${{ matrix.arch }}"
+          chmod +x "arch-build/meeting-recorder-v${VERSION}-${{ matrix.arch }}"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: arch
-          path: arch-build/*.pkg.tar.zst
+          name: arch-${{ matrix.arch }}
+          path: |
+            arch-build/*.pkg.tar.zst
+            arch-build/meeting-recorder-v*
 
   # ── Create source tarball and Release with the Arch artifact ─────────────────
   release:
@@ -90,9 +111,9 @@ jobs:
           rm -rf \
             "${SRC}/meeting-recorder-${VERSION}/.git" \
             "${SRC}/meeting-recorder-${VERSION}/.claude" \
-            "${SRC}/meeting-recorder-${VERSION}/gh-pages-dir"
-          find "${SRC}" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-          find "${SRC}" -name '*.pyc' -delete 2>/dev/null || true
+            "${SRC}/meeting-recorder-${VERSION}/gh-pages-dir" \
+            "${SRC}/meeting-recorder-${VERSION}/linux/target" \
+            "${SRC}/meeting-recorder-${VERSION}/target"
           tar -czf "meeting-recorder_${VERSION}.tar.gz" -C "${SRC}" "meeting-recorder-${VERSION}"
 
       - name: Create Release
@@ -101,5 +122,6 @@ jobs:
           tag_name: v${{ needs.get-version.outputs.version }}
           files: |
             *.pkg.tar.zst
+            meeting-recorder-v*
             meeting-recorder_*.tar.gz
           generate_release_notes: true

@@ -14,21 +14,21 @@ info() { echo -e "${GREEN}[info]${NC} $*"; }
 warn() { echo -e "${YELLOW}[warn]${NC} $*"; }
 
 # ── 1. Kill running instance ──────────────────────────────────────────────────
-if pgrep -f "meeting_recorder" > /dev/null 2>&1; then
+if pgrep -f "meeting-recorder" > /dev/null 2>&1; then
     info "Stopping running instance…"
-    pkill -f "meeting_recorder" || true
+    pkill -f "meeting-recorder" || true
     sleep 1
 fi
 
-# ── 2. Install directory (source + venv + app log) ───────────────────────────
+# ── 2. Install directory (binary assets) ──────────────────────────────────────
 if [ -d "$INSTALL_DIR" ]; then
     info "Removing $INSTALL_DIR…"
     rm -rf "$INSTALL_DIR"
 fi
 
-# ── 3. Launcher binary ───────────────────────────────────────────────────────
+# ── 3. Installed binary ───────────────────────────────────────────────────────
 if [ -f "$BIN_DIR/$APP_NAME" ]; then
-    info "Removing launcher $BIN_DIR/$APP_NAME…"
+    info "Removing binary $BIN_DIR/$APP_NAME…"
     rm -f "$BIN_DIR/$APP_NAME"
 fi
 

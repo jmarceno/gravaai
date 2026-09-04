@@ -44,6 +44,15 @@ pub fn own_appimage() -> Option<PathBuf> {
     own_appimage_from(appimage.as_deref(), appdir.as_deref(), &exe)
 }
 
+/// Mount root of the AppImage containing this process, if any. Only an
+/// APPDIR that actually contains the running binary is accepted, so host
+/// AppImage exports (Cursor, OpenCode) are ignored.
+pub fn own_appdir() -> Option<PathBuf> {
+    let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
+    let exe = std::env::current_exe().ok()?;
+    path_is_under(&exe, &appdir).then_some(appdir)
+}
+
 /// Path for a process that must outlive the caller (and its AppImage mount).
 /// Prefer the owning AppImage file; otherwise `current_exe()`.
 pub fn persistent_exe() -> PathBuf {

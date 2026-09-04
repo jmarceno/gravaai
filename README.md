@@ -17,7 +17,7 @@ This repository holds the Linux desktop app (Rust, Qt 6/QML):
 
 ### Features
 
-- **Record** system audio + microphone simultaneously, or microphone only
+- **Record** system audio + microphone simultaneously, or microphone only — each channel is automatically loudness-normalized during capture, so quiet microphones are boosted into healthy levels (up to 20 dB, applied independently to mic and system audio)
 - **Transcribe** with any OpenAI-compatible endpoint or local whisper.cpp (timestamped transcript)
 - **Summarize** into structured Markdown notes with any OpenAI-compatible endpoint or local Ollama
 - **Summarize from the library** — re-run summarization for any past meeting from the meetings browser

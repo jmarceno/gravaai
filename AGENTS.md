@@ -308,9 +308,11 @@ threads, hopping back via main-loop pollers.
 - `recorder.rs` runs a single `ffmpeg` subprocess reading PulseAudio/PipeWire
   sources directly (`-f pulse`); `mixer.rs` builds the command — mic+system
   mode `amerge`s mic (left channel) and sink monitor (right channel) into a
-  true-stereo MP3 with a `highpass=f=80` filter, preserving speaker separation
-  for transcription. Device names are resolved once in `start()` via
-  `devices.rs` (`pactl`).
+  true-stereo MP3 with a `highpass=f=80` + per-channel `dynaudnorm` filter
+  (realtime-safe loudness normalization that lifts quiet microphones; each
+  channel is normalized independently, boost capped at 20 dB), preserving
+  speaker separation for transcription. Device names are resolved once in
+  `start()` via `devices.rs` (`pactl`).
 - Pause/resume works via **segments**: pause terminates ffmpeg cleanly
   (SIGTERM, saving the current segment), resume spawns a new ffmpeg writing
   the next segment, and stop concatenates all segments with ffmpeg's concat
@@ -629,7 +631,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   renders empty (`tray`), the notification gate that suppresses alerts
   unless the StatusNotifier registration is live (`notifications`), and the
   Qt controller library payload (`qt/controller`: meetings JSON carries
-  resolved audio/transcript/notes paths, validated file-open allow-list).
+  resolved audio/transcript/notes paths, validated file-open allow-list,
+  AppImage-safe opener environment, portal `file://` percent-encoding).
 
 The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by

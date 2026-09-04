@@ -51,12 +51,15 @@ fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<(
             WhisperCppModelDownloader::default().download(&spec.model, on_status)
         }
         install_spec::KIND_OLLAMA_MODEL => {
-            use crate::services::ollama_service::OllamaClient;
+            use crate::services::ollama_service::{ensure_ollama_serving, OllamaClient};
             let host = if spec.host.is_empty() {
                 crate::config::defaults::OLLAMA_DEFAULT_HOST.to_string()
             } else {
                 spec.host.clone()
             };
+            // Start the server automatically when it is down (binary present,
+            // local host) so a Download click just works.
+            ensure_ollama_serving(&host, on_status)?;
             require(
                 OllamaClient::new().pull_model(&spec.model, &host, on_status)?,
                 &format!(

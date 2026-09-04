@@ -243,7 +243,10 @@ closing. Installs are keyed by the pure
 models install concurrently while the same request dedups); the daemon emits
 `InstallProgress(key,text)`/`InstallFinished(key,ok,message)` D-Bus signals
 to the open Models page and `GetInstalls()` lets a reopened window re-attach
-to in-flight installs (`reflect_running_installs`). Install failures are
+to in-flight installs (`reflect_running_installs`). An Ollama model download
+starts `ollama serve` automatically when the binary is present and the host
+is local (`ensure_ollama_serving`, with readiness wait); remote hosts and
+missing binaries fail with guidance instead. Install failures are
 surfaced, never silent: the Models page writes the reason into the row
 subtitle/tooltip (engine installs) or the model row (downloads) and shows an
 `AlertDialog`; the daemon additionally emits a desktop notification so a
@@ -319,7 +322,9 @@ daemon), and `CancelToken` provides cooperative cancellation.
   `providers/openai_compat.rs:OpenAiCompatProvider` (`POST
   {base_url}/audio/transcriptions` multipart for transcription, `POST
   {base_url}/chat/completions` for summarization/titling, Bearer auth,
-  `{transcript}` prompt rendering with append-fallback). Local providers:
+  `{transcript}` prompt rendering with append-fallback). The pipeline also
+  auto-starts `ollama serve` before Ollama summarization when the server is
+  down. Local providers:
   `providers/whisper_cpp.rs` (`whisper-cli` subprocess run with
   `LD_LIBRARY_PATH` pointed at its bundled `.so` libraries, plus the pure
   `parse_whisper_cpp_output()`) and `providers/ollama.rs` (`/api/generate`
@@ -576,8 +581,9 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   backend detection + verified download/extract/smoke-test
   (`whisper_cpp_service`, including auto→cpu routing, cuda rejection, and
   missing-binary diagnostics naming archive contents), Ollama prefix-match +
-  unreachable tolerance + pull preflight with `ollama serve` guidance
-  (`ollama_service`).
+  unreachable tolerance + automatic `ollama serve` startup for pulls and
+  summarization (`ollama_service`: local-host gating, readiness wait,
+  install guidance when no binary/remote host).
 - `daemon/` — child protocol parsing (`processor`), stderr tail buffer
   (`child_io`), window spawn-vs-present (`window_supervisor`), install
   dedup/progress/finished routing (`install_manager`), headless `Engine`

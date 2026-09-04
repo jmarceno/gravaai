@@ -136,6 +136,107 @@ impl Default for OllamaClient {
     }
 }
 
+/// True when `host` points at this machine (empty = the default localhost).
+/// Only local servers are ever auto-started — a remote hostname is left alone.
+pub fn is_local_host(host: &str) -> bool {
+    let h = host.trim();
+    if h.is_empty() {
+        return true;
+    }
+    let after_scheme = h.rsplit("://").next().unwrap_or(h);
+    let authority = after_scheme.split('/').next().unwrap_or("");
+    let authority = authority.split('@').next_back().unwrap_or(authority);
+    let name = if let Some(rest) = authority.strip_prefix('[') {
+        rest.split(']').next().unwrap_or("")
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    };
+    matches!(
+        name.to_lowercase().as_str(),
+        "localhost" | "127.0.0.1" | "::1" | "0.0.0.0"
+    )
+}
+
+/// How long to wait for a freshly started server (1s polls).
+pub const OLLAMA_START_TIMEOUT_SECS: u64 = 45;
+
+/// Ensure an Ollama server answers at `host`, starting `ollama serve`
+/// automatically when the binary is present and the host is local.
+/// A started server is left running afterwards for future use.
+pub fn ensure_ollama_serving(host: &str, on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
+    let client = OllamaClient::new();
+    ensure_ollama_serving_with(
+        host,
+        on_status,
+        &|| client.get_installed_models(host).is_some(),
+        crate::services::system_installer::OllamaInstaller::is_available(),
+        &spawn_ollama_serve,
+        OLLAMA_START_TIMEOUT_SECS,
+        &|| std::thread::sleep(std::time::Duration::from_secs(1)),
+    )
+}
+
+fn spawn_ollama_serve() -> anyhow::Result<()> {
+    use std::process::{Command, Stdio};
+    let child = Command::new("ollama")
+        .arg("serve")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to start `ollama serve`: {e:#}"))?;
+    log::info!(
+        "Started `ollama serve` automatically (pid {}); leaving it running for future use",
+        child.id()
+    );
+    // Intentionally not waited on: the starter is a short-lived child while
+    // the server keeps running (reparented) for future pulls and jobs.
+    std::mem::forget(child);
+    Ok(())
+}
+
+fn ensure_ollama_serving_with(
+    host: &str,
+    on_status: &dyn Fn(&str),
+    is_serving: &dyn Fn() -> bool,
+    have_binary: bool,
+    spawn: &dyn Fn() -> anyhow::Result<()>,
+    polls: u64,
+    wait: &dyn Fn(),
+) -> anyhow::Result<()> {
+    if is_serving() {
+        return Ok(());
+    }
+    if !is_local_host(host) {
+        anyhow::bail!(
+            "Cannot reach Ollama at {host}. Start it there first, or point the Ollama host at this machine."
+        );
+    }
+    if !have_binary {
+        anyhow::bail!("Ollama is not installed. Install it from Settings → Models first.");
+    }
+    on_status("Starting Ollama server…");
+    log::info!("Ollama not serving at {host} — starting `ollama serve` automatically");
+    if let Err(e) = spawn() {
+        // Likely collision: another server just took the port — re-check.
+        wait();
+        if is_serving() {
+            return Ok(());
+        }
+        return Err(anyhow::anyhow!("Could not start `ollama serve`: {e:#}"));
+    }
+    for _ in 0..polls.max(1) {
+        wait();
+        if is_serving() {
+            log::info!("Auto-started Ollama server is responding at {host}");
+            return Ok(());
+        }
+    }
+    anyhow::bail!(
+        "Started `ollama serve` but it is not responding at {host}. Check `ollama serve` output for errors (e.g. port already in use)."
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +264,130 @@ mod tests {
             .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("ollama serve"), "unexpected message: {msg}");
+    }
+
+    #[test]
+    fn local_host_matching() {
+        assert!(is_local_host(""));
+        assert!(is_local_host("  "));
+        assert!(is_local_host("http://localhost:11434"));
+        assert!(is_local_host("localhost"));
+        assert!(is_local_host("http://127.0.0.1:11434"));
+        assert!(is_local_host("http://[::1]:11434"));
+        assert!(is_local_host("http://0.0.0.0:11434"));
+        assert!(is_local_host("https://LOCALHOST:11434/api"));
+        assert!(!is_local_host("http://192.168.0.59:11434"));
+        assert!(!is_local_host("http://myserver:11434"));
+        assert!(!is_local_host("http://localhost.example.com:11434"));
+        assert!(!is_local_host("not a url at all"));
+    }
+
+    #[test]
+    fn ensure_noops_when_serving() {
+        let spawns = std::cell::Cell::new(0);
+        let r = ensure_ollama_serving_with(
+            "http://localhost:11434",
+            &|_| {},
+            &|| true,
+            true,
+            &|| {
+                spawns.set(spawns.get() + 1);
+                Ok::<(), anyhow::Error>(())
+            },
+            3,
+            &|| {},
+        );
+        assert!(r.is_ok());
+        assert_eq!(spawns.get(), 0);
+    }
+
+    #[test]
+    fn ensure_spawns_and_waits_for_readiness() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let spawns = std::cell::Cell::new(0);
+        let r = ensure_ollama_serving_with(
+            "http://localhost:11434",
+            &|_| {},
+            &{
+                let calls = calls.clone();
+                move || calls.fetch_add(1, Ordering::SeqCst) >= 2
+            },
+            true,
+            &|| {
+                spawns.set(spawns.get() + 1);
+                Ok::<(), anyhow::Error>(())
+            },
+            5,
+            &{
+                let polls = polls.clone();
+                move || {
+                    polls.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+        );
+        assert!(r.is_ok());
+        assert_eq!(spawns.get(), 1);
+        // One readiness check runs before spawning, so two polls follow.
+        assert_eq!(polls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn ensure_refuses_remote_and_missing_binary() {
+        // Remote host: never spawn, guidance error instead.
+        let spawns = std::cell::Cell::new(0);
+        let err = ensure_ollama_serving_with(
+            "http://192.168.0.59:11434",
+            &|_| {},
+            &|| false,
+            true,
+            &|| {
+                spawns.set(spawns.get() + 1);
+                Ok::<(), anyhow::Error>(())
+            },
+            3,
+            &|| {},
+        )
+        .unwrap_err();
+        assert_eq!(spawns.get(), 0);
+        assert!(format!("{err:#}").contains("Start it there first"));
+        // No binary: never spawn, install guidance instead.
+        let err = ensure_ollama_serving_with(
+            "http://localhost:11434",
+            &|_| {},
+            &|| false,
+            false,
+            &|| {
+                spawns.set(spawns.get() + 1);
+                Ok::<(), anyhow::Error>(())
+            },
+            3,
+            &|| {},
+        )
+        .unwrap_err();
+        assert_eq!(spawns.get(), 0);
+        assert!(format!("{err:#}").contains("not installed"));
+    }
+
+    #[test]
+    fn ensure_times_out_with_actionable_error() {
+        let spawns = std::cell::Cell::new(0);
+        let err = ensure_ollama_serving_with(
+            "http://localhost:11434",
+            &|_| {},
+            &|| false,
+            true,
+            &|| {
+                spawns.set(spawns.get() + 1);
+                Ok::<(), anyhow::Error>(())
+            },
+            3,
+            &|| {},
+        )
+        .unwrap_err();
+        assert_eq!(spawns.get(), 1);
+        assert!(format!("{err:#}").contains("not responding"));
     }
 }

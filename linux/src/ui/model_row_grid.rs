@@ -84,14 +84,6 @@ impl ModelRowGrid {
         }
     }
 
-    /// Enable/disable every row's Download button (e.g. while Ollama is
-    /// offline, so a pull cannot fail with a raw connection error).
-    pub fn set_all_sensitive(&self, sensitive: bool) {
-        for r in self.rows.borrow().values() {
-            r.button.set_sensitive(sensitive);
-        }
-    }
-
     fn update_row(&self, model: &str, status: &str, btn_label: &str, sensitive: bool) {
         if let Some(r) = self.rows.borrow().get(model) {
             r.status.set_text(status);

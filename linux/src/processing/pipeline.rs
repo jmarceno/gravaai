@@ -80,6 +80,15 @@ impl Pipeline {
         check_cancelled(cancel_token)?;
 
         // Summarization.
+        if self.config.summarization_service == "ollama" {
+            // The server may be down between meetings — start it automatically
+            // (binary present, local host) instead of failing the job.
+            let status_cb = |m: &str| self.status(m);
+            crate::services::ollama_service::ensure_ollama_serving(
+                &self.config.ollama_host,
+                &status_cb,
+            )?;
+        }
         let ss_provider = create_summarization_provider(&self.config);
         let notes = ss_provider.summarize(&transcript, Some(&status_cb))?;
         ss_provider.unload();

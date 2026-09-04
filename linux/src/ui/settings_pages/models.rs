@@ -304,7 +304,7 @@ impl ModelsPage {
         } else {
             let group = adw::PreferencesGroup::builder()
                 .title("Ollama")
-                .description("Requires Ollama to be installed and running (ollama serve).")
+                .description("Requires Ollama to be installed. Its server starts automatically for downloads and summarization.")
                 .build();
             let model_entry = adw::EntryRow::builder().title("Ollama model").build();
             model_entry.set_text(&cfg.ollama_model);
@@ -649,24 +649,18 @@ impl ModelsPage {
 
     fn set_ollama_unreachable(&self) {
         if let Some(row) = self.ollama_status_row.borrow().as_ref() {
-            row.set_subtitle("Not reachable. Start it with: ollama serve");
+            row.set_subtitle("Not running — it starts automatically when needed");
         }
         if let Some(grid) = self.ollama_grid.borrow().as_ref() {
             for model in OLLAMA_MODELS {
-                grid.set_status_text(model, "Ollama offline — start it with: ollama serve");
+                grid.set_status_text(model, "Ollama offline");
             }
-            // Downloads cannot succeed without a server; disable them so the
-            // failure presents as guidance, not a raw connection error.
-            grid.set_all_sensitive(false);
         }
     }
 
     fn set_ollama_reachable(&self) {
         if let Some(row) = self.ollama_status_row.borrow().as_ref() {
             row.set_subtitle("Ollama is running.");
-        }
-        if let Some(grid) = self.ollama_grid.borrow().as_ref() {
-            grid.set_all_sensitive(true);
         }
     }
 

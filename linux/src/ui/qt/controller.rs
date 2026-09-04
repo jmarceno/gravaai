@@ -5,7 +5,7 @@
 //! owned event payloads through a standard channel which `poll_input` drains.
 
 use std::ffi::OsString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
@@ -66,6 +66,14 @@ enum Command {
     ConfirmSaveSettings,
     RefreshInstalls,
     StartInstall(String),
+    TranscribeMeeting {
+        audio: String,
+        transcript: String,
+        notes: String,
+        label: String,
+    },
+    RefreshEngineStatus,
+    OpenDataFolder(String),
     RequestClose,
     LaunchLepramim,
     Shutdown,
@@ -78,6 +86,7 @@ enum Event {
     Settings(String),
     Meetings(String),
     Installs(String),
+    EngineStatus(String),
     Toast(String),
     Dialog { message: String, confirm: bool },
     Present,
@@ -166,6 +175,12 @@ async fn worker_loop(
     send_settings(&event_tx);
     refresh_meetings_sync(&event_tx);
     send_lepramim_status(&event_tx).await;
+    // Engine/payload status involves filesystem walks and one short Ollama
+    // probe — run it alongside the loop instead of delaying startup events.
+    let status_tx = event_tx.clone();
+    tokio::spawn(async move {
+        refresh_engine_status_event(status_tx).await;
+    });
 
     let mut pending_settings: Option<Config> = None;
     while let Some(command) = cmd_rx.recv().await {
@@ -184,9 +199,20 @@ fn spawn_signal_tasks(proxy: EngineProxy<'static>, tx: Sender<Event>) {
         let Ok(mut stream) = p.receive_snapshot_changed().await else {
             return;
         };
+        let mut tracker = MeetingRefreshTracker::default();
         while let Some(signal) = stream.next().await {
             if let Ok(args) = signal.args() {
-                let _ = out.send(Event::Snapshot(args.json.clone()));
+                let json = args.json.clone();
+                let _ = out.send(Event::Snapshot(json.clone()));
+                // Meeting folders change when a job finishes or a recording
+                // is saved — re-scan so the Library and Recent card stay
+                // fresh without a manual refresh click.
+                if tracker.update(&json) {
+                    let tx = out.clone();
+                    tokio::spawn(async move {
+                        refresh_meetings_event(tx).await;
+                    });
+                }
             }
         }
     });
@@ -275,9 +301,100 @@ fn spawn_signal_tasks(proxy: EngineProxy<'static>, tx: Sender<Event>) {
                 if let Ok(json) = refresh_proxy.get_installs().await {
                     let _ = out.send(Event::Installs(json));
                 }
+                // An install changed what's on disk — refresh the engine
+                // status card and the Downloads payloads.
+                let tx = out.clone();
+                tokio::spawn(async move {
+                    refresh_engine_status_event(tx).await;
+                });
             }
         }
     });
+}
+
+/// Re-scan meetings off the Qt thread and publish them to the UI.
+async fn refresh_meetings_event(tx: Sender<Event>) {
+    match tokio::task::spawn_blocking(meeting_json).await {
+        Ok(json) => {
+            let _ = tx.send(Event::Meetings(json));
+        }
+        Err(err) => log::warn!("Could not scan meetings: {err:#}"),
+    }
+}
+
+/// Build the engine/payload status JSON off the Qt thread and publish it.
+async fn refresh_engine_status_event(tx: Sender<Event>) {
+    match tokio::task::spawn_blocking(engine_status_json).await {
+        Ok(json) => {
+            let _ = tx.send(Event::EngineStatus(json));
+        }
+        Err(err) => log::warn!("Could not scan engine status: {err:#}"),
+    }
+}
+
+/// Blocking engine/payload status scan (worker threads only — it walks the
+/// payload dirs and makes one short Ollama HTTP probe).
+fn engine_status_json() -> String {
+    let base = crate::utils::payloads::payload_base_dir();
+    let cfg = settings::load();
+    let host = if cfg.ollama_host.trim().is_empty() {
+        crate::config::defaults::OLLAMA_DEFAULT_HOST.to_string()
+    } else {
+        cfg.ollama_host.clone()
+    };
+    let ollama_installed = crate::services::system_installer::OllamaInstaller::is_available();
+    let fetched =
+        crate::services::ollama_service::OllamaClient::new().get_installed_models_with_sizes(&host);
+    let ollama_serving = fetched.is_some();
+    let models = fetched.unwrap_or_default();
+    let store = crate::utils::payloads::ollama_models_store();
+    crate::utils::payloads::service_status_json(&crate::utils::payloads::StatusInput {
+        base: &base,
+        ollama_host: &host,
+        ollama_serving,
+        ollama_installed,
+        ollama_models: &models,
+        ollama_models_store: store.as_deref(),
+    })
+}
+
+/// Tracks job/state transitions between snapshots and decides when the
+/// meetings list must be re-scanned (pure, unit-tested).
+#[derive(Default)]
+struct MeetingRefreshTracker {
+    jobs: std::collections::HashMap<i64, String>,
+    state: String,
+}
+
+impl MeetingRefreshTracker {
+    /// Feed one snapshot; returns true when the meeting folders on disk may
+    /// have changed and the UI list should be re-scanned.
+    fn update(&mut self, snapshot_json: &str) -> bool {
+        let snap = crate::core::wire::snapshot_from_json(snapshot_json);
+        let mut needed = false;
+        // A job that stops processing (done/error) just wrote its files.
+        for job in &snap.jobs {
+            let prev = self
+                .jobs
+                .insert(job.job_id, job.status.as_str().to_string());
+            if job.status.as_str() != "processing" && prev.as_deref() == Some("processing") {
+                needed = true;
+            }
+        }
+        // Jobs that disappeared (cancelled/dismissed) may have left files.
+        let live: std::collections::HashSet<i64> = snap.jobs.iter().map(|j| j.job_id).collect();
+        if self.jobs.keys().any(|id| !live.contains(id)) {
+            needed = true;
+        }
+        self.jobs.retain(|id, _| live.contains(id));
+        // A recording just ended — its meeting folder was created/renamed.
+        let was_active = matches!(self.state.as_str(), "recording" | "paused" | "countdown");
+        if snap.state == "idle" && was_active {
+            needed = true;
+        }
+        self.state = snap.state.clone();
+        needed
+    }
 }
 
 async fn handle_command(
@@ -338,7 +455,12 @@ async fn handle_command(
             Ok(_) => {}
             Err(err) => send_error(tx, format!("Could not summarize meeting: {err:#}")),
         },
-        Command::RefreshMeetings => refresh_meetings_async(tx.clone()).await,
+        Command::RefreshMeetings => {
+            let meetings_tx = tx.clone();
+            tokio::spawn(async move {
+                refresh_meetings_event(meetings_tx).await;
+            });
+        }
         Command::RenameMeeting { path, title } => {
             rename_meeting(&path, &title, tx);
         }
@@ -381,6 +503,57 @@ async fn handle_command(
         Command::RefreshInstalls => refresh_installs(proxy, tx).await,
         Command::StartInstall(spec) => {
             call_unit(tx, proxy.start_install(&spec).await, "StartInstall")
+        }
+        Command::TranscribeMeeting {
+            audio,
+            transcript,
+            notes,
+            label,
+        } => match proxy
+            .transcribe_meeting(&audio, &transcript, &notes, &label)
+            .await
+        {
+            Ok(message) if !message.trim().is_empty() => {
+                let _ = tx.send(Event::Toast(message));
+            }
+            Ok(_) => {}
+            Err(err) => send_error(tx, format!("Could not transcribe meeting: {err:#}")),
+        },
+        Command::RefreshEngineStatus => {
+            // Fire-and-forget: never block the command loop on the fs walk
+            // + Ollama probe.
+            let status_tx = tx.clone();
+            tokio::spawn(async move {
+                refresh_engine_status_event(status_tx).await;
+            });
+        }
+        Command::OpenDataFolder(path) => {
+            // Canonicalize first so `..` segments can't sneak past the
+            // string-prefix allow-list; canonicalize the roots the same way
+            // so symlinked homes still match.
+            let base = crate::utils::payloads::payload_base_dir();
+            let store = crate::utils::payloads::ollama_models_store();
+            let canon =
+                |p: &Path| -> PathBuf { p.canonicalize().unwrap_or_else(|_| p.to_path_buf()) };
+            let requested = Path::new(&path);
+            match requested.canonicalize() {
+                Ok(resolved) => {
+                    let base = canon(&base).to_string_lossy().into_owned();
+                    let store = store
+                        .as_deref()
+                        .map(|s| canon(s).to_string_lossy().into_owned());
+                    if is_data_open_allowed(&resolved.to_string_lossy(), &base, store.as_deref()) {
+                        open_path(&resolved.to_string_lossy(), tx).await;
+                    } else {
+                        let _ = tx.send(Event::Toast(
+                            "Folder is outside the app data directory.".into(),
+                        ));
+                    }
+                }
+                Err(_) => {
+                    let _ = tx.send(Event::Toast("Folder does not exist yet.".into()));
+                }
+            }
         }
         Command::RequestClose => {
             let cfg = settings::load();
@@ -612,6 +785,7 @@ fn meeting_json() -> String {
                 "title": m.title.unwrap_or_default(),
                 "has_notes": m.has_notes,
                 "has_transcript": m.has_transcript,
+                "has_audio": m.has_audio,
                 "duration_seconds": m.duration_seconds.unwrap_or(0),
                 "audio_path": audio,
                 "transcript_path": m.path.join("transcript.md").to_string_lossy(),
@@ -661,6 +835,25 @@ async fn open_validated_file(path: &str, tx: &Sender<Event>) {
     open_path(path, tx).await;
 }
 
+/// Pure allow-list for data-folder opens (unit-tested): a path is allowed
+/// when it is the payload base dir or inside it, or the Ollama model store
+/// or inside it. Everything else (e.g. the whole home dir) is rejected.
+/// Roots are normalized (trailing slashes dropped) so `$OLLAMA_MODELS=…/`
+/// style values still match; `..` segments are handled by the caller, which
+/// canonicalizes the requested path before checking it here.
+fn is_data_open_allowed(path: &str, base: &str, ollama_store: Option<&str>) -> bool {
+    let normalize = |root: &str| root.trim_end_matches('/').to_string();
+    let inside = |root: &str| path == root || path.starts_with(&format!("{root}/"));
+    let base = normalize(base);
+    if !base.is_empty() && inside(&base) {
+        return true;
+    }
+    match ollama_store.map(normalize) {
+        Some(store) => !store.is_empty() && inside(&store),
+        None => false,
+    }
+}
+
 fn shellexpand(p: &str) -> String {
     if let Some(rest) = p.strip_prefix("~/") {
         match dirs::home_dir() {
@@ -674,15 +867,6 @@ fn shellexpand(p: &str) -> String {
 
 fn refresh_meetings_sync(tx: &Sender<Event>) {
     let _ = tx.send(Event::Meetings(meeting_json()));
-}
-
-async fn refresh_meetings_async(tx: Sender<Event>) {
-    match tokio::task::spawn_blocking(meeting_json).await {
-        Ok(json) => {
-            let _ = tx.send(Event::Meetings(json));
-        }
-        Err(err) => send_error(&tx, format!("Could not scan meetings: {err:#}")),
-    }
 }
 
 fn rename_meeting(path: &str, title: &str, tx: &Sender<Event>) {
@@ -758,6 +942,11 @@ async fn persist_settings(cfg: Config, proxy: &EngineProxy<'static>, tx: &Sender
         );
     }
     send_settings(tx);
+    // The saved Ollama host may point somewhere else — refresh the status.
+    let status_tx = tx.clone();
+    tokio::spawn(async move {
+        refresh_engine_status_event(status_tx).await;
+    });
     let _ = tx.send(Event::Toast("Settings saved.".into()));
 }
 
@@ -820,6 +1009,7 @@ mod qobject {
         #[qproperty(QString, settings_json)]
         #[qproperty(QString, meetings_json)]
         #[qproperty(QString, installs_json)]
+        #[qproperty(QString, engine_status_json)]
         #[qproperty(QString, toast_message)]
         #[qproperty(i32, toast_serial)]
         #[qproperty(QString, dialog_message)]
@@ -960,6 +1150,21 @@ mod qobject {
         #[cxx_name = "startInstall"]
         fn start_install(self: Pin<&mut Self>, spec: QString);
         #[qinvokable]
+        #[cxx_name = "transcribeMeeting"]
+        fn transcribe_meeting(
+            self: Pin<&mut Self>,
+            audio: QString,
+            transcript: QString,
+            notes: QString,
+            label: QString,
+        );
+        #[qinvokable]
+        #[cxx_name = "refreshEngineStatus"]
+        fn refresh_engine_status(self: Pin<&mut Self>);
+        #[qinvokable]
+        #[cxx_name = "openDataFolder"]
+        fn open_data_folder(self: Pin<&mut Self>, path: QString);
+        #[qinvokable]
         #[cxx_name = "requestClose"]
         fn request_close(self: Pin<&mut Self>);
         #[qinvokable]
@@ -981,6 +1186,7 @@ pub struct AppControllerRust {
     settings_json: QString,
     meetings_json: QString,
     installs_json: QString,
+    engine_status_json: QString,
     toast_message: QString,
     toast_serial: i32,
     dialog_message: QString,
@@ -1006,6 +1212,7 @@ impl Default for AppControllerRust {
             settings_json: QString::from("{}"),
             meetings_json: QString::from("[]"),
             installs_json: QString::from("[]"),
+            engine_status_json: QString::from("{}"),
             toast_message: QString::default(),
             toast_serial: 0,
             dialog_message: QString::default(),
@@ -1049,6 +1256,7 @@ impl qobject::AppController {
             Event::Settings(json) => self.as_mut().set_settings_json(QString::from(&json)),
             Event::Meetings(json) => self.as_mut().set_meetings_json(QString::from(&json)),
             Event::Installs(json) => self.as_mut().set_installs_json(QString::from(&json)),
+            Event::EngineStatus(json) => self.as_mut().set_engine_status_json(QString::from(&json)),
             Event::Toast(message) => {
                 self.as_mut().set_toast_message(QString::from(&message));
                 let serial = *self.toast_serial() + 1;
@@ -1133,7 +1341,16 @@ impl qobject::AppController {
     }
 
     fn select_page(mut self: Pin<&mut Self>, page: QString) {
-        self.as_mut().set_selected_page(page);
+        let page = String::from(page);
+        self.as_mut().set_selected_page(QString::from(&page));
+        // Opening the Library re-scans meetings, so a freshly processed
+        // recording is never missing from a stale list.
+        if page == "library" {
+            self.rust().send(Command::RefreshMeetings);
+        }
+        if page == "models" || page == "downloads" {
+            self.rust().send(Command::RefreshEngineStatus);
+        }
     }
 
     fn set_title(self: Pin<&mut Self>, title: QString) {
@@ -1256,6 +1473,27 @@ impl qobject::AppController {
     fn start_install(self: Pin<&mut Self>, spec: QString) {
         self.rust().send(Command::StartInstall(String::from(spec)));
     }
+    fn transcribe_meeting(
+        self: Pin<&mut Self>,
+        audio: QString,
+        transcript: QString,
+        notes: QString,
+        label: QString,
+    ) {
+        self.rust().send(Command::TranscribeMeeting {
+            audio: String::from(audio),
+            transcript: String::from(transcript),
+            notes: String::from(notes),
+            label: String::from(label),
+        });
+    }
+    fn refresh_engine_status(self: Pin<&mut Self>) {
+        self.rust().send(Command::RefreshEngineStatus);
+    }
+    fn open_data_folder(self: Pin<&mut Self>, path: QString) {
+        self.rust()
+            .send(Command::OpenDataFolder(String::from(path)));
+    }
     fn request_close(self: Pin<&mut Self>) {
         self.rust().send(Command::RequestClose);
     }
@@ -1310,6 +1548,80 @@ mod tests {
         assert!(is_open_allowed("/meetings", &dirs, "/meetings"));
         assert!(!is_open_allowed("/etc/passwd", &dirs, "/meetings"));
         assert!(!is_open_allowed("/meetings-evil/x", &dirs, "/meetings"));
+    }
+
+    #[test]
+    fn data_open_allow_list_covers_payload_dirs_only() {
+        let base = "/home/u/.local/share/gravaai";
+        let store = "/home/u/.ollama/models";
+        assert!(is_data_open_allowed(
+            "/home/u/.local/share/gravaai/whisper.cpp",
+            base,
+            Some(store)
+        ));
+        assert!(is_data_open_allowed(
+            "/home/u/.local/share/gravaai/whisper-cpp-models/ggml-small.bin",
+            base,
+            Some(store)
+        ));
+        assert!(is_data_open_allowed(base, base, Some(store)));
+        assert!(is_data_open_allowed(
+            "/home/u/.ollama/models/blobs/sha256-x",
+            base,
+            Some(store)
+        ));
+        // A trailing slash on the root (e.g. $OLLAMA_MODELS) still matches.
+        assert!(is_data_open_allowed(
+            "/home/u/.ollama/models",
+            base,
+            Some("/home/u/.ollama/models/")
+        ));
+        // The whole home directory is not openable through this entry point.
+        assert!(!is_data_open_allowed("/home/u", base, Some(store)));
+        // A sibling directory that starts with the same prefix must fail.
+        assert!(!is_data_open_allowed(
+            "/home/u/.local/share/gravaai-evil/x",
+            base,
+            Some(store)
+        ));
+        // Without a known Ollama store only the payload base is allowed.
+        assert!(!is_data_open_allowed("/home/u/.ollama/models", base, None));
+    }
+
+    #[test]
+    fn meeting_refresh_tracker_fires_on_finish_and_record_end() {
+        let snap = |state: &str, jobs: &[(&str, &str)]| {
+            let list: Vec<serde_json::Value> = jobs
+                .iter()
+                .map(|(id, st)| {
+                    serde_json::json!({"job_id": id.parse::<i64>().unwrap(), "status": st})
+                })
+                .collect();
+            serde_json::json!({"state": state, "jobs": list}).to_string()
+        };
+        let mut tracker = MeetingRefreshTracker::default();
+        // Idle with no jobs: nothing to refresh.
+        assert!(!tracker.update(&snap("idle", &[])));
+        // A job appears while processing: folders have not changed yet.
+        assert!(!tracker.update(&snap("idle", &[("1", "processing")])));
+        // Status text churn (still processing) must NOT trigger refreshes.
+        assert!(!tracker.update(&snap("idle", &[("1", "processing")])));
+        // Job finishes: refresh.
+        assert!(tracker.update(&snap("idle", &[("1", "done")])));
+        // Recording started — the finished job disappears from the snapshot,
+        // which also warrants a re-scan (dismissed/cancelled jobs may leave
+        // files behind).
+        assert!(tracker.update(&snap("recording", &[])));
+        // Active recording states churn without triggering refreshes.
+        assert!(!tracker.update(&snap("paused", &[])));
+        assert!(!tracker.update(&snap("recording", &[])));
+        // Recording ended: its meeting folder was created/renamed — refresh.
+        assert!(tracker.update(&snap("idle", &[])));
+        // Job cancelled/removed: refresh (files may be left behind).
+        assert!(!tracker.update(&snap("idle", &[("2", "processing")])));
+        assert!(tracker.update(&snap("idle", &[])));
+        // Garbage snapshot is tolerated.
+        assert!(!tracker.update("garbage"));
     }
 
     #[test]

@@ -70,6 +70,16 @@ ApplicationWindow {
             { key: "whisper_cpp:model", status: "Downloading 42%" },
             { key: "ollama:model", status: "Ready" }
         ])
+        controller.engine_status_json = JSON.stringify({
+            base_dir: "/tmp/gravaai-data",
+            payloads: [
+                { name: "whisper.cpp engine (whisper-cli)", kind: "engine", path: "/tmp/gravaai-data/whisper.cpp", path_is_dir: true, size_bytes: 12300000, present: true },
+                { name: "ggml-large-v3-turbo.bin", kind: "model", path: "/tmp/gravaai-data/whisper-cpp-models/ggml-large-v3-turbo.bin", path_is_dir: false, size_bytes: 1600000000, present: true },
+                { name: "phi4-mini:latest", kind: "model", path: "/tmp/ollama-store", path_is_dir: true, size_bytes: 2500000000, present: true }
+            ],
+            whisper: { engine_installed: true, engine_path: "/tmp/gravaai-data/whisper.cpp", engine_size_bytes: 12300000, models_dir: "/tmp/gravaai-data/whisper-cpp-models", models_url: "https://example.invalid" },
+            ollama: { installed: true, binary_path: "/tmp/gravaai-data/ollama/ollama", serving: true, host: "http://localhost:11434", models_dir: "/tmp/ollama-store", models: [{ name: "phi4-mini:latest", size: 2500000000 }] }
+        })
         smokeTimer.start()
     }
 
@@ -86,6 +96,7 @@ ApplicationWindow {
             LibraryPage { id: libraryPage; controller: root.controller }
             JobsPage { id: jobsPage; controller: root.controller }
             ModelsPage { id: modelsPage; controller: root.controller }
+            DownloadsPage { id: downloadsPage; controller: root.controller }
             PromptsPage { id: promptsPage; controller: root.controller }
             GeneralPage { id: generalPage; controller: root.controller }
         }

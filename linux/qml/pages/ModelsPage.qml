@@ -8,12 +8,17 @@ Item {
     required property AppController controller
     property var cfg: ({})
     property var installs: []
+    property var status: ({})
     Layout.fillWidth: true
     Layout.fillHeight: true
 
     function readData() {
         try { root.cfg = JSON.parse(controller.settings_json) } catch (error) { root.cfg = {} }
         try { root.installs = JSON.parse(controller.installs_json) } catch (error2) { root.installs = [] }
+        readStatus()
+    }
+    function readStatus() {
+        try { root.status = JSON.parse(controller.engine_status_json) } catch (error) { root.status = {} }
     }
     function install(kind, model, backend, host) {
         controller.startInstall(JSON.stringify({kind: kind || "", model: model || "", backend: backend || "", host: host || ""}))
@@ -54,12 +59,38 @@ Item {
         if (root.installs.length === 0) return "No installs running."
         return root.installs.map(function(i) { return (i.key || "?") + ": " + (i.status || "running") }).join("\n")
     }
+    function fmtSize(bytes) {
+        var b = Number(bytes || 0)
+        if (b <= 0) return ""
+        if (b < 1048576) return Math.max(1, Math.round(b / 1024)) + " KB"
+        if (b < 1073741824) return (b / 1048576).toFixed(1) + " MB"
+        return (b / 1073741824).toFixed(2) + " GB"
+    }
+    function whisperStatus() {
+        var w = root.status.whisper || {}
+        if (!w.engine_path) return "Checking…"
+        return w.engine_installed ? "Installed · " + root.fmtSize(w.engine_size_bytes) : "Not installed"
+    }
+    function ggmlModels() {
+        return (root.status.payloads || []).filter(function(p) { return p.kind === "model" && p.name.indexOf("ggml-") === 0 })
+    }
+    function ollamaModels() {
+        return (root.status.ollama || {}).models || []
+    }
+    function ollamaStatus() {
+        var o = root.status.ollama || {}
+        if (!root.status.base_dir) return "Checking…"
+        if (!o.installed) return "Not installed"
+        if (o.serving) return "Running at " + (o.host || "http://localhost:11434") + " · " + root.ollamaModels().length + " model(s)"
+        return "Installed — the server starts automatically when a job needs it"
+    }
 
     Component.onCompleted: readData()
     property Connections controllerConnection: Connections {
         target: controller
         function onSettings_jsonChanged() { root.readData() }
         function onInstalls_jsonChanged() { root.readData() }
+        function onEngine_status_jsonChanged() { root.readStatus() }
     }
 
     Flickable {
@@ -141,6 +172,64 @@ Item {
                 Layout.fillWidth: true
                 ColumnLayout {
                     spacing: 10
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "Status"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true; Layout.fillWidth: true }
+                        AppButton { text: "Refresh"; variant: "secondary"; implicitHeight: 30; onClicked: controller.refreshEngineStatus() }
+                    }
+                    ColumnLayout {
+                        spacing: 2
+                        Layout.fillWidth: true
+                        Label { text: "whisper.cpp (transcription)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
+                        Label { text: root.whisperStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
+                        Label { text: (root.status.whisper || {}).engine_path || ""; visible: (root.status.whisper || {}).engine_installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                    }
+                    ColumnLayout {
+                        spacing: 2
+                        Layout.fillWidth: true
+                        Label { text: "GGML models"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
+                        Label {
+                            visible: root.ggmlModels().length === 0
+                            text: "No models downloaded."
+                            color: Theme.textMuted; font.pixelSize: 12
+                        }
+                        Repeater {
+                            model: root.ggmlModels()
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Label { text: root.fmtSize(modelData.size_bytes); color: Theme.textMuted; font.pixelSize: 11 }
+                            }
+                        }
+                        Label { text: "Models come from HuggingFace: " + ((root.status.whisper || {}).models_url || ""); color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                    }
+                    ColumnLayout {
+                        spacing: 2
+                        Layout.fillWidth: true
+                        Label { text: "Ollama (summarization)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
+                        Label { text: root.ollamaStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
+                        Label { text: (root.status.ollama || {}).binary_path || ""; visible: (root.status.ollama || {}).installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                        Repeater {
+                            model: root.ollamaModels()
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Label { text: root.fmtSize(modelData.size); color: Theme.textMuted; font.pixelSize: 11 }
+                            }
+                        }
+                    }
+                    Label { text: root.installStatusText(); color: Theme.textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
+                }
+            }
+
+            AppCard {
+                Layout.fillWidth: true
+                ColumnLayout {
+                    spacing: 10
                     Label { text: "Request timeout"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
                     RowLayout {
                         Layout.fillWidth: true
@@ -148,11 +237,9 @@ Item {
                         Label { text: "Minutes"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
                         AppComboBox { id: timeout; model: ["1", "2", "3", "5", "8", "10"]; currentIndex: root.indexOfValue(["1", "2", "3", "5", "8", "10"], String(root.cfg.llm_request_timeout_minutes || 5)); Layout.fillWidth: true }
                     }
-                    Label { text: root.installStatusText(); color: Theme.textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
                     RowLayout {
                         Layout.fillWidth: true
                         Item { Layout.fillWidth: true }
-                        AppButton { text: "Refresh installs"; variant: "secondary"; onClicked: controller.refreshInstalls() }
                         AppButton { text: "Save model settings"; onClicked: root.save() }
                     }
                 }

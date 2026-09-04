@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::config::defaults::Config;
 use crate::config::settings;
-use crate::core::job::{CancelToken, Job, JobStatus};
+use crate::core::job::{CancelToken, Job, JobMode, JobStatus};
 use crate::core::job_manager::JobManager;
 use crate::core::recording_controller::{
     Callbacks, PendingRecording, RecorderBackend, RecordingController,
@@ -63,7 +63,7 @@ pub struct EngineHooks {
 /// Processing-child backend. The real one spawns `--process` children; tests
 /// inject a fake that records launches.
 pub trait ProcessorBackend: Send {
-    fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str);
+    fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str, mode: JobMode);
     fn cancel(&mut self, job_id: i64);
 }
 
@@ -219,6 +219,11 @@ impl<R: RecorderBackend + Send> Engine<R> {
             .unwrap_or_default()
     }
 
+    #[cfg(test)]
+    pub fn job_mode_for(&self, job_id: i64) -> Option<JobMode> {
+        self.jobs.find(job_id).map(|j| j.mode)
+    }
+
     // ------------------------------------------------------------------
     // Recording commands (event-loop thread only)
     // ------------------------------------------------------------------
@@ -346,12 +351,44 @@ impl<R: RecorderBackend + Send> Engine<R> {
     }
 
     /// Process a library meeting; returns an error string or None on success.
+    ///
+    /// Mode selection: a meeting that already has a transcript on disk is
+    /// summarized directly (never re-transcribed); otherwise the full
+    /// transcribe+summarize pipeline runs.
     pub fn summarize_meeting(
         &mut self,
         audio: &str,
         transcript: &str,
         notes: &str,
         label: &str,
+    ) -> Option<String> {
+        self.create_meeting_job(audio, transcript, notes, label, None)
+    }
+
+    /// Transcribe a library meeting (audio-only rows). Never summarizes.
+    pub fn transcribe_meeting(
+        &mut self,
+        audio: &str,
+        transcript: &str,
+        notes: &str,
+        label: &str,
+    ) -> Option<String> {
+        self.create_meeting_job(
+            audio,
+            transcript,
+            notes,
+            label,
+            Some(JobMode::TranscribeOnly),
+        )
+    }
+
+    fn create_meeting_job(
+        &mut self,
+        audio: &str,
+        transcript: &str,
+        notes: &str,
+        label: &str,
+        forced_mode: Option<JobMode>,
     ) -> Option<String> {
         if self
             .jobs
@@ -361,11 +398,19 @@ impl<R: RecorderBackend + Send> Engine<R> {
         {
             return Some("This meeting is already being processed.".to_string());
         }
-        let id = self.jobs.create(
+        let mode = forced_mode.unwrap_or_else(|| {
+            if PathBuf::from(transcript).is_file() {
+                JobMode::SummarizeOnly
+            } else {
+                JobMode::Full
+            }
+        });
+        let id = self.jobs.create_with_mode(
             audio.into(),
             transcript.into(),
             notes.into(),
             label.to_string(),
+            mode,
         );
         self.changed();
         self.launch_processor(id);
@@ -554,7 +599,8 @@ impl<R: RecorderBackend + Send> Engine<R> {
             job.transcript_path.to_string_lossy().into_owned(),
             job.notes_path.to_string_lossy().into_owned(),
         );
-        self.backend.launch(job_id, &a, &t, &n);
+        let mode = job.mode;
+        self.backend.launch(job_id, &a, &t, &n, mode);
         self.changed();
     }
 
@@ -677,14 +723,21 @@ mod tests {
     }
 
     struct FakeBackend {
-        launched: Vec<(i64, String, String, String)>,
+        launched: Vec<(i64, String, String, String, JobMode)>,
         cancelled: Vec<i64>,
     }
 
     impl ProcessorBackend for FakeBackend {
-        fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str) {
+        fn launch(
+            &mut self,
+            job_id: i64,
+            audio: &str,
+            transcript: &str,
+            notes: &str,
+            mode: JobMode,
+        ) {
             self.launched
-                .push((job_id, audio.into(), transcript.into(), notes.into()));
+                .push((job_id, audio.into(), transcript.into(), notes.into(), mode));
         }
         fn cancel(&mut self, job_id: i64) {
             self.cancelled.push(job_id);
@@ -703,11 +756,18 @@ mod tests {
     struct SharedBackend(Arc<Mutex<FakeBackend>>);
 
     impl ProcessorBackend for SharedBackend {
-        fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str) {
+        fn launch(
+            &mut self,
+            job_id: i64,
+            audio: &str,
+            transcript: &str,
+            notes: &str,
+            mode: JobMode,
+        ) {
             self.0
                 .lock()
                 .unwrap()
-                .launch(job_id, audio, transcript, notes);
+                .launch(job_id, audio, transcript, notes, mode);
         }
         fn cancel(&mut self, job_id: i64) {
             self.0.lock().unwrap().cancel(job_id);
@@ -812,6 +872,32 @@ mod tests {
         assert_eq!(f.engine.job_folder(job_id).as_deref(), Some("/m/new"));
         let snap = f.engine.snapshot_json();
         assert!(snap.contains("\"status\":\"done\""));
+    }
+
+    #[test]
+    fn library_jobs_pick_the_right_pipeline_mode() {
+        let mut f = fixture();
+        let dir = tempfile::tempdir().unwrap();
+        let t = dir.path().join("transcript.md");
+        std::fs::write(&t, "hello").unwrap();
+        let transcript = t.to_string_lossy().into_owned();
+        // A meeting with a transcript on disk is summarized only — the
+        // existing transcript is never re-transcribed.
+        f.engine
+            .summarize_meeting("/a.mp3", &transcript, "/n.md", "L");
+        // Transcribe forces transcribe-only even when a transcript exists.
+        f.engine
+            .transcribe_meeting("/b.mp3", &transcript, "/n.md", "L");
+        // A meeting without a transcript runs the full pipeline.
+        f.engine
+            .summarize_meeting("/c.mp3", "/missing/t.md", "/n.md", "L");
+        let launched = f.launched.lock().unwrap();
+        assert_eq!(launched.launched.len(), 3);
+        assert_eq!(launched.launched[0].4, JobMode::SummarizeOnly);
+        assert_eq!(launched.launched[1].4, JobMode::TranscribeOnly);
+        assert_eq!(launched.launched[2].4, JobMode::Full);
+        // The queued job persists its mode.
+        assert_eq!(f.engine.job_mode_for(1), Some(JobMode::TranscribeOnly));
     }
 
     #[test]

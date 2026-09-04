@@ -292,8 +292,10 @@ models install concurrently while the same request dedups); the daemon emits
 to the open Models page and `GetInstalls()` lets a reopened window re-attach
 to in-flight installs (`reflect_running_installs`). An Ollama model download
 starts `ollama serve` automatically when the binary is present and the host
-is local (`ensure_ollama_serving`, with readiness wait); remote hosts and
-missing binaries fail with guidance instead. An auto-started server's pid is
+is local (`ensure_ollama_serving`, with readiness wait); the same auto-start
+runs right after a fresh Ollama runtime install, so "Install Ollama" leaves a
+working server behind (remote hosts and missing binaries still fail with
+guidance). An auto-started server's pid is
 recorded in `$XDG_STATE_HOME/gravaai/ollama-server.json` and the
 daemon stops exactly that process on exit (verified via `/proc` cmdline) —
 a pre-existing server has no record and is never interfered with. Install failures are
@@ -301,8 +303,10 @@ surfaced, never silent: the Models page writes the reason into the row
 subtitle/tooltip (engine installs) or the model row (downloads) and shows an
 `AlertDialog`; the daemon additionally emits a desktop notification so a
 failure with no open window is still visible. Read-only status
-checks (is-cached / ollama-reachable) still run in the window on worker
-threads, hopping back via main-loop pollers.
+checks run in the window on worker threads: `controller::engine_status_json`
+(`utils/payloads.rs`) walks `~/.local/share/gravaai` and makes one short
+Ollama `/api/tags` probe, refreshed at startup, when the Models/Downloads page
+is opened, after every finished install and after Settings are saved.
 
 **Audio recording** (`audio/`):
 - `recorder.rs` runs a single `ffmpeg` subprocess reading PulseAudio/PipeWire
@@ -361,6 +365,15 @@ daemon), and `CancelToken` provides cooperative cancellation.
 - `Pipeline` runs transcription then summarization as separate calls.
   `run(token)` checks cancellation **between stages** (an in-flight request
   still completes but no further stage starts and nothing is written).
+  `PipelineMode` (mirrored by `core::job::JobMode`, persisted in jobs.json
+  with a `full` default for older files) selects the stages: `Full`
+  (transcribe+summarize), `TranscribeOnly` (transcript only, no notes) and
+  `SummarizeOnly` (uses the existing transcript file, never re-transcribes).
+  The engine picks the mode for Library actions: Summarize on a meeting with
+  a transcript on disk → `SummarizeOnly`, the Library Transcribe button →
+  `TranscribeOnly`, everything else → `Full`. The `--process` child receives
+  the mode as an optional `--transcribe-only` / `--summarize-only` flag
+  before the positional paths (`processor::parse_process_args`).
 - Transient network failures (timeouts, connection resets, 5xx, 429) are
   retried with exponential backoff via `core/retry.rs` — used around the
   OpenAI-compatible and Ollama calls. Permanent errors (bad key, 4xx, model
@@ -435,10 +448,15 @@ startup failures in `window-qt.log` (1 MiB plus one backup).
 
 **UI pages and integration:** `qml/pages/` implements Recorder (dashboard with
 recording, live processing-pipeline, background-jobs and recent-meetings
-cards), Library, Models & Services, Prompts and General. There is no About
+cards), Library, Models & Services (with a live Status card), Downloads
+(payload inventory with paths/sizes), Prompts and General. There is no About
 page and no Local-tools section. `JobsPage.qml` is retained as a tested
 building block but is not in the sidebar navigation — jobs are managed from
-the Recorder dashboard. `AppController`
+the Recorder dashboard. The meeting lists (Recorder recent card + Library)
+refresh themselves when a background job finishes or a recording is saved
+(`controller::MeetingRefreshTracker` on `SnapshotChanged`) and when the
+Library page is opened; the Library and recent card expose Transcribe and
+Summarize actions (mode-aware, see below). `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
@@ -582,10 +600,12 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `core/retry.rs` — transient classifier (5xx/429/timeout/connect sniffing),
   retry-then-succeed, permanent-fails-immediately.
 - `core/state_machine.rs` — `can_transition` legality table.
-- `core/job.rs` — row `actions_for_status` policy, `CancelToken`.
+- `core/job.rs` — row `actions_for_status` policy, `CancelToken`, `JobMode`
+  serialization defaults.
 - `core/job_manager.rs` — persistence round-trips, cancelled-job exclusion,
   startup recovery (interrupted→error+retry, done pruned, id collision
-  avoidance, corrupt state tolerated), plus the pure `restore_status` policy.
+  avoidance, corrupt state tolerated), mode round-trip + legacy
+  (mode-less) jobs.json loading, plus the pure `restore_status` policy.
 - `core/errors.rs` — dialog-vs-toast `error_presentation` policy.
 - `core/recording_controller.rs` — full lifecycle headless (start/pause/
   resume, stop with and without countdown, countdown tick/cancel,
@@ -595,7 +615,10 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   `core/commands.rs` — key/install-key JSON round-trips, mode dispatch,
   close policy, owner-watch policy, snapshot round-trip + tolerant parsing,
   pacman version parsing (AppImage VERSION file is read at runtime).
-- `processing/pipeline.rs` — fail-fast without audio, cancel-before-start.
+- `processing/pipeline.rs` — fail-fast without audio, cancel-before-start,
+  pipeline modes (`SummarizeOnly` requires an existing transcript file and
+  skips transcription, `TranscribeOnly` routes to the transcribe stage and
+  writes nothing when cancelled).
 - `processing/providers/openai_compat.rs` — `{transcript}` prompt rendering +
   append-fallback, verbose-JSON segment extraction, clear auth errors.
 - `processing/providers/whisper_cpp.rs` — pure `parse_whisper_cpp_output`
@@ -608,22 +631,25 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
   autostart entry management (`autostart`), AppImage-aware exe resolution
-  that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata
-  (`meeting_scanner`), in-tree-reuse vs. copy (`recording_import`),
+  that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata +
+  `has_audio` (`meeting_scanner`), payload inventory + dir sizes + status
+  JSON shape (`payloads`), in-tree-reuse vs. copy (`recording_import`),
   uninstall target plan + removal (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +
   backend detection + verified download/extract/smoke-test
   (`whisper_cpp_service`, including auto→cpu routing, cuda rejection, and
   missing-binary diagnostics naming archive contents), Ollama prefix-match +
   unreachable tolerance + automatic `ollama serve` startup for pulls and
-  summarization (`ollama_service`: local-host gating, readiness wait,
-  pid-record ownership with verified stop-on-exit, install guidance when no
-  binary/remote host).
-- `daemon/` — child protocol parsing (`processor`), stderr tail buffer
-  (`child_io`), window spawn-vs-present (`window_supervisor`), install
-  dedup/progress/finished routing (`install_manager`), headless `Engine`
-  snapshot/lifecycle/child-event handling with a fake backend (`engine`,
-  including recording without an API key and auto-process-off saves audio only).
+  summarization + `/api/tags` name/size parsing (`ollama_service`: local-host
+  gating, readiness wait, pid-record ownership with verified stop-on-exit,
+  install guidance when no binary/remote host).
+- `daemon/` — child protocol parsing + `--process` mode-flag split
+  (`processor`), stderr tail buffer (`child_io`), window spawn-vs-present
+  (`window_supervisor`), install dedup/progress/finished routing
+  (`install_manager`), headless `Engine` snapshot/lifecycle/child-event
+  handling with a fake backend (`engine`, including recording without an API
+  key, auto-process-off saves audio only, and Library job mode selection:
+  summarize-only with a transcript, transcribe-only via Transcribe).
 - `ui/` — pure tray policy (`tray_model`: appearance priority, per-state menus,
   never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
   pause bars / processing sweep), Models-tab visibility (`settings_visibility`),
@@ -631,8 +657,10 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   renders empty (`tray`), the notification gate that suppresses alerts
   unless the StatusNotifier registration is live (`notifications`), and the
   Qt controller library payload (`qt/controller`: meetings JSON carries
-  resolved audio/transcript/notes paths, validated file-open allow-list,
-  AppImage-safe opener environment, portal `file://` percent-encoding).
+  resolved audio/transcript/notes paths + `has_audio`, validated file-open
+  allow-list, data-folder allow-list, the snapshot-driven
+  `MeetingRefreshTracker` that keeps the meeting lists fresh, AppImage-safe
+  opener environment, portal `file://` percent-encoding).
 
 The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by

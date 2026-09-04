@@ -34,6 +34,17 @@ impl OllamaClient {
 
     /// Installed model names, or None if Ollama is unreachable.
     pub fn get_installed_models(&self, host: &str) -> Option<Vec<String>> {
+        Some(
+            self.get_installed_models_with_sizes(host)?
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect(),
+        )
+    }
+
+    /// Installed models with their on-disk sizes, or None when the server is
+    /// unreachable. Sizes come straight from `/api/tags`.
+    pub fn get_installed_models_with_sizes(&self, host: &str) -> Option<Vec<(String, u64)>> {
         let data: serde_json::Value = self
             .inner
             .get(format!("{}/api/tags", Self::base(host)))
@@ -42,19 +53,7 @@ impl OllamaClient {
             .ok()?
             .json()
             .ok()?;
-        Some(
-            data.get("models")
-                .and_then(|m| m.as_array())
-                .cloned()
-                .unwrap_or_default()
-                .iter()
-                .filter_map(|m| {
-                    m.get("name")
-                        .and_then(|n| n.as_str())
-                        .map(|s| s.to_string())
-                })
-                .collect(),
-        )
+        Some(parse_ollama_tags(&data))
     }
 
     pub fn is_model_installed(&self, model: &str, installed: &[String]) -> bool {
@@ -134,6 +133,21 @@ impl Default for OllamaClient {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Pure parser for an `/api/tags` payload: `(name, size_bytes)` pairs.
+/// Tolerates missing sizes (0) and missing models (empty list).
+pub fn parse_ollama_tags(data: &serde_json::Value) -> Vec<(String, u64)> {
+    data.get("models")
+        .and_then(|m| m.as_array())
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|m| {
+            let name = m.get("name").and_then(|n| n.as_str())?;
+            let size = m.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
+            Some((name.to_string(), size))
+        })
+        .collect()
 }
 
 /// True when `host` points at this machine (empty = the default localhost).
@@ -466,6 +480,27 @@ fn ensure_ollama_serving_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_tags_extraction() {
+        let data = serde_json::json!({
+            "models": [
+                {"name": "phi4-mini:latest", "size": 2_500_000_000u64},
+                {"name": "gemma3:4b"},
+                {"not-a-model": true}
+            ]
+        });
+        let parsed = parse_ollama_tags(&data);
+        assert_eq!(
+            parsed,
+            vec![
+                ("phi4-mini:latest".to_string(), 2_500_000_000u64),
+                ("gemma3:4b".to_string(), 0)
+            ]
+        );
+        assert!(parse_ollama_tags(&serde_json::json!({})).is_empty());
+        assert!(parse_ollama_tags(&serde_json::json!(null)).is_empty());
+    }
 
     #[test]
     fn prefix_match() {

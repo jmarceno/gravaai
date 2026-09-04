@@ -72,6 +72,24 @@ Item {
     function jobId(j) {
         return (j.job_id !== undefined) ? j.job_id : (j.id !== undefined ? j.id : -1)
     }
+    function audioFor(m) {
+        return m.audio_path || (m.path + "/recording.mp3")
+    }
+    function transcriptFor(m) {
+        return m.transcript_path || (m.path + "/transcript.md")
+    }
+    function notesFor(m) {
+        return m.notes_path || (m.path + "/notes.md")
+    }
+    function meetingTitle(m) {
+        return (m.title && m.title.length > 0) ? m.title : (m.time_label || "Meeting")
+    }
+    function transcribe(m) {
+        root.controller.transcribeMeeting(audioFor(m), transcriptFor(m), notesFor(m), meetingTitle(m))
+    }
+    function summarize(m) {
+        root.controller.summarizeMeeting(audioFor(m), transcriptFor(m), notesFor(m), meetingTitle(m))
+    }
 
     Component.onCompleted: { updateSnapshot(); updateCfg() }
     property Connections controllerConnection: Connections {
@@ -418,20 +436,35 @@ Item {
                                 Label { text: root.friendlyTime(modelData.path, modelData.time_label) + (modelData.duration_seconds ? " · " + root.durationLabel(modelData.duration_seconds) : ""); color: Theme.textMuted; font.pixelSize: 11 }
                             }
                             AppButton {
-                                text: "Transcript"
+                                text: "Transcribe"
                                 variant: "teal"
                                 implicitHeight: 30
-                                enabled: modelData.has_transcript
+                                visible: !modelData.has_transcript
+                                enabled: modelData.has_audio !== false
                                 opacity: enabled ? 1.0 : 0.45
-                                onClicked: root.controller.openFile(modelData.transcript_path || (modelData.path + "/transcript.md"))
+                                onClicked: root.transcribe(modelData)
+                            }
+                            AppButton {
+                                text: "Summarize"
+                                variant: "teal"
+                                implicitHeight: 30
+                                enabled: modelData.has_transcript || modelData.has_audio !== false
+                                opacity: enabled ? 1.0 : 0.45
+                                onClicked: root.summarize(modelData)
+                            }
+                            AppButton {
+                                text: "Transcript"
+                                variant: "secondary"
+                                implicitHeight: 30
+                                visible: modelData.has_transcript
+                                onClicked: root.controller.openFile(root.transcriptFor(modelData))
                             }
                             AppButton {
                                 text: "Notes"
-                                variant: "warning"
+                                variant: "secondary"
                                 implicitHeight: 30
-                                enabled: modelData.has_notes
-                                opacity: enabled ? 1.0 : 0.45
-                                onClicked: root.controller.openFile(modelData.notes_path || (modelData.path + "/notes.md"))
+                                visible: modelData.has_notes
+                                onClicked: root.controller.openFile(root.notesFor(modelData))
                             }
                             Button {
                                 text: "›"

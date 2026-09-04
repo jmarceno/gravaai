@@ -24,6 +24,7 @@ fn main() {
         QmlFile::from("qml/pages/LibraryPage.qml"),
         QmlFile::from("qml/pages/JobsPage.qml"),
         QmlFile::from("qml/pages/ModelsPage.qml"),
+        QmlFile::from("qml/pages/DownloadsPage.qml"),
         QmlFile::from("qml/pages/PromptsPage.qml"),
         QmlFile::from("qml/pages/GeneralPage.qml"),
         // Test-only scene used by the offscreen geometry/contract smoke gate.

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::job::{CancelToken, Job, JobStatus};
+use super::job::{CancelToken, Job, JobMode, JobStatus};
 
 pub const INTERRUPTED_MSG: &str = "Interrupted — the app exited while this job was running";
 
@@ -29,6 +29,8 @@ struct PersistedJob {
     label: String,
     status: String,
     error_msg: Option<String>,
+    #[serde(default)]
+    mode: JobMode,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -95,12 +97,31 @@ impl JobManager {
         notes_path: PathBuf,
         label: String,
     ) -> i64 {
-        let job = Job::new(
+        self.create_with_mode(
+            audio_path,
+            transcript_path,
+            notes_path,
+            label,
+            JobMode::Full,
+        )
+    }
+
+    /// Create a job with an explicit pipeline mode (transcribe-only, etc.).
+    pub fn create_with_mode(
+        &mut self,
+        audio_path: PathBuf,
+        transcript_path: PathBuf,
+        notes_path: PathBuf,
+        label: String,
+        mode: JobMode,
+    ) -> i64 {
+        let job = Job::with_mode(
             self.allocate_id(),
             audio_path,
             transcript_path,
             notes_path,
             label,
+            mode,
         );
         let id = job.job_id;
         self.jobs.push(job);
@@ -154,6 +175,7 @@ impl JobManager {
                 label: j.label.clone(),
                 status: j.status.as_str().to_string(),
                 error_msg: j.error_msg.clone(),
+                mode: j.mode,
             })
             .collect();
         let state = PersistedState {
@@ -220,6 +242,10 @@ impl JobManager {
                                 .map(|s| s.to_string())
                         }),
                         cancelled: false,
+                        mode: entry
+                            .get("mode")
+                            .and_then(|m| serde_json::from_value(m.clone()).ok())
+                            .unwrap_or(JobMode::Full),
                         token: CancelToken::new(),
                     })
                 })();
@@ -303,5 +329,46 @@ mod tests {
         m.persist();
         let mut m2 = JobManager::new(Some(_d.path().to_path_buf()));
         assert!(m2.load_persisted().is_empty());
+    }
+
+    #[test]
+    fn mode_round_trip_and_legacy_jobs_default_to_full() {
+        let (_d, mut m) = tmp_mgr();
+        let id = m.create_with_mode(
+            "a.mp3".into(),
+            "t.md".into(),
+            "n.md".into(),
+            "L".into(),
+            JobMode::TranscribeOnly,
+        );
+        let mut m2 = JobManager::new(Some(_d.path().to_path_buf()));
+        let ids = m2.load_persisted();
+        assert_eq!(ids, vec![id]);
+        assert_eq!(m2.find(id).unwrap().mode, JobMode::TranscribeOnly);
+
+        // A jobs.json written by an older build has no `mode` key: it must
+        // still load, defaulting to the full pipeline.
+        let legacy = serde_json::json!({
+            "version": 1,
+            "next_id": 2,
+            "jobs": [{
+                "job_id": 1,
+                "audio_path": "a.mp3",
+                "transcript_path": "t.md",
+                "notes_path": "n.md",
+                "label": "L",
+                "status": "error",
+                "error_msg": null
+            }]
+        });
+        std::fs::write(
+            _d.path().join("jobs.json"),
+            serde_json::to_string(&legacy).unwrap(),
+        )
+        .unwrap();
+        let mut m3 = JobManager::new(Some(_d.path().to_path_buf()));
+        let ids = m3.load_persisted();
+        assert_eq!(ids, vec![1]);
+        assert_eq!(m3.find(1).unwrap().mode, JobMode::Full);
     }
 }

@@ -17,6 +17,18 @@ use crate::utils::meeting_scanner::{rename_meeting_path, write_metadata};
 use super::summarization::{create_prompt_provider, create_summarization_provider};
 use super::transcription::create_transcription_provider;
 
+/// Which stages the pipeline runs (mirrors `core::job::JobMode`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PipelineMode {
+    /// Transcribe, then summarize (the normal pipeline).
+    #[default]
+    Full,
+    /// Transcribe only — write transcript.md, never notes.md.
+    TranscribeOnly,
+    /// Summarize an existing transcript — never re-transcribe.
+    SummarizeOnly,
+}
+
 #[derive(Debug)]
 pub struct PipelineCancelled;
 
@@ -36,6 +48,7 @@ pub struct Pipeline {
     transcript_path: Option<PathBuf>,
     notes_path: Option<PathBuf>,
     on_status: Option<StatusCallback>,
+    mode: PipelineMode,
 }
 
 impl Pipeline {
@@ -46,12 +59,31 @@ impl Pipeline {
         notes_path: Option<PathBuf>,
         on_status: Option<StatusCallback>,
     ) -> Self {
+        Self::with_mode(
+            config,
+            audio_path,
+            transcript_path,
+            notes_path,
+            on_status,
+            PipelineMode::Full,
+        )
+    }
+
+    pub fn with_mode(
+        config: Config,
+        audio_path: Option<PathBuf>,
+        transcript_path: Option<PathBuf>,
+        notes_path: Option<PathBuf>,
+        on_status: Option<StatusCallback>,
+        mode: PipelineMode,
+    ) -> Self {
         Self {
             config,
             audio_path,
             transcript_path,
             notes_path,
             on_status,
+            mode,
         }
     }
 
@@ -66,20 +98,81 @@ impl Pipeline {
     /// in-flight network call still completes, but no further stage starts
     /// and nothing is written).
     pub fn run(&mut self, cancel_token: Option<&CancelToken>) -> anyhow::Result<()> {
+        check_cancelled(cancel_token)?;
+        match self.mode {
+            PipelineMode::TranscribeOnly => {
+                let transcript = self.transcribe(cancel_token)?;
+                self.status("Saving transcript…");
+                self.write_results(&transcript, None);
+                Ok(())
+            }
+            PipelineMode::Full => {
+                let transcript = self.transcribe(cancel_token)?;
+                let notes = self.summarize(cancel_token, &transcript)?;
+                self.write_results(&transcript, Some(&notes));
+                if self.config.auto_title {
+                    self.auto_title(&notes);
+                }
+                Ok(())
+            }
+            PipelineMode::SummarizeOnly => {
+                // The transcript already exists on disk; never re-transcribe.
+                let transcript = self.summarize_existing_transcript(cancel_token)?;
+                let notes = self.summarize(cancel_token, &transcript)?;
+                self.write_results(&transcript, Some(&notes));
+                if self.config.auto_title {
+                    self.auto_title(&notes);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Transcription stage. Returns the transcript text.
+    fn transcribe(&mut self, cancel_token: Option<&CancelToken>) -> anyhow::Result<String> {
         let audio_path = self
             .audio_path
             .clone()
             .ok_or_else(|| anyhow::anyhow!("Pipeline requires an audio path to transcribe"))?;
         check_cancelled(cancel_token)?;
 
-        // Transcription.
         let ts_provider = create_transcription_provider(&self.config);
         let status_cb = |m: &str| self.status(m);
         let transcript = ts_provider.transcribe(&audio_path, Some(&status_cb))?;
         ts_provider.unload();
         check_cancelled(cancel_token)?;
+        Ok(transcript)
+    }
 
-        // Summarization.
+    /// Summarize-only stage: read the existing transcript file instead of
+    /// re-transcribing the audio. Fails fast with an actionable message when
+    /// the transcript is missing so the user is told to transcribe first.
+    fn summarize_existing_transcript(
+        &mut self,
+        cancel_token: Option<&CancelToken>,
+    ) -> anyhow::Result<String> {
+        let path = self
+            .transcript_path
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("No transcript was provided to summarize"))?;
+        if !path.is_file() {
+            anyhow::bail!(
+                "Transcript not found at {}. Transcribe this meeting first, then summarize.",
+                path.display()
+            );
+        }
+        check_cancelled(cancel_token)?;
+        self.status("Reading existing transcript…");
+        std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("Could not read {}: {e:#}", path.display()))
+    }
+
+    /// Summarization stage (skipped for transcribe-only runs).
+    fn summarize(
+        &mut self,
+        cancel_token: Option<&CancelToken>,
+        transcript: &str,
+    ) -> anyhow::Result<String> {
         if self.config.summarization_service == "ollama" {
             // The server may be down between meetings — start it automatically
             // (binary present, local host) instead of failing the job.
@@ -90,15 +183,11 @@ impl Pipeline {
             )?;
         }
         let ss_provider = create_summarization_provider(&self.config);
-        let notes = ss_provider.summarize(&transcript, Some(&status_cb))?;
+        let status_cb = |m: &str| self.status(m);
+        let notes = ss_provider.summarize(transcript, Some(&status_cb))?;
         ss_provider.unload();
         check_cancelled(cancel_token)?;
-
-        self.write_results(&transcript, &notes);
-        if self.config.auto_title {
-            self.auto_title(&notes);
-        }
-        Ok(())
+        Ok(notes)
     }
 
     pub fn output_paths(&self) -> (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>) {
@@ -184,7 +273,10 @@ impl Pipeline {
         }
     }
 
-    fn write_results(&self, transcript: &str, notes: &str) {
+    /// Write results. `notes` is None for transcribe-only runs (transcript
+    /// rewrite is idempotent: the summarize-only path passes the file's own
+    /// content back).
+    fn write_results(&self, transcript: &str, notes: Option<&str>) {
         self.status("Saving results…");
         if let Some(p) = &self.transcript_path {
             if let Some(parent) = p.parent() {
@@ -194,12 +286,14 @@ impl Pipeline {
                 log::info!("Transcript saved: {}", p.display());
             }
         }
-        if let Some(p) = &self.notes_path {
-            if let Some(parent) = p.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if std::fs::write(p, notes).is_ok() {
-                log::info!("Notes saved: {}", p.display());
+        if let Some(notes) = notes {
+            if let Some(p) = &self.notes_path {
+                if let Some(parent) = p.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                if std::fs::write(p, notes).is_ok() {
+                    log::info!("Notes saved: {}", p.display());
+                }
             }
         }
     }
@@ -232,5 +326,80 @@ mod tests {
         token.cancel();
         let err = p.run(Some(&token)).unwrap_err();
         assert!(err.is::<PipelineCancelled>());
+    }
+
+    #[test]
+    fn summarize_only_requires_an_existing_transcript_file() {
+        // Summarize-only must fail fast with an actionable message when the
+        // transcript is missing — and must not require or touch the audio.
+        let dir = tempfile::tempdir().unwrap();
+        let transcript = dir.path().join("transcript.md");
+        let mut p = Pipeline::with_mode(
+            Config::default(),
+            None,
+            Some(transcript),
+            Some(dir.path().join("notes.md")),
+            None,
+            PipelineMode::SummarizeOnly,
+        );
+        let err = p.run(None).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("Transcribe this meeting first"), "{msg}");
+    }
+
+    #[test]
+    fn summarize_only_fails_without_a_transcript_path() {
+        let mut p = Pipeline::with_mode(
+            Config::default(),
+            None,
+            None,
+            None,
+            None,
+            PipelineMode::SummarizeOnly,
+        );
+        let err = p.run(None).unwrap_err();
+        assert!(format!("{err:#}").contains("No transcript was provided"));
+    }
+
+    #[test]
+    fn transcribe_only_maps_to_the_transcription_path() {
+        // Transcribe-only without audio must report the transcription
+        // requirement (not the summarize-only transcript requirement) —
+        // proving the mode routes to the transcribe stage before any
+        // provider is ever constructed.
+        let dir = tempfile::tempdir().unwrap();
+        let mut p = Pipeline::with_mode(
+            Config::default(),
+            None,
+            Some(dir.path().join("transcript.md")),
+            Some(dir.path().join("notes.md")),
+            None,
+            PipelineMode::TranscribeOnly,
+        );
+        let err = p.run(None).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("requires an audio path"),
+            "unexpected error: {err:#}"
+        );
+    }
+
+    #[test]
+    fn transcribe_only_cancelled_before_start_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let audio = dir.path().join("recording.mp3");
+        std::fs::write(&audio, b"x").unwrap();
+        let transcript = dir.path().join("transcript.md");
+        let mut p = Pipeline::with_mode(
+            Config::default(),
+            Some(audio),
+            Some(transcript.clone()),
+            Some(dir.path().join("notes.md")),
+            None,
+            PipelineMode::TranscribeOnly,
+        );
+        let token = CancelToken::new();
+        token.cancel();
+        assert!(p.run(Some(&token)).is_err());
+        assert!(!transcript.exists(), "cancelled run must not write files");
     }
 }

@@ -165,9 +165,11 @@ Open the window from the tray icon, then use the sidebar.
 1. **Models & services tab** — choose your transcription and summarization services and configure them:
    - *OpenAI-compatible*: set the base URL, paste your API key and choose models
    - *whisper.cpp*: pick an acceleration backend and install the engine (first time), then download a GGML model
-   - *Ollama*: set host and click Download next to your preferred model
+   - *Ollama*: set host and click Download next to your preferred model — installing Ollama starts `ollama serve` automatically
+   - The **Status** card on the same tab always shows what is installed and running: the whisper.cpp engine (path + size), downloaded GGML models, and the Ollama server (host, running state, pulled models with sizes)
 2. **General tab** — set output folder, recording quality and background behavior
 3. **Prompts tab** — optionally customize the transcription, summarization or title prompt (built-in defaults are shown)
+4. **Downloads tab** — every payload the app downloaded in one list, with its exact location on disk and size (engine, GGML models, the Ollama runtime and Ollama models)
 
 ### Settings Reference
 
@@ -219,7 +221,30 @@ Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 
 |---|---|
 | Ollama model | Free-text model name to use for local summarization (`phi4-mini` default) |
 | Ollama host | Ollama server address (default: `http://localhost:11434`) |
-| Model list | Download status and one-click download for each available model. A down server starts automatically for downloads when the Ollama binary is present and the host is local; a server the app started is stopped again on app exit (a pre-existing server is never touched) |
+| Model list | Download status and one-click download for each available model. A down server starts automatically for downloads when the Ollama binary is present and the host is local; a server the app started is stopped again on app exit (a pre-existing server is never touched). Installing Ollama itself also starts the server right away — no manual `ollama serve` |
+
+#### Status card (Models & services)
+
+The **Status** card shows the live state of the optional local engines: whether the
+whisper.cpp engine is installed (with its path and size), which GGML models are
+downloaded (with sizes), and whether Ollama is installed and serving (host,
+running state and pulled models with sizes). Click **Refresh** any time; the
+card also refreshes on its own after every install finishes.
+
+#### Downloads tab
+
+One list of **everything the app downloaded**, each row with name, kind
+(engine / model / runtime), exact location on disk and size:
+
+| Payload | Location |
+|---|---|
+| whisper.cpp engine (`whisper-cli` + libraries) | `~/.local/share/gravaai/whisper.cpp/` |
+| GGML models | `~/.local/share/gravaai/whisper-cpp-models/` |
+| Ollama runtime | `~/.local/share/gravaai/ollama/` |
+| Ollama models | Ollama's own store (`~/.ollama/models` by default) |
+
+Use **Open folder** on a row (or **Open data folder** for the root) to inspect
+the files in your file manager; **Refresh** re-scans sizes.
 
 Available Ollama models:
 
@@ -239,9 +264,16 @@ Note: transcription prompts apply to the OpenAI-compatible service only — the 
 
 #### Library
 
-Browse past meetings. Select rows to delete, open transcripts/notes directly, re-run summarization, rename, or open the meeting folder.
+Browse past meetings. Every row offers the actions that make sense for its
+state: **Transcribe** (audio-only meetings), **Summarize** (uses the existing
+transcript when there is one — the audio is never re-transcribed — otherwise it
+runs the full transcribe + summarize pipeline), **Transcript** / **Notes** to
+open the files, plus Rename and Open folder. Select rows to delete.
 
-The Recorder dashboard also shows recent meetings (with Transcript/Notes shortcuts) and live background jobs with Cancel/Retry/Dismiss/Open actions. The processing-pipeline card reflects the current Models & services configuration.
+The Recorder dashboard shows the same actions on its recent-meetings card and
+live background jobs with Cancel/Retry/Dismiss/Open actions. Both meeting lists
+refresh by themselves when a background job finishes or a recording is saved —
+no manual Refresh needed (the button is still there if you want one).
 
 ### Workflow
 

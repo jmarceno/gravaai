@@ -18,6 +18,7 @@ pub struct Meeting {
     pub title: Option<String>,
     pub has_notes: bool,
     pub has_transcript: bool,
+    pub has_audio: bool,
     pub duration_seconds: Option<u64>,
 }
 
@@ -123,6 +124,7 @@ pub fn scan_meetings(output_folder: &str) -> Vec<Meeting> {
                 .map(|s| s.to_string()),
             has_notes: dir.join("notes.md").exists(),
             has_transcript: dir.join("transcript.md").exists(),
+            has_audio: !audio_files.is_empty(),
             duration_seconds: duration,
             date: dt,
             path: dir,
@@ -255,6 +257,8 @@ mod tests {
         assert_eq!(meetings[0].time_label, "2026-03-02_09-00_Standup");
         assert!(meetings[1].has_notes);
         assert!(!meetings[0].has_notes);
+        // Every fixture meeting carries an audio file.
+        assert!(meetings.iter().all(|m| m.has_audio));
     }
 
     #[test]

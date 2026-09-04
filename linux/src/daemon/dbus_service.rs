@@ -111,6 +111,21 @@ impl EngineIface {
             .unwrap_or_default()
     }
 
+    async fn transcribe_meeting(
+        &self,
+        audio: String,
+        transcript: String,
+        notes: String,
+        label: String,
+    ) -> String {
+        self.ctx
+            .engine
+            .lock()
+            .await
+            .transcribe_meeting(&audio, &transcript, &notes, &label)
+            .unwrap_or_default()
+    }
+
     async fn cancel_job(&self, id: i32) {
         self.ctx.engine.lock().await.cancel_job(id as i64);
     }

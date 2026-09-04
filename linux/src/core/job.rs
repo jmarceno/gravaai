@@ -22,6 +22,32 @@ impl JobStatus {
     }
 }
 
+/// Which pipeline stages a job runs. Serialized with jobs.json; older
+/// persisted jobs without the field restore as [`JobMode::Full`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum JobMode {
+    /// Transcribe, then summarize (the normal pipeline).
+    #[default]
+    #[serde(rename = "full")]
+    Full,
+    /// Transcribe only — never write notes.
+    #[serde(rename = "transcribe")]
+    TranscribeOnly,
+    /// Summarize an existing transcript — never re-transcribe.
+    #[serde(rename = "summarize")]
+    SummarizeOnly,
+}
+
+impl JobMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            JobMode::Full => "full",
+            JobMode::TranscribeOnly => "transcribe",
+            JobMode::SummarizeOnly => "summarize",
+        }
+    }
+}
+
 /// Cooperative cancellation token, checked between pipeline stages.
 #[derive(Debug, Clone, Default)]
 pub struct CancelToken {
@@ -52,6 +78,7 @@ pub struct Job {
     pub status: JobStatus,
     pub error_msg: Option<String>,
     pub cancelled: bool,
+    pub mode: JobMode,
     pub token: CancelToken,
 }
 
@@ -63,6 +90,24 @@ impl Job {
         notes_path: PathBuf,
         label: String,
     ) -> Self {
+        Self::with_mode(
+            job_id,
+            audio_path,
+            transcript_path,
+            notes_path,
+            label,
+            JobMode::Full,
+        )
+    }
+
+    pub fn with_mode(
+        job_id: i64,
+        audio_path: PathBuf,
+        transcript_path: PathBuf,
+        notes_path: PathBuf,
+        label: String,
+        mode: JobMode,
+    ) -> Self {
         Self {
             job_id,
             audio_path,
@@ -72,6 +117,7 @@ impl Job {
             status: JobStatus::Processing,
             error_msg: None,
             cancelled: false,
+            mode,
             token: CancelToken::new(),
         }
     }

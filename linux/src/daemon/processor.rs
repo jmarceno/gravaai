@@ -54,7 +54,9 @@ fn emit(prefix: &str, text: &str) {
     println!("{prefix}{}", text.replace('\n', " "));
 }
 
-/// Entry for `gravaai --process <audio> <transcript> <notes>`.
+/// Entry for `gravaai --process [mode] <audio> <transcript> <notes>` where
+/// `[mode]` is an optional `--transcribe-only` / `--summarize-only` flag
+/// (default: full pipeline).
 /// Internal daemon plumbing only: refuses to run unless spawned by the
 /// daemon (see `core::run_mode::CHILD_ENV`). Returns the process exit code.
 pub fn run_processor_child(args: &[String]) -> i32 {
@@ -64,33 +66,48 @@ pub fn run_processor_child(args: &[String]) -> i32 {
         eprintln!("Run the app normally (no flags) to open the graphical UI.");
         return 2;
     }
-    if args.len() < 3 {
+    let (mode, rest) = parse_process_args(args);
+    let Some((audio, transcript, notes)) = rest else {
         emit(
             CHILD_ERROR_PREFIX,
             "processor: missing audio/transcript/notes arguments",
         );
         return 2;
-    }
-    let (audio, transcript, notes) = (args[0].clone(), args[1].clone(), args[2].clone());
+    };
     let cfg = crate::config::settings::load();
     if cfg.openai_api_key.is_empty()
         && (cfg.transcription_service == "openai" || cfg.summarization_service == "openai")
         && cfg.openai_base_url == OPENAI_DEFAULT_BASE_URL
     {
         // Keep the child honest: without a key the provider calls would fail
-        // deep inside with confusing errors.
-        emit(
-            CHILD_ERROR_PREFIX,
-            "OpenAI-compatible API key is not configured. Please open Settings.",
-        );
-        return 1;
+        // deep inside with confusing errors. Summarize-only jobs only need
+        // the chat service; transcribe-only jobs only need the STT service.
+        let needs_key = match mode {
+            crate::processing::pipeline::PipelineMode::SummarizeOnly => {
+                cfg.summarization_service == "openai"
+            }
+            crate::processing::pipeline::PipelineMode::TranscribeOnly => {
+                cfg.transcription_service == "openai"
+            }
+            crate::processing::pipeline::PipelineMode::Full => {
+                cfg.transcription_service == "openai" || cfg.summarization_service == "openai"
+            }
+        };
+        if needs_key {
+            emit(
+                CHILD_ERROR_PREFIX,
+                "OpenAI-compatible API key is not configured. Please open Settings.",
+            );
+            return 1;
+        }
     }
-    let mut pipeline = crate::processing::pipeline::Pipeline::new(
+    let mut pipeline = crate::processing::pipeline::Pipeline::with_mode(
         cfg,
         Some(PathBuf::from(&audio)),
         Some(PathBuf::from(&transcript)),
         Some(PathBuf::from(&notes)),
         Some(Box::new(|msg: &str| emit(CHILD_STATUS_PREFIX, msg))),
+        mode,
     );
     if let Err(e) = pipeline.run(None) {
         log::error!("Processor job failed: {e:#}");
@@ -104,6 +121,38 @@ pub fn run_processor_child(args: &[String]) -> i32 {
         &serde_json::json!([opt(a), opt(t), opt(n)]).to_string(),
     );
     0
+}
+
+/// Pure CLI split for the `--process` child: an optional mode flag followed
+/// by the three positional paths. Unit-tested.
+pub fn parse_process_args(
+    args: &[String],
+) -> (
+    crate::processing::pipeline::PipelineMode,
+    Option<(String, String, String)>,
+) {
+    use crate::processing::pipeline::PipelineMode;
+    let mut mode = PipelineMode::Full;
+    let mut rest = args;
+    match args.first().map(String::as_str) {
+        Some("--transcribe-only") => {
+            mode = PipelineMode::TranscribeOnly;
+            rest = &args[1..];
+        }
+        Some("--summarize-only") => {
+            mode = PipelineMode::SummarizeOnly;
+            rest = &args[1..];
+        }
+        _ => {}
+    }
+    if rest.len() >= 3 {
+        (
+            mode,
+            Some((rest[0].clone(), rest[1].clone(), rest[2].clone())),
+        )
+    } else {
+        (mode, None)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -167,12 +216,23 @@ impl ProcessorLauncher {
         audio: &str,
         transcript: &str,
         notes: &str,
+        mode: crate::core::job::JobMode,
     ) -> ProcessorHandle {
         // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
         let exe = crate::utils::exe::internal_exe();
-        let mut child = Command::new(&exe)
+        let mut cmd = Command::new(&exe);
+        cmd.env(crate::core::run_mode::CHILD_ENV, "1");
+        match mode {
+            crate::core::job::JobMode::TranscribeOnly => {
+                cmd.arg("--transcribe-only");
+            }
+            crate::core::job::JobMode::SummarizeOnly => {
+                cmd.arg("--summarize-only");
+            }
+            crate::core::job::JobMode::Full => {}
+        }
+        let mut child = cmd
             .args(["--process", audio, transcript, notes])
-            .env(crate::core::run_mode::CHILD_ENV, "1")
             // Capture stderr too: provider tooling (whisper-cli, TLS, ...) can
             // fail on stderr, so keep a tail to surface the real reason.
             .stdout(Stdio::piped())
@@ -250,6 +310,8 @@ impl ProcessorLauncher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::job::JobMode;
+    use crate::processing::pipeline::PipelineMode;
 
     #[test]
     fn protocol_lines() {
@@ -271,5 +333,56 @@ mod tests {
             Some(ChildEvent::Error(_))
         ));
         assert!(parse_child_line("random log line").is_none());
+    }
+
+    #[test]
+    fn process_args_split_mode_flag() {
+        let none = |s: &str| s.to_string();
+        // Default (legacy) positional form.
+        let (mode, rest) = parse_process_args(&[none("a"), none("t"), none("n")]);
+        assert_eq!(mode, PipelineMode::Full);
+        assert_eq!(rest.unwrap(), (none("a"), none("t"), none("n")));
+        // Transcribe-only flag.
+        let (mode, rest) =
+            parse_process_args(&[none("--transcribe-only"), none("a"), none("t"), none("n")]);
+        assert_eq!(mode, PipelineMode::TranscribeOnly);
+        assert_eq!(rest.unwrap(), (none("a"), none("t"), none("n")));
+        // Summarize-only flag.
+        let (mode, rest) =
+            parse_process_args(&[none("--summarize-only"), none("a"), none("t"), none("n")]);
+        assert_eq!(mode, PipelineMode::SummarizeOnly);
+        assert_eq!(rest.unwrap(), (none("a"), none("t"), none("n")));
+        // Too few args → no paths.
+        let (mode, rest) = parse_process_args(&[none("--transcribe-only"), none("a")]);
+        assert_eq!(mode, PipelineMode::TranscribeOnly);
+        assert!(rest.is_none());
+        let (_, rest) = parse_process_args(&[]);
+        assert!(rest.is_none());
+        let _ = JobMode::Full;
+    }
+
+    #[test]
+    fn job_mode_maps_to_pipeline_mode_flag() {
+        // The launcher must forward every JobMode as the matching CLI flag.
+        for (job_mode, flag) in [
+            (JobMode::Full, None),
+            (JobMode::TranscribeOnly, Some("--transcribe-only")),
+            (JobMode::SummarizeOnly, Some("--summarize-only")),
+        ] {
+            let mut extra: Vec<String> = Vec::new();
+            if let Some(flag) = flag {
+                extra.push(flag.to_string());
+            }
+            extra.push("a".into());
+            extra.push("t".into());
+            extra.push("n".into());
+            let (mode, rest) = parse_process_args(&extra);
+            match job_mode {
+                JobMode::Full => assert_eq!(mode, PipelineMode::Full),
+                JobMode::TranscribeOnly => assert_eq!(mode, PipelineMode::TranscribeOnly),
+                JobMode::SummarizeOnly => assert_eq!(mode, PipelineMode::SummarizeOnly),
+            }
+            assert!(rest.is_some(), "{job_mode:?} must still carry paths");
+        }
     }
 }

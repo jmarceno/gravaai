@@ -38,6 +38,13 @@ pub trait Engine {
         notes: &str,
         label: &str,
     ) -> zbus::Result<String>;
+    fn transcribe_meeting(
+        &self,
+        audio: &str,
+        transcript: &str,
+        notes: &str,
+        label: &str,
+    ) -> zbus::Result<String>;
     fn cancel_job(&self, id: i32) -> zbus::Result<()>;
     fn retry_job(&self, id: i32) -> zbus::Result<()>;
     fn dismiss_job(&self, id: i32) -> zbus::Result<()>;

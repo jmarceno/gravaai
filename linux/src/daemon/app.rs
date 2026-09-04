@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 
 use crate::audio::recorder::Recorder;
 use crate::config::settings;
+use crate::core::job::JobMode;
 use crate::core::task_runner::{MainCallback, TaskRunner};
 use crate::daemon::dbus_service::{self, ENGINE_NAME, ENGINE_PATH};
 use crate::daemon::engine::{Engine, EngineHooks, ProcessorBackend};
@@ -50,8 +51,8 @@ struct LauncherBackend {
 }
 
 impl ProcessorBackend for LauncherBackend {
-    fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str) {
-        let handle = self.launcher.launch(job_id, audio, transcript, notes);
+    fn launch(&mut self, job_id: i64, audio: &str, transcript: &str, notes: &str, mode: JobMode) {
+        let handle = self.launcher.launch(job_id, audio, transcript, notes, mode);
         self.handles.insert(job_id, handle);
     }
 

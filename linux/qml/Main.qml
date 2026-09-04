@@ -31,7 +31,7 @@ ApplicationWindow {
         installsData = parse(controller.installs_json, [])
     }
     function pageTitle() {
-        var titles = { recorder: "New recording", library: "Library", models: "Models & services", prompts: "Prompts", general: "General" }
+        var titles = { recorder: "New recording", library: "Library", models: "Models & services", downloads: "Downloads", prompts: "Prompts", general: "General" }
         return titles[controller.selected_page] || "New recording"
     }
     function pageSubtitle() {
@@ -39,6 +39,7 @@ ApplicationWindow {
             recorder: "Record a meeting, then transcribe and summarize it automatically.",
             library: "Browse recordings, transcripts and notes.",
             models: "Configure cloud and optional local AI services.",
+            downloads: "Everything the app downloaded: engines, models and their sizes.",
             prompts: "Tune the instructions used for transcription and notes.",
             general: "Recording, storage and background behavior."
         }
@@ -189,6 +190,7 @@ ApplicationWindow {
                         Label { text: "CONFIGURATION"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 16; Layout.leftMargin: 4; font.letterSpacing: 1.1 }
                         Item { Layout.preferredHeight: 2 }
                         SidebarItem { iconText: "◫"; text: "Models & services"; selected: root.controller.selected_page === "models"; onClicked: root.controller.selectPage("models"); Layout.fillWidth: true }
+                        SidebarItem { iconText: "⤓"; text: "Downloads"; selected: root.controller.selected_page === "downloads"; onClicked: root.controller.selectPage("downloads"); Layout.fillWidth: true }
                         SidebarItem { iconText: "💬"; text: "Prompts"; selected: root.controller.selected_page === "prompts"; onClicked: root.controller.selectPage("prompts"); Layout.fillWidth: true }
                         SidebarItem { iconText: "◍"; text: "General"; selected: root.controller.selected_page === "general"; onClicked: root.controller.selectPage("general"); Layout.fillWidth: true }
                         Item { Layout.fillHeight: true }
@@ -214,10 +216,11 @@ ApplicationWindow {
                             id: pages
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            currentIndex: Math.max(0, ["recorder", "library", "models", "prompts", "general"].indexOf(root.controller.selected_page))
+                            currentIndex: Math.max(0, ["recorder", "library", "models", "downloads", "prompts", "general"].indexOf(root.controller.selected_page))
                             RecorderPage { controller: root.controller }
                             LibraryPage { controller: root.controller }
                             ModelsPage { controller: root.controller }
+                            DownloadsPage { controller: root.controller }
                             PromptsPage { controller: root.controller }
                             GeneralPage { controller: root.controller }
                         }

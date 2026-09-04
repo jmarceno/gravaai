@@ -63,6 +63,9 @@ Item {
     function resummarize(m) {
         controller.summarizeMeeting(audioFor(m), transcriptFor(m), notesFor(m), displayTitle(m))
     }
+    function transcribe(m) {
+        controller.transcribeMeeting(audioFor(m), transcriptFor(m), notesFor(m), displayTitle(m))
+    }
 
     Component.onCompleted: refresh()
     property Connections controllerConnection: Connections {
@@ -138,8 +141,8 @@ Item {
                                     }
                                 }
                                 StatusBadge {
-                                    labelText: modelData.has_notes ? "Notes" : (modelData.has_transcript ? "Transcript" : "Audio only")
-                                    dotColor: modelData.has_notes ? Theme.statusGreen : Theme.accentStrong
+                                    labelText: modelData.has_notes ? "Notes" : (modelData.has_transcript ? "Transcript" : (modelData.has_audio ? "Audio only" : "Empty"))
+                                    dotColor: modelData.has_notes ? Theme.statusGreen : (modelData.has_audio || modelData.has_transcript ? Theme.accentStrong : Theme.warning)
                                     pillBg: modelData.has_notes ? Theme.statusGreenBg : Theme.accentSoft
                                 }
                             }
@@ -152,8 +155,25 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 8
                                 AppButton {
-                                    text: "Transcript"
+                                    text: "Transcribe"
                                     variant: "teal"
+                                    implicitHeight: 32
+                                    visible: !modelData.has_transcript
+                                    enabled: modelData.has_audio !== false
+                                    opacity: enabled ? 1.0 : 0.5
+                                    onClicked: root.transcribe(modelData)
+                                }
+                                AppButton {
+                                    text: "Summarize"
+                                    variant: "teal"
+                                    implicitHeight: 32
+                                    enabled: modelData.has_transcript || modelData.has_audio !== false
+                                    opacity: enabled ? 1.0 : 0.5
+                                    onClicked: root.resummarize(modelData)
+                                }
+                                AppButton {
+                                    text: "Transcript"
+                                    variant: "secondary"
                                     implicitHeight: 32
                                     enabled: modelData.has_transcript
                                     opacity: enabled ? 1.0 : 0.45
@@ -161,13 +181,12 @@ Item {
                                 }
                                 AppButton {
                                     text: "Notes"
-                                    variant: "warning"
+                                    variant: "secondary"
                                     implicitHeight: 32
                                     enabled: modelData.has_notes
                                     opacity: enabled ? 1.0 : 0.45
                                     onClicked: root.controller.openFile(root.notesFor(modelData))
                                 }
-                                AppButton { text: "Re-summarize"; variant: "secondary"; implicitHeight: 32; enabled: modelData.has_transcript; opacity: enabled ? 1.0 : 0.5; onClicked: root.resummarize(modelData) }
                                 AppButton { text: "Rename"; variant: "secondary"; implicitHeight: 32; onClicked: root.renamePath = (root.renamePath === mpath ? "" : mpath) }
                                 AppButton { text: "Open"; variant: "secondary"; implicitHeight: 32; onClicked: controller.openMeetingFolder(mpath) }
                             }

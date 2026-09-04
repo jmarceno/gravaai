@@ -35,8 +35,25 @@ fn require(ok: bool, what: &str) -> anyhow::Result<()> {
 fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
     use crate::services::system_installer::OllamaInstaller;
     match spec.kind.as_str() {
-        install_spec::KIND_OLLAMA => OllamaInstaller::install(on_status)
-            .map_err(|e| anyhow::anyhow!("Ollama install: {e:#}")),
+        install_spec::KIND_OLLAMA => {
+            OllamaInstaller::install(on_status)
+                .map_err(|e| anyhow::anyhow!("Ollama install: {e:#}"))?;
+            // Leave a working setup behind: start `ollama serve` right after
+            // the download so the user doesn't have to run it by hand.
+            // Ownership is recorded, so daemon shutdown stops exactly this
+            // server; a pre-existing server is detected and left alone.
+            let host = if spec.host.is_empty() {
+                crate::config::settings::load().ollama_host
+            } else {
+                spec.host.clone()
+            };
+            if let Err(e) = crate::services::ollama_service::ensure_ollama_serving(&host, on_status)
+            {
+                log::warn!("Ollama installed but the server did not start: {e:#}");
+                on_status("Ollama installed — start it with `ollama serve` before use.");
+            }
+            Ok(())
+        }
         install_spec::KIND_WHISPER_CPP_ENGINE => {
             use crate::services::whisper_cpp_service::WhisperCppEngineInstaller;
             let backend = if spec.backend.is_empty() {

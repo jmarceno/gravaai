@@ -49,18 +49,22 @@ ApplicationWindow {
             state: "recording",
             elapsed: 73,
             jobs: [
-                { id: 1, status: "processing", label: "A long meeting title that still fits", progress: 42 },
-                { id: 2, status: "error", label: "A failed job", error: "Network timeout" }
+                { job_id: 1, status: "processing", label: "A long meeting title that still fits", status_text: "Transcribing… 42%" },
+                { job_id: 2, status: "error", label: "A failed job", error_msg: "Network timeout" }
             ]
         })
         controller.settings_json = JSON.stringify({
             transcription_service: "whisper_cpp",
+            whisper_cpp_model: "large-v3-turbo",
             summarization_service: "openai",
-            output_folder: "~/meetings"
+            openai_summarization_model: "gpt-5.6-luna",
+            output_folder: "~/meetings",
+            auto_title: true,
+            auto_process_enabled: true
         })
         controller.meetings_json = JSON.stringify([
-            { path: "/tmp/short", label: "Short", has_transcript: true, has_notes: false },
-            { path: "/tmp/long", label: "A long library entry with an intentionally verbose title", has_transcript: true, has_notes: true }
+            { path: "/tmp/short", time_label: "2026-03-01_14-30", title: "Short", has_transcript: true, has_notes: false, duration_seconds: 120, audio_path: "/tmp/short/recording.mp3", transcript_path: "/tmp/short/transcript.md", notes_path: "/tmp/short/notes.md" },
+            { path: "/tmp/long", time_label: "2026-03-02_09-00", title: "A long library entry with an intentionally verbose title", has_transcript: true, has_notes: true, duration_seconds: 2520, audio_path: "/tmp/long/recording.mp3", transcript_path: "/tmp/long/transcript.md", notes_path: "/tmp/long/notes.md" }
         ])
         controller.installs_json = JSON.stringify([
             { key: "whisper_cpp:model", status: "Downloading 42%" },
@@ -84,7 +88,6 @@ ApplicationWindow {
             ModelsPage { id: modelsPage; controller: root.controller }
             PromptsPage { id: promptsPage; controller: root.controller }
             GeneralPage { id: generalPage; controller: root.controller }
-            AboutPage { id: aboutPage; controller: root.controller }
         }
     }
 }

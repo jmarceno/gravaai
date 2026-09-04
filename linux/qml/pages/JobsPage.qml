@@ -14,6 +14,12 @@ Item {
         try { snapshot = JSON.parse(controller.snapshot_json) }
         catch (error) { snapshot = {} }
     }
+    function jobId(j) {
+        return (j.job_id !== undefined) ? j.job_id : (j.id !== undefined ? j.id : -1)
+    }
+    function jobError(j) {
+        return j.error_msg || j.error || j.message || ""
+    }
 
     Component.onCompleted: refresh()
     property Connections controllerConnection: Connections {
@@ -46,6 +52,7 @@ Item {
                     required property var modelData
                     Layout.fillWidth: true
                     ColumnLayout {
+                        spacing: 8
                         RowLayout {
                             Layout.fillWidth: true
                             Label {
@@ -58,46 +65,53 @@ Item {
                             }
                             StatusBadge {
                                 labelText: modelData.status_text || modelData.status || "Pending"
-                                dotColor: modelData.status === "error" ? Theme.danger : (modelData.status === "done" ? Theme.statusGreen : Theme.accent)
+                                dotColor: modelData.status === "error" ? Theme.danger : (modelData.status === "done" ? Theme.statusGreen : Theme.accentStrong)
+                                pillBg: modelData.status === "error" ? Theme.dangerBg : (modelData.status === "done" ? Theme.statusGreenBg : Theme.accentSoft)
                             }
                         }
                         Label {
-                            text: modelData.error || modelData.message || modelData.status_text || "Working…"
+                            text: root.jobError(modelData) || modelData.status_text || "Working…"
                             color: modelData.status === "error" ? Theme.danger : Theme.textMuted
                             wrapMode: Text.WordWrap
                             Layout.fillWidth: true
+                            font.pixelSize: 12
+                            visible: (root.jobError(modelData) || modelData.status_text || "").length > 0
                         }
                         RowLayout {
                             Layout.fillWidth: true
-                            ProgressBar {
+                            spacing: 8
+                            AppProgressBar {
                                 visible: modelData.status === "processing"
                                 indeterminate: true
                                 Layout.fillWidth: true
-                                Accessible.name: "Job progress"
                             }
-                            Button {
+                            AppButton {
                                 text: "Cancel"
+                                variant: "secondary"
+                                implicitHeight: 32
                                 visible: modelData.status === "processing"
-                                onClicked: root.controller.cancelJob(modelData.job_id)
-                                Accessible.name: "Cancel job"
+                                onClicked: root.controller.cancelJob(root.jobId(modelData))
                             }
-                            Button {
+                            AppButton {
                                 text: "Retry"
+                                variant: "secondary"
+                                implicitHeight: 32
                                 visible: modelData.status === "error"
-                                onClicked: root.controller.retryJob(modelData.job_id)
-                                Accessible.name: "Retry job"
+                                onClicked: root.controller.retryJob(root.jobId(modelData))
                             }
-                            Button {
+                            AppButton {
                                 text: "Open folder"
+                                variant: "secondary"
+                                implicitHeight: 32
                                 visible: modelData.status === "done"
-                                onClicked: root.controller.openJobFolder(modelData.job_id)
-                                Accessible.name: "Open job folder"
+                                onClicked: root.controller.openJobFolder(root.jobId(modelData))
                             }
-                            Button {
+                            AppButton {
                                 text: "Dismiss"
+                                variant: "secondary"
+                                implicitHeight: 32
                                 visible: modelData.status !== "processing"
-                                onClicked: root.controller.dismissJob(modelData.job_id)
-                                Accessible.name: "Dismiss job"
+                                onClicked: root.controller.dismissJob(root.jobId(modelData))
                             }
                         }
                     }

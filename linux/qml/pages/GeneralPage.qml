@@ -23,7 +23,7 @@ Item {
             openai_transcription_model: cfg.openai_transcription_model || "whisper-1",
             openai_summarization_model: cfg.openai_summarization_model || "gpt-5.6-luna",
             output_folder: outputFolder.text,
-            recording_quality: quality.currentValue,
+            recording_quality: quality.currentText,
             call_detection_enabled: callDetection.checked,
             start_at_startup: autostart.checked,
             auto_title: autoTitle.checked,
@@ -70,28 +70,33 @@ Item {
             AppCard {
                 Layout.fillWidth: true
                 ColumnLayout {
+                    spacing: 6
                     Label { text: "Recording"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
-                    AppSwitch { id: autostart; text: "Start daemon with the desktop"; checked: root.cfg.start_at_startup || false }
-                    AppSwitch { id: callDetection; text: "Detect calls and notify me"; checked: root.cfg.call_detection_enabled || false }
-                    AppSwitch { id: autoTitle; text: "Generate meeting titles automatically"; checked: root.cfg.auto_title !== false }
-                    AppSwitch { id: autoProcess; text: "Automatically transcribe and summarize after stopping"; checked: root.cfg.auto_process_enabled !== false }
-                    AppSwitch { id: countdown; text: "Show processing countdown"; checked: root.cfg.processing_countdown_enabled || false }
-                    AppSwitch { id: lowMemory; text: "Low memory mode (exit window when closed)"; checked: root.cfg.low_memory_mode || false }
+                    AppSwitch { id: autostart; text: "Start daemon with the desktop"; checked: root.cfg.start_at_startup || false; Layout.fillWidth: true }
+                    AppSwitch { id: callDetection; text: "Detect calls and notify me"; checked: root.cfg.call_detection_enabled || false; Layout.fillWidth: true }
+                    AppSwitch { id: autoTitle; text: "Generate meeting titles automatically"; checked: root.cfg.auto_title !== false; Layout.fillWidth: true }
+                    AppSwitch { id: autoProcess; text: "Automatically transcribe and summarize after stopping"; checked: root.cfg.auto_process_enabled !== false; Layout.fillWidth: true }
+                    AppSwitch { id: countdown; text: "Show processing countdown"; checked: root.cfg.processing_countdown_enabled || false; Layout.fillWidth: true }
+                    AppSwitch { id: lowMemory; text: "Low memory mode (exit window when closed)"; checked: root.cfg.low_memory_mode || false; Layout.fillWidth: true }
                     RowLayout {
                         Layout.fillWidth: true
+                        Layout.topMargin: 6
+                        spacing: 10
                         Label { text: "Quality"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        ComboBox { id: quality; model: ["low", "medium", "high", "very_high"]; currentIndex: root.qualityIndex(root.cfg.recording_quality || "high"); Layout.fillWidth: true }
+                        AppComboBox { id: quality; model: ["low", "medium", "high", "very_high"]; currentIndex: root.qualityIndex(root.cfg.recording_quality || "high"); Layout.fillWidth: true }
                     }
                 }
             }
             AppCard {
                 Layout.fillWidth: true
                 ColumnLayout {
+                    spacing: 10
                     Label { text: "Storage"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
                     RowLayout {
                         Layout.fillWidth: true
+                        spacing: 8
                         AppField { id: outputFolder; label: "Default output folder"; text: root.cfg.output_folder || "~/meetings"; Layout.fillWidth: true }
-                        Button { text: "Browse"; Layout.alignment: Qt.AlignBottom; onClicked: folderDialog.open() }
+                        AppButton { text: "Browse"; variant: "secondary"; Layout.alignment: Qt.AlignBottom; onClicked: folderDialog.open() }
                     }
                     Label { text: "Recordings remain on disk when the UI or daemon is upgraded."; color: Theme.textMuted; font.pixelSize: 12 }
                     RowLayout {

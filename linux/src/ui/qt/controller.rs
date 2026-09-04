@@ -55,6 +55,7 @@ enum Command {
     },
     DeleteMeetings(String),
     OpenMeetingFolder(String),
+    OpenFile(String),
     OpenOutputFolder,
     LoadSettings,
     SaveSettings {
@@ -355,6 +356,9 @@ async fn handle_command(
                 }
             }
         }
+        Command::OpenFile(path) => {
+            open_validated_file(&path, tx).await;
+        }
         Command::OpenOutputFolder => match proxy.output_folder().await {
             Ok(path) if !path.trim().is_empty() => {
                 open_path(&path, tx).await;
@@ -501,6 +505,9 @@ fn meeting_json() -> String {
     let rows: Vec<serde_json::Value> = scan_meetings(&cfg.output_folder)
         .into_iter()
         .map(|m| {
+            let audio = crate::utils::meeting_scanner::find_audio_file(&m.path)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| m.path.join("recording.mp3").to_string_lossy().into_owned());
             serde_json::json!({
                 "path": m.path.to_string_lossy(),
                 "time_label": m.time_label,
@@ -508,10 +515,63 @@ fn meeting_json() -> String {
                 "has_notes": m.has_notes,
                 "has_transcript": m.has_transcript,
                 "duration_seconds": m.duration_seconds.unwrap_or(0),
+                "audio_path": audio,
+                "transcript_path": m.path.join("transcript.md").to_string_lossy(),
+                "notes_path": m.path.join("notes.md").to_string_lossy(),
             })
         })
         .collect();
     serde_json::to_string(&rows).unwrap_or_else(|_| "[]".into())
+}
+
+/// Pure allow-list for library file opens (unit-tested): a path is allowed
+/// when it is inside a known meeting dir or inside the output root.
+fn is_open_allowed(path: &str, meeting_dirs: &[String], output_root: &str) -> bool {
+    if meeting_dirs
+        .iter()
+        .any(|dir| path == dir || path.starts_with(&format!("{dir}/")))
+    {
+        return true;
+    }
+    path == output_root || path.starts_with(&format!("{output_root}/"))
+}
+
+/// Open a transcript/notes/audio file inside the output folder through the
+/// Freedesktop portal. Validates the path stays inside the library so a
+/// compromised QML payload cannot open arbitrary locations.
+async fn open_validated_file(path: &str, tx: &Sender<Event>) {
+    use crate::utils::meeting_scanner::scan_meetings;
+    let cfg = settings::load();
+    let meetings = scan_meetings(&cfg.output_folder);
+    let dirs: Vec<String> = meetings
+        .iter()
+        .map(|m| m.path.to_string_lossy().into_owned())
+        .collect();
+    let root = shellexpand(&cfg.output_folder);
+    if !is_open_allowed(path, &dirs, &root) {
+        let _ = tx.send(Event::Toast("File is no longer in the library.".into()));
+        return;
+    }
+    if Path::new(path).is_dir() {
+        open_path(path, tx).await;
+        return;
+    }
+    if !Path::new(path).exists() {
+        let _ = tx.send(Event::Toast("File does not exist yet.".into()));
+        return;
+    }
+    open_path(path, tx).await;
+}
+
+fn shellexpand(p: &str) -> String {
+    if let Some(rest) = p.strip_prefix("~/") {
+        match dirs::home_dir() {
+            Some(h) => h.join(rest).to_string_lossy().into_owned(),
+            None => p.to_string(),
+        }
+    } else {
+        p.to_string()
+    }
 }
 
 fn refresh_meetings_sync(tx: &Sender<Event>) {
@@ -772,8 +832,20 @@ mod qobject {
         #[cxx_name = "openMeetingFolder"]
         fn open_meeting_folder(self: Pin<&mut Self>, path: QString);
         #[qinvokable]
+        #[cxx_name = "openFile"]
+        fn open_file(self: Pin<&mut Self>, path: QString);
+        #[qinvokable]
         #[cxx_name = "openOutputFolder"]
         fn open_output_folder(self: Pin<&mut Self>);
+        #[qinvokable]
+        #[cxx_name = "transcriptionDefault"]
+        fn transcription_default(self: Pin<&mut Self>) -> QString;
+        #[qinvokable]
+        #[cxx_name = "summarizationDefault"]
+        fn summarization_default(self: Pin<&mut Self>) -> QString;
+        #[qinvokable]
+        #[cxx_name = "titleDefault"]
+        fn title_default(self: Pin<&mut Self>) -> QString;
         #[qinvokable]
         #[cxx_name = "loadSettings"]
         fn load_settings(self: Pin<&mut Self>);
@@ -1053,8 +1125,20 @@ impl qobject::AppController {
         self.rust()
             .send(Command::OpenMeetingFolder(String::from(path)));
     }
+    fn open_file(self: Pin<&mut Self>, path: QString) {
+        self.rust().send(Command::OpenFile(String::from(path)));
+    }
     fn open_output_folder(self: Pin<&mut Self>) {
         self.rust().send(Command::OpenOutputFolder);
+    }
+    fn transcription_default(self: Pin<&mut Self>) -> QString {
+        QString::from(crate::config::defaults::TRANSCRIPTION_PROMPT)
+    }
+    fn summarization_default(self: Pin<&mut Self>) -> QString {
+        QString::from(crate::config::defaults::SUMMARIZATION_PROMPT)
+    }
+    fn title_default(self: Pin<&mut Self>) -> QString {
+        QString::from(crate::config::defaults::TITLE_PROMPT)
     }
     fn load_settings(self: Pin<&mut Self>) {
         self.rust().send(Command::LoadSettings);
@@ -1094,6 +1178,40 @@ mod tests {
         let json = meeting_json();
         assert!(json.starts_with('['));
         assert!(json.ends_with(']'));
+    }
+
+    #[test]
+    fn meeting_json_carries_resolved_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let meeting = dir.path().join("2026-03-01_14-30_Standup");
+        std::fs::create_dir_all(&meeting).unwrap();
+        std::fs::write(meeting.join("recording.mp3"), b"fake").unwrap();
+        std::fs::write(meeting.join("transcript.md"), b"t").unwrap();
+        let meetings = crate::utils::meeting_scanner::scan_meetings(&dir.path().to_string_lossy());
+        assert_eq!(meetings.len(), 1);
+        let m = &meetings[0];
+        let audio = crate::utils::meeting_scanner::find_audio_file(&m.path)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| m.path.join("recording.mp3").to_string_lossy().into_owned());
+        assert!(audio.ends_with("recording.mp3"));
+        assert!(m
+            .path
+            .join("transcript.md")
+            .to_string_lossy()
+            .contains("transcript.md"));
+    }
+
+    #[test]
+    fn open_allow_list_stays_inside_library() {
+        let dirs = vec!["/meetings/2026-03-01_14-30".to_string()];
+        assert!(is_open_allowed(
+            "/meetings/2026-03-01_14-30/transcript.md",
+            &dirs,
+            "/meetings"
+        ));
+        assert!(is_open_allowed("/meetings", &dirs, "/meetings"));
+        assert!(!is_open_allowed("/etc/passwd", &dirs, "/meetings"));
+        assert!(!is_open_allowed("/meetings-evil/x", &dirs, "/meetings"));
     }
 
     #[test]

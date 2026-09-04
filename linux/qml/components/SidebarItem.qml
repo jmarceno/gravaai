@@ -5,7 +5,8 @@ import io.github.jmarceno.gravaai
 Button {
     id: root
     property bool selected: false
-    implicitHeight: 36
+    property string iconText: ""
+    implicitHeight: 38
     leftPadding: 14
     rightPadding: 12
     background: Rectangle {
@@ -16,18 +17,23 @@ Button {
     }
     contentItem: Row {
         spacing: 10
-        Label {
-            text: root.text.slice(0, 1)
-            width: 18
-            color: root.selected ? Theme.accent : Theme.textMuted
+        Text {
+            text: root.iconText.length > 0 ? root.iconText : root.text.slice(0, 1)
+            width: 20
+            color: root.selected ? Theme.accentStrong : Theme.textMuted
+            font.pixelSize: 14
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            anchors.verticalCenter: parent.verticalCenter
         }
         Label {
             text: root.text
             color: root.selected ? Theme.textPrimary : Theme.textSecondary
             font.pixelSize: 13
+            font.bold: root.selected
             verticalAlignment: Text.AlignVCenter
+            anchors.verticalCenter: parent.verticalCenter
         }
     }
 }

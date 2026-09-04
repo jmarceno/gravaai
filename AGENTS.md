@@ -428,8 +428,12 @@ keeps rendering deterministic across desktops. The root helper observes
 `objectCreated`, calls native `QCoreApplication::quit/exit`, and records QML
 startup failures in `window-qt.log` (1 MiB plus one backup).
 
-**UI pages and integration:** `qml/pages/` implements Recorder, Background
-jobs, Library, Models & Services, Prompts, General and About. `AppController`
+**UI pages and integration:** `qml/pages/` implements Recorder (dashboard with
+recording, live processing-pipeline, background-jobs and recent-meetings
+cards), Library, Models & Services, Prompts and General. There is no About
+page and no Local-tools section. `JobsPage.qml` is retained as a tested
+building block but is not in the sidebar navigation — jobs are managed from
+the Recorder dashboard. `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
@@ -619,8 +623,10 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
   pause bars / processing sweep), Models-tab visibility (`settings_visibility`),
   bundled artwork PNG decoding plus embedded fallback so the tray never
-  renders empty (`tray`), and the notification gate that suppresses alerts
-  unless the StatusNotifier registration is live (`notifications`).
+  renders empty (`tray`), the notification gate that suppresses alerts
+  unless the StatusNotifier registration is live (`notifications`), and the
+  Qt controller library payload (`qt/controller`: meetings JSON carries
+  resolved audio/transcript/notes paths, validated file-open allow-list).
 
 The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by

@@ -2,10 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import io.github.jmarceno.gravaai
 
-Switch {
+CheckBox {
     id: root
-    implicitHeight: 32
-    spacing: 12
+    implicitHeight: 30
+    spacing: 10
     contentItem: Label {
         text: root.text
         color: Theme.textSecondary
@@ -13,25 +13,25 @@ Switch {
         verticalAlignment: Text.AlignVCenter
         leftPadding: root.indicator.width + root.spacing
         rightPadding: 4
+        elide: Text.ElideRight
         wrapMode: Text.WordWrap
     }
     indicator: Rectangle {
-        implicitWidth: 42
-        implicitHeight: 24
+        implicitWidth: 20
+        implicitHeight: 20
         x: root.leftPadding
         y: (root.height - height) / 2
-        radius: height / 2
-        color: root.checked ? Theme.accent : Theme.sliderTrack
+        radius: 6
+        color: root.checked ? Theme.accentSoft : Theme.inputBg
         border.color: root.checked ? Theme.accent : Theme.borderSubtle
         border.width: 1
-        Rectangle {
-            width: 18
-            height: 18
-            radius: 9
-            x: root.checked ? parent.width - width - 3 : 3
-            y: 3
-            color: root.checked ? "#ffffff" : Theme.textMuted
-            Behavior on x { NumberAnimation { duration: Theme.animationDuration } }
+        Text {
+            anchors.centerIn: parent
+            text: "✓"
+            color: Theme.accentStrong
+            font.pixelSize: 13
+            font.bold: true
+            visible: root.checked
         }
     }
 }

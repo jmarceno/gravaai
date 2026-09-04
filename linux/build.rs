@@ -12,6 +12,9 @@ fn main() {
         QmlFile::from("qml/Theme.qml").singleton(true),
         QmlFile::from("qml/components/AppButton.qml"),
         QmlFile::from("qml/components/AppCard.qml"),
+        QmlFile::from("qml/components/AppCheckBox.qml"),
+        QmlFile::from("qml/components/AppComboBox.qml"),
+        QmlFile::from("qml/components/AppProgressBar.qml"),
         QmlFile::from("qml/components/AppField.qml"),
         QmlFile::from("qml/components/AppSwitch.qml"),
         QmlFile::from("qml/components/StatusBadge.qml"),
@@ -23,7 +26,6 @@ fn main() {
         QmlFile::from("qml/pages/ModelsPage.qml"),
         QmlFile::from("qml/pages/PromptsPage.qml"),
         QmlFile::from("qml/pages/GeneralPage.qml"),
-        QmlFile::from("qml/pages/AboutPage.qml"),
         // Test-only scene used by the offscreen geometry/contract smoke gate.
         QmlFile::from("qml/SmokeHarness.qml"),
     ]))

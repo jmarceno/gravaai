@@ -13,7 +13,7 @@ ApplicationWindow {
     minimumWidth: 960
     minimumHeight: 640
     visible: true
-    color: Theme.windowBg
+    color: "transparent"
     title: "Grava Aí"
     flags: Qt.Window | Qt.FramelessWindowHint
     property var snapshotData: ({})
@@ -31,20 +31,25 @@ ApplicationWindow {
         installsData = parse(controller.installs_json, [])
     }
     function pageTitle() {
-        var titles = { recorder: "Record", library: "Library", jobs: "Background jobs", models: "Models & services", prompts: "Prompts", general: "General", about: "About" }
-        return titles[controller.selected_page] || "Record"
+        var titles = { recorder: "New recording", library: "Library", models: "Models & services", prompts: "Prompts", general: "General" }
+        return titles[controller.selected_page] || "New recording"
     }
     function pageSubtitle() {
         var subtitles = {
-            recorder: "Capture a meeting and turn it into professional notes.",
+            recorder: "Record a meeting, then transcribe and summarize it automatically.",
             library: "Browse recordings, transcripts and notes.",
-            jobs: "Monitor transcription and summarization in the background.",
             models: "Configure cloud and optional local AI services.",
             prompts: "Tune the instructions used for transcription and notes.",
-            general: "Recording, storage and background behavior.",
-            about: "Grava Aí identity, version and runtime information."
+            general: "Recording, storage and background behavior."
         }
         return subtitles[controller.selected_page] || subtitles.recorder
+    }
+    function recorderStatus() {
+        var st = snapshotData.state || "idle"
+        if (st === "recording") return "Recording"
+        if (st === "paused") return "Paused"
+        if (st === "countdown") return "Processing"
+        return "Ready"
     }
     function beginResize(edges) { root.startSystemResize(edges) }
 
@@ -97,6 +102,7 @@ ApplicationWindow {
         standardButtons: controller.dialog_confirm ? (Dialog.Ok | Dialog.Cancel) : Dialog.Ok
         anchors.centerIn: Overlay.overlay
         width: Math.min(480, root.width - 80)
+        background: Rectangle { radius: Theme.radiusSm; color: Theme.cardBgRaised; border.color: Theme.borderSubtle }
         contentItem: Label {
             text: controller.dialog_message
             color: Theme.textSecondary
@@ -123,90 +129,98 @@ ApplicationWindow {
         radius: Theme.radiusSm
         color: Theme.cardBgRaised
         border.color: Theme.accentMuted
+        border.width: 1
         visible: shown
         z: 100
         Label { id: textLabel; anchors.centerIn: parent; width: parent.width - 32; color: Theme.textSecondary; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
         property Timer hideTimer: Timer { interval: 4200; onTriggered: toast.shown = false }
     }
 
-    ColumnLayout {
+    Rectangle {
+        id: outer
         anchors.fill: parent
-        spacing: 0
-        TitleBar { window: root; controller: root.controller; Layout.fillWidth: true }
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        radius: 18
+        color: Theme.windowBg
+        border.color: Theme.borderSubtle
+        border.width: 1
+        clip: true
+
+        ColumnLayout {
+            anchors.fill: parent
             spacing: 0
-
-            Rectangle {
-                Layout.fillHeight: true
-                Layout.preferredWidth: Theme.sidebarWidth
-                color: Theme.cardBg
-                border.color: Theme.borderSubtle
-                border.width: 1
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 14
-                    spacing: 6
-                    Label { text: "RECORDER"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 4 }
-                    SidebarItem { text: "Record"; selected: root.controller.selected_page === "recorder"; onClicked: root.controller.selectPage("recorder"); Layout.fillWidth: true }
-                    SidebarItem { text: "Library"; selected: root.controller.selected_page === "library"; onClicked: root.controller.selectPage("library"); Layout.fillWidth: true }
-                    SidebarItem { text: "Background jobs"; selected: root.controller.selected_page === "jobs"; onClicked: root.controller.selectPage("jobs"); Layout.fillWidth: true }
-                    Label { text: "CONFIGURATION"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 18 }
-                    SidebarItem { text: "Models & services"; selected: root.controller.selected_page === "models"; onClicked: root.controller.selectPage("models"); Layout.fillWidth: true }
-                    SidebarItem { text: "Prompts"; selected: root.controller.selected_page === "prompts"; onClicked: root.controller.selectPage("prompts"); Layout.fillWidth: true }
-                    SidebarItem { text: "General"; selected: root.controller.selected_page === "general"; onClicked: root.controller.selectPage("general"); Layout.fillWidth: true }
-                    SidebarItem { text: "About"; selected: root.controller.selected_page === "about"; onClicked: root.controller.selectPage("about"); Layout.fillWidth: true }
-                    Label { text: "LOCAL TOOLS"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 18 }
-                    Button {
-                        text: "Grava Aí   ✓"
-                        flat: true
-                        Layout.fillWidth: true
-                        contentItem: Label { text: parent.text; color: Theme.statusGreen; horizontalAlignment: Text.AlignLeft; leftPadding: 14 }
-                    }
-                    Button {
-                        text: root.controller.lepramim_ready ? "Lepramim   ✓" : "Lepramim   —"
-                        flat: true
-                        enabled: root.controller.lepramim_ready
-                        Layout.fillWidth: true
-                        contentItem: Label { text: parent.text; color: parent.enabled ? Theme.textSecondary : Theme.textDim; horizontalAlignment: Text.AlignLeft; leftPadding: 14 }
-                        onClicked: root.controller.launchLepramim()
-                    }
-                    Item { Layout.fillHeight: true }
-                    Label { text: root.controller.daemon_alive ? "●  Daemon ready" : "○  Connecting…"; color: root.controller.daemon_alive ? Theme.statusGreen : Theme.textMuted; font.pixelSize: 11; Layout.fillWidth: true; padding: 8 }
-                }
-            }
-
-            Rectangle {
+            TitleBar { window: root; controller: root.controller; Layout.fillWidth: true }
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: Theme.windowBg
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 24
-                    spacing: 16
-                    RowLayout {
-                        Layout.fillWidth: true
+                spacing: 0
+
+                Rectangle {
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: Theme.sidebarWidth
+                    color: Theme.windowBg
+                    Rectangle { width: 1; height: parent.height; x: parent.width - 1; color: Theme.borderSubtle }
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        anchors.topMargin: 10
+                        spacing: 4
+                        Label { text: "RECORDER"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 4; Layout.leftMargin: 4; font.letterSpacing: 1.1 }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 4
+                            Layout.topMargin: 6
+                            spacing: 8
+                            Rectangle {
+                                width: 8; height: 8; radius: 4
+                                color: root.recorderStatus() === "Ready" ? Theme.statusGreen : (root.recorderStatus() === "Recording" ? Theme.danger : Theme.warning)
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            Label { text: root.recorderStatus(); color: Theme.textPrimary; font.pixelSize: 13; font.bold: true }
+                        }
+                        Label {
+                            text: controller.daemon_alive ? "Local daemon running" : "Connecting to daemon…"
+                            color: Theme.textMuted; font.pixelSize: 11
+                            Layout.fillWidth: true; Layout.leftMargin: 20
+                            elide: Text.ElideRight
+                        }
+                        Item { Layout.preferredHeight: 8 }
+                        SidebarItem { iconText: "◉"; text: "Record"; selected: root.controller.selected_page === "recorder"; onClicked: root.controller.selectPage("recorder"); Layout.fillWidth: true }
+                        SidebarItem { iconText: "▢"; text: "Library"; selected: root.controller.selected_page === "library"; onClicked: root.controller.selectPage("library"); Layout.fillWidth: true }
+                        Label { text: "CONFIGURATION"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; Layout.topMargin: 16; Layout.leftMargin: 4; font.letterSpacing: 1.1 }
+                        Item { Layout.preferredHeight: 2 }
+                        SidebarItem { iconText: "◫"; text: "Models & services"; selected: root.controller.selected_page === "models"; onClicked: root.controller.selectPage("models"); Layout.fillWidth: true }
+                        SidebarItem { iconText: "💬"; text: "Prompts"; selected: root.controller.selected_page === "prompts"; onClicked: root.controller.selectPage("prompts"); Layout.fillWidth: true }
+                        SidebarItem { iconText: "◍"; text: "General"; selected: root.controller.selected_page === "general"; onClicked: root.controller.selectPage("general"); Layout.fillWidth: true }
+                        Item { Layout.fillHeight: true }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Theme.windowBg
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 24
+                        anchors.topMargin: 12
+                        spacing: 14
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 4
-                            Label { text: root.pageTitle(); color: Theme.textPrimary; font.pixelSize: 28; font.bold: true }
+                            Label { text: root.pageTitle(); color: Theme.textPrimary; font.pixelSize: 26; font.bold: true }
                             Label { text: root.pageSubtitle(); color: Theme.textMuted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                         }
-                        StatusBadge { labelText: root.controller.ready ? "Ready" : "Starting"; dotColor: root.controller.ready ? Theme.statusGreen : Theme.accent }
-                    }
-                    StackLayout {
-                        id: pages
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        currentIndex: ["recorder", "library", "jobs", "models", "prompts", "general", "about"].indexOf(root.controller.selected_page)
-                        RecorderPage { controller: root.controller }
-                        LibraryPage { controller: root.controller }
-                        JobsPage { controller: root.controller }
-                        ModelsPage { controller: root.controller }
-                        PromptsPage { controller: root.controller }
-                        GeneralPage { controller: root.controller }
-                        AboutPage { controller: root.controller }
+                        StackLayout {
+                            id: pages
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            currentIndex: Math.max(0, ["recorder", "library", "models", "prompts", "general"].indexOf(root.controller.selected_page))
+                            RecorderPage { controller: root.controller }
+                            LibraryPage { controller: root.controller }
+                            ModelsPage { controller: root.controller }
+                            PromptsPage { controller: root.controller }
+                            GeneralPage { controller: root.controller }
+                        }
                     }
                 }
             }

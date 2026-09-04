@@ -5,18 +5,20 @@ import io.github.jmarceno.gravaai
 Label {
     id: root
     property color dotColor: Theme.statusGreen
-    text: "●  " + labelText
     property string labelText: "Ready"
+    property string pillBg: Theme.statusGreenBg
+    text: "●  " + labelText
     color: dotColor
     font.pixelSize: 12
     font.bold: true
     padding: 8
-    leftPadding: 10
-    rightPadding: 10
+    leftPadding: 12
+    rightPadding: 12
     background: Rectangle {
-        radius: Theme.radiusSm
-        color: Theme.accentSoft
-        border.color: Theme.accentMuted
+        radius: 12
+        color: root.pillBg
+        border.color: root.dotColor
         border.width: 1
+        opacity: 0.95
     }
 }

@@ -2,20 +2,26 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property color windowBg: "#181a1f"
-    readonly property color cardBg: "#21252b"
-    readonly property color cardBgRaised: "#272c33"
-    readonly property color accent: "#3bb2a4"
-    readonly property color accentMuted: "#3bb2a433"
-    readonly property color accentSoft: "#3bb2a41a"
+    readonly property color windowBg: "#121418"
+    readonly property color cardBg: "#1b1e25"
+    readonly property color cardBgRaised: "#232833"
+    readonly property color accent: "#2fb3a3"
+    readonly property color accentMuted: "#2fb3a433"
+    readonly property color accentSoft: "#2fb3a422"
+    readonly property color accentStrong: "#3fd4c1"
     readonly property color textPrimary: "#ffffff"
     readonly property color textSecondary: "#c5c9ce"
     readonly property color textMuted: "#8b929a"
     readonly property color textDim: "#6b7280"
     readonly property color statusGreen: "#3ecf8e"
-    readonly property color danger: "#e35d6a"
-    readonly property color borderSubtle: "#2c313a"
-    readonly property color inputBg: "#16191e"
+    readonly property color statusGreenBg: "#3ecf8e22"
+    readonly property color danger: "#e5656e"
+    readonly property color dangerBg: "#e5656e26"
+    readonly property color dangerStrong: "#f07880"
+    readonly property color warning: "#e8b339"
+    readonly property color warningBg: "#e8b33926"
+    readonly property color borderSubtle: "#2a303b"
+    readonly property color inputBg: "#12151b"
     readonly property color sliderTrack: "#2a2f38"
     readonly property color accentText: textPrimary
     readonly property color hover: cardBgRaised
@@ -27,7 +33,8 @@ QtObject {
         && Qt.application.arguments
         && Qt.application.arguments.indexOf("--reduce-motion") >= 0)
     readonly property int animationDuration: animationsEnabled ? 180 : 0
-    readonly property int radius: 10
-    readonly property int radiusSm: 8
-    readonly property int sidebarWidth: 236
+    readonly property int radius: 14
+    readonly property int radiusSm: 10
+    readonly property int radiusXs: 8
+    readonly property int sidebarWidth: 228
 }

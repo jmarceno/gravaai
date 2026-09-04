@@ -160,14 +160,14 @@ Mix and match freely — e.g. whisper.cpp for transcription + Ollama for summari
 
 ### First-Time Setup
 
-Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear icon also has an **About GravaAi** entry showing the app version and project links.
+Open the window from the tray icon, then use the sidebar.
 
-1. **General tab** — choose your transcription and summarization services; set output folder and recording quality
-2. **Models tab** — configure the selected services:
+1. **Models & services tab** — choose your transcription and summarization services and configure them:
    - *OpenAI-compatible*: set the base URL, paste your API key and choose models
    - *whisper.cpp*: pick an acceleration backend and install the engine (first time), then download a GGML model
    - *Ollama*: set host and click Download next to your preferred model
-3. **Prompts tab** — optionally customize the transcription or summarization prompt
+2. **General tab** — set output folder, recording quality and background behavior
+3. **Prompts tab** — optionally customize the transcription, summarization or title prompt (built-in defaults are shown)
 
 ### Settings Reference
 
@@ -175,16 +175,16 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 | Setting | Description |
 |---|---|
-| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local; default) |
-| Summarization service | OpenAI-compatible (cloud; default) or Ollama (local) |
 | Start at system startup | Launch automatically on login |
 | Enable call detection | Monitor for active calls and notify you to start recording |
 | Low memory mode | Unload the window from memory when you close it (~20 MB vs. ~100 MB idle in the tray) at the cost of a brief delay when reopening. Off by default — enable on low-memory systems |
-| Auto-process recordings | Automatically start transcription and summarization when a recording stops (on by default). When off, only the audio is saved — start processing manually from Jobs or the Library |
+| Auto-process recordings | Automatically start transcription and summarization when a recording stops (on by default). When off, only the audio is saved — start processing manually from the Recorder dashboard or the Library |
 | Output folder | Where recordings and notes are saved (default: `~/meetings`) |
 | Recording quality | Audio bitrate preset (Very High / High / Medium / Low) |
 
-#### Models tab
+#### Models & services tab
+
+Choose the transcription/summarization services here, then configure them below.
 
 **OpenAI-compatible**
 
@@ -233,9 +233,15 @@ Available Ollama models:
 
 #### Prompts tab
 
-Customize the transcription and summarization prompts. Each has a **Reset to default** button. The `{transcript}` placeholder in the summarization prompt is replaced with the transcript text.
+Customize the transcription, summarization and title prompts. Built-in defaults are shown on first open. **Reset defaults** restores them; saving a default stores it as "use built-in". The `{transcript}` placeholder in the summarization prompt is replaced with the transcript text.
 
 Note: transcription prompts apply to the OpenAI-compatible service only — the local whisper.cpp engine does not use a prompt.
+
+#### Library
+
+Browse past meetings. Select rows to delete, open transcripts/notes directly, re-run summarization, rename, or open the meeting folder.
+
+The Recorder dashboard also shows recent meetings (with Transcript/Notes shortcuts) and live background jobs with Cancel/Retry/Dismiss/Open actions. The processing-pipeline card reflects the current Models & services configuration.
 
 ### Workflow
 

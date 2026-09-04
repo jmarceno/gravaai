@@ -427,7 +427,10 @@ are installed on demand from **Settings → Models**:
   Vulkan stays explicit-only; aarch64 is CPU-only). Lands in
   `~/.local/share/gravaai/crisp-asr/` with a `--version` smoke test;
   Nemotron GGUF models (Q8 default) download from HuggingFace into
-  `~/.local/share/gravaai/crisp-asr-models/`. Transcription runs as a
+  `~/.local/share/gravaai/crisp-asr-models/`. The weights must be CrispASR's
+  own `cstr/` conversion — third-party GGUFs of the same base model miss the
+  tensors the `nemotron` backend requires and transcribe to silence (a
+  regression test pins the download URL). Transcription runs as a
   short-lived CLI call inside the `--process` child, so there is no
   persistent service to start/stop — GPU memory is freed by unloading Ollama
   models first, exactly like the whisper.cpp path.

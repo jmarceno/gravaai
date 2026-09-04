@@ -231,7 +231,7 @@ hashes are not pinned yet on this experimental branch.
 | Setting | Description |
 |---|---|
 | Acceleration backend | `auto`, `cpu`, `vulkan` or `cuda` (all three installable; Vulkan/CUDA Linux builds are x86_64-only) |
-| Model | Nemotron quant to use (`nemotron-3.5-asr-0.6b-q8_0` default; Q6_K / Q5_K_M / Q4_K_M / F16 available) |
+| Model | Nemotron quant to use (`nemotron-3.5-asr-0.6b-q8_0` default; Q4_K / F16 available) |
 | Model list | Download status and one-click download for each Nemotron GGUF from HuggingFace |
 
 **Ollama**

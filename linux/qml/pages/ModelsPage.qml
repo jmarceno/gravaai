@@ -150,7 +150,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 10
                         Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: crispModel; model: ["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q6_k", "nemotron-3.5-asr-0.6b-q5_k_m", "nemotron-3.5-asr-0.6b-q4_k_m", "nemotron-3.5-asr-0.6b-f16"]; currentIndex: root.indexOfValue(["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q6_k", "nemotron-3.5-asr-0.6b-q5_k_m", "nemotron-3.5-asr-0.6b-q4_k_m", "nemotron-3.5-asr-0.6b-f16"], root.cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0"); Layout.fillWidth: true }
+                        AppComboBox { id: crispModel; model: ["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q4_k", "nemotron-3.5-asr-0.6b-f16"]; currentIndex: root.indexOfValue(["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q4_k", "nemotron-3.5-asr-0.6b-f16"], root.cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0"); Layout.fillWidth: true }
                         AppComboBox { id: crispBackend; model: ["auto", "cpu", "vulkan", "cuda"]; currentIndex: root.indexOfValue(["auto", "cpu", "vulkan", "cuda"], root.cfg.crisp_asr_backend || "auto"); Layout.fillWidth: true }
                     }
                     RowLayout {

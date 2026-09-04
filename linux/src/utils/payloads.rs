@@ -305,7 +305,7 @@ mod tests {
         write(
             &base
                 .path()
-                .join("crisp-asr-models/nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"),
+                .join("crisp-asr-models/nemotron-3.5-asr-streaming-0.6b-q8_0.gguf"),
             &[0u8; 11],
         );
         write(&base.path().join("ollama/ollama"), &[0u8; 2]);
@@ -337,7 +337,7 @@ mod tests {
             "crisp engine row points at a directory"
         );
         assert!(crisp_engine.path.ends_with("crisp-asr"));
-        let crisp_model = by_name("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf");
+        let crisp_model = by_name("nemotron-3.5-asr-streaming-0.6b-q8_0.gguf");
         assert_eq!(crisp_model.size_bytes, 11);
         assert!(!crisp_model.path_is_dir, "crisp model row points at a file");
         let ollama = by_name("Ollama runtime");

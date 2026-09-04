@@ -19,7 +19,6 @@ use std::process::Command;
 
 use crate::config::defaults::{
     crisp_asr_engine_asset, crisp_asr_engine_url, crisp_asr_model_file, APP_DIR_NAME,
-    CRISP_ASR_HF_BASE_URL,
 };
 
 pub fn crisp_asr_home() -> PathBuf {
@@ -338,10 +337,11 @@ impl CrispAsrModelDownloader {
 
     /// Download `model`'s GGUF weights from HuggingFace. Raises (Err) on failure.
     pub fn download(&self, model: &str, on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
-        let filename = crisp_asr_model_file(model)
+        let filename = crate::config::defaults::crisp_asr_model_file(model)
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("{model}.gguf"));
-        let url = format!("{CRISP_ASR_HF_BASE_URL}{filename}");
+        let url = crate::config::defaults::crisp_asr_model_url(model)
+            .ok_or_else(|| anyhow::anyhow!("Unknown CrispASR model: {model:?}"))?;
         let dest = self.cache_root.join(&filename);
         std::fs::create_dir_all(&self.cache_root)?;
         on_status(&format!("Downloading {filename}…"));
@@ -392,8 +392,29 @@ impl CrispAsrModelDownloader {
         }
         drop(file);
         std::fs::rename(&tmp, &dest)?;
+        // Drop stale weights from the pre-fix wrong-repo era (uppercase
+        // `transcribe.cpp`-flavored filenames): they can never transcribe and
+        // would otherwise linger in Downloads forever.
+        for stale in stale_model_files() {
+            let path = self.cache_root.join(stale);
+            if path != dest {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
         Ok(())
     }
+}
+
+/// Filenames from the pre-fix wrong-repo era, removed after a successful
+/// download (pure helper so the policy is unit-testable).
+pub fn stale_model_files() -> &'static [&'static str] {
+    &[
+        "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+        "nemotron-3.5-asr-streaming-0.6b-Q6_K.gguf",
+        "nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+        "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf",
+        "nemotron-3.5-asr-streaming-0.6b-F16.gguf",
+    ]
 }
 
 impl Default for CrispAsrModelDownloader {
@@ -486,6 +507,34 @@ mod tests {
         assert!(checker
             .model_path_for(model)
             .to_string_lossy()
-            .ends_with("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"));
+            .ends_with("nemotron-3.5-asr-streaming-0.6b-q8_0.gguf"));
+    }
+
+    #[test]
+    fn model_urls_point_at_the_crispasr_conversion() {
+        // Regression guard: third-party conversions of the same base model
+        // (e.g. transcribe.cpp-flavored GGUFs) miss the tensors the nemotron
+        // backend requires and transcribe to silence — only the official
+        // `cstr/` conversion may ever be served.
+        use crate::config::defaults::{crisp_asr_model_url, CRISP_ASR_MODELS};
+        for model in CRISP_ASR_MODELS {
+            let url = crisp_asr_model_url(model).expect("known model must resolve");
+            assert!(
+                url.starts_with(
+                    "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF/resolve/main/"
+                ),
+                "unexpected url: {url}"
+            );
+        }
+        assert!(crisp_asr_model_url("nope").is_none());
+        // Stale wrong-repo filenames must never collide with current ones.
+        for stale in stale_model_files() {
+            assert!(
+                !CRISP_ASR_MODELS
+                    .iter()
+                    .any(|m| { crate::config::defaults::crisp_asr_model_file(m) == Some(*stale) }),
+                "stale file still served: {stale}"
+            );
+        }
     }
 }

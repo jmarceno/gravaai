@@ -67,39 +67,43 @@ pub const CRISP_ASR_DEFAULT_MODEL: &str = "nemotron-3.5-asr-0.6b-q8_0";
 
 pub const CRISP_ASR_MODELS: &[&str] = &[
     "nemotron-3.5-asr-0.6b-q8_0",
-    "nemotron-3.5-asr-0.6b-q6_k",
-    "nemotron-3.5-asr-0.6b-q5_k_m",
-    "nemotron-3.5-asr-0.6b-q4_k_m",
+    "nemotron-3.5-asr-0.6b-q4_k",
     "nemotron-3.5-asr-0.6b-f16",
 ];
 
 pub const CRISP_ASR_BACKENDS: &[&str] = &["auto", "cpu", "vulkan", "cuda"];
 
 /// HuggingFace repo hosting the Nemotron GGUF weights.
-pub const CRISP_ASR_HF_REPO: &str = "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf";
+///
+/// NOTE: this must be CrispASR's own `cstr/` conversion (GGUF architecture
+/// `nemotron`). Third-party conversions of the same base model (e.g. the
+/// `transcribe.cpp`-flavored ones) miss the tensors/preprocessor metadata
+/// the `nemotron` backend requires and transcribe to silence.
+pub const CRISP_ASR_HF_REPO: &str = "cstr/nemotron-3.5-asr-streaming-0.6b-GGUF";
 pub const CRISP_ASR_HF_BASE_URL: &str =
-    "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/";
+    "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF/resolve/main/";
 
 pub fn crisp_asr_model_file(model: &str) -> Option<&'static str> {
     match model {
-        "nemotron-3.5-asr-0.6b-q8_0" => Some("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"),
-        "nemotron-3.5-asr-0.6b-q6_k" => Some("nemotron-3.5-asr-streaming-0.6b-Q6_K.gguf"),
-        "nemotron-3.5-asr-0.6b-q5_k_m" => Some("nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf"),
-        "nemotron-3.5-asr-0.6b-q4_k_m" => Some("nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf"),
-        "nemotron-3.5-asr-0.6b-f16" => Some("nemotron-3.5-asr-streaming-0.6b-F16.gguf"),
+        "nemotron-3.5-asr-0.6b-q8_0" => Some("nemotron-3.5-asr-streaming-0.6b-q8_0.gguf"),
+        "nemotron-3.5-asr-0.6b-q4_k" => Some("nemotron-3.5-asr-streaming-0.6b-q4_k.gguf"),
+        "nemotron-3.5-asr-0.6b-f16" => Some("nemotron-3.5-asr-streaming-0.6b-f16.gguf"),
         _ => None,
     }
 }
 
 pub fn crisp_asr_model_info(model: &str) -> (&'static str, &'static str) {
     match model {
-        "nemotron-3.5-asr-0.6b-q8_0" => ("~640 MB", "Default, best accuracy"),
-        "nemotron-3.5-asr-0.6b-q6_k" => ("~480 MB", "Good balance"),
-        "nemotron-3.5-asr-0.6b-q5_k_m" => ("~410 MB", "Smaller, fast"),
-        "nemotron-3.5-asr-0.6b-q4_k_m" => ("~370 MB", "Smallest, lower accuracy"),
+        "nemotron-3.5-asr-0.6b-q8_0" => ("~750 MB", "Default, best accuracy"),
+        "nemotron-3.5-asr-0.6b-q4_k" => ("~430 MB", "Smaller, fast"),
         "nemotron-3.5-asr-0.6b-f16" => ("~1.2 GB", "Full precision, slowest"),
         _ => ("", ""),
     }
+}
+
+/// Full download URL for a CrispASR model, or None for unknown ids.
+pub fn crisp_asr_model_url(model: &str) -> Option<String> {
+    crisp_asr_model_file(model).map(|f| format!("{CRISP_ASR_HF_BASE_URL}{f}"))
 }
 
 // --- CrispASR engine (prebuilt, no source builds) ----------------------------

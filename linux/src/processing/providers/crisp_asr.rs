@@ -47,6 +47,7 @@ pub fn parse_crisp_asr_output(raw: &str) -> String {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .trim();
+                let text = strip_language_tags(text);
                 if !text.is_empty() {
                     lines.push(format!("[{h:02}:{m:02}:{s:02}] {text}"));
                 }
@@ -55,15 +56,36 @@ pub fn parse_crisp_asr_output(raw: &str) -> String {
         }
     }
     // Plain-text stdout: drop progress/log lines, keep transcript lines.
-    let kept: Vec<&str> = raw
+    let kept: Vec<String> = raw
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with("crispasr:"))
+        .map(strip_language_tags)
+        .filter(|l| !l.is_empty())
         .collect();
     kept.join("\n")
 }
 
 pub type RunnerFn = Box<dyn Fn(&[String]) -> anyhow::Result<String> + Send>;
+
+/// Strip model-emitted language-tag tokens (e.g. `<en-US>`) from transcript
+/// text. The Nemotron decoder emits these inline; they are noise in meeting
+/// notes. Pure and unit-testable.
+fn strip_language_tags(text: &str) -> String {
+    text.split_whitespace()
+        .filter(|tok| {
+            let t = tok.trim_matches(|c: char| ".,!?;:\"'()[]".contains(c));
+            !(t.starts_with('<')
+                && t.ends_with('>')
+                && t.contains('-')
+                && t.len() < 16
+                && t[1..t.len() - 1]
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-'))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
 
 fn default_binary() -> PathBuf {
     crate::services::crisp_asr_service::crisp_asr_binary()
@@ -230,6 +252,19 @@ mod tests {
         let mixed =
             "crispasr: transcribed 3.2s audio in 0.32s (10.1x realtime)\nThe quick brown fox\n";
         assert_eq!(parse_crisp_asr_output(mixed), "The quick brown fox");
+    }
+
+    #[test]
+    fn strips_language_tags() {
+        let raw = r#"{"transcription":[{"offsets":{"from":1000,"to":2000},"text":"Hello <en-US> world"}]}"#;
+        assert_eq!(parse_crisp_asr_output(raw), "[00:00:01] Hello world");
+        assert_eq!(
+            parse_crisp_asr_output("line one <de-DE>\n<en-US>\nline two\n"),
+            "line one\nline two"
+        );
+        // Real words in angle brackets-ish form are kept.
+        assert_eq!(strip_language_tags("a < b and c > d"), "a < b and c > d");
+        assert_eq!(strip_language_tags(""), "");
     }
 
     #[test]

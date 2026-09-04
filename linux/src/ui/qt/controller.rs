@@ -390,10 +390,57 @@ async fn handle_command(
     }
 }
 
-/// Open a local folder through the Freedesktop portal.  No GUI-thread I/O or
-/// shell helper is involved: the worker owns the D-Bus call and sends only a
-/// toast result back to QML.
+/// Open a local folder or file with the desktop's default handler.
+///
+/// Prefers `xdg-open` (argv, no shell, detached) because the OpenURI portal
+/// only reports that the request was accepted — not that anything actually
+/// opened — which previously toasted "Opened folder." while nothing happened.
+/// Falls back to the portal when no opener is installed.
 async fn open_path(path: &str, tx: &Sender<Event>) {
+    let fs_path = Path::new(path);
+    let display = fs_path.display().to_string();
+    // Resolve to an absolute path for the opener; keep the original for errors.
+    let abs = fs_path
+        .canonicalize()
+        .ok()
+        .or_else(|| fs_path.is_absolute().then(|| fs_path.to_path_buf()));
+    let Some(abs) = abs else {
+        send_error(tx, format!("Could not open: invalid path {display}"));
+        return;
+    };
+    if !abs.exists() {
+        let _ = tx.send(Event::Toast("File does not exist yet.".into()));
+        return;
+    }
+    let is_dir = abs.is_dir();
+    let label = if is_dir { "folder" } else { "file" };
+    // Try desktop openers first (detached, no shell).
+    for opener in ["xdg-open", "gio", "kde-open", "exo-open"] {
+        let mut cmd = std::process::Command::new(opener);
+        if opener == "gio" {
+            cmd.arg("open");
+        }
+        cmd.arg(&abs)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        match cmd.spawn() {
+            Ok(_) => {
+                let _ = tx.send(Event::Toast(format!("Opened {label}.")));
+                return;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => {
+                log::warn!("Opener {opener} failed for {}: {err:#}", abs.display());
+                continue;
+            }
+        }
+    }
+    // Fall back to the Freedesktop portal.
+    open_path_via_portal(&abs, label, tx).await;
+}
+
+async fn open_path_via_portal(path: &Path, label: &str, tx: &Sender<Event>) {
     let path = Path::new(path);
     let Some(uri) = file_uri(path) else {
         send_error(
@@ -435,9 +482,9 @@ async fn open_path(path: &str, tx: &Sender<Event>) {
         portal.call("OpenURI", &("", uri.as_str(), options)).await;
     match result {
         Ok(_) => {
-            let _ = tx.send(Event::Toast("Opened folder.".into()));
+            let _ = tx.send(Event::Toast(format!("Opened {label}.")));
         }
-        Err(err) => send_error(tx, format!("Could not open folder: {err:#}")),
+        Err(err) => send_error(tx, format!("Could not open {label}: {err:#}")),
     }
 }
 

@@ -401,7 +401,10 @@ are installed on demand from **Settings → Models**:
 - **Installer security conventions** (`services/system_installer.rs`): no
   shell execution — commands are argv lists run without a shell and logged
   before execution; downloads are verified (pinned SHA-256 for the engine;
-  size + logged SHA-256 for the Ollama script) — never `curl | sh`. No
+  `sha256sum.txt` for the Ollama archive) — never `curl | sh`. Tar extraction
+  is path- and link-safe (relative symlinks like versioned `.so` names are
+  kept; absolute/escaping targets rejected). Engine and GGML downloads
+  stream to disk with progress instead of buffering multi-GB files in RAM. No
   privilege escalation and no system packages anywhere in the install path.
 
 **Config:** `~/.config/gravaai/config.json`, `chmod 600`. Empty string

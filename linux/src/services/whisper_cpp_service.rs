@@ -191,9 +191,6 @@ fn extract_archive(archive: &Path, stage: &Path, format: &str) -> anyhow::Result
         for entry in tar.entries()? {
             let mut entry = entry?;
             let entry_type = entry.header().entry_type();
-            if entry_type.is_symlink() || entry_type.is_hard_link() {
-                anyhow::bail!("Engine archive contains an unsupported link entry");
-            }
             let relative = entry.path()?.into_owned();
             if relative.is_absolute()
                 || relative
@@ -204,6 +201,25 @@ fn extract_archive(archive: &Path, stage: &Path, format: &str) -> anyhow::Result
                     "Engine archive contains an unsafe path: {}",
                     relative.display()
                 );
+            }
+            if entry_type.is_symlink() || entry_type.is_hard_link() {
+                // Upstream ships versioned .so symlinks (e.g. libwhisper.so ->
+                // libwhisper.so.1). Allow relative links that stay inside the
+                // stage; reject absolute or escaping targets.
+                let target = entry
+                    .link_name()?
+                    .ok_or_else(|| anyhow::anyhow!("Engine archive has a link without target"))?;
+                if target.is_absolute()
+                    || target
+                        .components()
+                        .any(|c| matches!(c, std::path::Component::ParentDir))
+                {
+                    anyhow::bail!(
+                        "Engine archive contains an unsafe link: {} -> {}",
+                        relative.display(),
+                        target.display()
+                    );
+                }
             }
             let destination = stage.join(&relative);
             if let Some(parent) = destination.parent() {
@@ -360,13 +376,48 @@ impl WhisperCppModelDownloader {
         std::fs::create_dir_all(&self.cache_root)?;
         on_status(&format!("Downloading {filename}…"));
         log::info!("Downloading {url}");
-        let bytes = reqwest::blocking::get(&url)
-            .and_then(|r| r.error_for_status())
-            .and_then(|r| r.bytes())
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(3600))
+            .build()?;
+        let mut resp = client
+            .get(&url)
+            .send()
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to download GGML model {model:?} from HuggingFace: {e:#}")
+            })?
+            .error_for_status()
             .map_err(|e| {
                 anyhow::anyhow!("Failed to download GGML model {model:?} from HuggingFace: {e:#}")
             })?;
-        std::fs::write(&dest, &bytes)?;
+        let total = resp.content_length().unwrap_or(0);
+        let tmp = dest.with_extension("part");
+        let mut file = std::fs::File::create(&tmp)?;
+        {
+            use std::io::{Read as _, Write as _};
+            let mut buf = [0u8; 256 * 1024];
+            let mut downloaded: u64 = 0;
+            let mut last_pct = 0u64;
+            loop {
+                let n = resp.read(&mut buf).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to download GGML model {model:?} from HuggingFace: {e:#}"
+                    )
+                })?;
+                if n == 0 {
+                    break;
+                }
+                file.write_all(&buf[..n])?;
+                downloaded += n as u64;
+                if let Some(pct) = downloaded.saturating_mul(100).checked_div(total.max(1)) {
+                    if total > 0 && pct >= last_pct + 5 {
+                        last_pct = pct;
+                        on_status(&format!("Downloading {filename}… {pct}%"));
+                    }
+                }
+            }
+        }
+        drop(file);
+        std::fs::rename(&tmp, &dest)?;
         Ok(())
     }
 }
@@ -460,6 +511,39 @@ mod tests {
         assert!(msg.contains("whisper-cli"), "unexpected message: {msg}");
         assert!(msg.contains("Release"), "unexpected message: {msg}");
         assert!(!home.join("whisper-cli").exists());
+    }
+
+    #[test]
+    fn engine_archive_allows_relative_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let tgz = dir.path().join("engine.tar.gz");
+        {
+            let f = std::fs::File::create(&tgz).unwrap();
+            let enc = flate2::write::GzEncoder::new(f, flate2::Compression::fast());
+            let mut tar = tar::Builder::new(enc);
+            let data = b"fake-so";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(data.len() as u64);
+            header.set_mode(0o644);
+            tar.append_data(&mut header, "pkg/libwhisper.so.1.9.3", &data[..])
+                .unwrap();
+            let mut link = tar::Header::new_gnu();
+            link.set_entry_type(tar::EntryType::Symlink);
+            link.set_size(0);
+            link.set_mode(0o777);
+            tar.append_link(&mut link, "pkg/libwhisper.so", "libwhisper.so.1.9.3")
+                .unwrap();
+            tar.into_inner().unwrap().finish().unwrap();
+        }
+        let stage = dir.path().join("stage");
+        std::fs::create_dir_all(&stage).unwrap();
+        extract_archive(&tgz, &stage, "tar.gz").unwrap();
+        assert_eq!(
+            std::fs::read_link(stage.join("pkg/libwhisper.so"))
+                .unwrap()
+                .to_string_lossy(),
+            "libwhisper.so.1.9.3"
+        );
     }
 
     #[test]

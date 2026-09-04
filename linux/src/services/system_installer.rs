@@ -65,7 +65,8 @@ impl OllamaInstaller {
         let file_name = format!("ollama-linux-{arch}.tgz");
         let base = format!("{OLLAMA_RELEASE_BASE}/v{OLLAMA_RELEASE_VERSION}");
         let archive_url = format!("{base}/{file_name}");
-        let checksums_url = format!("{base}/sha256sums.txt");
+        // Upstream publishes the hashes as `sha256sum.txt` (singular).
+        let checksums_url = format!("{base}/sha256sum.txt");
         on_status(&format!(
             "Downloading Ollama {OLLAMA_RELEASE_VERSION} ({arch})…"
         ));
@@ -89,14 +90,7 @@ impl OllamaInstaller {
             .map_err(|e| anyhow::anyhow!("Ollama checksum download failed: {e:#}"))?
             .text()
             .map_err(|e| anyhow::anyhow!("Failed to read Ollama checksums: {e:#}"))?;
-        let expected = checksums
-            .lines()
-            .find_map(|line| {
-                let mut fields = line.split_whitespace();
-                let digest = fields.next()?;
-                let name = fields.next()?.trim_start_matches('*');
-                (name == file_name).then(|| digest.to_ascii_lowercase())
-            })
+        let expected = find_checksum(&checksums, &file_name)
             .ok_or_else(|| anyhow::anyhow!("Ollama checksums do not list {file_name}"))?;
         let actual = sha256_hex(&archive);
         if actual != expected {
@@ -122,6 +116,18 @@ impl OllamaInstaller {
     }
 }
 
+/// Find the expected SHA-256 for `file_name` in a `sha256sum.txt` body.
+/// Handles `./`-prefixed and `*`-marked entries as published by Ollama.
+fn find_checksum(checksums: &str, file_name: &str) -> Option<String> {
+    checksums.lines().find_map(|line| {
+        let mut fields = line.split_whitespace();
+        let digest = fields.next()?;
+        let raw = fields.next()?.trim_start_matches('*');
+        let name = raw.trim_start_matches("./");
+        (name == file_name).then(|| digest.to_ascii_lowercase())
+    })
+}
+
 fn extract_ollama_archive(archive: &[u8], stage: &Path) -> anyhow::Result<PathBuf> {
     let decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(archive));
     let mut tar = tar::Archive::new(decoder);
@@ -129,9 +135,6 @@ fn extract_ollama_archive(archive: &[u8], stage: &Path) -> anyhow::Result<PathBu
     for entry in tar.entries()? {
         let mut entry = entry?;
         let entry_type = entry.header().entry_type();
-        if entry_type.is_symlink() || entry_type.is_hard_link() {
-            anyhow::bail!("Ollama archive contains an unsupported link entry");
-        }
         let relative = entry.path()?.into_owned();
         if relative.is_absolute()
             || relative
@@ -142,6 +145,22 @@ fn extract_ollama_archive(archive: &[u8], stage: &Path) -> anyhow::Result<PathBu
                 "Ollama archive contains an unsafe path: {}",
                 relative.display()
             );
+        }
+        if entry_type.is_symlink() || entry_type.is_hard_link() {
+            let target = entry
+                .link_name()?
+                .ok_or_else(|| anyhow::anyhow!("Ollama archive has a link without target"))?;
+            if target.is_absolute()
+                || target
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                anyhow::bail!(
+                    "Ollama archive contains an unsafe link: {} -> {}",
+                    relative.display(),
+                    target.display()
+                );
+            }
         }
         let destination = stage.join(&relative);
         if let Some(parent) = destination.parent() {
@@ -252,6 +271,53 @@ pub fn sha256_hex(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checksum_parsing_handles_dot_slash_prefix() {
+        let body = "a388afb2ccf4e61a3d0de88f0d0600e9e1d67e56bbc9a011ee287f62780bee33  ./ollama-linux-amd64.tgz\n";
+        assert_eq!(
+            find_checksum(body, "ollama-linux-amd64.tgz").as_deref(),
+            Some("a388afb2ccf4e61a3d0de88f0d0600e9e1d67e56bbc9a011ee287f62780bee33")
+        );
+        assert_eq!(find_checksum(body, "ollama-linux-arm64.tgz"), None);
+    }
+
+    #[test]
+    fn ollama_archive_allows_relative_symlinks() {
+        // Build a tiny tgz with a file + relative symlink and ensure extraction keeps both.
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("ollama"), b"bin").unwrap();
+        std::os::unix::fs::symlink("ollama", src.join("ollama-link")).unwrap();
+        let tgz = dir.path().join("a.tgz");
+        {
+            let f = std::fs::File::create(&tgz).unwrap();
+            let enc = flate2::write::GzEncoder::new(f, flate2::Compression::fast());
+            let mut tar = tar::Builder::new(enc);
+            tar.append_path_with_name(src.join("ollama"), "bin/ollama")
+                .unwrap();
+            // Append symlink manually.
+            let mut header = tar::Header::new_gnu();
+            header.set_entry_type(tar::EntryType::Symlink);
+            header.set_size(0);
+            header.set_mode(0o777);
+            tar.append_link(&mut header, "bin/ollama-link", "ollama")
+                .unwrap();
+            tar.into_inner().unwrap().finish().unwrap();
+        }
+        let bytes = std::fs::read(&tgz).unwrap();
+        let stage = dir.path().join("stage");
+        std::fs::create_dir_all(&stage).unwrap();
+        let found = extract_ollama_archive(&bytes, &stage).unwrap();
+        assert!(found.is_file());
+        assert_eq!(
+            std::fs::read_link(stage.join("bin/ollama-link"))
+                .unwrap()
+                .to_string_lossy(),
+            "ollama"
+        );
+    }
 
     #[test]
     fn sha256_known_vector() {

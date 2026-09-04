@@ -43,23 +43,25 @@ ComboBox {
             clip: true
             implicitHeight: Math.min(240, contentHeight)
             model: root.delegateModel
+            currentIndex: root.highlightedIndex
             ScrollBar.vertical: ScrollBar {}
         }
     }
     delegate: ItemDelegate {
-        required property var model
+        required property var modelData
         required property int index
-        width: root.width - 12
+        width: ListView.view ? ListView.view.width : root.width - 12
         highlighted: root.highlightedIndex === index
         background: Rectangle {
             radius: 6
-            color: highlighted ? Theme.accentSoft : "transparent"
+            color: highlighted ? Theme.accent : "transparent"
         }
         contentItem: Label {
-            text: modelData !== undefined ? modelData : model
-            color: highlighted ? Theme.textPrimary : Theme.textSecondary
+            text: String(modelData)
+            color: highlighted ? "#ffffff" : Theme.textPrimary
             font.pixelSize: 13
             elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
         }
         onClicked: {
             root.currentIndex = index

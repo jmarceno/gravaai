@@ -31,7 +31,7 @@ use super::widgets::{action_row, install_button, make_scroll_page, IdComboRow};
 fn service_label(id: &str) -> &str {
     match id {
         "openai" => "OpenAI-compatible",
-        "whisper_cpp" => "whisper.cpp (local, GPU)",
+        "whisper_cpp" => "whisper.cpp (local)",
         "ollama" => "Ollama (local)",
         other => other,
     }
@@ -214,7 +214,9 @@ impl ModelsPage {
         *self.wcpp_install_row.borrow_mut() = None;
 
         // Backend selector is always available — it picks which prebuilt
-        // engine binary to download.
+        // engine binary to download. Only CPU prebuilts exist for Linux
+        // (upstream ships CUDA bundles for Windows only), so auto resolves
+        // to cpu; an explicit cuda choice fails with guidance.
         let detected = detect_gpu_backend();
         let backend_combo = IdComboRow::new(
             "Acceleration backend",
@@ -222,11 +224,11 @@ impl ModelsPage {
             WHISPER_CPP_BACKENDS,
             &cfg.whisper_cpp_backend,
         );
-        backend_combo
-            .widget
-            .set_subtitle(&format!("Detected: {detected}"));
+        backend_combo.widget.set_subtitle(&format!(
+            "Detected: {detected} (Linux installs use the CPU build)"
+        ));
         let group = adw::PreferencesGroup::builder()
-            .title("whisper.cpp (GPU-accelerated)")
+            .title("whisper.cpp (local)")
             .build();
         group.add(&backend_combo.widget);
         self.wcpp_box.append(&group);
@@ -234,7 +236,7 @@ impl ModelsPage {
 
         if !WhisperCppEngineInstaller.is_installed() {
             let install_group = adw::PreferencesGroup::builder()
-                .description("The whisper.cpp engine is not installed. It is downloaded as an official prebuilt binary (CPU, or CUDA for NVIDIA GPUs — about 670 MB) with its models from HuggingFace. No compiler or system packages needed.")
+                .description("The whisper.cpp engine is not installed. It is downloaded as an official prebuilt CPU binary with its models from HuggingFace. No compiler or system packages needed.")
                 .build();
             let btn = install_button("Install");
             {
@@ -651,14 +653,20 @@ impl ModelsPage {
         }
         if let Some(grid) = self.ollama_grid.borrow().as_ref() {
             for model in OLLAMA_MODELS {
-                grid.set_status_text(model, "Ollama offline");
+                grid.set_status_text(model, "Ollama offline — start it with: ollama serve");
             }
+            // Downloads cannot succeed without a server; disable them so the
+            // failure presents as guidance, not a raw connection error.
+            grid.set_all_sensitive(false);
         }
     }
 
     fn set_ollama_reachable(&self) {
         if let Some(row) = self.ollama_status_row.borrow().as_ref() {
             row.set_subtitle("Ollama is running.");
+        }
+        if let Some(grid) = self.ollama_grid.borrow().as_ref() {
+            grid.set_all_sensitive(true);
         }
     }
 

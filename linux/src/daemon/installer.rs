@@ -35,7 +35,8 @@ fn require(ok: bool, what: &str) -> anyhow::Result<()> {
 fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
     use crate::services::system_installer::OllamaInstaller;
     match spec.kind.as_str() {
-        install_spec::KIND_OLLAMA => require(OllamaInstaller::install(on_status), "Ollama install"),
+        install_spec::KIND_OLLAMA => OllamaInstaller::install(on_status)
+            .map_err(|e| anyhow::anyhow!("Ollama install: {e:#}")),
         install_spec::KIND_WHISPER_CPP_ENGINE => {
             use crate::services::whisper_cpp_service::WhisperCppEngineInstaller;
             let backend = if spec.backend.is_empty() {
@@ -58,7 +59,10 @@ fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<(
             };
             require(
                 OllamaClient::new().pull_model(&spec.model, &host, on_status)?,
-                &format!("Ollama pull {}", spec.model),
+                &format!(
+                    "Ollama pull {} did not confirm success — check `ollama serve` output and retry",
+                    spec.model
+                ),
             )
         }
         kind => Err(anyhow::anyhow!("unknown install kind: {kind:?}")),

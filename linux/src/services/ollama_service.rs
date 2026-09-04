@@ -72,12 +72,24 @@ impl OllamaClient {
         host: &str,
         on_progress: &dyn Fn(&str),
     ) -> anyhow::Result<bool> {
+        // Fail fast with an actionable message when the server is not running
+        // instead of surfacing a raw connection-refused error after the pull.
+        if self.get_installed_models(host).is_none() {
+            anyhow::bail!(
+                "Cannot reach Ollama at {host}. Install Ollama and start it with `ollama serve`, then retry."
+            );
+        }
         let body = serde_json::json!({"name": model, "stream": true});
         let resp = self
             .inner
             .post(format!("{}/api/pull", Self::base(host)))
             .json(&body)
-            .send()?;
+            .send()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Ollama pull failed for {model:?} at {host}: {e:#}. Is Ollama still running (`ollama serve`)?"
+                )
+            })?;
         let reader = std::io::BufReader::new(resp);
         for line in reader.lines().map_while(Result::ok) {
             if line.trim().is_empty() {
@@ -141,5 +153,15 @@ mod tests {
     fn unreachable_returns_none() {
         let c = OllamaClient::new();
         assert!(c.get_installed_models("http://127.0.0.1:1").is_none());
+    }
+
+    #[test]
+    fn pull_prefails_fast_with_actionable_error() {
+        let c = OllamaClient::new();
+        let err = c
+            .pull_model("phi4-mini", "http://127.0.0.1:1", &|_| {})
+            .unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("ollama serve"), "unexpected message: {msg}");
     }
 }

@@ -106,20 +106,21 @@ pub struct EngineAsset {
 
 /// Prebuilt engine binary for (`arch`, `backend`).
 /// `arch` is `std::env::consts::ARCH` (`"x86_64"` / `"aarch64"`).
-/// Returns None when no prebuilt exists (e.g. CUDA on ARM64).
+/// Returns None when no prebuilt exists.
+///
+/// NOTE: upstream publishes CUDA bundles for **Windows only**
+/// (`whisper-cublas-*-bin-x64.zip` = `Release/*.exe` + `*.dll` — verified
+/// against the b4938 asset listing). There is no prebuilt CUDA engine for
+/// Linux, so `"cuda"` deliberately has no asset: `resolve_backend()` in
+/// `services/whisper_cpp_service.rs` routes `auto` to `cpu` and rejects an
+/// explicit `cuda` with an actionable message instead of downloading 670 MB
+/// of unusable Windows binaries.
 pub fn whisper_cpp_engine_asset(arch: &str, backend: &str) -> Option<EngineAsset> {
     match (arch, backend) {
         ("x86_64", "cpu") => Some(EngineAsset {
             filename: "whisper-bin-ubuntu-x64.tar.gz",
             sha256: "f4cfc1f969a13805908fb72043ce7cc896eb42e0b8afbe841dc8e7298923b061",
             format: "tar.gz",
-        }),
-        ("x86_64", "cuda") => Some(EngineAsset {
-            // Bundles its CUDA libraries (~670 MB); only the NVIDIA driver
-            // on the host is required.
-            filename: "whisper-cublas-12.4.0-bin-x64.zip",
-            sha256: "c1b17166e1e31a91cc8e9c1f910d3785e3ce757bb2958bf9dce13fdb4880005f",
-            format: "zip",
         }),
         ("aarch64", "cpu") => Some(EngineAsset {
             filename: "whisper-bin-ubuntu-arm64.tar.gz",

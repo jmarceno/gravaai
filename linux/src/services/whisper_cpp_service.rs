@@ -46,35 +46,35 @@ pub fn detect_gpu_backend_with(which_fn: &dyn Fn(&str) -> Option<String>) -> Str
 
 /// Resolve a backend selector (`"auto"`/`"cuda"`/`"cpu"`) to a concrete
 /// flavor, validating it against this machine. Returns Err with an actionable
-/// message when the choice cannot be served (e.g. CUDA on ARM64).
+/// message when the choice cannot be served.
+///
+/// Upstream ships no prebuilt CUDA engine for Linux (their `whisper-cublas-*`
+/// bundles are Windows `.exe`/`.dll`), so `auto` always resolves to `cpu`
+/// — even on NVIDIA machines — and an explicit `cuda` fails immediately
+/// (before any 670 MB download) telling the user to pick `cpu`.
 pub fn resolve_backend(backend: &str) -> anyhow::Result<String> {
-    let flavor = if backend == "auto" {
-        detect_gpu_backend()
-    } else if matches!(backend, "cuda" | "cpu") {
-        backend.to_string()
-    } else {
-        anyhow::bail!("Unknown whisper.cpp backend: {backend:?} (expected auto, cuda or cpu)");
-    };
-    if flavor == "cuda" {
-        if std::env::consts::ARCH != "x86_64" {
-            anyhow::bail!(
-                "No prebuilt CUDA engine for {}. Use the CPU backend instead.",
-                std::env::consts::ARCH
+    resolve_backend_with(backend, &detect_gpu_backend())
+}
+
+/// Pure core of [`resolve_backend`] (`detected` is `detect_gpu_backend()`).
+pub fn resolve_backend_with(backend: &str, detected: &str) -> anyhow::Result<String> {
+    if backend == "auto" {
+        if detected == "cuda" {
+            log::info!(
+                "NVIDIA GPU detected but upstream ships no prebuilt CUDA engine for Linux — using the CPU build"
             );
         }
-        if crate::services::system_installer::which("nvidia-smi").is_none() {
-            anyhow::bail!(
-                "CUDA backend selected but no NVIDIA GPU was detected (nvidia-smi not found)."
-            );
-        }
+        return Ok("cpu".to_string());
     }
-    if whisper_cpp_engine_asset(std::env::consts::ARCH, &flavor).is_none() {
+    if backend == "cpu" {
+        return Ok("cpu".to_string());
+    }
+    if backend == "cuda" {
         anyhow::bail!(
-            "No prebuilt engine for {} / {flavor}. Use the CPU backend instead.",
-            std::env::consts::ARCH
+            "No prebuilt CUDA engine for Linux (upstream ships CUDA bundles for Windows only). Use the CPU backend instead — it runs on any machine."
         );
     }
-    Ok(flavor)
+    anyhow::bail!("Unknown whisper.cpp backend: {backend:?} (expected auto, cuda or cpu)");
 }
 
 #[derive(Default)]
@@ -252,7 +252,10 @@ fn install_staged_engine(stage: &Path, home: &Path) -> anyhow::Result<()> {
         }
     }
     let Some(binary) = binary else {
-        anyhow::bail!("Engine archive did not contain whisper-cli");
+        anyhow::bail!(
+            "Engine archive did not contain whisper-cli (top-level: {}). The upstream release layout may have changed — please report this.",
+            top_level_names(stage, 12)
+        );
     };
     std::fs::copy(&binary, home.join("whisper-cli"))?;
     for lib in libs {
@@ -269,6 +272,26 @@ fn install_staged_engine(stage: &Path, home: &Path) -> anyhow::Result<()> {
         )?;
     }
     Ok(())
+}
+
+/// First `limit` entry names under `dir` (one level), for error messages that
+/// say what an archive actually contained instead of just what was missing.
+fn top_level_names(dir: &Path, limit: usize) -> String {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names.truncate(limit);
+    if names.is_empty() {
+        "(empty)".to_string()
+    } else {
+        names.join(", ")
+    }
 }
 
 pub struct WhisperCppStatusChecker {
@@ -325,7 +348,12 @@ impl WhisperCppModelDownloader {
         std::fs::create_dir_all(&self.cache_root)?;
         on_status(&format!("Downloading {filename}…"));
         log::info!("Downloading {url}");
-        let bytes = reqwest::blocking::get(&url)?.bytes()?;
+        let bytes = reqwest::blocking::get(&url)
+            .and_then(|r| r.error_for_status())
+            .and_then(|r| r.bytes())
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to download GGML model {model:?} from HuggingFace: {e:#}")
+            })?;
         std::fs::write(&dest, &bytes)?;
         Ok(())
     }
@@ -363,12 +391,30 @@ mod tests {
         let flavor = resolve_backend("cpu").unwrap();
         assert_eq!(flavor, "cpu");
         assert!(whisper_cpp_engine_asset(std::env::consts::ARCH, "cpu").is_some());
-        // No CUDA prebuilt for ARM64.
+        // No CUDA prebuilt for any arch (upstream ships CUDA for Windows only).
         assert!(whisper_cpp_engine_asset("aarch64", "cuda").is_none());
+        assert!(whisper_cpp_engine_asset("x86_64", "cuda").is_none());
         let url = whisper_cpp_engine_url(
             &whisper_cpp_engine_asset(std::env::consts::ARCH, "cpu").unwrap(),
         );
         assert!(url.starts_with("https://github.com/ggml-org/whisper.cpp/releases/download/"));
+    }
+
+    #[test]
+    fn auto_resolves_to_cpu_even_with_nvidia() {
+        // Upstream has no Linux CUDA prebuilt, so auto never picks cuda —
+        // an NVIDIA machine gets the CPU build instead of a 670 MB Windows zip.
+        assert_eq!(resolve_backend_with("auto", "cuda").unwrap(), "cpu");
+        assert_eq!(resolve_backend_with("auto", "cpu").unwrap(), "cpu");
+        assert_eq!(resolve_backend_with("cpu", "cuda").unwrap(), "cpu");
+    }
+
+    #[test]
+    fn explicit_cuda_fails_before_downloading() {
+        let err = resolve_backend_with("cuda", "cuda").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("CPU"), "unexpected message: {msg}");
+        assert!(resolve_backend("cuda").is_err());
     }
 
     #[test]
@@ -385,6 +431,23 @@ mod tests {
         assert!(home.join("whisper-cli").is_file());
         assert!(home.join("libwhisper.so.1").is_file());
         assert!(!home.join("README.md").exists());
+    }
+
+    #[test]
+    fn staged_install_missing_binary_names_contents() {
+        // A layout change (e.g. a Windows-only bundle) must say what the
+        // archive contained instead of just what was missing.
+        let root = tempfile::tempdir().unwrap();
+        let stage = root.path().join("stage");
+        let home = root.path().join("home");
+        std::fs::create_dir_all(stage.join("Release")).unwrap();
+        std::fs::create_dir_all(&home).unwrap();
+        std::fs::write(stage.join("Release/whisper-cli.exe"), b"bin").unwrap();
+        let err = install_staged_engine(&stage, &home).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("whisper-cli"), "unexpected message: {msg}");
+        assert!(msg.contains("Release"), "unexpected message: {msg}");
+        assert!(!home.join("whisper-cli").exists());
     }
 
     #[test]

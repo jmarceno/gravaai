@@ -48,39 +48,25 @@ impl OllamaInstaller {
         which("ollama").is_some()
     }
 
-    pub fn install(on_status: &dyn Fn(&str)) -> bool {
+    pub fn install(on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
         on_status("Downloading Ollama install script…");
-        let client = match reqwest::blocking::Client::builder()
+        let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
-            .build()
-        {
-            Ok(c) => c,
-            Err(e) => {
-                log::error!("Failed to install Ollama: {e:#}");
-                return false;
-            }
-        };
-        let script: Vec<u8> = match client.get(OLLAMA_INSTALL_URL).send() {
-            Ok(r) => match r.bytes() {
-                Ok(b) => b.to_vec(),
-                Err(e) => {
-                    log::error!("Failed to install Ollama: {e:#}");
-                    return false;
-                }
-            },
-            Err(e) => {
-                log::error!("Failed to install Ollama: {e:#}");
-                return false;
-            }
-        };
+            .build()?;
+        let script: Vec<u8> = client
+            .get(OLLAMA_INSTALL_URL)
+            .send()
+            .map_err(|e| anyhow::anyhow!("Failed to fetch the Ollama install script: {e:#}"))?
+            .bytes()
+            .map_err(|e| anyhow::anyhow!("Failed to read the Ollama install script: {e:#}"))?
+            .to_vec();
         if script.len() < MIN_INSTALL_SCRIPT_BYTES {
             // A captive portal or proxy can return a tiny/empty 200 body;
             // executing that would silently "succeed" without installing.
-            log::error!(
+            anyhow::bail!(
                 "Ollama install script suspiciously small ({} bytes) — aborting",
                 script.len()
             );
-            return false;
         }
         // SHA-256 is logged for auditability (the hash cannot be pinned —
         // upstream updates the script — so HTTPS remains the trust anchor).
@@ -90,12 +76,14 @@ impl OllamaInstaller {
             script.len()
         );
         let path = std::env::temp_dir().join(format!("ollama-install-{}.sh", std::process::id()));
-        if std::fs::write(&path, &script).is_err() {
-            return false;
-        }
+        std::fs::write(&path, &script)?;
         let code = run_command(&["sh".to_string(), path.to_string_lossy().into_owned()]);
         let _ = std::fs::remove_file(&path);
-        code == 0
+        if code == 0 {
+            Ok(())
+        } else {
+            anyhow::bail!("Ollama install script exited with code {code}")
+        }
     }
 }
 

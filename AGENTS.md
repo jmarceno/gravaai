@@ -338,8 +338,9 @@ are installed on demand from **Settings → Models**:
 - `whisper_cpp` — an official upstream whisper.cpp binary release, downloaded
   and SHA-256-verified by `services/whisper_cpp_service.rs`
   (`WhisperCppEngineInstaller`; pinned release tag + per-asset hashes in
-  `config/defaults.rs`, chosen per arch/backend by `detect_gpu_backend()`:
-  CPU everywhere, CUDA bundle for NVIDIA on x86_64). Lands in
+  `config/defaults.rs`; CPU prebuilts for x86_64/aarch64 — upstream ships no
+  CUDA prebuilt for Linux, so `resolve_backend()` routes `auto` to `cpu` and
+  rejects explicit `cuda` before any download). Lands in
   `~/.local/share/meeting-recorder/whisper.cpp/` with a `--help` smoke test;
   GGML models download from HuggingFace via the status/downloader helpers.
 - **Installer security conventions** (`services/system_installer.rs`): no
@@ -431,8 +432,8 @@ Linux desktop app:
   rustls).
 - **Opt-in local engines (installed on demand from Settings → Models,
   prebuilt downloads — never source builds, no compiler needed):**
-  whisper.cpp engine binary (CPU everywhere, CUDA bundle for NVIDIA on
-  x86_64) + GGML models from HuggingFace; Ollama summarization via its local
+  whisper.cpp engine binary (CPU prebuilts for x86_64/aarch64 — no Linux CUDA
+  upstream) + GGML models from HuggingFace; Ollama summarization via its local
   HTTP API (installed via the official script).
 - **System tray:** a `ksni` StatusNotifierItem — no GTK widgets and no extra
   system dependency. Left-click opens the window where the SNI host delivers
@@ -573,8 +574,10 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   uninstall target plan + removal (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +
   backend detection + verified download/extract/smoke-test
-  (`whisper_cpp_service`), Ollama prefix-match + unreachable
-  tolerance (`ollama_service`).
+  (`whisper_cpp_service`, including auto→cpu routing, cuda rejection, and
+  missing-binary diagnostics naming archive contents), Ollama prefix-match +
+  unreachable tolerance + pull preflight with `ollama serve` guidance
+  (`ollama_service`).
 - `daemon/` — child protocol parsing (`processor`), stderr tail buffer
   (`child_io`), window spawn-vs-present (`window_supervisor`), install
   dedup/progress/finished routing (`install_manager`), headless `Engine`

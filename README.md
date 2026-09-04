@@ -64,7 +64,7 @@ The base install is **cloud-only and minimal** — no local engines or GPU libra
 | **OpenAI-compatible** (transcription + summarization) | Base URL + API key for any `/v1`-style endpoint (OpenAI, Azure OpenAI, LiteLLM, llama.cpp server, …) — no local install |
 
 > Your API key is stored in the system keyring (GNOME Keyring / KWallet) when one is available, falling back to a permission-restricted config file otherwise.
-| **whisper.cpp** (local transcription, GPU) | Engine downloaded as an official prebuilt binary on opt-in — CPU everywhere, CUDA build for NVIDIA GPUs; GGML model downloaded from HuggingFace. No compiler or system packages needed |
+| **whisper.cpp** (local transcription) | Engine downloaded as an official prebuilt CPU binary on opt-in; GGML model downloaded from HuggingFace. No compiler or system packages needed |
 | **Ollama** (local summarization) | [Ollama](https://ollama.com) installed and running (`ollama serve`); uses NVIDIA/AMD GPU automatically |
 
 ### Installation
@@ -173,7 +173,7 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 | Setting | Description |
 |---|---|
-| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local, GPU; default) |
+| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local; default) |
 | Summarization service | OpenAI-compatible (cloud; default) or Ollama (local) |
 | Start at system startup | Launch automatically on login |
 | Enable call detection | Monitor for active calls and notify you to start recording |
@@ -194,16 +194,18 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 | Summarization model | Free-text chat model name (`gpt-5.6-luna` default; type any compatible name) |
 | Processing timeout | Max time to wait for a response (1–10 min) |
 
-**whisper.cpp (GPU-accelerated)**
+**whisper.cpp (local)**
 
-A local transcription engine for NVIDIA (CUDA) and CPU machines. The engine is
+A local transcription engine using the official prebuilt CPU binary. The engine is
 **downloaded as an official prebuilt binary on opt-in** — no compiler, no
 build toolchain, no system packages; until then the section shows an
-**Install whisper.cpp engine** button.
+**Install whisper.cpp engine** button. (Upstream ships no CUDA prebuilt for
+Linux, so there is no GPU option: `auto` installs the CPU build, and an
+explicit `cuda` choice explains this instead of downloading.)
 
 | Setting | Description |
 |---|---|
-| Acceleration backend | `auto` (detect: CUDA when an NVIDIA GPU is present, else CPU), or force `cuda` / `cpu`. Picks which prebuilt binary to download. The detected backend is shown next to the selector. Note: the CUDA bundle is ~670 MB and needs the NVIDIA driver; the CPU build runs anywhere. |
+| Acceleration backend | `auto` (installs the CPU build) or force `cpu`. Upstream ships no CUDA prebuilt for Linux, so `cuda` is rejected with guidance. The detected hardware is shown next to the selector. |
 | Model | Free-text GGML model name to use for local transcription (`large-v3-turbo` default) |
 | Model list | Download status and one-click download for each available GGML model. Failures are shown inline on the row plus a dialog/notification with the reason |
 
@@ -215,7 +217,7 @@ Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 
 |---|---|
 | Ollama model | Free-text model name to use for local summarization (`phi4-mini` default) |
 | Ollama host | Ollama server address (default: `http://localhost:11434`) |
-| Model list | Download status and one-click download for each available model |
+| Model list | Download status and one-click download for each available model. Downloads require Ollama to be running (`ollama serve`) — the buttons disable with guidance while it is offline |
 
 Available Ollama models:
 

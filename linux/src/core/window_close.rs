@@ -9,7 +9,8 @@ pub enum CloseAction {
 }
 
 /// By default the window hides on close (instant reopen); with Low memory mode
-/// it exits so GTK memory is reclaimed and the daemon respawns it on demand.
+/// it exits so the Qt scene memory is reclaimed and the daemon respawns it on
+/// demand.
 pub fn resolve_close_action(cfg: &Config) -> CloseAction {
     if cfg.low_memory_mode {
         CloseAction::Exit

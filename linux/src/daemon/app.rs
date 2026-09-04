@@ -1,9 +1,9 @@
 //! The daemon entry point (`gravaai --daemon`).
 //!
 //!
-//! Runs the GTK-free engine, tray, call detector and D-Bus service on a
-//! single-threaded event design: one async loop task owns all engine mutation
-//! (like the GLib main loop before it); recorder worker threads, processing
+//! Runs the toolkit-free engine, tray, call detector and D-Bus service on a
+//! single-threaded event design: one async loop task owns all engine mutation;
+//! recorder worker threads, processing
 //! children, install children and tray callbacks marshal back as messages.
 
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ use crate::daemon::installer::InstallEvent;
 use crate::daemon::processor::{ChildEvent, ProcessorHandle, ProcessorLauncher};
 use crate::daemon::window_supervisor::WindowSupervisor;
 use crate::detection::call_detector::CallDetector;
-use crate::ui::notifications::notify;
+use crate::ui::notifications::{notify, set_graphical_ready};
 use crate::ui::tray::{tick_tray_animation, update_tray, AppTray};
 use ksni::TrayMethods as _;
 
@@ -62,18 +62,79 @@ impl ProcessorBackend for LauncherBackend {
     }
 }
 
-/// Terminate the window child, if any, before the daemon exits.
+impl Drop for LauncherBackend {
+    fn drop(&mut self) {
+        // A tray Quit is a graceful application shutdown.  Do not use the
+        // user-cancel path here: it sends SIGKILL and can leave a processor's
+        // partial output in an indeterminate state. The child reader threads
+        // continue to reap after receiving SIGTERM.
+        for (_, mut handle) in self.handles.drain() {
+            handle.terminate_gracefully();
+        }
+    }
+}
+
+/// Ask the window child to exit cleanly before the daemon exits.
 ///
 /// A kept-in-memory (hidden) window would otherwise be orphaned and linger
-/// after the daemon quits. The window also self-exits when it sees the bus
-/// name vanish; this makes the cleanup immediate on a clean quit.
+/// after the daemon quits. Qt handles SIGTERM through its native event loop;
+/// we wait for it instead of using `Child::kill` (SIGKILL), which could lose
+/// pending settings or leave a corrupted log.
 fn shutdown_window(slot: &Arc<Mutex<Option<Child>>>, ctx: &Arc<dbus_service::ServiceCtx>) {
     let mut guard = slot.lock().unwrap();
     if let Some(mut child) = guard.take() {
-        let _ = child.kill();
-        let _ = child.wait();
+        request_child_term(&child);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Ok(None) => {
+                    log::warn!(
+                        "Qt window did not exit after SIGTERM; leaving it untouched (no SIGKILL)"
+                    );
+                    break;
+                }
+                Err(err) => {
+                    log::warn!("Could not reap Qt window after SIGTERM: {err}");
+                    break;
+                }
+            }
+        }
     }
     ctx.supervisor.lock().unwrap().on_child_exit();
+}
+
+#[cfg(unix)]
+fn request_child_term(child: &Child) {
+    // SAFETY: sending SIGTERM to the pid owned by this Child is the same
+    // process-control boundary used by ffmpeg's graceful recorder stop.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(child.id() as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_child_term(child: &Child) {
+    // Windows has no portable SIGTERM equivalent in std; this path is not
+    // used by the Linux release, but still avoids an unconditional force kill.
+    let _ = child.id();
+}
+
+/// Return whether a well-known name is currently owned on this session bus.
+async fn name_has_owner(conn: &zbus::Connection, name: &str) -> bool {
+    let Ok(bus_name) = zbus::names::BusName::try_from(name) else {
+        return false;
+    };
+    let Ok(proxy) = zbus::fdo::DBusProxy::new(conn).await else {
+        return false;
+    };
+    proxy.name_has_owner(bus_name).await.unwrap_or(false)
 }
 
 /// True when our connection owns the engine well-known name.
@@ -92,7 +153,7 @@ async fn name_is_ours(conn: &zbus::Connection) -> bool {
     }
 }
 
-pub fn run_daemon() {
+pub fn run_daemon() -> i32 {
     crate::utils::logging::setup_logging("daemon");
     if settings::migrate_key_to_keyring() {
         log::info!("Migrated API key into the keyring");
@@ -102,10 +163,15 @@ pub fn run_daemon() {
         .enable_all()
         .build()
         .expect("build tokio runtime");
-    rt.block_on(async_main());
+    rt.block_on(async_main())
 }
 
-async fn async_main() {
+/// A graphical host/tray is part of the application's contract.  Returning a
+/// distinct non-zero status lets a direct invocation and a client supervisor
+/// distinguish "no usable desktop" from a clean duplicate-launch no-op.
+const DAEMON_STARTUP_FAILURE: i32 = 74;
+
+async fn async_main() -> i32 {
     let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<DaemonMsg>();
     let (child_tx, mut child_rx) = mpsc::unbounded_channel::<(i64, ChildEvent)>();
     let (install_tx, mut install_rx) = mpsc::unbounded_channel::<(String, InstallEvent)>();
@@ -204,15 +270,17 @@ async fn async_main() {
     let slot_clone = child_slot.clone();
     let tx_clone = msg_tx.clone();
     let spawn_fn = move || {
-        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
-        let exe = crate::utils::exe::internal_exe();
-        match Command::new(&exe)
-            .arg("--window")
+        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE. The
+        // Qt process is a separate companion so this daemon remains free of
+        // Qt dependencies in both the linker and the runtime.
+        let exe = crate::utils::exe::internal_ui_exe();
+        let stderr = crate::utils::logging::open_window_stderr();
+        let mut command = Command::new(&exe);
+        command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        {
+            .stderr(stderr.map(Stdio::from).unwrap_or_else(|_| Stdio::null()));
+        match command.spawn() {
             Ok(child) => {
                 *slot_clone.lock().unwrap() = Some(child);
                 // Reaper: poll until exit, then report back (no zombies).
@@ -223,34 +291,47 @@ async fn async_main() {
                     .spawn(move || {
                         let born = std::time::Instant::now();
                         loop {
-                        std::thread::sleep(Duration::from_millis(500));
-                        let exited = slot2
-                            .lock()
-                            .unwrap()
-                            .as_mut()
-                            .map(|c| c.try_wait().ok().flatten().is_some())
-                            .unwrap_or(true);
-                        if exited {
-                            // Reap.
-                            if let Some(mut c) = slot2.lock().unwrap().take() {
-                                let _ = c.wait();
+                            std::thread::sleep(Duration::from_millis(500));
+                            let status = slot2
+                                .lock()
+                                .unwrap()
+                                .as_mut()
+                                .and_then(|c| c.try_wait().ok().flatten());
+                            if let Some(status) = status {
+                                if let Some(mut c) = slot2.lock().unwrap().take() {
+                                    let _ = c.wait();
+                                }
+                                if born.elapsed() < Duration::from_secs(10)
+                                    && status.code().is_some_and(|code| code != 0)
+                                {
+                                    let detail = format!(
+                                        "Window exited during startup (code {}).",
+                                        status.code().unwrap_or_default()
+                                    );
+                                    let _ = tx2.send(DaemonMsg::EngineError(format!(
+                                        "{detail} Check the window log at {}.",
+                                        crate::utils::logging::window_stderr_path().display()
+                                    )));
+                                } else if born.elapsed() < Duration::from_secs(10) {
+                                    log::info!(
+                                        "Qt window ended during startup without an application error"
+                                    );
+                                }
+                                let _ = tx2.send(DaemonMsg::WindowExited);
+                                break;
                             }
-                            // A window that dies within seconds of spawning
-                            // never showed anything — say so instead of
-                            // leaving the user staring at a dead menu.
-                            if born.elapsed() < Duration::from_secs(10) {
-                                let _ = tx2.send(DaemonMsg::EngineError(
-                                    "The window closed unexpectedly. Run with logging and check error.log, or report the issue.".to_string(),
-                                ));
-                            }
-                            let _ = tx2.send(DaemonMsg::WindowExited);
-                            break;
                         }
-                    }
                     })
                     .ok();
             }
-            Err(e) => log::error!("Failed to spawn window: {e:#}"),
+            Err(e) => {
+                let msg = format!(
+                    "Failed to start the Qt window: {e:#}. Check that the AppImage is complete."
+                );
+                log::error!("{msg}");
+                let _ = tx_clone.send(DaemonMsg::EngineError(msg));
+                let _ = tx_clone.send(DaemonMsg::WindowExited);
+            }
         }
     };
     let tx_present = msg_tx.clone();
@@ -273,31 +354,101 @@ async fn async_main() {
         }),
     });
 
-    // --- D-Bus ---------------------------------------------------------------
+    // --- D-Bus singleton guard ----------------------------------------------
+    // Claim a private name before creating the tray.  Two simultaneous
+    // launches must not both register a visible StatusNotifierItem while
+    // racing for the public Engine name.
     let conn = match zbus::Connection::session().await {
         Ok(c) => c,
         Err(e) => {
             log::error!("Failed to connect to session bus: {e:#}");
-            return;
+            return DAEMON_STARTUP_FAILURE;
         }
     };
+    let lock_reply = conn
+        .request_name_with_flags(
+            dbus_service::DAEMON_LOCK_NAME,
+            zbus::fdo::RequestNameFlags::DoNotQueue.into(),
+        )
+        .await;
+    match lock_reply {
+        Ok(zbus::fdo::RequestNameReply::PrimaryOwner)
+        | Ok(zbus::fdo::RequestNameReply::AlreadyOwner) => {}
+        Ok(reply) => {
+            log::info!(
+                "Another GravaAi daemon owns {}; exiting before tray startup ({reply})",
+                dbus_service::DAEMON_LOCK_NAME
+            );
+            return 0;
+        }
+        Err(e) => {
+            log::error!("Failed to claim daemon singleton: {e:#}");
+            return DAEMON_STARTUP_FAILURE;
+        }
+    }
+    if name_has_owner(&conn, ENGINE_NAME).await {
+        log::info!(
+            "Another GravaAi daemon already owns {ENGINE_NAME}; exiting before tray startup"
+        );
+        return 0;
+    }
+
+    // --- tray -----------------------------------------------------------------
+    // A daemon without a registered tray is not a usable GravaAi instance.
+    // Fail before exporting the Engine service so clients cannot open a window
+    // or receive notifications when no graphical host can show our icon.
+    let tray_tx = msg_tx.clone();
+    let tray = AppTray::new(Arc::new(move |cmd: String| {
+        let _ = tray_tx.send(DaemonMsg::TrayCommand(cmd));
+    }));
+    let tray_handle = match tray.spawn().await {
+        Ok(h) => Some(h),
+        Err(e) => {
+            log::error!(
+                "GravaAi requires a graphical StatusNotifier host; tray startup failed: {e:#}"
+            );
+            return DAEMON_STARTUP_FAILURE;
+        }
+    };
+
+    // --- public D-Bus service ------------------------------------------------
     let iface = dbus_service::EngineIface::new(ctx.clone());
     if let Err(e) = conn.object_server().at(ENGINE_PATH, iface).await {
         log::error!("Failed to export engine interface: {e:#}");
-        return;
+        if let Some(h) = tray_handle.as_ref() {
+            h.shutdown().await;
+        }
+        return DAEMON_STARTUP_FAILURE;
     }
-    match conn.request_name(ENGINE_NAME).await {
-        Ok(()) => {
+    let engine_reply = conn
+        .request_name_with_flags(ENGINE_NAME, zbus::fdo::RequestNameFlags::DoNotQueue.into())
+        .await;
+    match engine_reply {
+        Ok(zbus::fdo::RequestNameReply::PrimaryOwner)
+        | Ok(zbus::fdo::RequestNameReply::AlreadyOwner) => {
             // Confirm we actually own it — a second daemon must not fight for
             // the name (log and exit cleanly instead).
             if !name_is_ours(&conn).await {
                 log::warn!("Bus name {ENGINE_NAME} already owned — another daemon is running");
-                return;
+                if let Some(h) = tray_handle.as_ref() {
+                    h.shutdown().await;
+                }
+                return 0;
             }
+        }
+        Ok(reply) => {
+            log::warn!("Could not become the Engine owner ({reply}); another daemon is running");
+            if let Some(h) = tray_handle.as_ref() {
+                h.shutdown().await;
+            }
+            return DAEMON_STARTUP_FAILURE;
         }
         Err(e) => {
             log::error!("Failed to own bus name: {e:#}");
-            return;
+            if let Some(h) = tray_handle.as_ref() {
+                h.shutdown().await;
+            }
+            return DAEMON_STARTUP_FAILURE;
         }
     }
     log::info!("Engine service registered at {ENGINE_PATH}");
@@ -309,22 +460,15 @@ async fn async_main() {
         Ok(r) => r,
         Err(e) => {
             log::error!("Failed to get interface ref: {e:#}");
-            return;
+            if let Some(h) = tray_handle.as_ref() {
+                h.shutdown().await;
+            }
+            return DAEMON_STARTUP_FAILURE;
         }
     };
-
-    // --- tray -----------------------------------------------------------------
-    let tray_tx = msg_tx.clone();
-    let tray = AppTray::new(Arc::new(move |cmd: String| {
-        let _ = tray_tx.send(DaemonMsg::TrayCommand(cmd));
-    }));
-    let tray_handle = match tray.spawn().await {
-        Ok(h) => Some(h),
-        Err(e) => {
-            log::info!("Tray unavailable: {e:#}");
-            None
-        }
-    };
+    // The tray and Engine are both live now. Only from this point may any
+    // engine/call-detector callback enqueue a desktop notification.
+    set_graphical_ready(true);
 
     // --- call detector ----------------------------------------------------------
     let mut detector: Option<CallDetector> = None;
@@ -409,6 +553,13 @@ async fn async_main() {
             Wake::TrayAnim => {
                 // Pixmap-only; never push a D-Bus snapshot on anim ticks.
                 if let Some(h) = tray_handle.as_ref() {
+                    if h.is_closed() {
+                        set_graphical_ready(false);
+                        log::error!(
+                            "StatusNotifier host disconnected; GravaAi is stopping because the tray is required"
+                        );
+                        break;
+                    }
                     tick_tray_animation(h).await;
                 }
             }
@@ -519,8 +670,11 @@ async fn async_main() {
         }
     }
 
+    // Make the graphical invariant visible to every late worker callback
+    // before beginning child/task teardown.
+    set_graphical_ready(false);
     log::info!("Daemon shutting down");
-    // Kill the window child first so a hidden window doesn't outlive us.
+    // Ask the window child to exit first so a hidden window doesn't outlive us.
     shutdown_window(&child_slot, &ctx);
     if let Some(mut d) = detector.take() {
         d.stop();
@@ -532,19 +686,16 @@ async fn async_main() {
         engine.prepare_quit();
         engine.shutdown_tasks();
     }
+    ctx.installs.lock().await.shutdown();
     // Stop an Ollama server this app auto-started (recorded pid only — a
     // server that was already running has no record and is left alone).
-    if crate::services::ollama_service::shutdown_owned_server()
-        == crate::services::ollama_service::OwnedServerStop::Stopped
-    {
-        notify(
-            "GravaAi",
-            "Stopped the Ollama server started automatically (it was not running before).",
-        );
-    }
+    // Shutdown is intentionally quiet: once the tray is being torn down there
+    // is no icon through which an informational notification could be paired.
+    let _ = crate::services::ollama_service::shutdown_owned_server();
     if let Some(h) = tray_handle {
         h.shutdown().await;
     }
+    0
 }
 
 /// Re-render tray + push snapshot to the window.

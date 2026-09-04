@@ -57,6 +57,12 @@ impl InstallManager {
         serde_json::Value::Array(list).to_string()
     }
 
+    /// Ask in-flight installer children to exit before the daemon tears down
+    /// its event loop. The launcher threads remain responsible for reaping.
+    pub fn shutdown(&self) {
+        self.launcher.shutdown();
+    }
+
     /// Route one child event from the event loop.
     pub fn handle_event(&mut self, key: String, event: InstallEvent) {
         match event {

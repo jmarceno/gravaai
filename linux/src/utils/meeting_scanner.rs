@@ -133,7 +133,7 @@ pub fn scan_meetings(output_folder: &str) -> Vec<Meeting> {
 }
 
 fn probe_audio_duration(audio_path: &Path) -> Option<u64> {
-    let out = std::process::Command::new("ffprobe")
+    let out = std::process::Command::new(crate::utils::exe::runtime_program("ffprobe"))
         .args([
             "-v",
             "quiet",

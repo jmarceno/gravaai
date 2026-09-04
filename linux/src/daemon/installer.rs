@@ -7,6 +7,7 @@
 
 use std::io::BufRead;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
 use super::child_io::StderrTail;
@@ -113,11 +114,25 @@ pub fn run_install_child(spec_json: &str) -> i32 {
 /// install key) to the event loop.
 pub struct InstallLauncher {
     tx: mpsc::UnboundedSender<(String, InstallEvent)>,
+    children: Arc<Mutex<std::collections::HashMap<String, u32>>>,
 }
 
 impl InstallLauncher {
     pub fn new(tx: mpsc::UnboundedSender<(String, InstallEvent)>) -> Self {
-        Self { tx }
+        Self {
+            tx,
+            children: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        }
+    }
+
+    /// Request all in-flight install children to exit during daemon shutdown.
+    /// Worker threads still own and reap their `Child` values; normal Quit
+    /// never escalates this to a force-kill.
+    pub fn shutdown(&self) {
+        let pids: Vec<u32> = self.children.lock().unwrap().values().copied().collect();
+        for pid in pids {
+            request_pid_term(pid);
+        }
     }
 
     pub fn launch(&self, key: String, spec_json: &str) {
@@ -125,6 +140,7 @@ impl InstallLauncher {
         let exe = crate::utils::exe::internal_exe();
         let spec_json = spec_json.to_string();
         let tx = self.tx.clone();
+        let children = self.children.clone();
         std::thread::Builder::new()
             .name(format!("install-{key}"))
             .spawn(move || {
@@ -149,6 +165,7 @@ impl InstallLauncher {
                         return;
                     }
                 };
+                children.lock().unwrap().insert(key.clone(), child.id());
                 let stdout = child.stdout.take();
                 let stderr_tail = StderrTail::new();
                 let tail_clone = stderr_tail.clone();
@@ -174,6 +191,7 @@ impl InstallLauncher {
                     }
                 }
                 let _ = child.wait();
+                children.lock().unwrap().remove(&key);
                 if !ok && !stderr_tail.lines().is_empty() {
                     log::warn!("Install stderr: {}", stderr_tail.lines().join(" | "));
                     let tail = stderr_tail.tail();
@@ -188,3 +206,23 @@ impl InstallLauncher {
             .ok();
     }
 }
+
+impl Drop for InstallLauncher {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+#[cfg(unix)]
+fn request_pid_term(pid: u32) {
+    // SAFETY: the pid was captured from a Child spawned by this launcher.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_pid_term(_pid: u32) {}

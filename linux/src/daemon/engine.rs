@@ -1,4 +1,4 @@
-//! The GTK-free recording engine that lives in the daemon.
+//! The toolkit-free recording engine that lives in the daemon.
 //!
 //!
 //! Recording/job/processing logic that runs without a display. Owns the
@@ -773,9 +773,21 @@ mod tests {
         drain(&f.changes);
 
         f.engine.stop();
-        // FakeRecorder.stop runs inline (immediate scheduler) → Stopped queued;
-        // commit (no countdown) created the job awaiting the file; the Stopped
-        // event (queued after commit) launches the processor.
+        // `RecordingController::stop` always runs the blocking recorder stop on
+        // a worker, even with the immediate test scheduler. Pump the same
+        // event queue the daemon loop pumps while waiting for that worker;
+        // otherwise this assertion races the worker and occasionally observes
+        // the job before its `Stopped` event has launched the processor.
+        for _ in 0..100 {
+            f.engine.drain_events();
+            if f.launched.lock().unwrap().launched.len() == 1 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        f.engine.drain_events();
+        // The commit (no countdown) created the job awaiting the file; the
+        // Stopped event launches the processor once the file is finalized.
         let launched = f.launched.lock().unwrap();
         assert_eq!(launched.launched.len(), 1);
         drop(launched);

@@ -1,5 +1,8 @@
-//! GTK window (feature `ui`) plus the GTK-free UI helpers the daemon uses
-//! in every build (tray model, notifications, engine proxy).
+//! UI-facing helpers shared by the daemon and the Qt companion.
+//!
+//! The tray model, tray implementation, notifications and D-Bus proxy are
+//! toolkit-free and are compiled into the daemon. The Qt window is isolated
+//! in `qt` and only linked by the `gravaai-ui` binary.
 
 pub mod engine_proxy;
 pub mod notifications;
@@ -9,16 +12,4 @@ pub mod tray_icon;
 pub mod tray_model;
 
 #[cfg(feature = "ui")]
-pub mod jobs_panel;
-#[cfg(feature = "ui")]
-pub mod main_window;
-#[cfg(feature = "ui")]
-pub mod meeting_explorer;
-#[cfg(feature = "ui")]
-pub mod model_row_grid;
-#[cfg(feature = "ui")]
-pub mod settings_dialog;
-#[cfg(feature = "ui")]
-pub mod settings_pages;
-#[cfg(feature = "ui")]
-pub mod window_app;
+pub mod qt;

@@ -58,6 +58,94 @@ pub fn internal_exe() -> PathBuf {
     std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME))
 }
 
+/// Resolve the Qt companion executable without trusting a host AppImage's
+/// environment. The daemon binary lives in `usr/bin`, while the UI lives in
+/// `usr/libexec/gravaai` inside the same AppImage. Source builds keep both
+/// release/debug binaries side by side in Cargo's target directory.
+pub fn internal_ui_exe() -> PathBuf {
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME));
+    let appdir = std::env::var_os("APPDIR").map(PathBuf::from);
+    resolve_ui_exe(&exe, appdir.as_deref()).unwrap_or_else(|| {
+        exe.parent()
+            .map(|p| p.join("gravaai-ui"))
+            .unwrap_or_else(|| PathBuf::from("gravaai-ui"))
+    })
+}
+
+/// Resolve a helper executable from the current AppImage before consulting
+/// the host PATH. The AppRun script also puts this directory first, but
+/// resolving here keeps source runs, direct daemon launches and contaminated
+/// IDE environments consistent.
+pub fn runtime_program(name: &str) -> PathBuf {
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME));
+    let appdir = std::env::var_os("APPDIR").map(PathBuf::from);
+    resolve_runtime_program(&exe, appdir.as_deref(), name)
+        .or_else(|| crate::services::system_installer::which(name).map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from(name))
+}
+
+/// Pure helper resolver used by runtime code and unit tests.
+pub fn resolve_runtime_program(exe: &Path, appdir: Option<&Path>, name: &str) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(root) = appdir {
+        if path_is_under(exe, root) {
+            candidates.push(root.join("usr/bin").join(name));
+        }
+    }
+    if let Some(parent) = exe.parent() {
+        candidates.push(parent.join(name));
+        candidates.push(parent.join("../libexec/gravaai").join(name));
+    }
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+/// Pure UI companion resolver used by the daemon and tests.
+pub fn resolve_ui_exe(exe: &Path, appdir: Option<&Path>) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(root) = appdir {
+        // Only accept an APPDIR that actually contains the current binary.
+        if path_is_under(exe, root) {
+            candidates.push(root.join("usr/libexec/gravaai/gravaai-ui"));
+        }
+    }
+    if let Some(parent) = exe.parent() {
+        candidates.push(parent.join("gravaai-ui"));
+        candidates.push(parent.join("../libexec/gravaai/gravaai-ui"));
+        candidates.push(parent.join("../share/gravaai/gravaai-ui"));
+    }
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+/// Compatibility implementation of the historical `gravaai --window` role.
+/// The core process never loads Qt; it simply replaces itself with the
+/// companion executable and forwards all arguments except the role marker.
+pub fn run_ui_trampoline() -> i32 {
+    let ui = internal_ui_exe();
+    let args: Vec<String> = std::env::args()
+        .skip(1)
+        .filter(|arg| arg != "--window")
+        .collect();
+    let mut cmd = std::process::Command::new(&ui);
+    cmd.args(args);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt as _;
+        let err = cmd.exec();
+        eprintln!("Failed to start Qt UI {}: {err}", ui.display());
+        127
+    }
+    #[cfg(not(unix))]
+    {
+        match cmd.status() {
+            Ok(status) => status.code().unwrap_or(1),
+            Err(err) => {
+                eprintln!("Failed to start Qt UI {}: {err}", ui.display());
+                127
+            }
+        }
+    }
+}
+
 fn path_is_under(path: &Path, root: &Path) -> bool {
     let Ok(path) = path.canonicalize() else {
         return false;
@@ -115,5 +203,44 @@ mod tests {
         let file = sibling.join("bin");
         fs::write(&file, b"x").unwrap();
         assert!(!path_is_under(&file, &root));
+    }
+
+    #[test]
+    fn resolves_appimage_companion_only_inside_owned_mount() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("mount");
+        let bin = root.join("usr/bin");
+        let ui = root.join("usr/libexec/gravaai");
+        fs::create_dir_all(&bin).unwrap();
+        fs::create_dir_all(&ui).unwrap();
+        let exe = bin.join(APP_DIR_NAME);
+        let ui_exe = ui.join("gravaai-ui");
+        fs::write(&exe, b"x").unwrap();
+        fs::write(&ui_exe, b"x").unwrap();
+        assert_eq!(resolve_ui_exe(&exe, Some(&root)), Some(ui_exe.clone()));
+
+        let host = dir.path().join("host-mount");
+        fs::create_dir_all(host.join("usr/libexec/gravaai")).unwrap();
+        fs::write(host.join("usr/libexec/gravaai/gravaai-ui"), b"x").unwrap();
+        assert_ne!(
+            resolve_ui_exe(&exe, Some(&host)),
+            Some(host.join("usr/libexec/gravaai/gravaai-ui"))
+        );
+    }
+
+    #[test]
+    fn resolves_runtime_helper_inside_owned_mount() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("mount");
+        let bin = root.join("usr/bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let exe = bin.join(APP_DIR_NAME);
+        let helper = bin.join("ffmpeg");
+        std::fs::write(&exe, b"x").unwrap();
+        std::fs::write(&helper, b"x").unwrap();
+        assert_eq!(
+            resolve_runtime_program(&exe, Some(&root), "ffmpeg"),
+            Some(helper)
+        );
     }
 }

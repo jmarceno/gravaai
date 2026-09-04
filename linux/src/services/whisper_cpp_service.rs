@@ -185,19 +185,31 @@ fn download_verified(
 
 fn extract_archive(archive: &Path, stage: &Path, format: &str) -> anyhow::Result<()> {
     if format == "tar.gz" {
-        if crate::services::system_installer::which("tar").is_none() {
-            anyhow::bail!("`tar` is required to unpack the engine (install the tar package)");
-        }
-        let status = Command::new("tar")
-            .args([
-                "xzf",
-                &archive.to_string_lossy(),
-                "-C",
-                &stage.to_string_lossy(),
-            ])
-            .status()?;
-        if !status.success() {
-            anyhow::bail!("Failed to unpack the engine archive");
+        let file = std::fs::File::open(archive)?;
+        let decoder = flate2::read::GzDecoder::new(file);
+        let mut tar = tar::Archive::new(decoder);
+        for entry in tar.entries()? {
+            let mut entry = entry?;
+            let entry_type = entry.header().entry_type();
+            if entry_type.is_symlink() || entry_type.is_hard_link() {
+                anyhow::bail!("Engine archive contains an unsupported link entry");
+            }
+            let relative = entry.path()?.into_owned();
+            if relative.is_absolute()
+                || relative
+                    .components()
+                    .any(|component| matches!(component, std::path::Component::ParentDir))
+            {
+                anyhow::bail!(
+                    "Engine archive contains an unsafe path: {}",
+                    relative.display()
+                );
+            }
+            let destination = stage.join(&relative);
+            if let Some(parent) = destination.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            entry.unpack(&destination)?;
         }
         return Ok(());
     }

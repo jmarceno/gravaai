@@ -178,7 +178,15 @@ pub fn ensure_ollama_serving(host: &str, on_status: &dyn Fn(&str)) -> anyhow::Re
 
 fn spawn_ollama_serve() -> anyhow::Result<()> {
     use std::process::{Command, Stdio};
-    let child = Command::new("ollama")
+    let bundled = crate::services::system_installer::OllamaInstaller::binary_path();
+    let program = bundled
+        .is_file()
+        .then_some(bundled)
+        .or_else(|| {
+            crate::services::system_installer::which("ollama").map(std::path::PathBuf::from)
+        })
+        .ok_or_else(|| anyhow::anyhow!("Ollama is not installed"))?;
+    let child = Command::new(&program)
         .arg("serve")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -186,7 +194,10 @@ fn spawn_ollama_serve() -> anyhow::Result<()> {
         .spawn()
         .map_err(|e| anyhow::anyhow!("Failed to start `ollama serve`: {e:#}"))?;
     let pid = child.id();
-    log::info!("Started `ollama serve` automatically (pid {pid}); it will be stopped on app exit");
+    log::info!(
+        "Started `{} serve` automatically (pid {pid}); it will be stopped on app exit",
+        program.display()
+    );
     // Intentionally not waited on: the starter is a short-lived child while
     // the server keeps running (reparented) for future pulls and jobs.
     // Ownership is recorded so daemon shutdown stops exactly this server —
@@ -268,41 +279,103 @@ pub fn shutdown_owned_server_at(path: &std::path::Path) -> OwnedServerStop {
         }
     };
     let pid = record.pid;
-    match proc_cmdline(pid) {
+    let argv = match proc_argv_for_validation(pid) {
         // Nobody there (or unreadable): stale record, nothing to stop.
         None => {
             let _ = std::fs::remove_file(path);
-            OwnedServerStop::AlreadyGone
+            return OwnedServerStop::AlreadyGone;
         }
-        Some(cmdline) => {
-            if !(cmdline.contains("ollama") && cmdline.contains("serve")) {
-                log::warn!(
-                    "Recorded Ollama server pid {pid} is now `{cmdline}` — leaving it alone"
-                );
-                let _ = std::fs::remove_file(path);
-                return OwnedServerStop::NotOurs;
-            }
-            let gone = stop_pid(pid);
+        // A process that has just become a zombie can still have a /proc
+        // directory while its cmdline is already empty. Treat that exactly
+        // like an exited process; it is not evidence that the pid was reused.
+        Some(argv) if argv.is_empty() => {
             let _ = std::fs::remove_file(path);
-            if gone {
-                log::info!("Stopped auto-started Ollama server (pid {pid})");
-                OwnedServerStop::Stopped
+            return if proc_state(pid) == Some('Z') || proc_argv(pid).is_none() {
+                OwnedServerStop::AlreadyGone
             } else {
-                log::error!(
-                    "Could not stop auto-started Ollama server (pid {pid}) — leaving it running"
-                );
+                // An empty cmdline that is neither a zombie nor gone is not
+                // safe to identify as our server (it can be a pre-exec window
+                // or an unusual process); leave it alone.
                 OwnedServerStop::NotOurs
-            }
+            };
         }
+        Some(argv) => argv,
+    };
+    let cmdline = argv.join(" ");
+    if !is_ollama_serve(&argv) {
+        log::warn!("Recorded Ollama server pid {pid} is now `{cmdline}` — leaving it alone");
+        let _ = std::fs::remove_file(path);
+        return OwnedServerStop::NotOurs;
+    }
+    let gone = stop_pid(pid);
+    let _ = std::fs::remove_file(path);
+    if gone {
+        log::info!("Stopped auto-started Ollama server (pid {pid})");
+        OwnedServerStop::Stopped
+    } else {
+        log::error!("Could not stop auto-started Ollama server (pid {pid}) — leaving it running");
+        OwnedServerStop::NotOurs
     }
 }
 
 /// Raw `/proc/<pid>/cmdline` with NULs as spaces, or None when the process
 /// is gone/unreadable.
 fn proc_cmdline(pid: u32) -> Option<String> {
+    proc_argv(pid).map(|argv| argv.join(" "))
+}
+
+fn proc_argv(pid: u32) -> Option<Vec<String>> {
     std::fs::read(format!("/proc/{pid}/cmdline"))
         .ok()
-        .map(|bytes| String::from_utf8_lossy(&bytes).replace('\0', " "))
+        .map(|bytes| {
+            bytes
+                .split(|byte| *byte == 0)
+                .filter(|arg| !arg.is_empty())
+                .map(|arg| String::from_utf8_lossy(arg).into_owned())
+                .collect()
+        })
+}
+
+/// Read a process command line after exec has populated `/proc`. `spawn()` can
+/// return during the tiny fork/exec window where cmdline is empty; treating
+/// that as a foreign process would make the ownership check flaky. A genuine
+/// zombie also has an empty cmdline, but is classified as gone immediately.
+fn proc_argv_for_validation(pid: u32) -> Option<Vec<String>> {
+    for _ in 0..20 {
+        let argv = proc_argv(pid)?;
+        if !argv.is_empty() || proc_state(pid) == Some('Z') {
+            return Some(argv);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    proc_argv(pid)
+}
+
+/// Return the Linux `/proc` process state (`R`, `S`, `Z`, …), if readable.
+fn proc_state(pid: u32) -> Option<char> {
+    let text = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    text.lines()
+        .find_map(|line| line.strip_prefix("State:")?.trim().chars().next())
+}
+
+/// Validate the recorded process by executable and argument boundaries.
+///
+/// A substring search over the whole command line is unsafe: a test filter,
+/// unrelated argument, or another process name can contain both words and
+/// make us signal the wrong PID.  The small `ollama serve` invocation used by
+/// the installer has either `/path/ollama serve` or (for wrappers/tests) the
+/// equivalent `ollama serve` argv[0] spelling.
+fn is_ollama_serve(argv: &[String]) -> bool {
+    let Some(program) = argv.first() else {
+        return false;
+    };
+    let program_name = std::path::Path::new(program)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(program);
+    let executable_matches = program_name == "ollama" || program == "ollama serve";
+    let serve_arg = argv.iter().skip(1).any(|arg| arg == "serve") || program == "ollama serve";
+    executable_matches && serve_arg
 }
 
 fn pid_gone(pid: u32) -> bool {
@@ -317,28 +390,12 @@ fn pid_gone(pid: u32) -> bool {
     }
 }
 
-/// TERM, wait, then KILL. Returns true when the process is gone.
+/// Request TERM and wait for the validated process to disappear.  Normal
+/// daemon shutdown never escalates to SIGKILL; a process that ignores TERM is
+/// left running and reported to the caller.
 fn stop_pid(pid: u32) -> bool {
-    use std::process::{Command, Stdio};
-    let signal = |sig: &str| {
-        Command::new("kill")
-            .args([format!("-{sig}"), pid.to_string()])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    };
-    signal("TERM");
+    request_term(pid);
     for _ in 0..30 {
-        if pid_gone(pid) {
-            return true;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    signal("KILL");
-    for _ in 0..10 {
         if pid_gone(pid) {
             return true;
         }
@@ -346,6 +403,20 @@ fn stop_pid(pid: u32) -> bool {
     }
     pid_gone(pid)
 }
+
+#[cfg(unix)]
+fn request_term(pid: u32) {
+    // SAFETY: the caller verified /proc/<pid>/cmdline before signalling.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_term(_pid: u32) {}
 
 fn ensure_ollama_serving_with(
     host: &str,
@@ -592,12 +663,29 @@ mod tests {
             Err(_) => return, // no `sleep` binary — skip kill-path coverage
         };
         let pid = child.id();
-        // Reap lazily: shutdown kills it; take care not to leave a zombie if
-        // the assertion path changes — wait() after kill reaps.
+        // Reap lazily: shutdown requests TERM; wait() here reaps the child.
         record_spawned_server(&path, pid);
         assert_eq!(shutdown_owned_server_at(&path), OwnedServerStop::Stopped);
         assert!(!path.exists());
         assert!(pid_gone(pid), "owned server must be gone");
         let _ = child.wait();
+    }
+
+    #[test]
+    fn ollama_pid_validation_uses_argument_boundaries() {
+        assert!(is_ollama_serve(&["/usr/bin/ollama".into(), "serve".into()]));
+        assert!(is_ollama_serve(&["ollama serve".into(), "60".into()]));
+        assert!(!is_ollama_serve(&[
+            "/usr/bin/gravaai-test".into(),
+            "services::ollama_service::owned_server_lifecycle".into(),
+        ]));
+        assert!(!is_ollama_serve(&[
+            "/usr/bin/ollama-helper".into(),
+            "serve".into()
+        ]));
+        assert!(!is_ollama_serve(&[
+            "/usr/bin/ollama".into(),
+            "server".into()
+        ]));
     }
 }

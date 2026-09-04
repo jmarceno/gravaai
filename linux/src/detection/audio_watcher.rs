@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::utils::exe::runtime_program;
+
 /// Pure matcher: a new mic-capture stream appearing means a call may start.
 pub fn is_call_start_event(line: &str) -> bool {
     let lower = line.to_lowercase();
@@ -64,7 +66,7 @@ fn watch_loop(running: Arc<AtomicBool>, callback: Arc<dyn Fn() + Send + Sync>) {
         match spawn_pactl() {
             Ok(mut child) => {
                 read_events(&mut child, &running, &callback);
-                let _ = child.kill();
+                request_term(child.id());
                 let _ = child.wait();
                 // Healthy for over a minute → reset backoff.
                 if healthy_since.elapsed() >= Duration::from_secs(60) {
@@ -83,8 +85,22 @@ fn watch_loop(running: Arc<AtomicBool>, callback: Arc<dyn Fn() + Send + Sync>) {
     }
 }
 
+#[cfg(unix)]
+fn request_term(pid: u32) {
+    // SAFETY: pid belongs to the pactl child owned by this watcher.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_term(_pid: u32) {}
+
 fn spawn_pactl() -> anyhow::Result<Child> {
-    Ok(Command::new("pactl")
+    Ok(Command::new(runtime_program("pactl"))
         .arg("subscribe")
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

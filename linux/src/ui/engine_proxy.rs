@@ -75,8 +75,8 @@ pub trait Engine {
 // The macro above generates the `EngineProxy` D-Bus client struct.
 
 // ---------------------------------------------------------------------------
-// UI-friendly handle: fire-and-forget commands + blocking getters, shared
-// across GTK closures. The zbus connection is leaked ('static) since it lives
+// UI-friendly handle: fire-and-forget commands + async getters, shared
+// across UI callbacks. The zbus connection is leaked ('static) since it lives
 // as long as the window process.
 // ---------------------------------------------------------------------------
 
@@ -244,7 +244,7 @@ impl ProxyHandle {
         });
     }
 
-    // --- blocking getters (called from the GTK thread) ---
+    // --- async getters (called by the worker, never the Qt thread) ---
     fn block_on<F, T>(&self, fut: F) -> Option<T>
     where
         F: std::future::Future<Output = zbus::Result<T>>,

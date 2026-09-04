@@ -8,12 +8,14 @@
 //! installed — when one is missing the app tells the user (see
 //! `utils::dependencies`).
 
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub const OLLAMA_INSTALL_URL: &str = "https://ollama.com/install.sh";
-
-/// The real install script is ~10 KB; anything tiny is a broken/captive response.
-pub const MIN_INSTALL_SCRIPT_BYTES: usize = 1000;
+/// Ollama is installed from a versioned, architecture-specific release
+/// archive. The version is intentionally pinned so upgrades are explicit and
+/// reproducible; changing it also requires updating the release checksums.
+pub const OLLAMA_RELEASE_VERSION: &str = "0.11.4";
+pub const OLLAMA_RELEASE_BASE: &str = "https://github.com/ollama/ollama/releases/download";
 
 fn log_cmd(cmd: &[String]) {
     log::info!("Running: {}", cmd.join(" "));
@@ -44,47 +46,130 @@ pub fn which(bin: &str) -> Option<String> {
 pub struct OllamaInstaller;
 
 impl OllamaInstaller {
+    pub fn binary_path() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .join(".local/share/gravaai/ollama/ollama")
+    }
+
     pub fn is_available() -> bool {
-        which("ollama").is_some()
+        Self::binary_path().is_file() || which("ollama").is_some()
     }
 
     pub fn install(on_status: &dyn Fn(&str)) -> anyhow::Result<()> {
-        on_status("Downloading Ollama install script…");
+        let arch = match std::env::consts::ARCH {
+            "x86_64" => "amd64",
+            "aarch64" => "arm64",
+            other => anyhow::bail!("Ollama has no prebuilt Linux archive for {other}"),
+        };
+        let file_name = format!("ollama-linux-{arch}.tgz");
+        let base = format!("{OLLAMA_RELEASE_BASE}/v{OLLAMA_RELEASE_VERSION}");
+        let archive_url = format!("{base}/{file_name}");
+        let checksums_url = format!("{base}/sha256sums.txt");
+        on_status(&format!(
+            "Downloading Ollama {OLLAMA_RELEASE_VERSION} ({arch})…"
+        ));
         let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(3600))
             .build()?;
-        let script: Vec<u8> = client
-            .get(OLLAMA_INSTALL_URL)
+        let archive: Vec<u8> = client
+            .get(&archive_url)
             .send()
-            .map_err(|e| anyhow::anyhow!("Failed to fetch the Ollama install script: {e:#}"))?
+            .map_err(|e| anyhow::anyhow!("Failed to fetch Ollama release: {e:#}"))?
+            .error_for_status()
+            .map_err(|e| anyhow::anyhow!("Ollama release download failed: {e:#}"))?
             .bytes()
-            .map_err(|e| anyhow::anyhow!("Failed to read the Ollama install script: {e:#}"))?
+            .map_err(|e| anyhow::anyhow!("Failed to read Ollama release: {e:#}"))?
             .to_vec();
-        if script.len() < MIN_INSTALL_SCRIPT_BYTES {
-            // A captive portal or proxy can return a tiny/empty 200 body;
-            // executing that would silently "succeed" without installing.
+        let checksums = client
+            .get(&checksums_url)
+            .send()
+            .map_err(|e| anyhow::anyhow!("Failed to fetch Ollama checksums: {e:#}"))?
+            .error_for_status()
+            .map_err(|e| anyhow::anyhow!("Ollama checksum download failed: {e:#}"))?
+            .text()
+            .map_err(|e| anyhow::anyhow!("Failed to read Ollama checksums: {e:#}"))?;
+        let expected = checksums
+            .lines()
+            .find_map(|line| {
+                let mut fields = line.split_whitespace();
+                let digest = fields.next()?;
+                let name = fields.next()?.trim_start_matches('*');
+                (name == file_name).then(|| digest.to_ascii_lowercase())
+            })
+            .ok_or_else(|| anyhow::anyhow!("Ollama checksums do not list {file_name}"))?;
+        let actual = sha256_hex(&archive);
+        if actual != expected {
+            anyhow::bail!("Ollama archive integrity check failed (SHA-256 mismatch)");
+        }
+        log::info!("Verified Ollama {file_name} (sha256={actual})");
+
+        let root = Self::binary_path();
+        let install_dir = root
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Invalid Ollama install path"))?;
+        let stage = install_dir.join(format!(".stage-{}", std::process::id()));
+        if stage.exists() {
+            std::fs::remove_dir_all(&stage)?;
+        }
+        std::fs::create_dir_all(&stage)?;
+        let result = extract_ollama_archive(&archive, &stage)
+            .and_then(|source| install_ollama_binary(&source, &root));
+        let _ = std::fs::remove_dir_all(&stage);
+        result?;
+        on_status("Ollama is ready.");
+        Ok(())
+    }
+}
+
+fn extract_ollama_archive(archive: &[u8], stage: &Path) -> anyhow::Result<PathBuf> {
+    let decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(archive));
+    let mut tar = tar::Archive::new(decoder);
+    let mut binary = None;
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        let entry_type = entry.header().entry_type();
+        if entry_type.is_symlink() || entry_type.is_hard_link() {
+            anyhow::bail!("Ollama archive contains an unsupported link entry");
+        }
+        let relative = entry.path()?.into_owned();
+        if relative.is_absolute()
+            || relative
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
             anyhow::bail!(
-                "Ollama install script suspiciously small ({} bytes) — aborting",
-                script.len()
+                "Ollama archive contains an unsafe path: {}",
+                relative.display()
             );
         }
-        // SHA-256 is logged for auditability (the hash cannot be pinned —
-        // upstream updates the script — so HTTPS remains the trust anchor).
-        let digest = sha256_hex(&script);
-        log::info!(
-            "Fetched Ollama install script ({} bytes, sha256={digest}) from {OLLAMA_INSTALL_URL}",
-            script.len()
-        );
-        let path = std::env::temp_dir().join(format!("ollama-install-{}.sh", std::process::id()));
-        std::fs::write(&path, &script)?;
-        let code = run_command(&["sh".to_string(), path.to_string_lossy().into_owned()]);
-        let _ = std::fs::remove_file(&path);
-        if code == 0 {
-            Ok(())
-        } else {
-            anyhow::bail!("Ollama install script exited with code {code}")
+        let destination = stage.join(&relative);
+        if let Some(parent) = destination.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        entry.unpack(&destination)?;
+        if destination.file_name().and_then(|name| name.to_str()) == Some("ollama")
+            && destination.is_file()
+        {
+            binary = Some(destination);
         }
     }
+    binary.ok_or_else(|| anyhow::anyhow!("Ollama release archive did not contain an ollama binary"))
+}
+
+fn install_ollama_binary(source: &Path, destination: &Path) -> anyhow::Result<()> {
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let temporary = destination.with_extension("new");
+    std::fs::copy(source, &temporary)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o755))?;
+    }
+    std::fs::rename(temporary, destination)?;
+    Ok(())
 }
 
 pub fn sha256_hex(data: &[u8]) -> String {

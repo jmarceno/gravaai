@@ -1,6 +1,6 @@
 //! Pure tray icon/menu policy.
 //!
-//! GTK-free and bus-free so it is unit-testable without a display.
+//! Toolkit-free and bus-free so it is unit-testable without a display.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

@@ -14,6 +14,29 @@ fn fallback_log_dir() -> PathBuf {
         .join(format!(".local/share/{APP_DIR_NAME}"))
 }
 
+/// Persistent stderr capture for the short-lived Qt companion. A bounded
+/// pair of files prevents a broken QML binding from filling user storage.
+pub fn window_stderr_path() -> PathBuf {
+    fallback_log_dir().join("window-qt.log")
+}
+
+pub fn open_window_stderr() -> std::io::Result<std::fs::File> {
+    let path = window_stderr_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 1024 * 1024 {
+            let backup = path.with_extension("log.1");
+            let _ = std::fs::rename(&path, backup);
+        }
+    }
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+}
+
 fn writable_dir(p: &PathBuf) -> bool {
     std::fs::create_dir_all(p).is_ok()
         && std::fs::OpenOptions::new()

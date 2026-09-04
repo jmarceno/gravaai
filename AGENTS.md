@@ -4,12 +4,13 @@ Memory (Graphiti): at session end, register an episode via the `graphiti-memory`
 
 Repository: https://github.com/jmarceno/gravaai
 Hard fork: no upstream, no links back to the original repo.
-Linux desktop app: `linux/` (Rust/GTK4). The app is not tied to any distro —
+Linux desktop app: `linux/` (Rust, Qt 6/QML). The app is not tied to any distro —
 it never installs system packages; when a helper program is missing it tells
 the user (see `utils/dependencies.rs`).
 
-> **Rust port (2026-09):** the app was migrated one-shot from Python/GTK4 to
-> Rust/GTK4, keeping the daemon/UI architecture and all features. The cloud
+> **Qt cutover (2026-09):** the app was migrated one-shot from the former
+> toolkit to Rust with a Qt 6/QML companion, keeping the daemon/UI architecture
+> and all features. The cloud
 > provider is a single **OpenAI-compatible** service
 > (`processing/providers/openai_compat.rs`). No Python code or toolchain
 > references remain — see "Project overview".
@@ -51,9 +52,9 @@ G. Workflow:
 4. User clicks start recording at the tray icon context menu, or press a configured shortcut
 5. When done, User clicks stop recording at the tray icon context menu, or press a configured shortcut
 
-Current code is the Rust/GTK4 app described below — not yet the
-Rust/Tauri target above. (The GTK UI stays: Rust binds GTK4/libadwaita
-natively via gtk-rs, so no Qt port was needed and the layout is unchanged.)
+Current code is the Rust/Qt 6 app described below. The daemon and Qt window are
+separate executables in one AppImage; the persistent D-Bus, recording and
+on-disk contracts remain unchanged.
 
 ---
 
@@ -137,12 +138,15 @@ catch a regression in the behavior you changed:
   unit tests that cover the new behavior and its edge cases.
 - Fixing a bug → add a test that fails without the fix, so it can't silently
   regress.
-- When the meaningful logic is tangled with hard-to-test platform code (GTK
+- When the meaningful logic is tangled with hard-to-test platform code (Qt/QML
   UI, D-Bus wiring), **extract the pure logic into a standalone function and
   test that** (e.g. `tray_model`, `settings_visibility`,
   `parse_whisper_cpp_output`, `render_prompt`).
-- Run the relevant suite before committing: `cargo test --manifest-path
-  linux/Cargo.toml` (and `cargo clippy --all-targets -- -D warnings`).
+- Run the relevant suites before committing: core tests with
+  `cargo test --manifest-path linux/Cargo.toml --no-default-features --lib`,
+  the Qt-feature tests with `cargo test --manifest-path linux/Cargo.toml
+  --features ui --lib`, and `cargo clippy --all-targets --all-features --
+  -D warnings`.
 
 Skip new tests only when a change genuinely has no testable behavior (docs,
 comments, pure formatting, trivial constant tweaks) — and say so briefly
@@ -170,13 +174,13 @@ provide a migration path — never silently break an existing installation.
 
 ## What this repo is
 
-Linux desktop app (Rust, GTK4 + libadwaita) that records audio,
+Linux desktop app (Rust, Qt 6/QML) that records audio,
 transcribes it, and generates structured notes. It always runs as the
 graphical daemon/window pair — headless use is forbidden (the internal
 `--process` / `--install` child roles refuse to run outside the daemon, see
 `core/run_mode.rs::child_allowed`).
 
-- `linux/` — GTK4 + libadwaita desktop app (Rust, Linux)
+- `linux/` — Rust daemon plus Qt 6/QML window (Linux)
   (x86_64 + arm64)
 - `.gitea/` — release workflows
 
@@ -196,36 +200,45 @@ App identity:
 ### Linux app
 
 ```bash
-# Run (debug)
-cargo run --manifest-path linux/Cargo.toml
+# Build the toolkit-free daemon and Qt companion separately (debug)
+cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+# Run the client; it requires a graphical StatusNotifier host and starts the pair.
+./linux/target/debug/gravaai
 
-# Release build
-cargo build --release --manifest-path linux/Cargo.toml
+# Release build (the AppImage script performs these two builds automatically)
+cargo build --release --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
 
 # Pack AppImage (builds --release unless SKIP_BUILD=1)
 ./linux/packaging/appimage/build-appimage.sh
 
-# All tests
-cargo test --manifest-path linux/Cargo.toml
+# Core tests (no Qt)
+cargo test --manifest-path linux/Cargo.toml --no-default-features --lib
+# Complete Rust/UI-feature tests
+cargo test --manifest-path linux/Cargo.toml --features ui --lib
 
 # Single test (substring filter)
 cargo test --manifest-path linux/Cargo.toml whisper_cpp
 
 # Lint + format
-cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
+cargo clippy --manifest-path linux/Cargo.toml --all-targets --all-features -- -D warnings
 cargo fmt --check --manifest-path linux/Cargo.toml
 ```
 
-`linux/Cargo.toml` is the crate root (`src/main.rs` single binary). The `ui`
-cargo feature (default) pulls in GTK4/libadwaita; `cargo check
---no-default-features` builds the headless daemon/client stack without GTK.
+`linux/Cargo.toml` is the crate root for one shared library plus two binaries:
+`gravaai` (default, daemon/client and internal children) and `gravaai-ui`
+(`required-features = ["ui"]`, Qt/QML only). The `ui` feature contains only
+the CXX-Qt bridge and window code; `cargo check --no-default-features` proves
+the daemon has no Qt dependency.
 
 ### Install / uninstall (AppImage, no scripts)
 
 Users download `gravaai-<version>-<arch>.AppImage`, mark it executable,
-and run it. The AppImage carries the binary plus tray/icon assets; system
-helpers (`ffmpeg`, `pactl`, `curl`, `tar`) and GTK4/libadwaita stay on the host
-(same contract as before). Uninstall is built in — it removes the AppImage
+and run it. The AppImage carries both executables, Qt/QML, the platform
+plugins, tray/icon assets, FFmpeg/FFprobe and `pactl`; only legitimate platform
+services (kernel/glibc, compositor, session bus, audio server, portals and
+notification/tray hosts) remain on the host. Uninstall is built in — it removes the AppImage
 file (when running from one), desktop entries, icons, autostart entry, engines,
 models, logs, config and the stored API key, and keeps recordings:
 
@@ -237,42 +250,29 @@ models, logs, config and the stored API key, and keeps recordings:
 
 ## Linux architecture
 
-**Two-process daemon/UI split:** the app runs as a GTK-free **daemon** plus an
-on-demand GTK **window** child, so GTK/libadwaita is loaded only while a window
-is open. `main.rs` dispatches on `core/run_mode.rs:resolve_run_mode(argv)`:
-- **`--daemon`** (`daemon/app.rs`): always-on async (tokio) event loop — no
-  GTK. Owns the recording lifecycle, job queue, call detection, and the system
-  tray. The engine (`daemon/engine.rs:Engine`) keeps a plain snapshot and
-  reports mutations through `EngineHooks` (`on_change`/`on_error`/`on_output`),
-  which the loop fans out to the tray (`ui/tray.rs`, a `ksni`
-  StatusNotifierItem driven by an `on_command` callback) and to the D-Bus
-  service as `SnapshotChanged`/`Error`/`Output` signals. **AI processing does
-  not run in the daemon** — each job runs in a short-lived `--process`
-  **child** (`daemon/processor.rs`) that loads the AI stack, writes
-  transcript.md/notes.md, and exits (child protocol `STATUS:`/`RESULT:`/`ERROR:`
-  lines on stdout; cancel kills the child). `Engine<R>` is generic over the
-  recorder backend (`RecorderBackend` trait) so it is unit-testable with a
-  fake; controller callbacks queue into an internal event list applied by
-  `drain_events()` at the end of every engine method (worker threads marshal
-  back as loop messages instead).
-- **`--window`** (`ui/window_app.rs`): a short-lived `adw::Application`
-  (`NON_UNIQUE`, so it doesn't own the bus name) spawned by the daemon as a
-  child. `MainWindow` (`ui/main_window.rs`, built with `Rc::new_cyclic` for
-  self-referential button callbacks) renders `Snapshot`s fetched over D-Bus
-  (`ui/engine_proxy.rs:ProxyHandle`) and kept fresh by signal tasks that poll
-  into the GTK loop; clicks become method calls (fire-and-forget, or blocking
-  getters for snapshot/folders/installs). The close behavior is governed by the
-  pure `core/window_close.rs:resolve_close_action(cfg)` policy read fresh at
-  close time: by default the window **hides** so the daemon's present-path
-  reopens it instantly; **Low memory mode** (Settings → General) **exits** on
-  close so GTK memory is reclaimed and the daemon respawns a fresh window on
-  demand. A spawned window never outlives its daemon: it polls the Engine bus
-  name and quits when the daemon vanishes — covering a crash — via the pure
-  `core/daemon_watch.rs:should_exit_on_owner_change` (act only after the name
-  was seen owned, so a startup race can't kill the window early); and the
-  daemon kills its window child on quit.
-- **no flag** (`client.rs`): client mode — ensure the daemon is running (spawn
-  `--daemon` detached via setsid if not), then call `OpenWindow`.
+**Two-process daemon/UI split:** one AppImage contains a toolkit-free
+`gravaai` daemon/client binary and a Qt-only `gravaai-ui` companion. `main.rs`
+dispatches on `core/run_mode.rs::resolve_run_mode(argv)`:
+- **`--daemon`** (`daemon/app.rs`): an always-on Tokio event loop owns the
+  recording lifecycle, jobs, call detection, installs and the `ksni`
+  StatusNotifierItem. It claims `DAEMON_LOCK_NAME`, requires a registered
+  StatusNotifier host before exporting `ENGINE_NAME`, and exits without side
+  effects when no graphical tray is available. The engine snapshot is fanned
+  out as `SnapshotChanged`/`Error`/`Output` signals. AI processing and installs
+  stay in short-lived `--process`/`--install` children; their protocol is
+  `STATUS:`/`RESULT:`/`ERROR:` and all work remains daemon-owned.
+- **`gravaai-ui`** (`ui/qt/`): the only window process. It claims the UI
+  singleton, verifies the daemon/tray owner, loads the embedded QML module with
+  a fail-fast `objectCreated` hook and a five-second ready watchdog. The
+  `AppController` sends only owned commands to a Tokio worker; D-Bus, file,
+  network and model I/O never run on the Qt thread. Closing hides by default;
+  Low memory asks the companion to exit. A daemon-owner watch exits the UI when
+  the daemon disappears, and the daemon terminates the child gracefully on
+  Quit.
+- **`--window`** is a compatibility trampoline to `gravaai-ui`; **no flag**
+  (`client.rs`) starts the singleton daemon if necessary and calls `OpenWindow`.
+  `WindowSupervisor` guarantees one child and presents it instead of spawning a
+  second one.
 
 The daemon↔window boundary is the `io.github.jmarceno.GravaAi.Engine` D-Bus
 interface (`daemon/dbus_service.rs`, zbus 5 `#[interface]`); the JSON snapshot
@@ -417,62 +417,25 @@ crate and writes only the `@keyring` sentinel to config.json;
 key into the keyring. Without a keyring everything falls back to plaintext-in-
 chmod-600 exactly as before.
 
-**GTK4 / libadwaita toolkit notes (gtk-rs):** `ui/` builds with
-`adw::ApplicationWindow`+`adw::ToolbarView`+`adw::HeaderBar`+`adw::ViewStack`/
-`ViewSwitcher`, `Adw.PreferencesGroup` rows
-(`ActionRow`/`SwitchRow`/`ComboRow`/`EntryRow`/`PasswordEntryRow`),
-`Adw.ToastOverlay`/`Toast` for transient errors, `.boxed-list`/`.pill`/`.flat`
-style classes, and `Adw.Clamp` for centred content. Async file/folder pickers
-use `gtk::FileDialog`; message dialogs use `gtk::AlertDialog` /
-`adw::AlertDialog`. GTK widgets are `!Send`, and glib 0.20 has no
-`MainContext::channel` — worker threads only ever ship **owned data** over
-`std::sync::mpsc`, and the main loop picks it up via `timeout_add_local`
-pollers (see `window_app.rs` UiMsg bus, Models-page status checks). Enable the
-gtk-rs version features matching the system libraries (`gtk/v4_18`,
-`adw/v1_7` in `linux/Cargo.toml`).
+**Qt/QML toolkit notes:** `ui/qt/` contains the CXX-Qt `AppController`, the
+`QQmlApplicationEngine` bootstrap helper and the Rust worker bridge. The QML
+module is registered as `io.github.jmarceno.gravaai` and loads `ApplicationWindow`
+from the embedded resource tree. Every page/component that touches the bridge
+declares `required property var controller`; timers, `Connections`, dialogs and
+file pickers are named properties so they cannot be interpreted as a default
+property. `Theme.qml` is the sole color source and `QT_QUICK_CONTROLS_STYLE=Basic`
+keeps rendering deterministic across desktops. The root helper observes
+`objectCreated`, calls native `QCoreApplication::quit/exit`, and records QML
+startup failures in `window-qt.log` (1 MiB plus one backup).
 
-**UI** (`ui/`): `main_window.rs` (recording controls; job rows rendered by
-`jobs_panel.rs:JobsPanel` from the pure `actions_for_status()` policy;
-errors surfaced via the pure `core/errors.rs:error_presentation()` policy —
-actionable configuration problems get a modal dialog, transient/runtime
-failures get a toast; `present_window()` re-shows + `unminimize()` +
-`present()`; the header-bar gear is a `Gtk.MenuButton` offering
-**Preferences** → settings dialog and **About GravaAi** → an
-`Adw.AboutDialog` — app identity lives in `core/app_info.rs` plus a
-`resolve_version()` that reads the installed distro package version (pacman
-today, others later), returning
-`None` on a source checkout), `settings_dialog.rs` (thin `Adw.Window` shell —
-Cancel/ViewSwitcher/Save header, page instantiation, save flow; each tab lives
-in its own module under `settings_pages/`:
-`general.rs`/`models.rs`/`prompts.rs` page classes expose `.widget` and
-`.apply(cfg)`, with shared row helpers + `IdComboRow` in
-`settings_pages/widgets.rs`; `ModelsPage` routes daemon install signals to
-progress/finished row updates (failures also surface an `AlertDialog` with the
-reason) and re-attaches to in-flight installs on open; model names are
-free-text `EntryRow`s (OpenAI STT/chat defaulting to `whisper-1` /
-`gpt-5.6-luna`, whisper.cpp default `large-v3-turbo`, Ollama default
-`phi4-mini`); `compute_section_visibility()` in `settings_visibility.rs` is
-the pure Models-tab visibility policy; `on_saved` callback runs
-`ReloadConfig`),
-`model_row_grid.rs` (model `ActionRow`s with Download/Retry/progress states),
-`meeting_explorer.rs` (past meetings browser; `.boxed-list` rows;
-double-click-to-rename via `GestureClick`, AI re-summarize per meeting),
-`tray.rs` (ksni StatusNotifierItem; a single branded `IconPixmap` from
-`assets/tray/gravaai-*.png`, decoded with the `png` crate; recording /
-paused / processing visuals are composed at runtime by `tray_icon` —
-breathing opacity, grayscale pause bars, sweeping highlight — with an
-embedded 48px fallback plus an `icon_name` theme fallback so the tray never
-renders empty even when the artwork directory is missing). The app/launcher/window
-icon ships in `assets/icons/hicolor/` and is bundled into the AppImage under
-`usr/share/icons/hicolor/` (+ `usr/share/gravaai/`); at startup
-`ui/window_app.rs:setup_app_icon()` also adds the bundled tree to the GTK
-icon-theme search path and sets it as the default icon so it resolves from
-source and from the AppImage mount. `MainWindow` import-existing delegates its
-in-tree-reuse vs. copy decision to the pure `utils/recording_import.rs`.
-Client→daemon spawn uses `utils::exe::persistent_exe()` (re-exec our own
-AppImage when applicable so the FUSE mount outlives the short-lived client);
-daemon→window/process/install children use `internal_exe()` to share the
-daemon's mount.
+**UI pages and integration:** `qml/pages/` implements Recorder, Background
+jobs, Library, Models & Services, Prompts, General and About. `AppController`
+keeps the exact snake_case property contract and explicit camelCase invokables;
+its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
+desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
+composes the branded icon (`tray_icon`) with an embedded fallback. The app icon,
+QML resources and both binaries are bundled in the AppImage; `utils::exe`
+resolves the companion and helpers only from the current mount before PATH.
 
 **Import/crate convention:** one binary crate (`linux/Cargo.toml`,
 `src/main.rs`) organized in modules (`config`, `core`,
@@ -484,10 +447,10 @@ daemon's mount.
 
 Linux desktop app:
 
-- **Language:** Rust (single binary crate, edition 2021)
-- **UI:** GTK4 + libadwaita via gtk-rs (`adw::Application`/
-  `adw::ApplicationWindow`, preference-row settings, toasts, dark-mode; async
-  `gtk::AlertDialog`/`gtk::FileDialog` instead of blocking dialogs).
+- **Language:** Rust (one shared binary crate with daemon and UI targets,
+  edition 2021)
+- **UI:** Qt 6/QML through CXX-Qt 0.10.0, isolated in `gravaai-ui`; Basic
+  Controls style, embedded QML module and native fail-fast startup helper.
 - **Cloud AI:** single OpenAI-compatible provider (no SDK; plain
   `POST /audio/transcriptions` + `POST /chat/completions` over reqwest with
   rustls).
@@ -495,9 +458,10 @@ Linux desktop app:
   prebuilt downloads — never source builds, no compiler needed):**
   whisper.cpp engine binary (CPU prebuilts for x86_64/aarch64 — no Linux CUDA
   upstream) + GGML models from HuggingFace; Ollama summarization via its local
-  HTTP API (installed via the official script).
-- **System tray:** a `ksni` StatusNotifierItem — no GTK widgets and no extra
-  system dependency. Left-click opens the window where the SNI host delivers
+  HTTP API (installed from a pinned, checksum-verified archive).
+- **System tray:** a `ksni` StatusNotifierItem. The daemon claims a private
+  singleton before registering it and refuses to run when no SNI host is
+  registered. Left-click opens the window where the SNI host delivers
   `Activate`, otherwise opens the menu. GNOME needs the
   AppIndicator/KStatusNotifierItem extension to provide the SNI host. The tray
   uses one branded logo (`assets/tray/gravaai-*.png`) sent as a raw ARGB
@@ -507,23 +471,21 @@ Linux desktop app:
   fallback plus an `icon_name` theme fallback so it never renders empty when
   the artwork directory is missing (e.g. a stripped payload).
 - **Delivery:** Type-2 AppImage (`linux/packaging/appimage/`) bundling the
-  binary + assets; GTK4/libadwaita/ffmpeg/pactl remain host dependencies.
+  daemon, `gravaai-ui`, Qt/QML/plugins, FFmpeg/FFprobe, `pactl`, assets and
+  non-platform libraries. Only kernel/glibc, compositor, session D-Bus,
+  PipeWire/PulseAudio, portals and tray/notification services remain on host.
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
   (scalable SVG + PNG sizes, named `gravaai` — the `Icon=` key) and
-  is bundled into the AppImage; `setup_app_icon()` also registers the bundled
-  tree on the GTK icon-theme search path so it resolves from source and from
-  the AppImage mount.
+  is bundled into the AppImage and exposed through `XDG_DATA_DIRS` from the
+  current mount.
 
-**Linux runs as cooperating processes from one binary:** a GTK-free **daemon**
-(`--daemon`) owns the recording engine, jobs, installs, call detection and
-tray; the GTK **window** (`--window`) is spawned as a child on demand and
-renders a snapshot fetched over the `io.github.jmarceno.GravaAi.Engine` D-Bus
-interface. Launching with no flag is **client** mode: ensure the daemon is up,
-then open a window. Two more short-lived child roles keep heavy/long work out
-of the daemon: `--process` (one AI transcription+summarization job) and
-`--install` (one model/engine install), both spawned and tracked by the daemon
-and streamed back as `STATUS:`/`RESULT:`/`ERROR:` protocol lines, so they
-survive the window closing and don't bloat the daemon.
+**Linux runs as cooperating processes:** `gravaai` owns the singleton daemon,
+recording engine, jobs, installs, call detection, tray and D-Bus service;
+`gravaai-ui` is the one supervised Qt window child. `--window` remains a
+compatibility trampoline and no-flag client mode ensures the daemon then calls
+`OpenWindow`. Two short-lived children keep heavy work out of the daemon:
+`--process` and `--install`, both tracked and streamed with
+`STATUS:`/`RESULT:`/`ERROR:` lines. The UI exits when the daemon owner vanishes.
 
 The app supports any OpenAI-compatible endpoint for transcription/
 summarization (model names are free-text; chat default `gpt-5.6-luna`), local
@@ -544,22 +506,27 @@ are supported.
 **Running from source (developers only — regular installs never compile):**
 
 1. Install the toolchain + dependencies with your distro's packages:
-   Rust (`rust`/`cargo`), GTK4 + libadwaita dev files (`gtk4`, `libadwaita`,
-   `libnotify`), audio tools (`ffmpeg`, `pactl` via PipeWire/PulseAudio),
-   `curl`, `tar`.
+   Rust (`rust`/`cargo`), Qt 6 development files/tools (`qt6-base-dev`,
+   `qt6-declarative-dev`, `qt6-tools-dev-tools`, `qt6-svg-dev` on Ubuntu),
+   audio tools (`ffmpeg`, `pactl` via PipeWire/PulseAudio) and `curl` only for
+   bootstrapping appimagetool during a local package build.
 2. Build and run:
    ```bash
-   cargo run --manifest-path linux/Cargo.toml
-   # or: cargo build --release --manifest-path linux/Cargo.toml
-   #      ./linux/target/release/gravaai
+   cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+   cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+   ./linux/target/debug/gravaai
+   # or build both release binaries with the AppImage script:
+   # ./linux/packaging/appimage/build-appimage.sh
    ```
 
 **Running checks:**
 
 ```bash
 cargo fmt --check --manifest-path linux/Cargo.toml
-cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path linux/Cargo.toml
+cargo clippy --manifest-path linux/Cargo.toml --all-targets --all-features -- -D warnings
+cargo test --manifest-path linux/Cargo.toml --no-default-features --lib
+cargo test --manifest-path linux/Cargo.toml --features ui --lib
+./linux/tests/qt_smoke.sh
 ```
 
 **Install / uninstall (AppImage, no scripts):**
@@ -652,9 +619,12 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
   pause bars / processing sweep), Models-tab visibility (`settings_visibility`),
   bundled artwork PNG decoding plus embedded fallback so the tray never
-  renders empty (`tray`).
+  renders empty (`tray`), and the notification gate that suppresses alerts
+  unless the StatusNotifier registration is live (`notifications`).
 
-The `--process`/`--install` child entry points, the `Gio`-free zbus service
-and tray wiring, and the GTK widget construction need a real
-subprocess/bus/display and are not unit-tested (the engine/manager/key logic
-they rely on is, via fakes).
+The `--process`/`--install` child entry points, the D-Bus service/tray host and
+the Qt scene need real subprocess/bus/display integration and are covered by
+the QML/offscreen and AppImage smoke gates rather than ordinary unit tests.
+`linux/tests/qt_smoke.sh` runs qmllint/qmlimportscanner, loads every page at
+1332×820 and 960×640, and verifies direct UI refusal without a daemon/tray.
+The engine/manager/key logic they rely on is unit-tested via fakes.

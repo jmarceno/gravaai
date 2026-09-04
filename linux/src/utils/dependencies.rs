@@ -18,14 +18,14 @@ pub const DEPENDENCIES: &[Dependency] = &[
         required: true,
     },
     Dependency {
-        program: "pactl",
-        purpose: "audio device detection (PipeWire/PulseAudio)",
+        program: "ffprobe",
+        purpose: "recording duration and library metadata",
         required: true,
     },
     Dependency {
-        program: "notify-send",
-        purpose: "desktop notifications (falls back to the log)",
-        required: false,
+        program: "pactl",
+        purpose: "audio device detection (PipeWire/PulseAudio)",
+        required: true,
     },
 ];
 
@@ -41,7 +41,10 @@ pub fn check_missing(which: &dyn Fn(&str) -> Option<String>) -> Vec<&'static Dep
 /// everything needed is present. Tells the user what to install (their
 /// distro's packages) instead of installing anything.
 pub fn describe_missing_required() -> Option<String> {
-    describe_missing_required_with(&|b| crate::services::system_installer::which(b))
+    describe_missing_required_with(&|b| {
+        let path = crate::utils::exe::runtime_program(b);
+        path.is_file().then(|| path.to_string_lossy().into_owned())
+    })
 }
 
 fn describe_missing_required_with(which: &dyn Fn(&str) -> Option<String>) -> Option<String> {
@@ -79,20 +82,12 @@ mod tests {
         let msg = describe_missing_required_with(&none).unwrap();
         assert!(msg.contains("ffmpeg"));
         assert!(msg.contains("pactl"));
-        // Optional helpers never nag.
-        assert!(!msg.contains("notify-send"));
+        assert!(msg.contains("ffprobe"));
     }
 
     #[test]
     fn optional_only_is_silent() {
-        let only_optional_missing = |b: &str| {
-            if b == "notify-send" {
-                None
-            } else {
-                Some("/usr/bin/x".to_string())
-            }
-        };
-        assert_eq!(check_missing(&only_optional_missing).len(), 1);
-        assert!(describe_missing_required_with(&only_optional_missing).is_none());
+        let all_present = |_: &str| Some("/usr/bin/x".to_string());
+        assert!(describe_missing_required_with(&all_present).is_none());
     }
 }

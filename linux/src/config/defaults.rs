@@ -103,7 +103,8 @@ pub const WHISPER_CPP_RELEASE_BASE_URL: &str =
 pub struct EngineAsset {
     pub filename: &'static str,
     pub sha256: &'static str,
-    /// "tar.gz" (extract with system tar) or "zip" (extract in-process).
+    /// "tar.gz" (extract with the Rust tar/flate2 crates) or "zip"
+    /// (extract in-process).
     pub format: &'static str,
 }
 

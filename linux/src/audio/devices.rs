@@ -3,10 +3,12 @@
 use std::process::Command;
 use std::time::Duration;
 
+use crate::utils::exe::runtime_program;
+
 fn run_pactl(args: &[&str]) -> anyhow::Result<String> {
     // pactl is instantaneous under normal conditions; time it out so a hung
     // PipeWire/PulseAudio can't stall the caller for long.
-    let mut child = Command::new("pactl")
+    let mut child = Command::new(runtime_program("pactl"))
         .args(args)
         .stdout(std::process::Stdio::piped())
         .spawn()?;
@@ -22,7 +24,16 @@ fn run_pactl(args: &[&str]) -> anyhow::Result<String> {
             }
             None => {
                 if std::time::Instant::now() > deadline {
-                    let _ = child.kill();
+                    // A timed-out query is still a child owned by this
+                    // process.  Ask it to exit and reap it asynchronously so
+                    // the caller is not forced to use SIGKILL.
+                    request_term(child.id());
+                    let _ = std::thread::Builder::new()
+                        .name("pactl-timeout-reaper".into())
+                        .spawn(move || {
+                            let mut child = child;
+                            let _ = child.wait();
+                        });
                     anyhow::bail!("pactl {} timed out", args.join(" "));
                 }
                 std::thread::sleep(Duration::from_millis(50));
@@ -30,6 +41,20 @@ fn run_pactl(args: &[&str]) -> anyhow::Result<String> {
         }
     }
 }
+
+#[cfg(unix)]
+fn request_term(pid: u32) {
+    // SAFETY: pid belongs to the child spawned by run_pactl.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_term(_pid: u32) {}
 
 /// Default PulseAudio source (microphone), if any.
 pub fn get_default_source() -> Option<String> {

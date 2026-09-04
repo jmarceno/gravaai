@@ -11,11 +11,12 @@
 //! summary tells the user where they are.
 
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::time::Duration;
 
 use crate::config::defaults::{APP_DIR_NAME, APP_ID};
 use crate::config::keyring_store::KeyringStore;
 use crate::core::job_manager::default_state_dir;
+use crate::daemon::dbus_service::ENGINE_PATH;
 
 const ICON_SIZES: &[u32] = &[16, 24, 32, 48, 64, 128, 256];
 
@@ -99,26 +100,111 @@ pub fn remove_all(home: &Path, state_dir: &Path, exe: &Path) -> Vec<PathBuf> {
     removed
 }
 
-fn best_effort(cmd: &str, args: &[&str]) {
-    let _ = std::process::Command::new(cmd)
-        .args(args)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+/// Return process IDs that are demonstrably one of our daemon/UI roles.
+///
+/// Process matching is restricted to validated GravaAI executable paths and
+/// role arguments so an unrelated user's process can never be terminated.
+/// `/proc/<pid>/cmdline` is inspected, the executable basename is constrained,
+/// and this process is excluded.
+fn owned_process_ids(exe: &Path) -> Vec<u32> {
+    let expected = exe
+        .canonicalize()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned());
+    let own_pid = std::process::id();
+    let mut result = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return result;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name();
+        let Ok(pid) = name.to_string_lossy().parse::<u32>() else {
+            continue;
+        };
+        if pid == own_pid {
+            continue;
+        }
+        let bytes = match std::fs::read(entry.path().join("cmdline")) {
+            Ok(bytes) => bytes,
+            Err(_) => continue,
+        };
+        let args: Vec<String> = bytes
+            .split(|b| *b == 0)
+            .filter(|part| !part.is_empty())
+            .map(|part| String::from_utf8_lossy(part).into_owned())
+            .collect();
+        let Some(program) = args.first() else {
+            continue;
+        };
+        let program_path = Path::new(program);
+        let same_binary = expected
+            .as_deref()
+            .and_then(|wanted| {
+                program_path
+                    .canonicalize()
+                    .ok()
+                    .map(|got| got.to_string_lossy() == wanted)
+            })
+            .unwrap_or(false);
+        let program_name = program_path.file_name().and_then(|n| n.to_str());
+        let daemon_name = program_name == Some(APP_DIR_NAME);
+        let ui_name = program_name == Some("gravaai-ui");
+        let role = args
+            .iter()
+            .any(|arg| arg == "--daemon" || arg == "--window");
+        if ui_name || ((same_binary || daemon_name) && role) {
+            result.push(pid);
+        }
+    }
+    result
 }
 
-/// Stop any running daemon/window (best-effort, never fails the uninstall).
-fn stop_running() {
-    for role in ["--daemon", "--window"] {
-        // Installed / mounted binary: ".../gravaai --daemon"
-        best_effort("pkill", &["-f", &format!("{APP_DIR_NAME} {role}")]);
-        // AppImage file: ".../gravaai-<ver>-<arch>.AppImage --daemon"
-        best_effort(
-            "pkill",
-            &["-f", &format!("{APP_DIR_NAME}-.*\\.AppImage {role}")],
-        );
+#[cfg(unix)]
+fn send_term(pid: u32) {
+    // SAFETY: the pid was validated from /proc and is not this process.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
     }
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn send_term(_pid: u32) {}
+
+/// Stop our running daemon/window (best-effort, never fails uninstall).
+/// Prefer the Engine Quit method so the daemon can flush state; `/proc` is a
+/// validated SIGTERM fallback for a crashed or bus-less session.
+fn stop_running(exe: &Path) {
+    #[cfg(unix)]
+    if let Ok(conn) = zbus::blocking::Connection::session() {
+        if let Ok(proxy) = zbus::blocking::Proxy::new(
+            &conn,
+            APP_ID,
+            ENGINE_PATH,
+            "io.github.jmarceno.GravaAi.Engine",
+        ) {
+            let _: Result<(), _> = proxy.call("Quit", &());
+        }
+    }
+
+    for attempt in 0..30 {
+        let pids = owned_process_ids(exe);
+        if pids.is_empty() {
+            return;
+        }
+        if attempt == 0 {
+            for pid in pids {
+                send_term(pid);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let remaining = owned_process_ids(exe);
+    if !remaining.is_empty() {
+        println!("Waiting for GravaAI processes to exit: {:?}", remaining);
+    }
 }
 
 /// Run the full uninstall. Always succeeds from the user's perspective;
@@ -132,7 +218,7 @@ pub fn run_uninstall() -> i32 {
     });
 
     println!("Stopping {APP_DIR_NAME}…");
-    stop_running();
+    stop_running(&exe);
 
     let state_dir = default_state_dir();
     let removed = remove_all(&home, &state_dir, &exe);
@@ -149,20 +235,6 @@ pub fn run_uninstall() -> i32 {
             println!("Kept {} (needs root to remove)", system_log.display());
         }
     }
-
-    // Refresh caches so the launcher and tray icons vanish immediately.
-    best_effort(
-        "update-desktop-database",
-        &[&home.join(".local/share/applications").to_string_lossy()],
-    );
-    best_effort(
-        "gtk-update-icon-cache",
-        &[
-            "-f",
-            "-t",
-            &home.join(".local/share/icons/hicolor").to_string_lossy(),
-        ],
-    );
 
     println!();
     println!("Uninstall complete. Your recordings were kept.");

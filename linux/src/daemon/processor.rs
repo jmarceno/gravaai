@@ -10,7 +10,9 @@
 //!   `RESULT:<json>` final `[audio, transcript, notes]` paths (auto-title may
 //!                    have moved them); success
 //!   `ERROR:<text>`  failure
-//! Anything else on stdout is ignored. Cancellation = the daemon kills the child.
+//! Anything else on stdout is ignored. User cancellation is forceful so a
+//! cancelled job cannot keep running; daemon shutdown uses the separate
+//! graceful SIGTERM path below.
 
 use std::io::BufRead;
 use std::path::PathBuf;
@@ -122,7 +124,31 @@ impl ProcessorHandle {
             let _ = child.kill();
         }
     }
+
+    /// Ask a processor to exit as part of daemon shutdown.  The reader thread
+    /// owns reaping; we only send SIGTERM and deliberately never escalate to
+    /// SIGKILL during a normal application Quit.
+    pub fn terminate_gracefully(&mut self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        if let Some(child) = self.child.lock().unwrap().as_ref() {
+            request_pid_term(child.id());
+        }
+    }
 }
+
+#[cfg(unix)]
+fn request_pid_term(pid: u32) {
+    // SAFETY: this targets a child process whose pid is held by Child.
+    unsafe extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    unsafe {
+        let _ = kill(pid as i32, 15);
+    }
+}
+
+#[cfg(not(unix))]
+fn request_pid_term(_pid: u32) {}
 
 /// Spawns `--process` children and decodes their protocol stream on a reader
 /// thread, forwarding [`ChildEvent`]s (tagged by job id) to the event loop.

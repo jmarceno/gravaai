@@ -1,38 +1,25 @@
-// GravaAi — single binary, dispatched by CLI flag (see core::run_mode).
+// GravaAi core executable, dispatched by CLI flag (see core::run_mode).
 //
 // Single binary, dispatched by CLI flag (see core::run_mode):
-//   --daemon    GTK-free background daemon (engine + tray + D-Bus service)
-//   --window    GTK/libadwaita window child (spawned by the daemon)
+//   --daemon    toolkit-free background daemon (engine + tray + D-Bus service)
+//   --window    compatibility trampoline to the Qt/QML companion
 //   --process   one-shot AI processing child (audio transcript notes)
 //   --install   one-shot model/engine install child (spec json)
 //   --uninstall remove everything the app installed or created, then exit
 //   (no flag)   client mode: ensure the daemon runs, then open a window.
 
-mod audio;
-mod client;
-mod config;
-mod core;
-mod daemon;
-mod detection;
-mod processing;
-mod services;
-mod utils;
-
-mod ui;
+use gravaai::{client, core, daemon, utils};
 
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
     let mode = core::run_mode::resolve_run_mode(&argv);
     match mode {
-        core::run_mode::RunMode::Daemon => daemon::app::run_daemon(),
+        core::run_mode::RunMode::Daemon => std::process::exit(daemon::app::run_daemon()),
         core::run_mode::RunMode::Window => {
-            #[cfg(feature = "ui")]
-            ui::window_app::run_window();
-            #[cfg(not(feature = "ui"))]
-            {
-                eprintln!("window UI not compiled in (feature \"ui\" disabled)");
-                std::process::exit(1);
-            }
+            // Keep the historical role as a compatibility trampoline. The
+            // real Qt process is a separate executable so the daemon never
+            // links or maps Qt libraries.
+            std::process::exit(utils::exe::run_ui_trampoline());
         }
         core::run_mode::RunMode::Process => {
             // --process <audio> <transcript> <notes>
@@ -57,7 +44,7 @@ fn main() {
             ));
         }
         core::run_mode::RunMode::Uninstall => {
-            std::process::exit(crate::utils::self_uninstall::run_uninstall());
+            std::process::exit(utils::self_uninstall::run_uninstall());
         }
         core::run_mode::RunMode::Client => client::run_client(),
     }

@@ -1,7 +1,8 @@
 //! Background-thread work facility.
 //!
 //! `TaskRunner::submit` runs work on tracked daemon threads and routes the
-//! result back through a main-thread scheduler (GLib idle in the daemon/window,
+//! result back through an injected main-thread scheduler (daemon queue or Qt
+//! timer in the window,
 //! injectable for headless use and tests).
 
 use std::sync::{Arc, Mutex};

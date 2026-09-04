@@ -3,11 +3,11 @@
 A meeting recorder that transcribes audio and generates structured notes using
 any OpenAI-compatible API, fully local Whisper/Ollama engines, or a mix of both.
 
-This repository holds the Linux desktop app (Rust, GTK4 + libadwaita):
+This repository holds the Linux desktop app (Rust, Qt 6/QML):
 
 | Path | Contents |
 |---|---|
-| `linux/` | GTK4 + libadwaita desktop app (Rust, Linux) |
+| `linux/` | Rust daemon plus Qt 6/QML window (Linux) |
 | `linux/assets/` | Tray artwork + hicolor app icons |
 | `linux/packaging/appimage/` | AppImage build script + desktop entry |
 
@@ -24,7 +24,8 @@ This repository holds the Linux desktop app (Rust, GTK4 + libadwaita):
 - **Local models** — run fully offline with no API key required
 - **Customizable prompts** — edit transcription and summarization prompts in Settings
 - **System tray** integration — a StatusNotifierItem (SNI) exposed over D-Bus; left-click opens the window where the host supports it, otherwise opens the menu
-- **Lightweight background daemon** — the app runs as a small GTK-free tray daemon, so recording, transcription, and model installs keep running in the background even with no window open. Closing the window returns to the tray; reopening (tray "Open" or the app icon) shows the current state (an in-progress model install still shows its progress).
+- **Graphical daemon + window pair** — the app always owns one StatusNotifier tray icon and one supervised Qt window. The daemon keeps recording, transcription, and model installs running while the window is hidden; it refuses to start when no graphical tray host is available, so there is never a usable headless instance.
+- **Single-instance guarantee** — a D-Bus singleton guard prevents concurrent daemons and the UI claims a second guard before creating a window. Launching the AppImage repeatedly presents the existing instance instead of creating another one.
 - **Low memory mode** — by default the window stays loaded in the background so reopening is instant; enable Low memory mode (Settings → General) to unload it on close instead, so the tray daemon idles at roughly a fifth of the memory at the cost of a brief delay when you reopen
 - **Call detection** — optionally monitor for active calls and get notified to start recording
 - **Start at system startup** — optionally launch the tray daemon automatically on login
@@ -47,15 +48,23 @@ Each recording session creates a folder:
 ### Requirements
 
 - Linux, x86_64 or arm64, with a system tray (or an AppIndicator extension) for the tray icon.
-- These programs on your `PATH` (install them with your distro's packages —
-  the app never installs system software, it tells you what is missing):
-  `ffmpeg` (audio recording), `pactl` (audio device detection, PipeWire/PulseAudio),
-  `curl` (engine/model downloads), `tar` (engine unpacking),
-  plus the GTK4 + libadwaita runtime (`gtk4`, `libadwaita`, `libnotify`).
+- The AppImage bundles `ffmpeg`, `ffprobe`, `pactl`, Qt 6/QML and their
+  non-platform libraries, so these programs and toolkits are not required on
+  the host. Source builds still need the Rust toolchain, Qt 6 development
+  packages and the audio utilities.
   The Rust toolchain is only required to build from source (see below).
 
-> **Look & theming:** the app uses **libadwaita**, so it follows your system **light/dark** preference and renders in the Adwaita style. On non-GNOME desktops (KDE, XFCE, Cinnamon, …) it still runs perfectly but keeps the Adwaita look rather than matching a custom desktop theme — this is libadwaita's intended behavior.
-- Delivery is a single **AppImage** (`gravaai-<version>-<arch>.AppImage`) that bundles the app binary and icons; GTK4/libadwaita and the helper programs above stay on the host.
+> **Look & theming:** Qt Quick Controls uses the built-in **Basic** style and
+> GravaAI's own QML primitives. `linux/qml/Theme.qml` is the single palette
+> source, based on the Lepramim identity and the supplied GravaAI mock.
+- Delivery is a single **Type-2 AppImage** (`gravaai-<version>-<arch>.AppImage`)
+  containing the daemon, `gravaai-ui`, Qt/QML modules/plugins, icons, FFmpeg,
+  FFprobe and `pactl`. No host Qt, FFmpeg or pactl installation is needed.
+- The host must provide a graphical Linux session: a compatible kernel/glibc,
+  X11 or Wayland compositor, session D-Bus, a StatusNotifier/AppIndicator host,
+  PipeWire/PulseAudio, Freedesktop portals and a notification service. Without
+  the tray host the daemon exits before exporting its Engine service; no window,
+  recording or notification can be started.
 
 The base install is **cloud-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
 
@@ -82,9 +91,10 @@ Optional: move it somewhere on your `PATH` (e.g. `~/.local/bin/`) or integrate
 it with [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) so
 it appears in your application menu.
 
-The AppImage ships **only the OpenAI-compatible essentials**. The local
-transcription engine (whisper.cpp, prebuilt download) and Ollama are installed
-later, on demand, from **Settings → Models** — no compiler ever required.
+The AppImage ships the complete desktop runtime and cloud path. The local
+transcription engine (whisper.cpp), Ollama and model weights are intentionally
+installed later, on demand, from **Settings → Models**; they remain outside the
+base image so updates stay small and user data is preserved.
 
 To uninstall (removes the AppImage when launched from one, desktop entries,
 icons, autostart entry, engines, models, logs, config and the stored API key —
@@ -100,22 +110,28 @@ recordings are kept):
 
 ### Running from Source (developers)
 
-Building from source requires the Rust toolchain and is only needed for
-development — regular installs never compile anything:
+Building from source requires the Rust toolchain, Qt 6 development headers
+(`qt6-base-dev`, `qt6-declarative-dev`, `qt6-tools-dev-tools`, `qt6-svg-dev` on
+Ubuntu) and the audio utilities. This is only needed for development — regular
+installs never compile anything:
 
 ```bash
 cd gravaai
-cargo build --manifest-path linux/Cargo.toml
+# Build the toolkit-free daemon and the Qt companion separately.
+cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
 ./linux/target/debug/gravaai
 
 # Pack a local AppImage (release build + assets):
 ./linux/packaging/appimage/build-appimage.sh
 ```
 
-`gravaai` (no flag) is **client** mode: it starts the background
-daemon if needed and opens a window. To run the pieces directly, use
-`gravaai --daemon` (the GTK-free tray daemon) and
-`gravaai --window` (the GTK window, normally spawned by the daemon).
+`gravaai` (no flag) is **client** mode: it starts the singleton daemon if
+needed and asks it to present the supervised Qt window. `gravaai --daemon` is
+the internal tray/engine role; it exits immediately if a graphical
+StatusNotifier host is unavailable. `gravaai --window` remains a compatibility
+trampoline, while the daemon normally launches the separate `gravaai-ui`
+companion. Running `gravaai-ui` directly without a live daemon/tray is refused.
 
 ### Recording Modes
 
@@ -269,8 +285,9 @@ error.log  — WARNING and above
 
 ```
 linux/
-├── src/                   # Rust app (single `gravaai` binary)
-│   ├── main.rs            # role dispatch: --daemon / --window / --process / --install / --uninstall / client
+├── src/                   # Rust library + daemon and Qt companion binaries
+│   ├── main.rs            # daemon/client/compatibility role dispatch
+│   ├── bin/gravaai-ui.rs  # Qt/QML window companion entry point
 │   ├── config/            # defaults + settings + keyring
 │   ├── core/              # state machine, jobs, recording controller, retry, wire format
 │   ├── audio/             # ffmpeg recorder + mixer + pactl devices
@@ -278,7 +295,8 @@ linux/
 │   ├── processing/        # pipeline + OpenAI-compatible / whisper.cpp / Ollama providers
 │   ├── services/          # opt-in engine/model installers + model clients
 │   ├── daemon/            # engine + D-Bus service + children + tray loop
-│   ├── ui/                # GTK4 + libadwaita window + ksni tray + D-Bus proxy
+│   ├── ui/                # toolkit-free tray/proxy helpers and isolated Qt bridge
+│   ├── qml/               # Qt Quick shell, pages, components and Theme.qml
 │   └── utils/             # autostart, AppImage exe resolution, logging, meetings, self-uninstall
 ├── assets/                # tray artwork + hicolor app icons
 ├── packaging/appimage/    # AppDir desktop entry + build-appimage.sh
@@ -289,8 +307,10 @@ linux/
 
 ```bash
 cargo fmt --check --manifest-path linux/Cargo.toml
-cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path linux/Cargo.toml
+cargo clippy --manifest-path linux/Cargo.toml --all-targets --all-features -- -D warnings
+cargo test --manifest-path linux/Cargo.toml --no-default-features --lib
+cargo test --manifest-path linux/Cargo.toml --features ui --lib
+./linux/tests/qt_smoke.sh
 ./linux/packaging/appimage/build-appimage.sh   # when a fresh AppImage is needed
 ```
 

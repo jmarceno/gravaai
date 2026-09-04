@@ -1,9 +1,8 @@
 //! Client mode (`gravaai` with no role flag).
 //!
 //!
-//! What the app-menu launcher invokes: make sure the daemon is running
-//! (starting it detached if not), then ask it to open a window. Loads no GTK;
-//! the daemon spawns the GTK window child.
+//! What the app-menu launcher invokes: make sure the singleton daemon/tray is
+//! running (starting it detached if not), then ask it to open the Qt window.
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};

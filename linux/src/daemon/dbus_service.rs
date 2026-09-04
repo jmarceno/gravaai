@@ -18,6 +18,10 @@ use crate::daemon::window_supervisor::WindowSupervisor;
 
 pub const ENGINE_NAME: &str = APP_ID;
 pub const ENGINE_PATH: &str = "/io/github/jmarceno/GravaAi";
+/// Private singleton guard.  The daemon claims this before registering the
+/// tray or the public Engine name, so concurrent launches cannot briefly
+/// create two visible tray items while they race for the Engine name.
+pub const DAEMON_LOCK_NAME: &str = "io.github.jmarceno.GravaAi.Daemon";
 
 /// Shared daemon state behind the D-Bus interface.
 pub struct ServiceCtx {

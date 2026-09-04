@@ -1,5 +1,6 @@
 pub mod autostart;
 pub mod dependencies;
+pub mod desktop;
 pub mod exe;
 pub mod filename;
 pub mod logging;

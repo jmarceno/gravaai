@@ -3,7 +3,7 @@
 //! The controller owns the recorder instance, the stop countdown and the
 //! authoritative lifecycle [`State`](crate::core::state_machine::State).
 //! Threading contract: all public methods are main-thread only; the recorder's
-//! `stop()` runs on a worker thread. GTK/GLib specifics (countdown scheduler,
+//! `stop()` runs on a worker thread. UI scheduler specifics (countdown timer,
 //! recorder factory, device validation) are injected so the whole lifecycle is
 //! unit-testable headless.
 

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ksni::menu::{MenuItem as KsniMenuItem, StandardItem};
-use ksni::{Category, Icon, Status, Tray};
+use ksni::{Category, Icon, OfflineReason, Status, Tray};
 
 use crate::config::defaults::{APP_DIR_NAME, APP_NAME};
 
@@ -233,6 +233,15 @@ impl Tray for AppTray {
         // (e.g. KDE Plasma); the GNOME AppIndicator extension opens the menu
         // instead.
         self.fire(crate::core::commands::SHOW_WINDOW.to_string());
+    }
+
+    fn watcher_offline(&self, reason: OfflineReason) -> bool {
+        // The tray is not optional for GravaAi.  Do not keep a headless daemon
+        // (and its notifications/jobs) alive while the desktop host is gone;
+        // the next normal launch will recreate the icon when the host returns.
+        crate::ui::notifications::set_graphical_ready(false);
+        log::error!("StatusNotifier host went offline: {reason:?}; stopping daemon");
+        false
     }
 
     fn menu(&self) -> Vec<KsniMenuItem<Self>> {

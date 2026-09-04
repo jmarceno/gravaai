@@ -11,6 +11,7 @@ use std::time::Duration;
 use super::devices::{get_default_sink, get_default_source, monitor_of_sink};
 use super::mixer::{build_ffmpeg_command, build_ffmpeg_command_mic_only};
 use crate::core::recording_controller::RecorderBackend;
+use crate::utils::exe::runtime_program;
 
 pub fn segment_path_for(output_path: &std::path::Path, index: u64) -> PathBuf {
     let stem = output_path
@@ -107,7 +108,7 @@ impl Recorder {
             })?;
             build_ffmpeg_command(&mic, &mon, &seg, &self.quality)
         };
-        let mut child = Command::new(&cmd[0])
+        let mut child = Command::new(runtime_program(&cmd[0]))
             .args(&cmd[1..])
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -182,7 +183,9 @@ impl Recorder {
         Ok(())
     }
 
-    /// Terminate the current ffmpeg process (SIGTERM → clean trailer, SIGKILL fallback).
+    /// Terminate the current ffmpeg process with SIGTERM and wait for its
+    /// trailer to be flushed.  Normal application shutdown must never use a
+    /// force-kill here: an abrupt exit can corrupt the current segment.
     fn stop_ffmpeg_segment(&mut self) {
         // Take the child out from under the monitor thread so only we reap it.
         let child = self.child.lock().unwrap().take();
@@ -191,15 +194,21 @@ impl Recorder {
             Ok(None) => {
                 terminate(&mut child);
                 let deadline = std::time::Instant::now() + Duration::from_secs(30);
+                let mut warned = false;
                 loop {
                     match child.try_wait() {
                         Ok(Some(_)) => break,
-                        Ok(None) if std::time::Instant::now() < deadline => {
+                        Ok(None) => {
+                            if !warned && std::time::Instant::now() >= deadline {
+                                log::warn!(
+                                    "ffmpeg did not exit after SIGTERM; continuing to wait for a clean trailer"
+                                );
+                                warned = true;
+                            }
                             std::thread::sleep(Duration::from_millis(100));
                         }
-                        _ => {
-                            log::warn!("ffmpeg did not exit in time; killing");
-                            let _ = child.kill();
+                        Err(err) => {
+                            log::warn!("Could not poll ffmpeg after SIGTERM: {err}");
                             let _ = child.wait();
                             break;
                         }
@@ -229,7 +238,7 @@ impl Recorder {
         if std::fs::write(&list_path, body).is_err() {
             return;
         }
-        let status = Command::new("ffmpeg")
+        let status = Command::new(runtime_program("ffmpeg"))
             .args([
                 "-y",
                 "-hide_banner",

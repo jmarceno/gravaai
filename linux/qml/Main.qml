@@ -53,6 +53,13 @@ ApplicationWindow {
         return "Ready"
     }
     function beginResize(edges) { root.startSystemResize(edges) }
+    function requestCloseWindow() {
+        // Hide synchronously so the X button always closes the window even
+        // when the worker/D-Bus round-trip is slow or stuck. The async
+        // closeAction reply only matters for Low-memory mode (exit).
+        root.hide()
+        controller.requestClose()
+    }
 
     Component.onCompleted: {
         refreshData()
@@ -83,6 +90,8 @@ ApplicationWindow {
         }
         function onOpenImport() { importDialog.open() }
         function onCloseAction(action) {
+            // The window was already hidden synchronously by requestCloseWindow;
+            // only Low-memory mode needs to quit the process here.
             if (action === "hide") root.hide()
             else controller.requestAppQuit()
         }
@@ -232,11 +241,11 @@ ApplicationWindow {
 
     property var escapeShortcut: Shortcut {
         sequence: "Escape"
-        onActivated: controller.requestClose()
+        onActivated: root.requestCloseWindow()
     }
     onClosing: function(close) {
         close.accepted = false
-        controller.requestClose()
+        root.requestCloseWindow()
     }
 
     // Native system resize requests work on both X11 and Wayland. The small

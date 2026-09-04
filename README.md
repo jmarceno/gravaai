@@ -23,9 +23,9 @@ This repository holds the Linux desktop app (Rust, Qt 6/QML):
 - **Summarize from the library** — re-run summarization for any past meeting from the meetings browser
 - **Local models** — run fully offline with no API key required
 - **Customizable prompts** — edit transcription and summarization prompts in Settings
-- **System tray** integration — a StatusNotifierItem (SNI) exposed over D-Bus; left-click opens the window where the host supports it, otherwise opens the menu
+- **System tray** integration — a StatusNotifierItem (SNI) exposed over D-Bus; left-click opens the window where the host supports it, otherwise opens the menu. The app starts tray-only with the window closed; closing the window (X) hides it back to the tray while recording, jobs and installs keep running in the daemon
 - **Graphical daemon + window pair** — the app always owns one StatusNotifier tray icon and one supervised Qt window. The daemon keeps recording, transcription, and model installs running while the window is hidden; it refuses to start when no graphical tray host is available, so there is never a usable headless instance.
-- **Single-instance guarantee** — a D-Bus singleton guard prevents concurrent daemons and the UI claims a second guard before creating a window. Launching the AppImage repeatedly presents the existing instance instead of creating another one.
+- **Single-instance guarantee** — a D-Bus singleton guard prevents concurrent daemons and the UI claims a second guard before creating a window. The first launch starts the tray-only daemon; launching the AppImage again while it runs presents the existing window instead of creating another instance.
 - **Low memory mode** — by default the window stays loaded in the background so reopening is instant; enable Low memory mode (Settings → General) to unload it on close instead, so the tray daemon idles at roughly a fifth of the memory at the cost of a brief delay when you reopen
 - **Call detection** — optionally monitor for active calls and get notified to start recording
 - **Start at system startup** — optionally launch the tray daemon automatically on login
@@ -127,8 +127,9 @@ cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
 ./linux/packaging/appimage/build-appimage.sh
 ```
 
-`gravaai` (no flag) is **client** mode: it starts the singleton daemon if
-needed and asks it to present the supervised Qt window. `gravaai --daemon` is
+`gravaai` (no flag) is **client** mode: it starts the singleton daemon tray-only
+(window closed) when none is running, and asks it to present the supervised Qt
+window when it is already running. `gravaai --daemon` is
 the internal tray/engine role; it exits immediately if a graphical
 StatusNotifier host is unavailable. `gravaai --window` remains a compatibility
 trampoline, while the daemon normally launches the separate `gravaai-ui`

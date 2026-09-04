@@ -66,7 +66,7 @@ Rectangle {
                         else if (modelData === "□") {
                             if (root.window.visibility === Window.Maximized) root.window.showNormal()
                             else root.window.showMaximized()
-                        } else root.controller.requestClose()
+                        } else root.window.requestCloseWindow()
                     }
                 }
             }

@@ -6,7 +6,8 @@
 //   --process   one-shot AI processing child (audio transcript notes)
 //   --install   one-shot model/engine install child (spec json)
 //   --uninstall remove everything the app installed or created, then exit
-//   (no flag)   client mode: ensure the daemon runs, then open a window.
+//   (no flag)   client mode: ensure the daemon runs (tray-only on fresh start,
+//               present the window when the daemon is already running)
 
 use gravaai::{client, core, daemon, utils};
 

@@ -203,7 +203,8 @@ App identity:
 # Build the toolkit-free daemon and Qt companion separately (debug)
 cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
 cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
-# Run the client; it requires a graphical StatusNotifier host and starts the pair.
+# Run the client; it requires a graphical StatusNotifier host. A fresh start
+# stays tray-only (window closed); a second run while the daemon lives presents the window.
 ./linux/target/debug/gravaai
 
 # Release build (the AppImage script performs these two builds automatically)
@@ -265,12 +266,15 @@ dispatches on `core/run_mode.rs::resolve_run_mode(argv)`:
   singleton, verifies the daemon/tray owner, loads the embedded QML module with
   a fail-fast `objectCreated` hook and a five-second ready watchdog. The
   `AppController` sends only owned commands to a Tokio worker; D-Bus, file,
-  network and model I/O never run on the Qt thread. Closing hides by default;
-  Low memory asks the companion to exit. A daemon-owner watch exits the UI when
+  network and model I/O never run on the Qt thread. Closing hides synchronously
+  in QML (`requestCloseWindow`) so the X button always closes to the tray even
+  when the worker round-trip is slow; the async `CloseAction` reply only matters
+  for Low memory mode, which asks the companion to exit. A daemon-owner watch exits the UI when
   the daemon disappears, and the daemon terminates the child gracefully on
   Quit.
 - **`--window`** is a compatibility trampoline to `gravaai-ui`; **no flag**
-  (`client.rs`) starts the singleton daemon if necessary and calls `OpenWindow`.
+  (`client.rs`) starts the singleton daemon tray-only on a fresh start (window
+  closed) and calls `OpenWindow` only when the daemon is already running.
   `WindowSupervisor` guarantees one child and presents it instead of spawning a
   second one.
 
@@ -530,8 +534,9 @@ Linux desktop app:
 **Linux runs as cooperating processes:** `gravaai` owns the singleton daemon,
 recording engine, jobs, installs, call detection, tray and D-Bus service;
 `gravaai-ui` is the one supervised Qt window child. `--window` remains a
-compatibility trampoline and no-flag client mode ensures the daemon then calls
-`OpenWindow`. Two short-lived children keep heavy work out of the daemon:
+compatibility trampoline and no-flag client mode ensures the daemon runs
+tray-only on a fresh start (window closed), calling `OpenWindow` only when the
+daemon is already running. Two short-lived children keep heavy work out of the daemon:
 `--process` and `--install`, both tracked and streamed with
 `STATUS:`/`RESULT:`/`ERROR:` lines. The UI exits when the daemon owner vanishes.
 

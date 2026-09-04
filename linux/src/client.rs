@@ -2,7 +2,8 @@
 //!
 //!
 //! What the app-menu launcher invokes: make sure the singleton daemon/tray is
-//! running (starting it detached if not), then ask it to open the Qt window.
+//! running. A fresh start stays tray-only (window closed); when the daemon is
+//! already running the existing window is presented instead.
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -77,6 +78,13 @@ async fn open_window(conn: &zbus::Connection) -> zbus::Result<()> {
     proxy.open_window().await
 }
 
+/// Pure startup decision (unit-tested): a fresh daemon start stays tray-only
+/// with the window closed; only a second launch while the daemon already runs
+/// presents the window.
+fn should_open_window(daemon_was_running: bool) -> bool {
+    daemon_was_running
+}
+
 pub fn run_client() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -93,13 +101,19 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
-    if !name_has_owner(&conn, ENGINE_NAME).await {
-        log::info!("Daemon not running — starting it");
+    let daemon_was_running = name_has_owner(&conn, ENGINE_NAME).await;
+    if !daemon_was_running {
+        log::info!("Daemon not running — starting tray-only (window stays closed)");
         spawn_daemon();
         if !wait_for_daemon(&conn, Duration::from_secs(8)).await {
             eprintln!("Daemon did not come up in time");
             return 1;
         }
+    }
+    if !should_open_window(daemon_was_running) {
+        // Fresh start: the daemon/tray is now up; the window opens on demand
+        // via the tray icon or a second launcher invocation.
+        return 0;
     }
     if let Err(e) = open_window(&conn).await {
         eprintln!("Failed to open window: {e:#}");
@@ -107,4 +121,19 @@ async fn async_main() -> i32 {
     }
     let _ = ENGINE_PATH;
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fresh_start_stays_tray_only() {
+        assert!(!should_open_window(false));
+    }
+
+    #[test]
+    fn second_launch_presents_window() {
+        assert!(should_open_window(true));
+    }
 }

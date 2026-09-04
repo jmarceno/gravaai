@@ -125,7 +125,13 @@ fn best_effort(cmd: &str, args: &[&str]) {
 /// Stop any running daemon/window (best-effort, never fails the uninstall).
 fn stop_running() {
     for role in ["--daemon", "--window"] {
+        // Installed / mounted binary: ".../meeting-recorder --daemon"
         best_effort("pkill", &["-f", &format!("{APP_NAME} {role}")]);
+        // AppImage file: ".../meeting-recorder-<ver>-<arch>.AppImage --daemon"
+        best_effort(
+            "pkill",
+            &["-f", &format!("{APP_NAME}-.*\\.AppImage {role}")],
+        );
     }
     std::thread::sleep(std::time::Duration::from_secs(1));
 }
@@ -134,7 +140,11 @@ fn stop_running() {
 /// individual misses are reported, never fatal.
 pub fn run_uninstall() -> i32 {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-    let exe = std::env::current_exe().unwrap_or_else(|_| home.join(".local/bin").join(APP_NAME));
+    // Prefer our own AppImage file (never a host IDE's APPIMAGE). The mounted
+    // squashfs binary is not deletable; removing the .AppImage is.
+    let exe = crate::utils::exe::own_appimage().unwrap_or_else(|| {
+        std::env::current_exe().unwrap_or_else(|_| home.join(".local/bin").join(APP_NAME))
+    });
 
     println!("Stopping {APP_NAME}…");
     stop_running();

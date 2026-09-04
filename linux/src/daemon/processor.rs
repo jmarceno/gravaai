@@ -142,7 +142,8 @@ impl ProcessorLauncher {
         transcript: &str,
         notes: &str,
     ) -> ProcessorHandle {
-        let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("meeting-recorder"));
+        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
+        let exe = crate::utils::exe::internal_exe();
         let mut child = Command::new(&exe)
             .args(["--process", audio, transcript, notes])
             .env(crate::core::run_mode::CHILD_ENV, "1")

@@ -64,7 +64,29 @@ exactly one branch. Commit directly on it.
 
 1. Commit changes locally.
 2. Releases are cut manually via the `Release` / `Auto Release` workflows in
-   `.gitea/workflows/` (version input; Arch `v*` tags only — no Android tags).
+   `.gitea/workflows/` (version input; `v*` tags; AppImage artifacts).
+
+---
+
+## AppImage builds — IMPORTANT
+
+**Always compile and build the appimage when done with changes that require a
+new build.**
+
+Delivery is the Type-2 AppImage produced by
+`linux/packaging/appimage/build-appimage.sh` (release artifact
+`meeting-recorder-<version>-<arch>.AppImage`). After code changes that need a
+fresh binary, run the script (it builds `--release` unless `SKIP_BUILD=1`) and
+smoke-check the result before considering the work done. Clear a host IDE's
+`APPIMAGE`/`APPDIR` when packaging or testing so Cursor (or similar) does not
+leak into the packager — the script already `unset`s them; tests and
+`utils::exe::own_appimage` only trust `$APPIMAGE` when `current_exe()` lives
+under `$APPDIR`.
+
+```bash
+./linux/packaging/appimage/build-appimage.sh           # version from Cargo.toml
+./linux/packaging/appimage/build-appimage.sh 1.2.0     # explicit version
+```
 
 ---
 
@@ -160,6 +182,9 @@ cargo run --manifest-path linux/Cargo.toml
 # Release build
 cargo build --release --manifest-path linux/Cargo.toml
 
+# Pack AppImage (builds --release unless SKIP_BUILD=1)
+./linux/packaging/appimage/build-appimage.sh
+
 # All tests
 cargo test --manifest-path linux/Cargo.toml
 
@@ -175,15 +200,17 @@ cargo fmt --check --manifest-path linux/Cargo.toml
 cargo feature (default) pulls in GTK4/libadwaita; `cargo check
 --no-default-features` builds the headless daemon/client stack without GTK.
 
-### Install / uninstall (no compiler needed, no scripts)
+### Install / uninstall (AppImage, no scripts)
 
-Users run a single `meeting-recorder` binary (release artifact
-`meeting-recorder-v<version>-<arch>`). Uninstall is built in — it removes the
-binary copy, desktop entries, icons, autostart entry, engines, models, logs,
-config and the stored API key, and keeps recordings:
+Users download `meeting-recorder-<version>-<arch>.AppImage`, mark it executable,
+and run it. The AppImage carries the binary plus tray/icon assets; system
+helpers (`ffmpeg`, `pactl`, `curl`, `tar`) and GTK4/libadwaita stay on the host
+(same contract as before). Uninstall is built in — it removes the AppImage
+file (when running from one), desktop entries, icons, autostart entry, engines,
+models, logs, config and the stored API key, and keeps recordings:
 
 ```bash
-meeting-recorder --uninstall   # see utils/self_uninstall.rs for the full target list
+./meeting-recorder-*.AppImage --uninstall   # see utils/self_uninstall.rs
 ```
 
 ---
@@ -414,12 +441,16 @@ double-click-to-rename via `GestureClick`, AI re-summarize per meeting),
 from `assets/tray/`, decoded with the `png` crate, with embedded 48px
 fallbacks plus an `icon_name` theme fallback so the tray never renders empty
 even when the artwork directory is missing). The app/launcher/window
-icon ships in `assets/icons/hicolor/` and is installed into the hicolor theme
-by the Arch packaging; at startup
+icon ships in `assets/icons/hicolor/` and is bundled into the AppImage under
+`usr/share/icons/hicolor/` (+ `usr/share/meeting-recorder/`); at startup
 `ui/window_app.rs:setup_app_icon()` also adds the bundled tree to the GTK
 icon-theme search path and sets it as the default icon so it resolves from
-source. `MainWindow` import-existing delegates its in-tree-reuse vs. copy
-decision to the pure `utils/recording_import.rs`.
+source and from the AppImage mount. `MainWindow` import-existing delegates its
+in-tree-reuse vs. copy decision to the pure `utils/recording_import.rs`.
+Client→daemon spawn uses `utils::exe::persistent_exe()` (re-exec our own
+AppImage when applicable so the FUSE mount outlives the short-lived client);
+daemon→window/process/install children use `internal_exe()` to share the
+daemon's mount.
 
 **Import/crate convention:** one binary crate (`linux/Cargo.toml`,
 `src/main.rs`) organized in modules (`config`, `core`,
@@ -451,12 +482,14 @@ Linux desktop app:
   processing) bundled in `assets/tray/` and sent as a raw ARGB `IconPixmap` so
   it renders on every host and from source, with embedded 48px fallbacks plus
   an `icon_name` theme fallback so it never renders empty when the artwork
-  directory is missing (e.g. standalone binary installs).
+  directory is missing (e.g. a stripped payload).
+- **Delivery:** Type-2 AppImage (`linux/packaging/appimage/`) bundling the
+  binary + assets; GTK4/libadwaita/ffmpeg/pactl remain host dependencies.
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
   (scalable SVG + PNG sizes, named `meeting-recorder` — the `Icon=` key) and
-  is installed into the hicolor theme by the Arch packaging;
-  `setup_app_icon()` also registers the bundled tree on the GTK icon-theme
-  search path and sets it as the default icon so it resolves from source.
+  is bundled into the AppImage; `setup_app_icon()` also registers the bundled
+  tree on the GTK icon-theme search path so it resolves from source and from
+  the AppImage mount.
 
 **Linux runs as cooperating processes from one binary:** a GTK-free **daemon**
 (`--daemon`) owns the recording engine, jobs, installs, call detection and
@@ -506,12 +539,12 @@ cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path linux/Cargo.toml
 ```
 
-**Install / uninstall (single binary, no scripts):**
+**Install / uninstall (AppImage, no scripts):**
 
-Users run the release binary directly. Uninstall is built in:
+Users run the release AppImage directly. Uninstall is built in:
 
 ```bash
-meeting-recorder --uninstall
+./meeting-recorder-*.AppImage --uninstall
 ```
 
 ---
@@ -524,7 +557,7 @@ Releases are manual with a version input:
 
 | Trigger | Workflow | Output |
 |---|---|---|
-| Manual (`version`, e.g. `1.2.0`) | `release.yml` | `.pkg.tar.zst` + source tarball attached to Release |
+| Manual (`version`, e.g. `1.2.0`) | `release.yml` | AppImage(s) + source tarball attached to Release |
 | Manual (`bump`) | `auto-release.yml` → `release.yml` | `v*` tag, then same as above |
 
 ### Repository layout
@@ -533,9 +566,7 @@ Releases are manual with a version input:
 linux/
 ├── src/                   # Rust app (single binary crate)
 ├── assets/                # tray artwork + hicolor app icons
-├── packaging/             # Arch PKGBUILD + desktop entry only
-│   ├── arch/              # PKGBUILD + install hook
-│   └── usr/               # io.github.jmarceno.Gravaai.desktop
+├── packaging/appimage/    # AppDir desktop entry + build-appimage.sh
 └── Cargo.toml / Cargo.lock
 .gitea/workflows/          # release workflows
 ```
@@ -564,7 +595,7 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   `core/daemon_watch.rs`, `core/wire.rs`, `core/app_info.rs`,
   `core/commands.rs` — key/install-key JSON round-trips, mode dispatch,
   close policy, owner-watch policy, snapshot round-trip + tolerant parsing,
-  pacman version parsing.
+  pacman version parsing (AppImage VERSION file is read at runtime).
 - `processing/pipeline.rs` — fail-fast without audio, cancel-before-start.
 - `processing/providers/openai_compat.rs` — `{transcript}` prompt rendering +
   append-fallback, verbose-JSON segment extraction, clear auth errors.
@@ -577,7 +608,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   layout, monitor naming, segment naming.
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
-  autostart entry management (`autostart`), scan/rename/metadata
+  autostart entry management (`autostart`), AppImage-aware exe resolution
+  that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata
   (`meeting_scanner`), in-tree-reuse vs. copy (`recording_import`),
   uninstall target plan + removal (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +

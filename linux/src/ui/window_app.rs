@@ -248,6 +248,11 @@ fn setup_app_icon() {
 
 fn icon_search_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
+    if let Ok(appdir) = std::env::var("APPDIR") {
+        if crate::utils::exe::own_appimage().is_some() {
+            dirs.push(PathBuf::from(&appdir).join("usr/share/meeting-recorder/icons"));
+        }
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             dirs.push(dir.join("assets/icons"));

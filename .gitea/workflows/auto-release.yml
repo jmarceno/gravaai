@@ -1,8 +1,8 @@
 name: Auto Release
 
-# Arch-only hard fork: manual dispatch only (was: push to main).
-# Creates a v* tag for the Linux app, then calls the Arch release workflow.
-# Android support was removed with the android/ directory.
+# Manual dispatch only. Creates a v* tag for the Linux app, then calls the
+# AppImage release workflow. Android support was removed with the android/
+# directory.
 
 on:
   workflow_dispatch:

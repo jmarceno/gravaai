@@ -6,7 +6,6 @@
 //! `RESULT:ok` success, `ERROR:<text>` failure.
 
 use std::io::BufRead;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tokio::sync::mpsc;
 
@@ -122,7 +121,8 @@ impl InstallLauncher {
     }
 
     pub fn launch(&self, key: String, spec_json: &str) {
-        let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("meeting-recorder"));
+        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
+        let exe = crate::utils::exe::internal_exe();
         let spec_json = spec_json.to_string();
         let tx = self.tx.clone();
         std::thread::Builder::new()

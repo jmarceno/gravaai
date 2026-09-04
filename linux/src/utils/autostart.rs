@@ -3,10 +3,11 @@
 //! The login entry launches the **daemon** (tray only) — its `Exec` carries
 //! `--daemon`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::defaults::APP_ID;
 use crate::core::run_mode::DAEMON_FLAG;
+use crate::utils::exe::own_appimage;
 
 pub const APP_NAME: &str = "meeting-recorder";
 pub const DESKTOP_FILENAME: &str = "meeting-recorder.desktop";
@@ -21,24 +22,38 @@ fn autostart_file() -> PathBuf {
     autostart_dir().join(DESKTOP_FILENAME)
 }
 
+/// Quote a path for a desktop-file `Exec=` key when it contains whitespace.
+fn desktop_exec_path(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    if s.chars().any(|c| c.is_whitespace()) {
+        format!("\"{s}\"")
+    } else {
+        s.into_owned()
+    }
+}
+
 fn find_exec() -> String {
-    // Prefer PATH resolution, then known locations, then PATH fallback at login.
+    // Prefer our own AppImage (never a host IDE's APPIMAGE — see own_appimage).
+    if let Some(appimage) = own_appimage() {
+        return desktop_exec_path(&appimage);
+    }
+    // Prefer known install locations, then PATH, then bare name at login.
     for candidate in ["/usr/bin/meeting-recorder"] {
-        if std::path::Path::new(candidate).exists() {
+        if Path::new(candidate).exists() {
             return candidate.to_string();
         }
     }
     if let Some(home) = dirs::home_dir() {
         let local = home.join(".local/bin/meeting-recorder");
         if local.exists() {
-            return local.to_string_lossy().into_owned();
+            return desktop_exec_path(&local);
         }
     }
     if let Ok(path) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path) {
             let c = dir.join(APP_NAME);
             if c.is_file() {
-                return c.to_string_lossy().into_owned();
+                return desktop_exec_path(&c);
             }
         }
     }
@@ -77,4 +92,21 @@ pub fn update_autostart(enabled: bool) {
 
 pub fn is_autostart_enabled() -> bool {
     autostart_file().exists()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn desktop_exec_quotes_whitespace() {
+        assert_eq!(
+            desktop_exec_path(Path::new("/opt/Meeting Recorder.AppImage")),
+            "\"/opt/Meeting Recorder.AppImage\""
+        );
+        assert_eq!(
+            desktop_exec_path(Path::new("/opt/MeetingRecorder.AppImage")),
+            "/opt/MeetingRecorder.AppImage"
+        );
+    }
 }

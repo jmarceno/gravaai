@@ -5,6 +5,11 @@ target/
 build/
 dist/
 
+# AppImage build scratch
+linux/packaging/appimage/out/
+linux/packaging/appimage/.tools/
+*.AppImage
+
 # Logs
 *.log
 

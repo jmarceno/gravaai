@@ -11,7 +11,10 @@ use std::time::{Duration, Instant};
 use crate::daemon::dbus_service::{ENGINE_NAME, ENGINE_PATH};
 
 fn daemon_exe() -> std::path::PathBuf {
-    std::env::current_exe().unwrap_or_else(|_| "meeting-recorder".into())
+    // Detached daemon must outlive this client — and, under AppImage, the
+    // client's FUSE mount. Prefer our own AppImage file when applicable;
+    // never trust a host IDE's APPIMAGE (see utils::exe::own_appimage).
+    crate::utils::exe::persistent_exe()
 }
 
 /// Spawn the daemon detached (own session) so it outlives this transient

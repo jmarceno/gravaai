@@ -1,11 +1,10 @@
 name: CI
 
-# Arch-only Rust port: all jobs run on manual dispatch only.
+# Manual dispatch: fmt/clippy/tests + AppImage pack smoke test.
 on:
   workflow_dispatch:
 
 jobs:
-  # ── Rust fmt + clippy + tests ───────────────────────────────────────────────
   rust-checks:
     name: fmt + clippy + tests
     runs-on: ubuntu-latest
@@ -27,70 +26,42 @@ jobs:
       - name: cargo test
         run: cargo test --manifest-path linux/Cargo.toml
 
-  # ── Pacman package build smoke test (Arch only) ─────────────────────────────
-  #
-  # Verifies that the Arch packaging toolchain produces a structurally valid
-  # artifact. Each job runs inside a matching Arch container so makepkg is
-  # available. x86_64 uses the official image; arm64 uses the community
-  # Arch Linux ARM image (no official arm64 image exists).
-  package-build:
-    name: ${{ matrix.arch }} Build pacman package + install smoke test
+  appimage-build:
+    name: ${{ matrix.arch }} Build AppImage + smoke test
     runs-on: ${{ matrix.runner }}
     needs: rust-checks
     strategy:
       fail-fast: false
       matrix:
         include:
-          - container: archlinux:latest
-            arch: X86_64
+          - arch: x86_64
             runner: ubuntu-latest
-          - container: menci/archlinuxarm:latest
-            arch: arm64
+          - arch: aarch64
             runner: ubuntu-24.04-arm
-    container: ${{ matrix.container }}
-
     steps:
-      - name: Install pacman build tools
-        run: |
-          # pacman 7's Landlock download sandbox cannot be applied inside
-          # Docker containers. The official x86 archlinux image ships with it
-          # disabled; the community ALARM image does not, so disable it here
-          # (it broke dependency downloads during pacman -U).
-          sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf
-          pacman -Syu --noconfirm git base-devel
-
       - uses: actions/checkout@v6
 
-      - name: Build pacman package
+      - name: Install build dependencies
         run: |
-          mkdir -p arch-build
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl file desktop-file-utils \
+            libgtk-4-dev libadwaita-1-dev libpulse-dev libglib2.0-dev
 
-          SRCDIR=$(mktemp -d)
-          mkdir "${SRCDIR}/meeting-recorder-0.0.0"
-          cp -r linux "${SRCDIR}/meeting-recorder-0.0.0/"
-          cp Cargo.lock "${SRCDIR}/meeting-recorder-0.0.0/Cargo.lock" 2>/dev/null || true
-          tar -czf arch-build/meeting-recorder-0.0.0.tar.gz \
-            -C "${SRCDIR}" meeting-recorder-0.0.0
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-          sed "s/@VERSION@/0.0.0/g" linux/packaging/arch/PKGBUILD > arch-build/PKGBUILD
-          cp linux/packaging/arch/meeting-recorder.install arch-build/
-
-          useradd -m builder
-          chown -R builder:builder arch-build
-          su builder -c "cd arch-build && makepkg --noconfirm --skipinteg --nodeps"
-
-      - name: Verify pacman package structure
+      - name: Build AppImage
         run: |
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/bin/meeting-recorder
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/meeting-recorder/tray/meeting-recorder-48.png
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/applications/io.github.jmarceno.Gravaai.desktop
-          bsdtar -tf arch-build/*.pkg.tar.* | grep -q usr/share/icons/hicolor/256x256/apps/meeting-recorder.png
-          echo "All required paths present in pacman package"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          unset APPIMAGE APPDIR || true
+          ./linux/packaging/appimage/build-appimage.sh 0.0.0 "$PWD/appimage-out"
 
-      # Install with the real depends array (pacman -U resolves them), then
-      # exercise the installed binary the way the launcher does.
-      - name: Install pacman package and binary smoke test
+      - name: Verify AppImage and smoke-test
         run: |
-          pacman -U --noconfirm arch-build/*.pkg.tar.*
-          meeting-recorder --install 'garbage' || test $? -eq 2
-          echo "Installed binary runs OK"
+          unset APPIMAGE APPDIR || true
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          IMG="appimage-out/meeting-recorder-0.0.0-${{ matrix.arch }}.AppImage"
+          test -x "$IMG"
+          "$IMG" --install 'garbage' || test $? -eq 2
+          echo "AppImage runs OK"

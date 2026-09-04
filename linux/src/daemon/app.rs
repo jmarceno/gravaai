@@ -204,7 +204,8 @@ async fn async_main() {
     let slot_clone = child_slot.clone();
     let tx_clone = msg_tx.clone();
     let spawn_fn = move || {
-        let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("meeting-recorder"));
+        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
+        let exe = crate::utils::exe::internal_exe();
         match Command::new(&exe)
             .arg("--window")
             .stdin(Stdio::null())

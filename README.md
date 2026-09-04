@@ -9,7 +9,7 @@ This repository holds the Linux desktop app (Rust, GTK4 + libadwaita):
 |---|---|
 | `linux/` | GTK4 + libadwaita desktop app (Rust, Linux) |
 | `linux/assets/` | Tray artwork + hicolor app icons |
-| `linux/packaging/` | Arch PKGBUILD + launcher/icon assets only |
+| `linux/packaging/appimage/` | AppImage build script + desktop entry |
 
 ---
 
@@ -55,7 +55,7 @@ Each recording session creates a folder:
   The Rust toolchain is only required to build from source (see below).
 
 > **Look & theming:** the app uses **libadwaita**, so it follows your system **light/dark** preference and renders in the Adwaita style. On non-GNOME desktops (KDE, XFCE, Cinnamon, …) it still runs perfectly but keeps the Adwaita look rather than matching a custom desktop theme — this is libadwaita's intended behavior.
-- No runtime beyond system libraries: the app ships as a single static-ish binary (`meeting-recorder`).
+- Delivery is a single **AppImage** (`meeting-recorder-<version>-<arch>.AppImage`) that bundles the app binary and icons; GTK4/libadwaita and the helper programs above stay on the host.
 
 The base install is **cloud-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
 
@@ -69,46 +69,29 @@ The base install is **cloud-only and minimal** — no local engines or GPU libra
 
 ### Installation
 
-#### Option 1: native package
+Download `meeting-recorder-<version>-<arch>.AppImage` from the
+[Releases](../../releases) page, make it executable, and run it — that single
+file is the whole app (daemon, window, tray, bundled icons):
 
-Download the package from the [Releases](../../releases) page.
-
-**Arch / Manjaro (.pkg.tar.zst)**
 ```bash
-sudo pacman -U meeting-recorder-*.pkg.tar.zst
-# To uninstall:
-sudo pacman -R meeting-recorder
+chmod +x meeting-recorder-*-x86_64.AppImage
+./meeting-recorder-*-x86_64.AppImage
 ```
 
-The package installs a single `meeting-recorder` binary with
-**only the OpenAI-compatible essentials**. The local transcription engine
-(whisper.cpp, prebuilt download) and Ollama are installed later, on
-demand, from **Settings → Models** — no compiler ever required.
+Optional: move it somewhere on your `PATH` (e.g. `~/.local/bin/`) or integrate
+it with [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) so
+it appears in your application menu.
 
-#### Option 2: standalone binary
+The AppImage ships **only the OpenAI-compatible essentials**. The local
+transcription engine (whisper.cpp, prebuilt download) and Ollama are installed
+later, on demand, from **Settings → Models** — no compiler ever required.
 
-Download `meeting-recorder-v<version>-<arch>` from the
-[Releases](../../releases) page, make it executable and put it on your
-`PATH` — that single file is the whole app (daemon, window, tray):
-
-```bash
-chmod +x meeting-recorder-v*-x86_64
-mkdir -p ~/.local/bin
-cp meeting-recorder-v*-x86_64 ~/.local/bin/meeting-recorder
-```
-
-To uninstall (removes the binary, desktop entries, icons, autostart entry,
-engines, models, logs, config and the stored API key — recordings are kept):
+To uninstall (removes the AppImage when launched from one, desktop entries,
+icons, autostart entry, engines, models, logs, config and the stored API key —
+recordings are kept):
 
 ```bash
-meeting-recorder --uninstall
-```
-
-Then launch either way:
-
-```bash
-meeting-recorder
-# or from your application menu: "Meeting Recorder"
+./meeting-recorder-*.AppImage --uninstall
 ```
 
 > **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. Install your distro's package for it (e.g. on Arch `sudo pacman -S gnome-shell-extension-appindicator`), then enable it in the GNOME Extensions app and log out/in.
@@ -124,6 +107,9 @@ development — regular installs never compile anything:
 cd meeting-recorder
 cargo build --manifest-path linux/Cargo.toml
 ./linux/target/debug/meeting-recorder
+
+# Pack a local AppImage (release build + assets):
+./linux/packaging/appimage/build-appimage.sh
 ```
 
 `meeting-recorder` (no flag) is **client** mode: it starts the background
@@ -277,73 +263,6 @@ error.log  — WARNING and above
 
 ---
 
-## Android App
-
-### Features
-
-- **Record** microphone audio (AAC/M4A) at a configurable quality, captured in a foreground service that survives brief interruptions
-- **Transcribe** with Google Gemini
-- **Summarize** into structured Markdown notes with Google Gemini
-- **Auto-title** — generates a meeting title from the notes when none is provided
-- **Generate from the library** — generate the transcript & notes, or regenerate notes, for any meeting from its detail screen
-- **Recover failed recordings** — if processing fails, the raw audio is kept in your library so you can generate the transcript & notes later
-- **Use Existing Recording** — import an external audio file and transcribe/summarize it
-- **Silenced-mic warning** — if the system mutes the mic mid-recording (e.g. an answered call), the audio is kept and you're warned instead of getting a silent transcript
-- **Do Not Disturb while recording** (optional) — silence notifications during capture
-- **Meetings browser** — browse and read past transcripts and notes; rename or delete meetings
-- **Audio playback** — play back recordings directly in the meeting detail view
-- Recordings saved to `Documents/Meetings/` — same structure as the Linux app
-
-### Requirements
-
-- Android 12+ (API 31)
-- Google Gemini API key — free from [aistudio.google.com](https://aistudio.google.com)
-- "All files access" (`MANAGE_EXTERNAL_STORAGE`) permission — required to read/write `Documents/Meetings/`
-
-### Installation
-
-Download `meeting-recorder-android-*.apk` from the [Releases](../../releases) page, transfer it to your phone, and install it (enable **Install from unknown sources** in Settings if prompted).
-
-### Output Structure
-
-Recordings are saved to `Documents/Meetings/` on external storage, in the same dated hierarchy as the Linux app:
-
-```
-Documents/Meetings/
-└── 2026/
-    └── March/
-        └── 04/
-            └── 14-30_Standup/
-                ├── recording.m4a
-                ├── transcript.md
-                └── notes.md
-```
-
-### First-Time Setup
-
-1. Open the app and tap the **Settings** icon
-2. Paste your Gemini API key and choose a model (`gemini-flash-latest` recommended)
-3. Return to the main screen — grant **All files access** when prompted
-4. Tap the microphone button to start recording
-
-### Building from Source
-
-```bash
-# Requires Android SDK (API 35) and JDK 17
-cd android
-./gradlew assembleDebug
-# APK: app/build/outputs/apk/debug/app-debug.apk
-
-# Release build (requires signing credentials)
-set -x KEYSTORE_PASSWORD your_store_pass
-set -x KEY_ALIAS meetingrecorder
-set -x KEY_PASSWORD your_key_pass
-./gradlew assembleRelease
-# APK: app/build/outputs/apk/release/app-release.apk
-```
-
----
-
 ## Development
 
 ### Repository layout
@@ -360,9 +279,9 @@ linux/
 │   ├── services/          # opt-in engine/model installers + model clients
 │   ├── daemon/            # engine + D-Bus service + children + tray loop
 │   ├── ui/                # GTK4 + libadwaita window + ksni tray + D-Bus proxy
-│   └── utils/             # autostart, logging, meetings, filenames, self-uninstall
+│   └── utils/             # autostart, AppImage exe resolution, logging, meetings, self-uninstall
 ├── assets/                # tray artwork + hicolor app icons
-├── packaging/             # Arch PKGBUILD + desktop entry only
+├── packaging/appimage/    # AppDir desktop entry + build-appimage.sh
 └── Cargo.toml / Cargo.lock
 ```
 
@@ -372,15 +291,17 @@ linux/
 cargo fmt --check --manifest-path linux/Cargo.toml
 cargo clippy --manifest-path linux/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path linux/Cargo.toml
+./linux/packaging/appimage/build-appimage.sh   # when a fresh AppImage is needed
 ```
 
 ### Release
 
-Pushing a tag triggers the release workflows:
+Releases are cut manually via the `Release` / `Auto Release` workflows:
 
-| Tag pattern | Workflow | Output |
+| Trigger | Workflow | Output |
 |---|---|---|
-| `v*` (e.g. `v1.2.0`) | `release.yml` | `.pkg.tar.zst` + source tarball attached to the Release |
+| Manual (`version`, e.g. `1.2.0`) | `release.yml` | AppImage(s) + source tarball attached to the Release |
+| Manual (`bump`) | `auto-release.yml` → `release.yml` | `v*` tag, then same as above |
 
 ## License
 

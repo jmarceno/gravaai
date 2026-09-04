@@ -1,5 +1,7 @@
 //! App identity + installed-version resolution.
 
+use std::path::PathBuf;
+
 pub const DESCRIPTION: &str =
     "Records meetings and generates transcripts and structured notes using AI.";
 pub const REPOSITORY: &str = "https://github.com/jmarceno/gravaai";
@@ -28,7 +30,25 @@ pub fn resolve_version(run: &dyn Fn() -> Option<String>) -> Option<String> {
     Some(version.to_string())
 }
 
+/// Version stamped into the AppImage at pack time
+/// (`usr/share/meeting-recorder/VERSION`). Only consulted when we are
+/// actually running from our own AppImage (host IDE AppImages are ignored).
+fn version_from_appimage() -> Option<String> {
+    let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
+    crate::utils::exe::own_appimage()?;
+    let text = std::fs::read_to_string(appdir.join("usr/share/meeting-recorder/VERSION")).ok()?;
+    let version = text.trim();
+    if version.is_empty() {
+        None
+    } else {
+        Some(version.to_string())
+    }
+}
+
 pub fn installed_version() -> Option<String> {
+    if let Some(v) = version_from_appimage() {
+        return Some(v);
+    }
     resolve_version(&|| {
         std::process::Command::new("pacman")
             .args(["-Q", PACKAGE_NAME])

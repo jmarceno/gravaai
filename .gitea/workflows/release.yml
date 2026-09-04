@@ -1,8 +1,7 @@
 name: Release
 
-# Arch-only hard fork: manual dispatch only. Provide a version (without the
+# AppImage hard fork: manual dispatch only. Provide a version (without the
 # leading v, e.g. 1.2.3) or, when called via workflow_call, pass it as input.
-# Original deb/rpm/apt-repo steps were removed — only the pacman artifact ships.
 
 on:
   workflow_dispatch:
@@ -19,7 +18,6 @@ on:
         type: string
 
 jobs:
-  # ── Extract version from input ───────────────────────────────────────────────
   get-version:
     runs-on: ubuntu-latest
     outputs:
@@ -29,68 +27,58 @@ jobs:
         run: |
           echo "VERSION=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
 
-  # ── Build pacman .pkg.tar.zst (+ standalone binary) ──────────────────────────
-  build-arch:
+  build-appimage:
     needs: get-version
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - container: archlinux:latest
+          - arch: x86_64
             runner: ubuntu-latest
-            arch: x86_64
-          - container: menci/archlinuxarm:latest
-            arch: aarch64
+          - arch: aarch64
             runner: ubuntu-24.04-arm
     env:
       VERSION: ${{ needs.get-version.outputs.version }}
     steps:
-      - name: Install build tools
-        run: |
-          sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf
-          pacman -Syu --noconfirm git base-devel
-
       - uses: actions/checkout@v6
 
-      - name: Build pacman package
+      - name: Install build dependencies
         run: |
-          mkdir -p arch-build
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl file desktop-file-utils \
+            libgtk-4-dev libadwaita-1-dev libpulse-dev libglib2.0-dev
 
-          # Source tarball
-          SRCDIR=$(mktemp -d)
-          mkdir "${SRCDIR}/meeting-recorder-${VERSION}"
-          cp -r linux "${SRCDIR}/meeting-recorder-${VERSION}/"
-          cp Cargo.lock "${SRCDIR}/meeting-recorder-${VERSION}/Cargo.lock" 2>/dev/null || true
-          tar -czf "arch-build/meeting-recorder-${VERSION}.tar.gz" \
-            -C "${SRCDIR}" "meeting-recorder-${VERSION}"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-          # Inject version into PKGBUILD
-          sed "s/@VERSION@/${VERSION}/g" linux/packaging/arch/PKGBUILD > arch-build/PKGBUILD
-          cp linux/packaging/arch/meeting-recorder.install arch-build/
-
-          # makepkg refuses to run as root
-          useradd -m builder
-          chown -R builder:builder arch-build
-          su builder -c "cd arch-build && makepkg --noconfirm --skipinteg --nodeps"
-
-      - name: Extract standalone binary
+      - name: Build AppImage
         run: |
-          bsdtar -xOf arch-build/*.pkg.tar.zst usr/bin/meeting-recorder \
-            > "arch-build/meeting-recorder-v${VERSION}-${{ matrix.arch }}"
-          chmod +x "arch-build/meeting-recorder-v${VERSION}-${{ matrix.arch }}"
+          # Nested AppImage hosts / CI runners often lack usable FUSE.
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          unset APPIMAGE APPDIR || true
+          ./linux/packaging/appimage/build-appimage.sh "$VERSION" \
+            "$PWD/appimage-out"
+
+      - name: Smoke-test AppImage
+        run: |
+          unset APPIMAGE APPDIR || true
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          IMG="appimage-out/meeting-recorder-${VERSION}-${{ matrix.arch }}.AppImage"
+          test -x "$IMG"
+          # Role flags refuse garbage outside the daemon — exit 2 means the
+          # binary ran and parsed argv (same check the old pacman smoke used).
+          "$IMG" --install 'garbage' || test $? -eq 2
+          echo "AppImage runs OK"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: arch-${{ matrix.arch }}
-          path: |
-            arch-build/*.pkg.tar.zst
-            arch-build/meeting-recorder-v*
+          name: appimage-${{ matrix.arch }}
+          path: appimage-out/meeting-recorder-*.AppImage
 
-  # ── Create source tarball and Release with the Arch artifact ─────────────────
   release:
-    needs: [get-version, build-arch]
+    needs: [get-version, build-appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -99,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Download all package artifacts
+      - name: Download AppImage artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
@@ -113,6 +101,8 @@ jobs:
             "${SRC}/meeting-recorder-${VERSION}/.claude" \
             "${SRC}/meeting-recorder-${VERSION}/gh-pages-dir" \
             "${SRC}/meeting-recorder-${VERSION}/linux/target" \
+            "${SRC}/meeting-recorder-${VERSION}/linux/packaging/appimage/out" \
+            "${SRC}/meeting-recorder-${VERSION}/linux/packaging/appimage/.tools" \
             "${SRC}/meeting-recorder-${VERSION}/target"
           tar -czf "meeting-recorder_${VERSION}.tar.gz" -C "${SRC}" "meeting-recorder-${VERSION}"
 
@@ -121,7 +111,6 @@ jobs:
         with:
           tag_name: v${{ needs.get-version.outputs.version }}
           files: |
-            *.pkg.tar.zst
-            meeting-recorder-v*
+            meeting-recorder-*.AppImage
             meeting-recorder_*.tar.gz
           generate_release_notes: true

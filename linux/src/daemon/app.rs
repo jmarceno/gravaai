@@ -469,7 +469,19 @@ async fn async_main() {
             }
             Wake::InstallDone((k, ok, m)) => {
                 use dbus_service::EngineIfaceSignals as _;
-                let _ = iface_ref.install_finished(k, ok, m).await;
+                let _ = iface_ref.install_finished(k.clone(), ok, m.clone()).await;
+                if !ok {
+                    // Installs survive the Settings window closing, so a bare
+                    // D-Bus signal may have no listener — notify as well so a
+                    // failure (e.g. whisper.cpp download) never fails silently.
+                    let detail = if m.trim().is_empty() {
+                        "Install failed. Check the logs for details.".to_string()
+                    } else {
+                        format!("Install {k} failed: {}", m.trim())
+                    };
+                    log::error!("{detail}");
+                    notify("Meeting Recorder", &detail);
+                }
             }
             Wake::Msg(DaemonMsg::ConfigReloaded) => {
                 let cfg = settings::load();

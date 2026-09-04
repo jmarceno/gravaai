@@ -12,8 +12,9 @@ use adw::prelude::*;
 
 use crate::config::defaults::{
     Config, LLM_TIMEOUT_OPTIONS, OLLAMA_DEFAULT_HOST, OLLAMA_MODELS, OPENAI_CHAT_MODELS,
-    OPENAI_DEFAULT_BASE_URL, OPENAI_STT_MODELS, SUMMARIZATION_SERVICES, TRANSCRIPTION_SERVICES,
-    WHISPER_CPP_BACKENDS, WHISPER_CPP_MODELS,
+    OPENAI_DEFAULT_BASE_URL, OPENAI_DEFAULT_CHAT_MODEL, OPENAI_DEFAULT_STT_MODEL,
+    OPENAI_STT_MODELS, SUMMARIZATION_SERVICES, TRANSCRIPTION_SERVICES, WHISPER_CPP_BACKENDS,
+    WHISPER_CPP_MODELS,
 };
 use crate::core::install_spec::{self, InstallSpec};
 use crate::services::ollama_service::OllamaClient;
@@ -41,28 +42,30 @@ pub struct ModelsPage {
     proxy: Option<ProxyHandle>,
     ts_combo: IdComboRow,
     ss_combo: IdComboRow,
-    // OpenAI section.
+    // OpenAI section (free-text model fields — any OpenAI-compatible name).
     openai_section: gtk::Box,
     key_entry: adw::PasswordEntryRow,
     base_url_entry: adw::EntryRow,
-    ts_model_combo: IdComboRow,
-    ss_model_combo: IdComboRow,
+    ts_model_entry: adw::EntryRow,
+    ss_model_entry: adw::EntryRow,
     timeout_combo: IdComboRow,
     // whisper.cpp section.
     wcpp_section: gtk::Box,
     wcpp_box: gtk::Box,
-    wcpp_model_combo: RefCell<Option<IdComboRow>>,
+    wcpp_model_entry: RefCell<Option<adw::EntryRow>>,
     wcpp_backend_combo: RefCell<Option<IdComboRow>>,
     wcpp_grid: RefCell<Option<Rc<ModelRowGrid>>>,
     wcpp_install_button: RefCell<Option<gtk::Button>>,
+    wcpp_install_row: RefCell<Option<adw::ActionRow>>,
     // Ollama section.
     ollama_section: gtk::Box,
     ollama_box: gtk::Box,
     ollama_grid: RefCell<Option<Rc<ModelRowGrid>>>,
     ollama_status_row: RefCell<Option<adw::ActionRow>>,
-    ollama_model_combo: RefCell<Option<IdComboRow>>,
+    ollama_model_entry: RefCell<Option<adw::EntryRow>>,
     ollama_host_entry: RefCell<Option<adw::EntryRow>>,
     ollama_install_button: RefCell<Option<gtk::Button>>,
+    ollama_install_row: RefCell<Option<adw::ActionRow>>,
 }
 
 impl ModelsPage {
@@ -91,6 +94,31 @@ impl ModelsPage {
         services.add(&ss_combo.widget);
         content.append(&services);
 
+        let ts_model_entry = adw::EntryRow::builder()
+            .title("Transcription model")
+            .build();
+        ts_model_entry.set_text(if cfg.openai_transcription_model.trim().is_empty() {
+            OPENAI_DEFAULT_STT_MODEL
+        } else {
+            cfg.openai_transcription_model.as_str()
+        });
+        let ss_model_entry = adw::EntryRow::builder()
+            .title("Summarization model")
+            .build();
+        ss_model_entry.set_text(if cfg.openai_summarization_model.trim().is_empty() {
+            OPENAI_DEFAULT_CHAT_MODEL
+        } else {
+            cfg.openai_summarization_model.as_str()
+        });
+        ts_model_entry.set_tooltip_text(Some(&format!(
+            "Model name sent to /audio/transcriptions (e.g. {})",
+            OPENAI_STT_MODELS.join(", ")
+        )));
+        ss_model_entry.set_tooltip_text(Some(&format!(
+            "Model name sent to /chat/completions (e.g. {})",
+            OPENAI_CHAT_MODELS.join(", ")
+        )));
+
         let page = Rc::new(Self {
             widget: scroll,
             proxy,
@@ -99,18 +127,8 @@ impl ModelsPage {
             openai_section: gtk::Box::new(gtk::Orientation::Vertical, 12),
             key_entry: adw::PasswordEntryRow::builder().title("API key").build(),
             base_url_entry: adw::EntryRow::builder().title("Base URL").build(),
-            ts_model_combo: IdComboRow::new(
-                "Transcription model",
-                OPENAI_STT_MODELS,
-                OPENAI_STT_MODELS,
-                &cfg.openai_transcription_model,
-            ),
-            ss_model_combo: IdComboRow::new(
-                "Summarization model",
-                OPENAI_CHAT_MODELS,
-                OPENAI_CHAT_MODELS,
-                &cfg.openai_summarization_model,
-            ),
+            ts_model_entry,
+            ss_model_entry,
             timeout_combo: {
                 let opts: Vec<String> = LLM_TIMEOUT_OPTIONS.iter().map(|n| n.to_string()).collect();
                 let refs: Vec<&str> = opts.iter().map(|s| s.as_str()).collect();
@@ -123,17 +141,19 @@ impl ModelsPage {
             },
             wcpp_section: gtk::Box::new(gtk::Orientation::Vertical, 12),
             wcpp_box: gtk::Box::new(gtk::Orientation::Vertical, 12),
-            wcpp_model_combo: RefCell::new(None),
+            wcpp_model_entry: RefCell::new(None),
             wcpp_backend_combo: RefCell::new(None),
             wcpp_grid: RefCell::new(None),
             wcpp_install_button: RefCell::new(None),
+            wcpp_install_row: RefCell::new(None),
             ollama_section: gtk::Box::new(gtk::Orientation::Vertical, 12),
             ollama_box: gtk::Box::new(gtk::Orientation::Vertical, 12),
             ollama_grid: RefCell::new(None),
             ollama_status_row: RefCell::new(None),
-            ollama_model_combo: RefCell::new(None),
+            ollama_model_entry: RefCell::new(None),
             ollama_host_entry: RefCell::new(None),
             ollama_install_button: RefCell::new(None),
+            ollama_install_row: RefCell::new(None),
         });
 
         page.build_openai_section(cfg);
@@ -177,8 +197,8 @@ impl ModelsPage {
         };
         self.base_url_entry.set_text(&base_url);
         group.add(&self.base_url_entry);
-        group.add(&self.ts_model_combo.widget);
-        group.add(&self.ss_model_combo.widget);
+        group.add(&self.ts_model_entry);
+        group.add(&self.ss_model_entry);
         group.add(&self.timeout_combo.widget);
         self.openai_section.append(&group);
     }
@@ -187,10 +207,11 @@ impl ModelsPage {
         while let Some(child) = self.wcpp_box.first_child() {
             self.wcpp_box.remove(&child);
         }
-        *self.wcpp_model_combo.borrow_mut() = None;
+        *self.wcpp_model_entry.borrow_mut() = None;
         *self.wcpp_backend_combo.borrow_mut() = None;
         *self.wcpp_grid.borrow_mut() = None;
         *self.wcpp_install_button.borrow_mut() = None;
+        *self.wcpp_install_row.borrow_mut() = None;
 
         // Backend selector is always available — it picks which prebuilt
         // engine binary to download.
@@ -220,22 +241,20 @@ impl ModelsPage {
                 let page = self.clone();
                 btn.connect_clicked(move |b| page.on_install_whisper_cpp(b));
             }
-            install_group.add(&action_row("whisper.cpp engine", "Not installed", &btn));
+            let row = action_row("whisper.cpp engine", "Not installed", &btn);
+            install_group.add(&row);
             self.wcpp_box.append(&install_group);
             *self.wcpp_install_button.borrow_mut() = Some(btn);
+            *self.wcpp_install_row.borrow_mut() = Some(row);
         } else {
             let cfg_group = adw::PreferencesGroup::builder()
                 .description("GGML models are downloaded from HuggingFace and cached locally.")
                 .build();
-            let model_combo = IdComboRow::new(
-                "Model",
-                WHISPER_CPP_MODELS,
-                WHISPER_CPP_MODELS,
-                &cfg.whisper_cpp_model,
-            );
-            cfg_group.add(&model_combo.widget);
+            let model_entry = adw::EntryRow::builder().title("Model").build();
+            model_entry.set_text(&cfg.whisper_cpp_model);
+            cfg_group.add(&model_entry);
             self.wcpp_box.append(&cfg_group);
-            *self.wcpp_model_combo.borrow_mut() = Some(model_combo);
+            *self.wcpp_model_entry.borrow_mut() = Some(model_entry);
 
             let grid = ModelRowGrid::new(
                 WHISPER_CPP_MODELS,
@@ -260,9 +279,10 @@ impl ModelsPage {
         }
         *self.ollama_grid.borrow_mut() = None;
         *self.ollama_status_row.borrow_mut() = None;
-        *self.ollama_model_combo.borrow_mut() = None;
+        *self.ollama_model_entry.borrow_mut() = None;
         *self.ollama_host_entry.borrow_mut() = None;
         *self.ollama_install_button.borrow_mut() = None;
+        *self.ollama_install_row.borrow_mut() = None;
 
         if !OllamaInstaller::is_available() {
             let group = adw::PreferencesGroup::builder()
@@ -274,22 +294,20 @@ impl ModelsPage {
                 let page = self.clone();
                 btn.connect_clicked(move |b| page.on_install_ollama(b));
             }
-            group.add(&action_row("Ollama", "Not installed", &btn));
+            let row = action_row("Ollama", "Not installed", &btn);
+            group.add(&row);
             self.ollama_box.append(&group);
             *self.ollama_install_button.borrow_mut() = Some(btn);
+            *self.ollama_install_row.borrow_mut() = Some(row);
         } else {
             let group = adw::PreferencesGroup::builder()
                 .title("Ollama")
                 .description("Requires Ollama to be installed and running (ollama serve).")
                 .build();
-            let model_combo = IdComboRow::new(
-                "Ollama model",
-                OLLAMA_MODELS,
-                OLLAMA_MODELS,
-                &cfg.ollama_model,
-            );
-            group.add(&model_combo.widget);
-            *self.ollama_model_combo.borrow_mut() = Some(model_combo);
+            let model_entry = adw::EntryRow::builder().title("Ollama model").build();
+            model_entry.set_text(&cfg.ollama_model);
+            group.add(&model_entry);
+            *self.ollama_model_entry.borrow_mut() = Some(model_entry);
 
             let host_entry = adw::EntryRow::builder().title("Ollama host").build();
             host_entry.set_text(&cfg.ollama_host);
@@ -329,7 +347,7 @@ impl ModelsPage {
         let ts = self
             .ts_combo
             .get_active_id()
-            .unwrap_or_else(|| "openai".to_string());
+            .unwrap_or_else(|| "whisper_cpp".to_string());
         let ss = self
             .ss_combo
             .get_active_id()
@@ -423,43 +441,51 @@ impl ModelsPage {
     }
 
     /// Daemon InstallFinished signal — reflect the outcome.
-    pub fn on_install_finished(self: &Rc<Self>, key: &str, ok: bool, message: &str) {
+    /// Returns an error message when the install failed so the caller can
+    /// surface it (dialog/notification) instead of failing silently.
+    pub fn on_install_finished(
+        self: &Rc<Self>,
+        key: &str,
+        ok: bool,
+        message: &str,
+    ) -> Option<String> {
         let (kind, arg) = split_key(key);
+        let failure = if message.trim().is_empty() {
+            "Install failed. Check the logs for details.".to_string()
+        } else {
+            message.trim().to_string()
+        };
         match kind {
-            install_spec::KIND_OLLAMA => self.on_ollama_install_finished(ok),
-            install_spec::KIND_WHISPER_CPP_ENGINE => self.on_wcpp_install_finished(ok),
+            install_spec::KIND_OLLAMA => self.on_ollama_install_finished(ok, &failure),
+            install_spec::KIND_WHISPER_CPP_ENGINE => self.on_wcpp_install_finished(ok, &failure),
             _ => {
                 if let Some(grid) = self.grid_for_kind(kind) {
                     if !arg.is_empty() {
                         if ok {
                             grid.set_ready(arg);
                         } else {
-                            grid.set_error(
-                                arg,
-                                if message.is_empty() {
-                                    "Download failed"
-                                } else {
-                                    message
-                                },
-                            );
+                            grid.set_error(arg, &failure);
                         }
                     }
                 }
             }
         }
-        if !ok && !message.is_empty() {
+        if !ok {
             let button = match kind {
                 install_spec::KIND_OLLAMA => self.ollama_install_button.borrow().clone(),
                 install_spec::KIND_WHISPER_CPP_ENGINE => self.wcpp_install_button.borrow().clone(),
                 _ => None,
             };
             if let Some(b) = button {
-                b.set_tooltip_text(Some(message));
+                b.set_tooltip_text(Some(&failure));
             }
+            Some(format_install_error(kind, arg, &failure))
+        } else {
+            None
         }
     }
 
-    fn on_ollama_install_finished(self: &Rc<Self>, ok: bool) {
+    fn on_ollama_install_finished(self: &Rc<Self>, ok: bool, failure: &str) {
         if ok && OllamaInstaller::is_available() {
             let cfg = crate::config::settings::load();
             self.build_ollama_section(&cfg);
@@ -467,10 +493,16 @@ impl ModelsPage {
         } else if let Some(b) = self.ollama_install_button.borrow().as_ref() {
             b.set_sensitive(true);
             b.set_label("Retry Install");
+            if !ok {
+                if let Some(row) = self.ollama_install_row.borrow().as_ref() {
+                    row.set_subtitle(&short_error(failure));
+                }
+                b.set_tooltip_text(Some(failure));
+            }
         }
     }
 
-    fn on_wcpp_install_finished(self: &Rc<Self>, ok: bool) {
+    fn on_wcpp_install_finished(self: &Rc<Self>, ok: bool, failure: &str) {
         if ok && WhisperCppEngineInstaller.is_installed() {
             let cfg = crate::config::settings::load();
             self.build_wcpp_section(&cfg);
@@ -478,6 +510,12 @@ impl ModelsPage {
         } else if let Some(b) = self.wcpp_install_button.borrow().as_ref() {
             b.set_sensitive(true);
             b.set_label("Retry Install");
+            if !ok {
+                if let Some(row) = self.wcpp_install_row.borrow().as_ref() {
+                    row.set_subtitle(&short_error(failure));
+                }
+                b.set_tooltip_text(Some(failure));
+            }
         }
     }
 
@@ -633,7 +671,7 @@ impl ModelsPage {
         cfg.transcription_service = self
             .ts_combo
             .get_active_id()
-            .unwrap_or_else(|| "openai".to_string());
+            .unwrap_or_else(|| "whisper_cpp".to_string());
         cfg.summarization_service = self
             .ss_combo
             .get_active_id()
@@ -645,33 +683,43 @@ impl ModelsPage {
         } else {
             base_url.trim().to_string()
         };
-        cfg.openai_transcription_model = self
-            .ts_model_combo
-            .get_active_id()
-            .unwrap_or_else(|| OPENAI_STT_MODELS[0].to_string());
-        cfg.openai_summarization_model = self
-            .ss_model_combo
-            .get_active_id()
-            .unwrap_or_else(|| OPENAI_CHAT_MODELS[0].to_string());
+        let stt = self.ts_model_entry.text().to_string();
+        cfg.openai_transcription_model = if stt.trim().is_empty() {
+            OPENAI_DEFAULT_STT_MODEL.to_string()
+        } else {
+            stt.trim().to_string()
+        };
+        let chat = self.ss_model_entry.text().to_string();
+        cfg.openai_summarization_model = if chat.trim().is_empty() {
+            OPENAI_DEFAULT_CHAT_MODEL.to_string()
+        } else {
+            chat.trim().to_string()
+        };
         cfg.llm_request_timeout_minutes = self
             .timeout_combo
             .get_active_id()
             .and_then(|s| s.parse().ok())
             .unwrap_or(5);
-        // These combos only exist once the opt-in engine is installed; preserve
+        // These entries only exist once the opt-in engine is installed; preserve
         // the stored value otherwise.
-        if let Some(c) = self.wcpp_model_combo.borrow().as_ref() {
-            cfg.whisper_cpp_model = c
-                .get_active_id()
-                .unwrap_or_else(|| WHISPER_CPP_MODELS[0].to_string());
+        if let Some(e) = self.wcpp_model_entry.borrow().as_ref() {
+            let v = e.text().to_string();
+            cfg.whisper_cpp_model = if v.trim().is_empty() {
+                WHISPER_CPP_MODELS[0].to_string()
+            } else {
+                v.trim().to_string()
+            };
         }
         if let Some(c) = self.wcpp_backend_combo.borrow().as_ref() {
             cfg.whisper_cpp_backend = c.get_active_id().unwrap_or_else(|| "auto".to_string());
         }
-        if let Some(c) = self.ollama_model_combo.borrow().as_ref() {
-            cfg.ollama_model = c
-                .get_active_id()
-                .unwrap_or_else(|| OLLAMA_MODELS[0].to_string());
+        if let Some(e) = self.ollama_model_entry.borrow().as_ref() {
+            let v = e.text().to_string();
+            cfg.ollama_model = if v.trim().is_empty() {
+                OLLAMA_MODELS[0].to_string()
+            } else {
+                v.trim().to_string()
+            };
         }
         if let Some(e) = self.ollama_host_entry.borrow().as_ref() {
             let host = e.text().to_string();
@@ -689,4 +737,25 @@ fn split_key(key: &str) -> (&str, &str) {
         Some((kind, arg)) => (kind, arg),
         None => (key, ""),
     }
+}
+
+/// Single-line truncation for inline row subtitles.
+fn short_error(msg: &str) -> String {
+    let one_line = msg.replace('\n', " ");
+    let short: String = one_line.chars().take(120).collect();
+    format!("Install failed: {short}")
+}
+
+/// Full sentence for dialogs/notifications.
+fn format_install_error(kind: &str, arg: &str, failure: &str) -> String {
+    let what = match kind {
+        install_spec::KIND_WHISPER_CPP_ENGINE => "whisper.cpp engine install failed".to_string(),
+        install_spec::KIND_OLLAMA => "Ollama install failed".to_string(),
+        install_spec::KIND_WHISPER_CPP_MODEL => {
+            format!("whisper.cpp model download failed ({arg})")
+        }
+        install_spec::KIND_OLLAMA_MODEL => format!("Ollama model download failed ({arg})"),
+        other => format!("Install failed ({other})"),
+    };
+    format!("{what}: {failure}")
 }

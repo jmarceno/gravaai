@@ -32,6 +32,7 @@ pub const LLM_TIMEOUT_OPTIONS: &[u64] = &[1, 2, 3, 5, 8, 10];
 
 /// Suggested OpenAI-compatible chat models for summarization / titling.
 pub const OPENAI_CHAT_MODELS: &[&str] = &[
+    "gpt-5.6-luna",
     "gpt-4o-mini",
     "gpt-4o",
     "gpt-4.1-mini",
@@ -44,7 +45,7 @@ pub const OPENAI_STT_MODELS: &[&str] =
     &["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"];
 
 pub const OPENAI_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
-pub const OPENAI_DEFAULT_CHAT_MODEL: &str = "gpt-4o-mini";
+pub const OPENAI_DEFAULT_CHAT_MODEL: &str = "gpt-5.6-luna";
 pub const OPENAI_DEFAULT_STT_MODEL: &str = "whisper-1";
 
 // --- Local-engine model catalogues ------------------------------------------
@@ -179,6 +180,11 @@ pub struct Config {
     pub start_at_startup: bool,
     pub auto_title: bool,
     pub processing_countdown_enabled: bool,
+    /// When false, stopping a recording saves the audio only — transcription
+    /// and summarization never auto-start (the user runs them manually from
+    /// Jobs / Library). True preserves the historical auto-process behavior.
+    #[serde(default = "default_true")]
+    pub auto_process_enabled: bool,
     pub low_memory_mode: bool,
     pub llm_request_timeout_minutes: u64,
     pub whisper_cpp_model: String,
@@ -190,10 +196,14 @@ pub struct Config {
     pub title_prompt: String,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
-            transcription_service: "openai".to_string(),
+            transcription_service: "whisper_cpp".to_string(),
             summarization_service: "openai".to_string(),
             openai_api_key: String::new(),
             openai_base_url: OPENAI_DEFAULT_BASE_URL.to_string(),
@@ -205,6 +215,7 @@ impl Default for Config {
             start_at_startup: false,
             auto_title: true,
             processing_countdown_enabled: false,
+            auto_process_enabled: true,
             low_memory_mode: false,
             llm_request_timeout_minutes: 5,
             whisper_cpp_model: "large-v3-turbo".to_string(),

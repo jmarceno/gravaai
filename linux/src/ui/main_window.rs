@@ -465,9 +465,23 @@ impl MainWindow {
     }
 
     /// Forward one daemon install event to the open Settings dialog, if any.
+    /// When no Settings dialog is open (installs survive window closing), a
+    /// failure is still surfaced via the standard error presentation so it
+    /// never fails silently.
     pub fn on_install_event(&self, event: &InstallUiEvent) {
         if let Some(dialog) = self.settings_dialog.borrow().as_ref() {
             dialog.on_install_event(event);
+            return;
+        }
+        if let InstallUiEvent::Finished(key, ok, message) = event {
+            if !ok {
+                let detail = if message.trim().is_empty() {
+                    format!("Install {key} failed. Check the logs for details.")
+                } else {
+                    format!("Install {key} failed: {}", message.trim())
+                };
+                self.show_error(&detail);
+            }
         }
     }
 

@@ -145,7 +145,7 @@ daemon if needed and opens a window. To run the pieces directly, use
 | Service | How it works | Requires |
 |---|---|---|
 | **OpenAI-compatible** | Audio sent to `/audio/transcriptions` | Base URL + API key |
-| **whisper.cpp** | Runs locally via a from-source whisper.cpp build | Engine built + GGML model downloaded in Settings → Models |
+| **whisper.cpp** | Runs locally via a prebuilt whisper.cpp binary (default) | Engine + GGML model downloaded in Settings → Models |
 
 #### Summarization
 
@@ -173,11 +173,12 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 
 | Setting | Description |
 |---|---|
-| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local, GPU) |
-| Summarization service | OpenAI-compatible (cloud) or Ollama (local) |
+| Transcription service | OpenAI-compatible (cloud) or whisper.cpp (local, GPU; default) |
+| Summarization service | OpenAI-compatible (cloud; default) or Ollama (local) |
 | Start at system startup | Launch automatically on login |
 | Enable call detection | Monitor for active calls and notify you to start recording |
 | Low memory mode | Unload the window from memory when you close it (~20 MB vs. ~100 MB idle in the tray) at the cost of a brief delay when reopening. Off by default — enable on low-memory systems |
+| Auto-process recordings | Automatically start transcription and summarization when a recording stops (on by default). When off, only the audio is saved — start processing manually from Jobs or the Library |
 | Output folder | Where recordings and notes are saved (default: `~/meetings`) |
 | Recording quality | Audio bitrate preset (Very High / High / Medium / Low) |
 
@@ -189,8 +190,8 @@ Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear ic
 |---|---|
 | API key | Required when an OpenAI-compatible service is selected |
 | Base URL | `https://api.openai.com/v1` by default; point it at any compatible endpoint |
-| Transcription model | Speech-to-text model (`whisper-1` default; custom names are preserved) |
-| Summarization model | Chat model (`gpt-4o-mini` default; custom names are preserved) |
+| Transcription model | Free-text speech-to-text model name (`whisper-1` default; type any compatible name) |
+| Summarization model | Free-text chat model name (`gpt-5.6-luna` default; type any compatible name) |
 | Processing timeout | Max time to wait for a response (1–10 min) |
 
 **whisper.cpp (GPU-accelerated)**
@@ -203,8 +204,8 @@ build toolchain, no system packages; until then the section shows an
 | Setting | Description |
 |---|---|
 | Acceleration backend | `auto` (detect: CUDA when an NVIDIA GPU is present, else CPU), or force `cuda` / `cpu`. Picks which prebuilt binary to download. The detected backend is shown next to the selector. Note: the CUDA bundle is ~670 MB and needs the NVIDIA driver; the CPU build runs anywhere. |
-| Model | GGML model to use for local transcription |
-| Model list | Download status and one-click download for each available GGML model |
+| Model | Free-text GGML model name to use for local transcription (`large-v3-turbo` default) |
+| Model list | Download status and one-click download for each available GGML model. Failures are shown inline on the row plus a dialog/notification with the reason |
 
 Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 GB), `medium` (~1.5 GB), `small` (~470 MB).
 
@@ -212,7 +213,7 @@ Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 
 
 | Setting | Description |
 |---|---|
-| Ollama model | Model to use for local summarization |
+| Ollama model | Free-text model name to use for local summarization (`phi4-mini` default) |
 | Ollama host | Ollama server address (default: `http://localhost:11434`) |
 | Model list | Download status and one-click download for each available model |
 
@@ -236,8 +237,8 @@ Note: transcription prompts apply to the OpenAI-compatible service only — the 
 
 1. Click **Record (Headphones)** or **Record (Speaker)** to start
 2. The timer shows elapsed recording time; **Pause** / **Resume** as needed
-3. Click **Stop** — a 5-second countdown begins (click **Cancel** to abort)
-4. After 5 seconds, transcription starts automatically
+3. Click **Stop** — a 5-second countdown begins when enabled in Settings (click **Cancel** to abort)
+4. After stopping, transcription starts automatically when **Auto-process recordings** is on (default); when off, only the audio is saved and you start processing manually from Jobs or the Library
 5. When done, links to the transcript and notes files appear in the window
 
 ### Noise Reduction (Optional)

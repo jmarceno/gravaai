@@ -34,7 +34,18 @@ pub fn tray_assets_dir() -> Option<PathBuf> {
 
 fn load_png_rgba(path: &PathBuf) -> Option<(u32, u32, Vec<u8>)> {
     let file = std::fs::File::open(path).ok()?;
-    let decoder = png::Decoder::new(file);
+    let bytes = {
+        let mut buf = Vec::new();
+        use std::io::Read as _;
+        let mut f = file;
+        f.read_to_end(&mut buf).ok()?;
+        buf
+    };
+    decode_png_rgba(&bytes)
+}
+
+fn decode_png_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
+    let decoder = png::Decoder::new(bytes);
     let mut reader = decoder.read_info().ok()?;
     let mut buf = vec![0u8; reader.output_buffer_size()];
     let info = reader.next_frame(&mut buf).ok()?;
@@ -72,6 +83,26 @@ pub struct AppTray {
     on_command: Arc<dyn Fn(String) + Send + Sync>,
 }
 
+/// Embedded 48px fallbacks so the tray never renders empty when the artwork
+/// directory is missing (standalone binary installs, bad packaging, dev runs
+/// from another cwd). Filesystem art still wins when present (crisper sizes).
+fn embedded_pixmap(base: &str) -> Option<(u32, u32, Vec<u8>)> {
+    let bytes: &[u8] = match base {
+        "meeting-recorder" => include_bytes!("../../assets/tray/meeting-recorder-48.png"),
+        "meeting-recorder-recording" => {
+            include_bytes!("../../assets/tray/meeting-recorder-recording-48.png")
+        }
+        "meeting-recorder-paused" => {
+            include_bytes!("../../assets/tray/meeting-recorder-paused-48.png")
+        }
+        "meeting-recorder-processing" => {
+            include_bytes!("../../assets/tray/meeting-recorder-processing-48.png")
+        }
+        _ => return None,
+    };
+    decode_png_rgba(bytes)
+}
+
 impl AppTray {
     pub fn new(on_command: Arc<dyn Fn(String) + Send + Sync>) -> Self {
         let mut t = Self {
@@ -99,6 +130,15 @@ impl AppTray {
                     });
                     break;
                 }
+            }
+        }
+        if self.pixmaps.is_empty() {
+            if let Some((w, h, argb)) = embedded_pixmap(base) {
+                self.pixmaps.push(Icon {
+                    width: w as i32,
+                    height: h as i32,
+                    data: argb,
+                });
             }
         }
     }
@@ -131,6 +171,13 @@ impl Tray for AppTray {
 
     fn icon_pixmap(&self) -> Vec<Icon> {
         self.pixmaps.clone()
+    }
+
+    fn icon_name(&self) -> String {
+        // Theme fallback for hosts that ignore pixmaps: the hicolor theme
+        // ships `meeting-recorder`, so idle always has something to render.
+        // Per-state artwork is pixmap-only (no theme equivalents exist).
+        "meeting-recorder".into()
     }
 
     fn tool_tip(&self) -> ksni::ToolTip {
@@ -221,5 +268,31 @@ mod tests {
             // Sanity: alpha channel is not uniformly zero.
             assert!(argb.chunks(4).any(|p| p[0] != 0));
         }
+    }
+
+    #[test]
+    fn embedded_fallback_decodes_for_all_states() {
+        for base in [
+            "meeting-recorder",
+            "meeting-recorder-recording",
+            "meeting-recorder-paused",
+            "meeting-recorder-processing",
+        ] {
+            let (w, h, argb) =
+                embedded_pixmap(base).unwrap_or_else(|| panic!("embedded decode {base}"));
+            assert_eq!((w, h), (48, 48));
+            assert_eq!(argb.len(), 48 * 48 * 4);
+            assert!(argb.chunks(4).any(|p| p[0] != 0));
+        }
+    }
+
+    #[test]
+    fn tray_always_has_icon() {
+        let tray = AppTray::new(Arc::new(|_| {}));
+        assert!(
+            !tray.icon_pixmap().is_empty(),
+            "tray must always carry a pixmap (embedded fallback)"
+        );
+        assert_eq!(tray.icon_name(), "meeting-recorder");
     }
 }

@@ -267,6 +267,14 @@ impl<R: RecorderBackend + Send> Engine<R> {
     }
 
     pub fn stop(&mut self) {
+        if !self.config.auto_process_enabled {
+            // Auto-process off: keep the audio, never start transcription.
+            // Manual runs (Jobs retry, Library re-summarize, Use Existing)
+            // still launch the processor explicitly.
+            self.controller.cancel_and_save();
+            self.drain_events();
+            return;
+        }
         let countdown = self.config.processing_countdown_enabled;
         self.controller.stop(countdown);
         self.drain_events();
@@ -834,6 +842,29 @@ mod tests {
         assert!(
             f.errors.recv_timeout(Duration::from_millis(200)).is_err(),
             "no key error may be emitted at record time"
+        );
+    }
+
+    #[test]
+    fn disabled_auto_process_saves_audio_only() {
+        let mut f = fixture();
+        let cfg = Config {
+            auto_process_enabled: false,
+            ..Config::default()
+        };
+        f.engine.set_config(cfg);
+        f.engine.start_recording("headphones");
+        assert_eq!(f.engine.state(), State::Recording);
+        drain(&f.changes);
+        f.engine.stop();
+        assert_eq!(f.engine.state(), State::Idle);
+        assert!(
+            f.launched.lock().unwrap().launched.is_empty(),
+            "no processor may launch when auto-process is off"
+        );
+        assert!(
+            !f.engine.snapshot_json().contains("processing"),
+            "no job may be queued when auto-process is off"
         );
     }
 }

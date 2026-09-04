@@ -109,11 +109,22 @@ impl SettingsDialog {
     }
 
     /// Forward one daemon install event to the Models page.
+    /// Failures are also surfaced as a dialog — a silent Retry button alone
+    /// leaves the user with no way to know what went wrong.
     pub fn on_install_event(&self, event: &InstallUiEvent) {
         match event {
             InstallUiEvent::Progress(key, text) => self.models.on_install_progress(key, text),
             InstallUiEvent::Finished(key, ok, message) => {
-                self.models.on_install_finished(key, *ok, message)
+                let failure = self.models.on_install_finished(key, *ok, message);
+                if let Some(detail) = failure {
+                    log::error!("Install {key} failed: {detail}");
+                    let alert = gtk::AlertDialog::builder()
+                        .message("Install failed")
+                        .detail(detail.as_str())
+                        .buttons(["OK"])
+                        .build();
+                    alert.show(Some(&self.window));
+                }
             }
         }
     }

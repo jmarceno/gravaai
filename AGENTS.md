@@ -243,7 +243,11 @@ closing. Installs are keyed by the pure
 models install concurrently while the same request dedups); the daemon emits
 `InstallProgress(key,text)`/`InstallFinished(key,ok,message)` D-Bus signals
 to the open Models page and `GetInstalls()` lets a reopened window re-attach
-to in-flight installs (`reflect_running_installs`). Read-only status
+to in-flight installs (`reflect_running_installs`). Install failures are
+surfaced, never silent: the Models page writes the reason into the row
+subtitle/tooltip (engine installs) or the model row (downloads) and shows an
+`AlertDialog`; the daemon additionally emits a desktop notification so a
+failure with no open window is still visible. Read-only status
 checks (is-cached / ollama-reachable) still run in the window on worker
 threads, hopping back via main-loop pollers.
 
@@ -276,8 +280,11 @@ countdown, and the authoritative lifecycle `State`. Callbacks
 `on_stopped`); the blocking recorder stop runs on a `TaskRunner` worker and
 `on_stopped` lets the engine delay the processor launch until the file is
 fully written (`awaiting_file`). The countdown is tick-driven by the owner
-(`countdown_tick()` + injected `request_tick`). Fully unit-tested headless
-with a fake recorder.
+(`countdown_tick()` + injected `request_tick`). When
+`auto_process_enabled` is off, `Engine::stop()` saves the audio only
+(`cancel_and_save`) and never launches the processor — manual runs (job
+Retry, Library re-summarize, Use Existing) still process explicitly. Fully
+unit-tested headless with a fake recorder.
 
 **Job queue & persistence** (`core/job_manager.rs`): `JobManager` owns the job
 list and persists every change to `$XDG_STATE_HOME/meeting-recorder/jobs.json`
@@ -343,6 +350,9 @@ are installed on demand from **Settings → Models**:
 
 **Config:** `~/.config/meeting-recorder/config.json`, `chmod 600`. Empty string
 for any prompt key = use built-in default (defined in `config/defaults.rs`).
+Clean-install defaults: transcription `whisper_cpp`, summarization `openai`
+(chat model `gpt-5.6-luna`), auto-process on. Existing installs keep their
+stored values on upgrade (unknown keys ignored, missing keys keep defaults).
 **API key storage:** when a D-Bus Secret Service is available (GNOME
 Keyring/KWallet), `settings::save()` stores the key there via the `keyring`
 crate and writes only the `@keyring` sentinel to config.json;
@@ -381,14 +391,20 @@ in its own module under `settings_pages/`:
 `general.rs`/`models.rs`/`prompts.rs` page classes expose `.widget` and
 `.apply(cfg)`, with shared row helpers + `IdComboRow` in
 `settings_pages/widgets.rs`; `ModelsPage` routes daemon install signals to
-progress/finished row updates and re-attaches to in-flight installs on open;
-`compute_section_visibility()` in `settings_visibility.rs` is the pure
-Models-tab visibility policy; `on_saved` callback runs `ReloadConfig`),
+progress/finished row updates (failures also surface an `AlertDialog` with the
+reason) and re-attaches to in-flight installs on open; model names are
+free-text `EntryRow`s (OpenAI STT/chat defaulting to `whisper-1` /
+`gpt-5.6-luna`, whisper.cpp default `large-v3-turbo`, Ollama default
+`phi4-mini`); `compute_section_visibility()` in `settings_visibility.rs` is
+the pure Models-tab visibility policy; `on_saved` callback runs
+`ReloadConfig`),
 `model_row_grid.rs` (model `ActionRow`s with Download/Retry/progress states),
 `meeting_explorer.rs` (past meetings browser; `.boxed-list` rows;
 double-click-to-rename via `GestureClick`, AI re-summarize per meeting),
 `tray.rs` (ksni StatusNotifierItem; branded per-state `IconPixmap` artwork
-from `assets/tray/`, decoded with the `png` crate). The app/launcher/window
+from `assets/tray/`, decoded with the `png` crate, with embedded 48px
+fallbacks plus an `icon_name` theme fallback so the tray never renders empty
+even when the artwork directory is missing). The app/launcher/window
 icon ships in `assets/icons/hicolor/` and is installed into the hicolor theme
 by the Arch packaging; at startup
 `ui/window_app.rs:setup_app_icon()` also adds the bundled tree to the GTK
@@ -424,7 +440,9 @@ Linux desktop app:
   AppIndicator/KStatusNotifierItem extension to provide the SNI host. The tray
   shows branded per-state artwork (idle microphone / record-dot / pause /
   processing) bundled in `assets/tray/` and sent as a raw ARGB `IconPixmap` so
-  it renders on every host and from source.
+  it renders on every host and from source, with embedded 48px fallbacks plus
+  an `icon_name` theme fallback so it never renders empty when the artwork
+  directory is missing (e.g. standalone binary installs).
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
   (scalable SVG + PNG sizes, named `meeting-recorder` — the `Icon=` key) and
   is installed into the hicolor theme by the Arch packaging;
@@ -443,8 +461,12 @@ and streamed back as `STATUS:`/`RESULT:`/`ERROR:` protocol lines, so they
 survive the window closing and don't bloat the daemon.
 
 The app supports any OpenAI-compatible endpoint for transcription/
-summarization, local whisper.cpp (built from source) for transcription, and
-local Ollama for summarization. Local engines are not in the base install —
+summarization (model names are free-text; chat default `gpt-5.6-luna`), local
+whisper.cpp (prebuilt binary download, the default transcription backend) for
+transcription, and local Ollama for summarization. A Settings → General
+**Auto-process recordings** toggle (on by default) controls whether stopping a
+recording auto-starts transcription/summarization or saves audio only for
+manual processing. Local engines are not in the base install —
 they are installed on demand from Settings → Models. x86_64 and arm64
 are supported.
 
@@ -557,10 +579,11 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   (`child_io`), window spawn-vs-present (`window_supervisor`), install
   dedup/progress/finished routing (`install_manager`), headless `Engine`
   snapshot/lifecycle/child-event handling with a fake backend (`engine`,
-  including recording without an API key).
+  including recording without an API key and auto-process-off saves audio only).
 - `ui/` — pure tray policy (`tray_model`: icon priority, per-state menus,
   never-reused menu ids), Models-tab visibility (`settings_visibility`),
-  bundled artwork PNG decoding (`tray`).
+  bundled artwork PNG decoding plus embedded fallback so the tray never
+  renders empty (`tray`).
 
 The `--process`/`--install` child entry points, the `Gio`-free zbus service
 and tray wiring, and the GTK widget construction need a real

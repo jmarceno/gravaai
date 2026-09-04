@@ -13,6 +13,7 @@ pub struct GeneralPage {
     detection_switch: adw::SwitchRow,
     low_memory_switch: adw::SwitchRow,
     auto_title_switch: adw::SwitchRow,
+    auto_process_switch: adw::SwitchRow,
     countdown_switch: adw::SwitchRow,
     quality_combo: IdComboRow,
     folder_entry: adw::EntryRow,
@@ -61,6 +62,17 @@ impl GeneralPage {
             .build();
         auto_title_switch.set_active(cfg.auto_title);
         recording.add(&auto_title_switch);
+
+        let auto_process_switch = adw::SwitchRow::builder()
+            .title("Auto-process recordings")
+            .subtitle(
+                "Automatically start transcription and summarization when a \
+                  recording stops. When off, only the audio is saved — start \
+                  processing manually from Jobs or the Library.",
+            )
+            .build();
+        auto_process_switch.set_active(cfg.auto_process_enabled);
+        recording.add(&auto_process_switch);
 
         let countdown_switch = adw::SwitchRow::builder()
             .title("Processing countdown")
@@ -129,6 +141,7 @@ impl GeneralPage {
             detection_switch,
             low_memory_switch,
             auto_title_switch,
+            auto_process_switch,
             countdown_switch,
             quality_combo,
             folder_entry,
@@ -151,6 +164,7 @@ impl GeneralPage {
         cfg.low_memory_mode = self.low_memory_switch.is_active();
         cfg.start_at_startup = self.startup_switch.is_active();
         cfg.auto_title = self.auto_title_switch.is_active();
+        cfg.auto_process_enabled = self.auto_process_switch.is_active();
         cfg.processing_countdown_enabled = self.countdown_switch.is_active();
     }
 }

@@ -67,6 +67,19 @@ fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<(
             use crate::services::whisper_cpp_service::WhisperCppModelDownloader;
             WhisperCppModelDownloader::default().download(&spec.model, on_status)
         }
+        install_spec::KIND_CRISP_ASR_ENGINE => {
+            use crate::services::crisp_asr_service::CrispAsrEngineInstaller;
+            let backend = if spec.backend.is_empty() {
+                "auto"
+            } else {
+                spec.backend.as_str()
+            };
+            CrispAsrEngineInstaller.install(backend, on_status)
+        }
+        install_spec::KIND_CRISP_ASR_MODEL => {
+            use crate::services::crisp_asr_service::CrispAsrModelDownloader;
+            CrispAsrModelDownloader::default().download(&spec.model, on_status)
+        }
         install_spec::KIND_OLLAMA_MODEL => {
             use crate::services::ollama_service::{ensure_ollama_serving, OllamaClient};
             let host = if spec.host.is_empty() {

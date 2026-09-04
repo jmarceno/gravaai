@@ -1,7 +1,7 @@
 # GravaAi
 
 A meeting recorder that transcribes audio and generates structured notes using
-any OpenAI-compatible API, fully local Whisper/Ollama engines, or a mix of both.
+any OpenAI-compatible API, fully local Whisper/CrispASR/Ollama engines, or a mix of both.
 
 This repository holds the Linux desktop app (Rust, Qt 6/QML):
 
@@ -18,7 +18,7 @@ This repository holds the Linux desktop app (Rust, Qt 6/QML):
 ### Features
 
 - **Record** system audio + microphone simultaneously, or microphone only — each channel is automatically loudness-normalized during capture, so quiet microphones are boosted into healthy levels (up to 20 dB, applied independently to mic and system audio)
-- **Transcribe** with any OpenAI-compatible endpoint or local whisper.cpp (timestamped transcript)
+- **Transcribe** with any OpenAI-compatible endpoint, local whisper.cpp (timestamped transcript) or experimental local CrispASR (Nemotron 3.5 ASR)
 - **Summarize** into structured Markdown notes with any OpenAI-compatible endpoint or local Ollama
 - **Summarize from the library** — re-run summarization for any past meeting from the meetings browser
 - **Local models** — run fully offline with no API key required
@@ -74,6 +74,7 @@ The base install is **cloud-only and minimal** — no local engines or GPU libra
 
 > Your API key is stored in the system keyring (GNOME Keyring / KWallet) when one is available, falling back to a permission-restricted config file otherwise.
 | **whisper.cpp** (local transcription) | Engine downloaded as an official prebuilt CPU binary on opt-in; GGML model downloaded from HuggingFace. No compiler or system packages needed |
+| **CrispASR** (experimental local transcription) | Engine downloaded as an official prebuilt binary on opt-in (CPU / Vulkan / CUDA flavors); Nemotron GGUF model downloaded from HuggingFace. No compiler or system packages needed |
 | **Ollama** (local summarization) | [Ollama](https://ollama.com) installed and running (`ollama serve`); uses NVIDIA/AMD GPU automatically |
 
 ### Installation
@@ -92,7 +93,7 @@ it with [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) so
 it appears in your application menu.
 
 The AppImage ships the complete desktop runtime and cloud path. The local
-transcription engine (whisper.cpp), Ollama and model weights are intentionally
+transcription engines (whisper.cpp, experimental CrispASR), Ollama and model weights are intentionally
 installed later, on demand, from **Settings → Models**; they remain outside the
 base image so updates stay small and user data is preserved.
 
@@ -148,6 +149,7 @@ companion. Running `gravaai-ui` directly without a live daemon/tray is refused.
 |---|---|---|
 | **OpenAI-compatible** | Audio sent to `/audio/transcriptions` | Base URL + API key |
 | **whisper.cpp** | Runs locally via a prebuilt whisper.cpp binary (default) | Engine + GGML model downloaded in Settings → Models |
+| **CrispASR** (experimental) | Runs locally via a prebuilt `crispasr` binary (Nemotron 3.5 ASR 0.6B Q8 default) | Engine + GGUF model downloaded in Settings → Models |
 
 #### Summarization
 
@@ -165,8 +167,9 @@ Open the window from the tray icon, then use the sidebar.
 1. **Models & services tab** — choose your transcription and summarization services and configure them:
    - *OpenAI-compatible*: set the base URL, paste your API key and choose models
    - *whisper.cpp*: pick an acceleration backend and install the engine (first time), then download a GGML model
+   - *CrispASR* (experimental): pick a cpu/vulkan/cuda backend and install the engine (first time), then download a Nemotron model
    - *Ollama*: set host and click Download next to your preferred model — installing Ollama starts `ollama serve` automatically
-   - The **Status** card on the same tab always shows what is installed and running: the whisper.cpp engine (path + size), downloaded GGML models, and the Ollama server (host, running state, pulled models with sizes)
+   - The **Status** card on the same tab always shows what is installed and running: the whisper.cpp engine (path + size), downloaded GGML models, the CrispASR engine with its GGUF models, and the Ollama server (host, running state, pulled models with sizes)
 2. **General tab** — set output folder, recording quality and background behavior
 3. **Prompts tab** — optionally customize the transcription, summarization or title prompt (built-in defaults are shown)
 4. **Downloads tab** — every payload the app downloaded in one list, with its exact location on disk and size (engine, GGML models, the Ollama runtime and Ollama models)
@@ -215,6 +218,22 @@ explicit `cuda` choice explains this instead of downloading.)
 
 Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 GB), `medium` (~1.5 GB), `small` (~470 MB).
 
+**CrispASR (experimental, local)**
+
+A third transcription option using the official prebuilt `crispasr` binary
+with the Nemotron 3.5 ASR 0.6B model (Q8 default). All three GPU flavors are
+selectable: CPU (~25 MB download), Vulkan (~60 MB) and CUDA (~206–271 MB);
+`auto` picks CUDA on NVIDIA machines and CPU elsewhere. Like whisper.cpp it
+runs as a short-lived CLI call inside the processing job and unloads Ollama
+models first to free GPU memory — no persistent service to manage. Engine
+hashes are not pinned yet on this experimental branch.
+
+| Setting | Description |
+|---|---|
+| Acceleration backend | `auto`, `cpu`, `vulkan` or `cuda` (all three installable; Vulkan/CUDA Linux builds are x86_64-only) |
+| Model | Nemotron quant to use (`nemotron-3.5-asr-0.6b-q8_0` default; Q6_K / Q5_K_M / Q4_K_M / F16 available) |
+| Model list | Download status and one-click download for each Nemotron GGUF from HuggingFace |
+
 **Ollama**
 
 | Setting | Description |
@@ -227,7 +246,8 @@ Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 
 
 The **Status** card shows the live state of the optional local engines: whether the
 whisper.cpp engine is installed (with its path and size), which GGML models are
-downloaded (with sizes), and whether Ollama is installed and serving (host,
+downloaded (with sizes), whether the CrispASR engine is installed (with its
+path, size and GGUF models), and whether Ollama is installed and serving (host,
 running state and pulled models with sizes). Click **Refresh** any time; the
 card also refreshes on its own after every install finishes.
 
@@ -240,6 +260,8 @@ One list of **everything the app downloaded**, each row with name, kind
 |---|---|
 | whisper.cpp engine (`whisper-cli` + libraries) | `~/.local/share/gravaai/whisper.cpp/` |
 | GGML models | `~/.local/share/gravaai/whisper-cpp-models/` |
+| CrispASR engine (`crispasr` + libraries) | `~/.local/share/gravaai/crisp-asr/` |
+| CrispASR (Nemotron GGUF) models | `~/.local/share/gravaai/crisp-asr-models/` |
 | Ollama runtime | `~/.local/share/gravaai/ollama/` |
 | Ollama models | Ollama's own store (`~/.ollama/models` by default) |
 
@@ -255,12 +277,13 @@ Available Ollama models:
 | `qwen2.5:7b` | ~5 GB | Very capable |
 | `llama3.1:8b` | ~5 GB | Very capable |
 | `gemma3:12b` | ~8 GB | Best quality, high RAM required |
+| `jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0` | ~380 MB | Tiny, fast local notes |
 
 #### Prompts tab
 
 Customize the transcription, summarization and title prompts. Built-in defaults are shown on first open. **Reset defaults** restores them; saving a default stores it as "use built-in". The `{transcript}` placeholder in the summarization prompt is replaced with the transcript text.
 
-Note: transcription prompts apply to the OpenAI-compatible service only — the local whisper.cpp engine does not use a prompt.
+Note: transcription prompts apply to the OpenAI-compatible service only — the local whisper.cpp and CrispASR engines do not use a prompt.
 
 #### Library
 

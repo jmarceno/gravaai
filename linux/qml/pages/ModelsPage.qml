@@ -43,6 +43,8 @@ Item {
             llm_request_timeout_minutes: Number(timeout.currentText || 5),
             whisper_cpp_model: whisperModel.currentText,
             whisper_cpp_backend: whisperBackend.currentText,
+            crisp_asr_model: crispModel.currentText,
+            crisp_asr_backend: crispBackend.currentText,
             ollama_model: ollamaModel.currentText,
             ollama_host: ollamaHost.text,
             transcription_prompt: root.cfg.transcription_prompt || "",
@@ -73,6 +75,14 @@ Item {
     }
     function ggmlModels() {
         return (root.status.payloads || []).filter(function(p) { return p.kind === "model" && p.name.indexOf("ggml-") === 0 })
+    }
+    function crispModels() {
+        return (root.status.payloads || []).filter(function(p) { return p.kind === "model" && p.name.indexOf(".gguf") >= 0 })
+    }
+    function crispStatus() {
+        var c = root.status.crispasr || {}
+        if (!c.engine_path) return "Checking…"
+        return c.engine_installed ? "Installed · " + root.fmtSize(c.engine_size_bytes) : "Not installed"
     }
     function ollamaModels() {
         return (root.status.ollama || {}).models || []
@@ -113,7 +123,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 10
                         Label { text: "Service"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: stt; model: ["openai", "whisper_cpp"]; currentIndex: root.indexOfValue(["openai", "whisper_cpp"], root.cfg.transcription_service || "whisper_cpp"); Layout.fillWidth: true }
+                        AppComboBox { id: stt; model: ["openai", "whisper_cpp", "crisp_asr"]; currentIndex: root.indexOfValue(["openai", "whisper_cpp", "crisp_asr"], root.cfg.transcription_service || "whisper_cpp"); Layout.fillWidth: true }
                     }
                     AppField { id: apiKey; label: "OpenAI-compatible API key"; password: true; text: root.cfg.openai_api_key || ""; visible: stt.currentText === "openai"; Layout.fillWidth: true }
                     AppField { id: baseUrl; label: "Base URL"; placeholderText: "https://api.openai.com/v1"; text: root.cfg.openai_base_url || ""; visible: stt.currentText === "openai" || chat.currentText === "openai"; Layout.fillWidth: true }
@@ -135,6 +145,23 @@ Item {
                         AppButton { text: "Download model"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("whisper_cpp_model", whisperModel.currentText, "", "") }
                     }
                     Label { visible: stt.currentText === "whisper_cpp"; text: "CPU prebuilt for Linux — no compiler needed. Upstream ships no CUDA prebuilt for Linux."; color: Theme.textDim; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    RowLayout {
+                        visible: stt.currentText === "crisp_asr"
+                        Layout.fillWidth: true
+                        spacing: 10
+                        Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
+                        AppComboBox { id: crispModel; model: ["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q6_k", "nemotron-3.5-asr-0.6b-q5_k_m", "nemotron-3.5-asr-0.6b-q4_k_m", "nemotron-3.5-asr-0.6b-f16"]; currentIndex: root.indexOfValue(["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q6_k", "nemotron-3.5-asr-0.6b-q5_k_m", "nemotron-3.5-asr-0.6b-q4_k_m", "nemotron-3.5-asr-0.6b-f16"], root.cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0"); Layout.fillWidth: true }
+                        AppComboBox { id: crispBackend; model: ["auto", "cpu", "vulkan", "cuda"]; currentIndex: root.indexOfValue(["auto", "cpu", "vulkan", "cuda"], root.cfg.crisp_asr_backend || "auto"); Layout.fillWidth: true }
+                    }
+                    RowLayout {
+                        visible: stt.currentText === "crisp_asr"
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Label { text: "Engine"; color: Theme.textMuted; Layout.preferredWidth: 120 }
+                        AppButton { text: "Install CrispASR"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("crisp_asr_engine", "", crispBackend.currentText, "") }
+                        AppButton { text: "Download model"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("crisp_asr_model", crispModel.currentText, "", "") }
+                    }
+                    Label { visible: stt.currentText === "crisp_asr"; text: "Experimental. Prebuilt, no compiler needed — CPU ~25 MB, Vulkan ~60 MB, CUDA ~206–271 MB. Auto picks CUDA on NVIDIA, CPU elsewhere."; color: Theme.textDim; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
             }
 
@@ -155,7 +182,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 10
                         Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: ollamaModel; model: ["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b"]; currentIndex: root.indexOfValue(["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b"], root.cfg.ollama_model || "phi4-mini"); Layout.fillWidth: true }
+                        AppComboBox { id: ollamaModel; model: ["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0"]; currentIndex: root.indexOfValue(["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0"], root.cfg.ollama_model || "phi4-mini"); Layout.fillWidth: true }
                     }
                     AppField { id: ollamaHost; label: "Ollama host"; text: root.cfg.ollama_host || "http://localhost:11434"; visible: chat.currentText === "ollama"; Layout.fillWidth: true }
                     RowLayout {
@@ -204,6 +231,29 @@ Item {
                             }
                         }
                         Label { text: "Models come from HuggingFace: " + ((root.status.whisper || {}).models_url || ""); color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                    }
+                    ColumnLayout {
+                        spacing: 2
+                        Layout.fillWidth: true
+                        Label { text: "CrispASR (transcription, experimental)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
+                        Label { text: root.crispStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
+                        Label { text: (root.status.crispasr || {}).engine_path || ""; visible: (root.status.crispasr || {}).engine_installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                        Label {
+                            visible: root.crispModels().length === 0
+                            text: "No models downloaded."
+                            color: Theme.textMuted; font.pixelSize: 12
+                        }
+                        Repeater {
+                            model: root.crispModels()
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Label { text: root.fmtSize(modelData.size_bytes); color: Theme.textMuted; font.pixelSize: 11 }
+                            }
+                        }
+                        Label { text: "Models come from HuggingFace: " + ((root.status.crispasr || {}).models_url || ""); color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
                     }
                     ColumnLayout {
                         spacing: 2

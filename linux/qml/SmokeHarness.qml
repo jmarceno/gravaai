@@ -78,6 +78,7 @@ ApplicationWindow {
                 { name: "phi4-mini:latest", kind: "model", path: "/tmp/ollama-store", path_is_dir: true, size_bytes: 2500000000, present: true }
             ],
             whisper: { engine_installed: true, engine_path: "/tmp/gravaai-data/whisper.cpp", engine_size_bytes: 12300000, models_dir: "/tmp/gravaai-data/whisper-cpp-models", models_url: "https://example.invalid" },
+            crispasr: { engine_installed: false, engine_path: "/tmp/gravaai-data/crisp-asr", engine_size_bytes: 0, models_dir: "/tmp/gravaai-data/crisp-asr-models", models_url: "https://example.invalid" },
             ollama: { installed: true, binary_path: "/tmp/gravaai-data/ollama/ollama", serving: true, host: "http://localhost:11434", models_dir: "/tmp/ollama-store", models: [{ name: "phi4-mini:latest", size: 2500000000 }] }
         })
         smokeTimer.start()

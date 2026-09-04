@@ -1,20 +1,25 @@
 //! Install request model.
 //!
 //! Install kinds: engine/runtime installers (`ollama`, `whisper_cpp_engine`,
-//! the latter carrying a `backend`) and per-model downloads (`whisper_cpp_model`
-//! with `model`, `ollama_model` with `model` + `host`).
+//! `crisp_asr_engine`, the latter two carrying a `backend`) and per-model
+//! downloads (`whisper_cpp_model` with `model`, `crisp_asr_model` with
+//! `model`, `ollama_model` with `model` + `host`).
 
 use serde::{Deserialize, Serialize};
 
 pub const KIND_OLLAMA: &str = "ollama";
 pub const KIND_WHISPER_CPP_ENGINE: &str = "whisper_cpp_engine";
 pub const KIND_WHISPER_CPP_MODEL: &str = "whisper_cpp_model";
+pub const KIND_CRISP_ASR_ENGINE: &str = "crisp_asr_engine";
+pub const KIND_CRISP_ASR_MODEL: &str = "crisp_asr_model";
 pub const KIND_OLLAMA_MODEL: &str = "ollama_model";
 
 pub const KINDS: &[&str] = &[
     KIND_OLLAMA,
     KIND_WHISPER_CPP_ENGINE,
     KIND_WHISPER_CPP_MODEL,
+    KIND_CRISP_ASR_ENGINE,
+    KIND_CRISP_ASR_MODEL,
     KIND_OLLAMA_MODEL,
 ];
 
@@ -33,7 +38,10 @@ pub struct InstallSpec {
 /// Stable id for dedup + UI mapping: per-model installs get a scoped key so
 /// different models install concurrently while the same request dedups.
 pub fn install_key(spec: &InstallSpec) -> String {
-    if matches!(spec.kind.as_str(), "whisper_cpp_model" | "ollama_model") {
+    if matches!(
+        spec.kind.as_str(),
+        "whisper_cpp_model" | "crisp_asr_model" | "ollama_model"
+    ) {
         return format!("{}:{}", spec.kind, spec.model);
     }
     spec.kind.clone()
@@ -74,6 +82,21 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(install_key(&o), "ollama");
+        let c = InstallSpec {
+            kind: "crisp_asr_engine".into(),
+            backend: "vulkan".into(),
+            ..Default::default()
+        };
+        assert_eq!(install_key(&c), "crisp_asr_engine");
+        let cm = InstallSpec {
+            kind: "crisp_asr_model".into(),
+            model: "nemotron-3.5-asr-0.6b-q8_0".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            install_key(&cm),
+            "crisp_asr_model:nemotron-3.5-asr-0.6b-q8_0"
+        );
     }
 
     #[test]

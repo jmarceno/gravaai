@@ -26,7 +26,7 @@ pub fn whisper_cpp_model_info(model: &str) -> (&'static str, &'static str) {
 ///
 /// NOTE: the retired `"whisper"` (faster-whisper) backend is gone; legacy
 /// configs using it resolve to the whisper.cpp engine.
-pub const TRANSCRIPTION_SERVICES: &[&str] = &["openai", "whisper_cpp"];
+pub const TRANSCRIPTION_SERVICES: &[&str] = &["openai", "whisper_cpp", "crisp_asr"];
 /// Summarization backends selectable in Settings → General.
 pub const SUMMARIZATION_SERVICES: &[&str] = &["openai", "ollama"];
 
@@ -57,12 +57,104 @@ pub const WHISPER_CPP_MODELS: &[&str] = &["large-v3-turbo", "large-v3", "medium"
 
 pub const WHISPER_CPP_BACKENDS: &[&str] = &["auto", "cuda", "cpu"];
 
+// --- CrispASR (experimental third transcription backend) ---------------------
+// One `crispasr` C++ binary plus a Nemotron GGUF model. The three GPU flavors
+// below mirror the upstream Linux release assets; `auto` picks CUDA on NVIDIA
+// machines and CPU elsewhere (Vulkan is cross-vendor and stays explicit-only).
+
+/// Default CrispASR model: Nemotron 3.5 ASR 0.6B Q8.
+pub const CRISP_ASR_DEFAULT_MODEL: &str = "nemotron-3.5-asr-0.6b-q8_0";
+
+pub const CRISP_ASR_MODELS: &[&str] = &[
+    "nemotron-3.5-asr-0.6b-q8_0",
+    "nemotron-3.5-asr-0.6b-q6_k",
+    "nemotron-3.5-asr-0.6b-q5_k_m",
+    "nemotron-3.5-asr-0.6b-q4_k_m",
+    "nemotron-3.5-asr-0.6b-f16",
+];
+
+pub const CRISP_ASR_BACKENDS: &[&str] = &["auto", "cpu", "vulkan", "cuda"];
+
+/// HuggingFace repo hosting the Nemotron GGUF weights.
+pub const CRISP_ASR_HF_REPO: &str = "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf";
+pub const CRISP_ASR_HF_BASE_URL: &str =
+    "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/";
+
+pub fn crisp_asr_model_file(model: &str) -> Option<&'static str> {
+    match model {
+        "nemotron-3.5-asr-0.6b-q8_0" => Some("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"),
+        "nemotron-3.5-asr-0.6b-q6_k" => Some("nemotron-3.5-asr-streaming-0.6b-Q6_K.gguf"),
+        "nemotron-3.5-asr-0.6b-q5_k_m" => Some("nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf"),
+        "nemotron-3.5-asr-0.6b-q4_k_m" => Some("nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf"),
+        "nemotron-3.5-asr-0.6b-f16" => Some("nemotron-3.5-asr-streaming-0.6b-F16.gguf"),
+        _ => None,
+    }
+}
+
+pub fn crisp_asr_model_info(model: &str) -> (&'static str, &'static str) {
+    match model {
+        "nemotron-3.5-asr-0.6b-q8_0" => ("~640 MB", "Default, best accuracy"),
+        "nemotron-3.5-asr-0.6b-q6_k" => ("~480 MB", "Good balance"),
+        "nemotron-3.5-asr-0.6b-q5_k_m" => ("~410 MB", "Smaller, fast"),
+        "nemotron-3.5-asr-0.6b-q4_k_m" => ("~370 MB", "Smallest, lower accuracy"),
+        "nemotron-3.5-asr-0.6b-f16" => ("~1.2 GB", "Full precision, slowest"),
+        _ => ("", ""),
+    }
+}
+
+// --- CrispASR engine (prebuilt, no source builds) ----------------------------
+// Pinned upstream release; per-asset SHA-256 values are still TODO (empty
+// means the installer streams the download without a hash check and logs a
+// warning — acceptable on this experimental branch, must be pinned before
+// merging to main).
+pub const CRISP_ASR_RELEASE: &str = "v0.8.32";
+pub const CRISP_ASR_RELEASE_BASE_URL: &str =
+    "https://github.com/CrispStrobe/CrispASR/releases/download";
+
+/// Prebuilt engine archive for (`arch`, `backend`).
+/// `arch` is `std::env::consts::ARCH` (`"x86_64"` / `"aarch64"`).
+/// Upstream ships Vulkan/CUDA Linux tarballs for x86_64 only; aarch64 has a
+/// CPU tarball, so explicit `vulkan`/`cuda` there fail with guidance.
+pub fn crisp_asr_engine_asset(arch: &str, backend: &str) -> Option<EngineAsset> {
+    match (arch, backend) {
+        ("x86_64", "cpu") => Some(EngineAsset {
+            filename: "crispasr-linux-x86_64.tar.gz",
+            sha256: "",
+            format: "tar.gz",
+        }),
+        ("x86_64", "vulkan") => Some(EngineAsset {
+            filename: "crispasr-linux-x86_64-vulkan.tar.gz",
+            sha256: "",
+            format: "tar.gz",
+        }),
+        ("x86_64", "cuda") => Some(EngineAsset {
+            filename: "crispasr-linux-x86_64-cuda.tar.gz",
+            sha256: "",
+            format: "tar.gz",
+        }),
+        ("aarch64", "cpu") => Some(EngineAsset {
+            filename: "crispasr-linux-arm64.tar.gz",
+            sha256: "",
+            format: "tar.gz",
+        }),
+        _ => None,
+    }
+}
+
+pub fn crisp_asr_engine_url(asset: &EngineAsset) -> String {
+    format!(
+        "{CRISP_ASR_RELEASE_BASE_URL}/{CRISP_ASR_RELEASE}/{}",
+        asset.filename
+    )
+}
+
 pub const OLLAMA_MODELS: &[&str] = &[
     "phi4-mini",
     "gemma3:4b",
     "qwen2.5:7b",
     "llama3.1:8b",
     "gemma3:12b",
+    "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0",
 ];
 
 pub const OLLAMA_DEFAULT_HOST: &str = "http://localhost:11434";
@@ -149,6 +241,7 @@ pub fn ollama_model_info(model: &str) -> (&'static str, &'static str) {
         "qwen2.5:7b" => ("~5 GB", "Very capable"),
         "llama3.1:8b" => ("~5 GB", "Very capable"),
         "gemma3:12b" => ("~8 GB", "Best quality, high RAM required"),
+        "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0" => ("~380 MB", "Tiny, fast local notes"),
         _ => ("", ""),
     }
 }
@@ -194,6 +287,8 @@ pub struct Config {
     pub llm_request_timeout_minutes: u64,
     pub whisper_cpp_model: String,
     pub whisper_cpp_backend: String,
+    pub crisp_asr_model: String,
+    pub crisp_asr_backend: String,
     pub ollama_model: String,
     pub ollama_host: String,
     pub transcription_prompt: String,
@@ -225,6 +320,8 @@ impl Default for Config {
             llm_request_timeout_minutes: 5,
             whisper_cpp_model: "large-v3-turbo".to_string(),
             whisper_cpp_backend: "auto".to_string(),
+            crisp_asr_model: CRISP_ASR_DEFAULT_MODEL.to_string(),
+            crisp_asr_backend: "auto".to_string(),
             ollama_model: "phi4-mini".to_string(),
             ollama_host: OLLAMA_DEFAULT_HOST.to_string(),
             transcription_prompt: String::new(),

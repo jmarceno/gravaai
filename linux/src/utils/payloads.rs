@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::config::defaults::{APP_DIR_NAME, WHISPER_CPP_GGML_BASE_URL};
+use crate::config::defaults::{APP_DIR_NAME, CRISP_ASR_HF_BASE_URL, WHISPER_CPP_GGML_BASE_URL};
 
 /// One downloaded payload shown in the Downloads tab.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -133,6 +133,23 @@ pub fn collect_payload_rows(
     // Downloaded GGML models.
     rows.extend(ggml_model_rows(&base.join("whisper-cpp-models")));
 
+    // CrispASR engine (binary + bundled .so backend libraries).
+    let crisp_dir = base.join("crisp-asr");
+    let crisp_binary = crisp_dir.join("crispasr");
+    if crisp_binary.is_file() {
+        rows.push(row(
+            "CrispASR engine (crispasr)",
+            "engine",
+            &crisp_dir,
+            true,
+            true,
+            dir_size(&crisp_dir),
+        ));
+    }
+
+    // Downloaded CrispASR (Nemotron GGUF) models.
+    rows.extend(ggml_model_rows(&base.join("crisp-asr-models")));
+
     // Ollama binary.
     let ollama_dir = base.join("ollama");
     let ollama_binary = ollama_dir.join("ollama");
@@ -192,6 +209,7 @@ pub struct StatusInput<'a> {
 /// Full status JSON consumed by the Models page (status card) and the
 /// Downloads page (payload table). Shape:
 /// `{"payloads":[…],"whisper":{"engine_installed","engine_path","engine_size_bytes","models_dir","models_url"},
+///   "crispasr":{"engine_installed","engine_path","engine_size_bytes","models_dir","models_url"},
 ///   "ollama":{"installed","binary_path","serving","host","models_dir","models":[{"name","size"}]}}`
 pub fn service_status_json(input: &StatusInput<'_>) -> String {
     let engine_dir = input.base.join("whisper.cpp");
@@ -205,6 +223,17 @@ pub fn service_status_json(input: &StatusInput<'_>) -> String {
         "engine_size_bytes": if engine_installed { dir_size(&engine_dir) } else { 0 },
         "models_dir": models_dir.to_string_lossy(),
         "models_url": WHISPER_CPP_GGML_BASE_URL,
+    });
+    let crisp_dir = input.base.join("crisp-asr");
+    let crisp_binary = crisp_dir.join("crispasr");
+    let crisp_installed = crisp_binary.is_file();
+    let crisp_models_dir = input.base.join("crisp-asr-models");
+    let crispasr = serde_json::json!({
+        "engine_installed": crisp_installed,
+        "engine_path": crisp_dir.to_string_lossy(),
+        "engine_size_bytes": if crisp_installed { dir_size(&crisp_dir) } else { 0 },
+        "models_dir": crisp_models_dir.to_string_lossy(),
+        "models_url": CRISP_ASR_HF_BASE_URL,
     });
     let ollama_binary = input.base.join("ollama/ollama");
     let ollama = serde_json::json!({
@@ -220,6 +249,7 @@ pub fn service_status_json(input: &StatusInput<'_>) -> String {
         "base_dir": input.base.to_string_lossy(),
         "payloads": payloads,
         "whisper": whisper,
+        "crispasr": crispasr,
         "ollama": ollama,
     })
     .to_string()
@@ -271,6 +301,13 @@ mod tests {
             &base.path().join("whisper-cpp-models/ggml-small.bin"),
             &[0u8; 9],
         );
+        write(&base.path().join("crisp-asr/crispasr"), &[0u8; 5]);
+        write(
+            &base
+                .path()
+                .join("crisp-asr-models/nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"),
+            &[0u8; 11],
+        );
         write(&base.path().join("ollama/ollama"), &[0u8; 2]);
         let store = tempfile::tempdir().unwrap();
         let models = vec![
@@ -292,6 +329,17 @@ mod tests {
         assert_eq!(ggml.size_bytes, 9);
         assert!(!ggml.path_is_dir, "ggml row points at a file");
         assert!(ggml.path.ends_with("whisper-cpp-models/ggml-small.bin"));
+        let crisp_engine = by_name("CrispASR engine (crispasr)");
+        assert_eq!(crisp_engine.kind, "engine");
+        assert_eq!(crisp_engine.size_bytes, 5);
+        assert!(
+            crisp_engine.path_is_dir,
+            "crisp engine row points at a directory"
+        );
+        assert!(crisp_engine.path.ends_with("crisp-asr"));
+        let crisp_model = by_name("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf");
+        assert_eq!(crisp_model.size_bytes, 11);
+        assert!(!crisp_model.path_is_dir, "crisp model row points at a file");
         let ollama = by_name("Ollama runtime");
         assert_eq!(ollama.size_bytes, 2);
         let model = by_name("phi4-mini:latest");
@@ -328,6 +376,8 @@ mod tests {
         );
         assert_eq!(json["whisper"]["engine_installed"], true);
         assert_eq!(json["whisper"]["engine_size_bytes"], 4);
+        assert_eq!(json["crispasr"]["engine_installed"], false);
+        assert_eq!(json["crispasr"]["engine_size_bytes"], 0);
         assert_eq!(json["ollama"]["serving"], true);
         assert_eq!(json["ollama"]["models"][0]["size"], 100);
         assert_eq!(json["payloads"].as_array().unwrap().len(), 2); // engine + 1 ollama model
@@ -344,6 +394,8 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(&service_status_json(&input)).unwrap();
         assert_eq!(json["whisper"]["engine_installed"], false);
         assert_eq!(json["whisper"]["engine_size_bytes"], 0);
+        assert_eq!(json["crispasr"]["engine_installed"], false);
+        assert_eq!(json["crispasr"]["engine_size_bytes"], 0);
         assert_eq!(json["ollama"]["serving"], false);
         assert_eq!(json["payloads"].as_array().unwrap().len(), 0);
     }

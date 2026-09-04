@@ -46,6 +46,7 @@ Item {
     function transcriptionLabel() {
         var svc = cfg.transcription_service || "whisper_cpp"
         if (svc === "openai") return "openai · " + (cfg.openai_transcription_model || "whisper-1")
+        if (svc === "crisp_asr") return "CrispASR · " + (cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0")
         return "whisper.cpp · " + (cfg.whisper_cpp_model || "large-v3-turbo")
     }
     function summaryLabel() {

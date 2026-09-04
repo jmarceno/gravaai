@@ -392,7 +392,11 @@ daemon), and `CancelToken` provides cooperative cancellation.
   down (ownership + stop-on-exit as above). Local providers:
   `providers/whisper_cpp.rs` (`whisper-cli` subprocess run with
   `LD_LIBRARY_PATH` pointed at its bundled `.so` libraries, plus the pure
-  `parse_whisper_cpp_output()`) and `providers/ollama.rs` (`/api/generate`
+  `parse_whisper_cpp_output()`), `providers/crisp_asr.rs` (experimental
+  `crispasr --backend nemotron` subprocess writing a `-ojf` JSON sidecar that
+  is parsed into the same `[HH:MM:SS]` format, `--gpu-backend` forwarded for
+  explicit backends, Ollama models unloaded first like the whisper path) and
+  `providers/ollama.rs` (`/api/generate`
   with retry, `/api/ps` eviction helpers).
 
 **Call detection** (`detection/`): `AudioWatcher` runs `pactl subscribe` on
@@ -413,6 +417,20 @@ are installed on demand from **Settings → Models**:
   rejects explicit `cuda` before any download). Lands in
   `~/.local/share/gravaai/whisper.cpp/` with a `--help` smoke test;
   GGML models download from HuggingFace via the status/downloader helpers.
+- `crisp_asr` (experimental third transcription backend) — an official
+  upstream CrispASR binary release, downloaded by
+  `services/crisp_asr_service.rs` (`CrispAsrEngineInstaller`; pinned release
+  tag in `config/defaults.rs`, engine hashes still TODO so the installer
+  streams without verification and logs a warning — must be pinned before
+  merging to main). All three flavors are installable on x86_64
+  (`cpu`/`vulkan`/`cuda`; `auto` picks CUDA on NVIDIA, CPU elsewhere —
+  Vulkan stays explicit-only; aarch64 is CPU-only). Lands in
+  `~/.local/share/gravaai/crisp-asr/` with a `--version` smoke test;
+  Nemotron GGUF models (Q8 default) download from HuggingFace into
+  `~/.local/share/gravaai/crisp-asr-models/`. Transcription runs as a
+  short-lived CLI call inside the `--process` child, so there is no
+  persistent service to start/stop — GPU memory is freed by unloading Ollama
+  models first, exactly like the whisper.cpp path.
 - **Installer security conventions** (`services/system_installer.rs`): no
   shell execution — commands are argv lists run without a shell and logged
   before execution; downloads are verified (pinned SHA-256 for the engine;
@@ -517,7 +535,10 @@ compatibility trampoline and no-flag client mode ensures the daemon then calls
 The app supports any OpenAI-compatible endpoint for transcription/
 summarization (model names are free-text; chat default `gpt-5.6-luna`), local
 whisper.cpp (prebuilt binary download, the default transcription backend) for
-transcription, and local Ollama for summarization. A Settings → General
+transcription, experimental local CrispASR (Nemotron 3.5 ASR, all three
+cpu/vulkan/cuda flavors installable) as a third transcription option,
+and local Ollama for summarization (including the tiny
+`jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0` option). A Settings → General
 **Auto-process recordings** toggle (on by default) controls whether stopping a
 recording auto-starts transcription/summarization or saves audio only for
 manual processing. Local engines are not in the base install —
@@ -612,7 +633,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   cancel+save, cancel+discard) with a fake recorder.
 - `core/install_spec.rs`, `core/run_mode.rs`, `core/window_close.rs`,
   `core/daemon_watch.rs`, `core/wire.rs`, `core/app_info.rs`,
-  `core/commands.rs` — key/install-key JSON round-trips, mode dispatch,
+  `core/commands.rs` — key/install-key JSON round-trips (including the
+  `crisp_asr_engine` / `crisp_asr_model` kinds), mode dispatch,
   close policy, owner-watch policy, snapshot round-trip + tolerant parsing,
   pacman version parsing (AppImage VERSION file is read at runtime).
 - `processing/pipeline.rs` — fail-fast without audio, cancel-before-start,
@@ -623,6 +645,10 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   append-fallback, verbose-JSON segment extraction, clear auth errors.
 - `processing/providers/whisper_cpp.rs` — pure `parse_whisper_cpp_output`
   plus the injected-runner transcribe flow.
+- `processing/providers/crisp_asr.rs` (experimental) — pure
+  `parse_crisp_asr_output` (JSON segments + plain-text/log-line fallback),
+  `--gpu-backend` flag mapping, injected-runner transcribe flow reading the
+  `-ojf` sidecar, missing-engine/model guidance.
 - `processing/providers/ollama.rs` — unreachable-host tolerance.
 - `config/settings.rs` — key presence/URL warnings, effective-prompt
   fallback.
@@ -633,12 +659,15 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   autostart entry management (`autostart`), AppImage-aware exe resolution
   that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata +
   `has_audio` (`meeting_scanner`), payload inventory + dir sizes + status
-  JSON shape (`payloads`), in-tree-reuse vs. copy (`recording_import`),
+  JSON shape (`payloads`, including the `crispasr` engine/model rows), in-tree-reuse vs. copy (`recording_import`),
   uninstall target plan + removal (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +
   backend detection + verified download/extract/smoke-test
   (`whisper_cpp_service`, including auto→cpu routing, cuda rejection, and
-  missing-binary diagnostics naming archive contents), Ollama prefix-match +
+  missing-binary diagnostics naming archive contents),
+  CrispASR asset table + backend detection + download/extract/smoke-test
+  (`crisp_asr_service`, including all-three-flavor resolution, x86_64-only
+  Vulkan/CUDA guidance, and Nemotron model paths), Ollama prefix-match +
   unreachable tolerance + automatic `ollama serve` startup for pulls and
   summarization + `/api/tags` name/size parsing (`ollama_service`: local-host
   gating, readiness wait, pid-record ownership with verified stop-on-exit,
@@ -652,7 +681,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   summarize-only with a transcript, transcribe-only via Transcribe).
 - `ui/` — pure tray policy (`tray_model`: appearance priority, per-state menus,
   never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
-  pause bars / processing sweep), Models-tab visibility (`settings_visibility`),
+  pause bars / processing sweep), Models-tab visibility (`settings_visibility`,
+  now a 4-tuple with the CrispASR section),
   bundled artwork PNG decoding plus embedded fallback so the tray never
   renders empty (`tray`), the notification gate that suppresses alerts
   unless the StatusNotifier registration is live (`notifications`), and the

@@ -33,6 +33,8 @@ Item {
             llm_request_timeout_minutes: Number(cfg.llm_request_timeout_minutes || 5),
             whisper_cpp_model: cfg.whisper_cpp_model || "large-v3-turbo",
             whisper_cpp_backend: cfg.whisper_cpp_backend || "auto",
+            crisp_asr_model: cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0",
+            crisp_asr_backend: cfg.crisp_asr_backend || "auto",
             ollama_model: cfg.ollama_model || "phi4-mini",
             ollama_host: cfg.ollama_host || "http://localhost:11434",
             transcription_prompt: cfg.transcription_prompt || "",

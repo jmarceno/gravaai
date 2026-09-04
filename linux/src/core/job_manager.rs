@@ -41,12 +41,15 @@ struct PersistedState {
 pub fn default_state_dir() -> PathBuf {
     if let Ok(base) = std::env::var("XDG_STATE_HOME") {
         if !base.is_empty() {
-            return PathBuf::from(base).join("meeting-recorder");
+            return PathBuf::from(base).join(crate::config::defaults::APP_DIR_NAME);
         }
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("~"))
-        .join(".local/state/meeting-recorder")
+        .join(format!(
+            ".local/state/{}",
+            crate::config::defaults::APP_DIR_NAME
+        ))
 }
 
 /// Job list + jobs.json persistence. All methods are main-thread only.

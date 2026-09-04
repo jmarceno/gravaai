@@ -12,7 +12,9 @@
 
 use std::path::{Path, PathBuf};
 
-const FALLBACK_NAME: &str = "meeting-recorder";
+use crate::config::defaults::APP_DIR_NAME;
+
+const FALLBACK_NAME: &str = APP_DIR_NAME;
 
 /// Pure check: is `appimage`/`appdir` owned by the process whose exe is
 /// `current_exe`? Injectable for tests — never mutates process environment.
@@ -78,7 +80,7 @@ mod tests {
         let host_appimage = dir.path().join("Cursor.AppImage");
         fs::create_dir_all(&host_appdir).unwrap();
         fs::write(&host_appimage, b"x").unwrap();
-        let our_exe = dir.path().join("elsewhere/meeting-recorder");
+        let our_exe = dir.path().join(format!("elsewhere/{APP_DIR_NAME}"));
         fs::create_dir_all(our_exe.parent().unwrap()).unwrap();
         fs::write(&our_exe, b"x").unwrap();
 
@@ -94,9 +96,9 @@ mod tests {
         let appdir = dir.path().join("mr-mount");
         let bin_dir = appdir.join("usr/bin");
         fs::create_dir_all(&bin_dir).unwrap();
-        let fake_exe = bin_dir.join("meeting-recorder");
+        let fake_exe = bin_dir.join(APP_DIR_NAME);
         fs::write(&fake_exe, b"x").unwrap();
-        let appimage = dir.path().join("MeetingRecorder.AppImage");
+        let appimage = dir.path().join("gravaai.AppImage");
         fs::write(&appimage, b"x").unwrap();
 
         let got = own_appimage_from(Some(&appimage), Some(&appdir), &fake_exe);

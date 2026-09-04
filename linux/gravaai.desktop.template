@@ -1,12 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Meeting Recorder
+Name=GravaAi
 Comment=Record, transcribe and summarize meetings
 Exec=LAUNCHER_PATH
-Icon=meeting-recorder
+Icon=gravaai
 Terminal=false
 Categories=AudioVideo;Audio;Recorder;
 Keywords=meeting;record;transcribe;notes;audio;
 StartupNotify=true
-StartupWMClass=io.github.jmarceno.Gravaai
+StartupWMClass=io.github.jmarceno.GravaAi

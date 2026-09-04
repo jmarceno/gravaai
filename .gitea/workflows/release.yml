@@ -65,7 +65,7 @@ jobs:
         run: |
           unset APPIMAGE APPDIR || true
           export APPIMAGE_EXTRACT_AND_RUN=1
-          IMG="appimage-out/meeting-recorder-${VERSION}-${{ matrix.arch }}.AppImage"
+          IMG="appimage-out/gravaai-${VERSION}-${{ matrix.arch }}.AppImage"
           test -x "$IMG"
           # Role flags refuse garbage outside the daemon — exit 2 means the
           # binary ran and parsed argv (same check the old pacman smoke used).
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: appimage-${{ matrix.arch }}
-          path: appimage-out/meeting-recorder-*.AppImage
+          path: appimage-out/gravaai-*.AppImage
 
   release:
     needs: [get-version, build-appimage]
@@ -95,22 +95,22 @@ jobs:
       - name: Create source tarball
         run: |
           SRC=$(mktemp -d)
-          cp -r . "${SRC}/meeting-recorder-${VERSION}"
+          cp -r . "${SRC}/gravaai-${VERSION}"
           rm -rf \
-            "${SRC}/meeting-recorder-${VERSION}/.git" \
-            "${SRC}/meeting-recorder-${VERSION}/.claude" \
-            "${SRC}/meeting-recorder-${VERSION}/gh-pages-dir" \
-            "${SRC}/meeting-recorder-${VERSION}/linux/target" \
-            "${SRC}/meeting-recorder-${VERSION}/linux/packaging/appimage/out" \
-            "${SRC}/meeting-recorder-${VERSION}/linux/packaging/appimage/.tools" \
-            "${SRC}/meeting-recorder-${VERSION}/target"
-          tar -czf "meeting-recorder_${VERSION}.tar.gz" -C "${SRC}" "meeting-recorder-${VERSION}"
+            "${SRC}/gravaai-${VERSION}/.git" \
+            "${SRC}/gravaai-${VERSION}/.claude" \
+            "${SRC}/gravaai-${VERSION}/gh-pages-dir" \
+            "${SRC}/gravaai-${VERSION}/linux/target" \
+            "${SRC}/gravaai-${VERSION}/linux/packaging/appimage/out" \
+            "${SRC}/gravaai-${VERSION}/linux/packaging/appimage/.tools" \
+            "${SRC}/gravaai-${VERSION}/target"
+          tar -czf "gravaai_${VERSION}.tar.gz" -C "${SRC}" "gravaai-${VERSION}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.get-version.outputs.version }}
           files: |
-            meeting-recorder-*.AppImage
-            meeting-recorder_*.tar.gz
+            gravaai-*.AppImage
+            gravaai_*.tar.gz
           generate_release_notes: true

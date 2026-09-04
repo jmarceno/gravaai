@@ -1,4 +1,4 @@
-// Meeting Recorder — single binary, dispatched by CLI flag (see core::run_mode).
+// GravaAi — single binary, dispatched by CLI flag (see core::run_mode).
 //
 // Single binary, dispatched by CLI flag (see core::run_mode):
 //   --daemon    GTK-free background daemon (engine + tray + D-Bus service)

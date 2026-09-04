@@ -70,7 +70,7 @@ impl MainWindow {
 
             let window = adw::ApplicationWindow::builder()
                 .application(application)
-                .title("Meeting Recorder")
+                .title(crate::config::defaults::APP_NAME)
                 .default_width(1100)
                 .default_height(760)
                 .resizable(true)
@@ -588,7 +588,7 @@ impl MainWindow {
             Presentation::Dialog => {
                 let alert = gtk::AlertDialog::builder()
                     .modal(true)
-                    .message("Meeting Recorder")
+                    .message("GravaAi")
                     .detail(msg)
                     .buttons(["OK"])
                     .build();
@@ -609,7 +609,7 @@ impl MainWindow {
     fn build_gear_menu_button(this: &Rc<Self>) -> gtk::MenuButton {
         let menu = gtk::gio::Menu::new();
         menu.append(Some("Preferences"), Some("gear.preferences"));
-        menu.append(Some("About Meeting Recorder"), Some("gear.about"));
+        menu.append(Some("About GravaAi"), Some("gear.about"));
 
         let actions = gtk::gio::SimpleActionGroup::new();
         {
@@ -656,7 +656,7 @@ impl MainWindow {
         let version = app_info::installed_version();
         let mut builder = adw::AboutDialog::builder()
             .application_name(crate::config::defaults::APP_NAME)
-            .application_icon("meeting-recorder")
+            .application_icon(crate::config::defaults::APP_DIR_NAME)
             .developer_name(app_info::DEVELOPER_NAME)
             .comments(app_info::DESCRIPTION)
             .website(app_info::REPOSITORY)

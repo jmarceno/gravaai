@@ -3,7 +3,8 @@
 //! When no Secret Service is reachable
 //! everything falls back to chmod-600 `config.json`, exactly like before.
 
-const SERVICE: &str = "meeting-recorder";
+use crate::config::defaults::APP_DIR_NAME;
+
 const ACCOUNT: &str = "openai-api-key";
 
 pub struct KeyringStore {
@@ -12,7 +13,7 @@ pub struct KeyringStore {
 
 impl KeyringStore {
     pub fn new() -> Self {
-        let entry = keyring::Entry::new(SERVICE, ACCOUNT).ok();
+        let entry = keyring::Entry::new(APP_DIR_NAME, ACCOUNT).ok();
         Self { entry }
     }
 

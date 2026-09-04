@@ -1,4 +1,4 @@
-//! Client mode (`meeting-recorder` with no role flag).
+//! Client mode (`gravaai` with no role flag).
 //!
 //!
 //! What the app-menu launcher invokes: make sure the daemon is running

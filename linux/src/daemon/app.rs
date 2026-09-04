@@ -1,4 +1,4 @@
-//! The daemon entry point (`meeting-recorder --daemon`).
+//! The daemon entry point (`gravaai --daemon`).
 //!
 //!
 //! Runs the GTK-free engine, tray, call detector and D-Bus service on a
@@ -25,7 +25,7 @@ use crate::daemon::processor::{ChildEvent, ProcessorHandle, ProcessorLauncher};
 use crate::daemon::window_supervisor::WindowSupervisor;
 use crate::detection::call_detector::CallDetector;
 use crate::ui::notifications::notify;
-use crate::ui::tray::{update_tray, AppTray};
+use crate::ui::tray::{tick_tray_animation, update_tray, AppTray};
 use ksni::TrayMethods as _;
 
 /// Messages marshalled onto the daemon loop (the "main thread").
@@ -355,11 +355,15 @@ async fn async_main() {
     // what is missing instead (tray-only users would otherwise get silence).
     if let Some(msg) = crate::utils::dependencies::describe_missing_required() {
         log::error!("{msg}");
-        notify("Meeting Recorder", &msg);
+        notify("GravaAi", &msg);
     }
 
     // Initial paint.
     refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
+
+    // Tray recording/processing effects: recompose pixmap only (~12 fps).
+    let mut tray_anim = tokio::time::interval(Duration::from_millis(80));
+    tray_anim.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         enum Wake {
@@ -368,6 +372,7 @@ async fn async_main() {
             Install((String, InstallEvent)),
             InstallProg((String, String)),
             InstallDone((String, bool, String)),
+            TrayAnim,
             Signal,
         }
         let wake = {
@@ -380,6 +385,7 @@ async fn async_main() {
                     Some(i) = install_rx.recv() => Wake::Install(i),
                     Some(p) = install_prog_rx.recv() => Wake::InstallProg(p),
                     Some(d) = install_done_rx.recv() => Wake::InstallDone(d),
+                    _ = tray_anim.tick() => Wake::TrayAnim,
                     _ = wait_unix_signal(sigterm.as_mut()) => Wake::Signal,
                     _ = wait_unix_signal(sigint.as_mut()) => Wake::Signal,
                     else => break,
@@ -394,11 +400,18 @@ async fn async_main() {
                     Some(i) = install_rx.recv() => Wake::Install(i),
                     Some(p) = install_prog_rx.recv() => Wake::InstallProg(p),
                     Some(d) = install_done_rx.recv() => Wake::InstallDone(d),
+                    _ = tray_anim.tick() => Wake::TrayAnim,
                     else => break,
                 }
             }
         };
         match wake {
+            Wake::TrayAnim => {
+                // Pixmap-only; never push a D-Bus snapshot on anim ticks.
+                if let Some(h) = tray_handle.as_ref() {
+                    tick_tray_animation(h).await;
+                }
+            }
             Wake::Signal => break,
             Wake::Msg(DaemonMsg::Quit) => break,
             Wake::Msg(DaemonMsg::EngineChanged) => {
@@ -409,13 +422,13 @@ async fn async_main() {
                 let _ = iface_ref.error(m.clone()).await;
                 // Tray-only users have no window to show the error in —
                 // surface it as a desktop notification instead of silence.
-                notify("Meeting Recorder", &m);
+                notify("GravaAi", &m);
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
             Wake::Msg(DaemonMsg::EngineOutput(t)) => {
                 use dbus_service::EngineIfaceSignals as _;
                 let _ = iface_ref.output(t.clone()).await;
-                notify("Meeting Recorder", &t);
+                notify("GravaAi", &t);
             }
             Wake::Msg(DaemonMsg::TrayCommand(cmd)) => {
                 if handle_tray_command(&ctx, &cmd).await {
@@ -450,7 +463,7 @@ async fn async_main() {
                 ctx.engine.lock().await.recorder_error(&m);
                 use dbus_service::EngineIfaceSignals as _;
                 let _ = iface_ref.error(m.clone()).await;
-                notify("Meeting Recorder", &m);
+                notify("GravaAi", &m);
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
             Wake::Msg(DaemonMsg::EmitPresent) => {
@@ -481,7 +494,7 @@ async fn async_main() {
                         format!("Install {k} failed: {}", m.trim())
                     };
                     log::error!("{detail}");
-                    notify("Meeting Recorder", &detail);
+                    notify("GravaAi", &detail);
                 }
             }
             Wake::Msg(DaemonMsg::ConfigReloaded) => {
@@ -525,7 +538,7 @@ async fn async_main() {
         == crate::services::ollama_service::OwnedServerStop::Stopped
     {
         notify(
-            "Meeting Recorder",
+            "GravaAi",
             "Stopped the Ollama server started automatically (it was not running before).",
         );
     }
@@ -605,7 +618,7 @@ fn start_detector(
         }
         crate::ui::notifications::notify(
             "Call Detected",
-            "A call may have started. Open Meeting Recorder to start recording.",
+            "A call may have started. Open GravaAi to start recording.",
         );
         let _ = msg_tx.send(DaemonMsg::EngineChanged);
     });

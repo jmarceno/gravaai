@@ -1,12 +1,12 @@
 [package]
-name = "meeting-recorder"
+name = "gravaai"
 version = "0.1.0"
 edition = "2021"
-description = "Meeting recorder, transcriber and organizer for Linux (Rust port)"
+description = "GravaAi — meeting recorder, transcriber and organizer for Linux"
 license = "MIT"
 
 [[bin]]
-name = "meeting-recorder"
+name = "gravaai"
 path = "src/main.rs"
 
 [dependencies]

@@ -2,14 +2,16 @@
 
 use std::path::PathBuf;
 
+use crate::config::defaults::APP_DIR_NAME;
+
 fn system_log_dir() -> PathBuf {
-    PathBuf::from("/var/log/meeting-recorder")
+    PathBuf::from(format!("/var/log/{APP_DIR_NAME}"))
 }
 
 fn fallback_log_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("~"))
-        .join(".local/share/meeting-recorder")
+        .join(format!(".local/share/{APP_DIR_NAME}"))
 }
 
 fn writable_dir(p: &PathBuf) -> bool {

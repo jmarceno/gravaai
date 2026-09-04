@@ -5,12 +5,11 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::config::defaults::APP_ID;
+use crate::config::defaults::{APP_DIR_NAME, APP_ID, APP_NAME};
 use crate::core::run_mode::DAEMON_FLAG;
 use crate::utils::exe::own_appimage;
 
-pub const APP_NAME: &str = "meeting-recorder";
-pub const DESKTOP_FILENAME: &str = "meeting-recorder.desktop";
+pub const DESKTOP_FILENAME: &str = "gravaai.desktop";
 
 fn autostart_dir() -> PathBuf {
     dirs::home_dir()
@@ -38,33 +37,33 @@ fn find_exec() -> String {
         return desktop_exec_path(&appimage);
     }
     // Prefer known install locations, then PATH, then bare name at login.
-    for candidate in ["/usr/bin/meeting-recorder"] {
-        if Path::new(candidate).exists() {
-            return candidate.to_string();
+    for candidate in [format!("/usr/bin/{APP_DIR_NAME}")] {
+        if Path::new(&candidate).exists() {
+            return candidate;
         }
     }
     if let Some(home) = dirs::home_dir() {
-        let local = home.join(".local/bin/meeting-recorder");
+        let local = home.join(format!(".local/bin/{APP_DIR_NAME}"));
         if local.exists() {
             return desktop_exec_path(&local);
         }
     }
     if let Ok(path) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path) {
-            let c = dir.join(APP_NAME);
+            let c = dir.join(APP_DIR_NAME);
             if c.is_file() {
                 return desktop_exec_path(&c);
             }
         }
     }
-    APP_NAME.to_string()
+    APP_DIR_NAME.to_string()
 }
 
 fn desktop_template(exec_path: &str) -> String {
     format!(
-        "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Meeting Recorder\n\
+        "[Desktop Entry]\nVersion=1.0\nType=Application\nName={APP_NAME}\n\
          Comment=Record, transcribe and summarize meetings\nExec={exec_path} {DAEMON_FLAG}\n\
-         Icon=meeting-recorder\nTerminal=false\nCategories=AudioVideo;Audio;Recorder;\n\
+         Icon={APP_DIR_NAME}\nTerminal=false\nCategories=AudioVideo;Audio;Recorder;\n\
          Keywords=meeting;record;transcribe;notes;audio;\nStartupNotify=true\nStartupWMClass={APP_ID}\n"
     )
 }
@@ -101,12 +100,12 @@ mod tests {
     #[test]
     fn desktop_exec_quotes_whitespace() {
         assert_eq!(
-            desktop_exec_path(Path::new("/opt/Meeting Recorder.AppImage")),
-            "\"/opt/Meeting Recorder.AppImage\""
+            desktop_exec_path(Path::new("/opt/GravaAi AppImage.AppImage")),
+            "\"/opt/GravaAi AppImage.AppImage\""
         );
         assert_eq!(
-            desktop_exec_path(Path::new("/opt/MeetingRecorder.AppImage")),
-            "/opt/MeetingRecorder.AppImage"
+            desktop_exec_path(Path::new("/opt/gravaai.AppImage")),
+            "/opt/gravaai.AppImage"
         );
     }
 }

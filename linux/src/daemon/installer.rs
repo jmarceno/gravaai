@@ -71,7 +71,7 @@ fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<(
     }
 }
 
-/// Entry for `meeting-recorder --install <spec-json>`. Internal daemon
+/// Entry for `gravaai --install <spec-json>`. Internal daemon
 /// plumbing only: refuses to run unless spawned by the daemon (see
 /// `core::run_mode::CHILD_ENV`). Returns exit code.
 pub fn run_install_child(spec_json: &str) -> i32 {
@@ -79,7 +79,7 @@ pub fn run_install_child(spec_json: &str) -> i32 {
     if !crate::core::run_mode::child_allowed() {
         eprintln!("--install is internal daemon plumbing, not a user command.");
         eprintln!("Run the app normally (no flags) to open the graphical UI.");
-        eprintln!("To remove the app, run: meeting-recorder --uninstall");
+        eprintln!("To remove the app, run: gravaai --uninstall");
         return 2;
     }
     let spec = match crate::core::install_spec::spec_from_json(spec_json) {

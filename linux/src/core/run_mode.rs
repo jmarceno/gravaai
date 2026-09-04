@@ -19,7 +19,7 @@ pub const UNINSTALL_FLAG: &str = "--uninstall";
 /// Marker the daemon sets when spawning its `--process` / `--install`
 /// children. Those roles are internal plumbing — headless use is forbidden,
 /// the app always runs as the graphical daemon/window pair.
-pub const CHILD_ENV: &str = "MEETING_RECORDER_CHILD";
+pub const CHILD_ENV: &str = "GRAVAAI_CHILD";
 
 /// True only inside a daemon-spawned child. Direct `--process` / `--install`
 /// invocations are refused (see `daemon::processor` / `daemon::installer`).
@@ -54,7 +54,7 @@ mod tests {
     use super::*;
 
     fn argv(flags: &[&str]) -> Vec<String> {
-        std::iter::once("meeting-recorder".to_string())
+        std::iter::once("gravaai".to_string())
             .chain(flags.iter().map(|s| s.to_string()))
             .collect()
     }

@@ -1,9 +1,9 @@
-//! Self-uninstall (`meeting-recorder --uninstall`).
+//! Self-uninstall (`gravaai --uninstall`).
 //!
 //! The binary removes everything it ever installed or created, so no shell
 //! script is needed and nothing is left behind: the running daemon/window,
 //! the installed binary copy, desktop entries, the autostart entry, hicolor
-//! icons, `~/.local/share/meeting-recorder` (assets, engines, models, logs),
+//! icons, `~/.local/share/gravaai` (assets, engines, models, logs),
 //! the config dir, the keyring credential, the state dir, and the system log
 //! dir (best-effort — needs root, skipped gracefully otherwise).
 //!
@@ -11,17 +11,11 @@
 //! summary tells the user where they are.
 
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 
-use crate::config::defaults::APP_ID;
+use crate::config::defaults::{APP_DIR_NAME, APP_ID};
 use crate::config::keyring_store::KeyringStore;
 use crate::core::job_manager::default_state_dir;
-
-pub const APP_NAME: &str = "meeting-recorder";
-
-const LEGACY_DESKTOP_IDS: &[&str] = &[
-    "io.github.dipakmdhrm.MeetingRecorder",
-    "com.github.mint-meeting-recorder",
-];
 
 const ICON_SIZES: &[u32] = &[16, 24, 32, 48, 64, 128, 256];
 
@@ -31,37 +25,28 @@ const ICON_SIZES: &[u32] = &[16, 24, 32, 48, 64, 128, 256];
 pub fn plan(home: &Path, state_dir: &Path) -> Vec<PathBuf> {
     let mut targets = Vec::new();
     // Installed binary copy.
-    targets.push(home.join(".local/bin").join(APP_NAME));
+    targets.push(home.join(".local/bin").join(APP_DIR_NAME));
     // App data: tray artwork, icons copy, whisper.cpp engine + models, logs.
-    targets.push(home.join(".local/share").join(APP_NAME));
-    // Desktop entries (current id + legacy names).
+    targets.push(home.join(".local/share").join(APP_DIR_NAME));
+    // Desktop entries.
     let apps = home.join(".local/share/applications");
     targets.push(apps.join(format!("{APP_ID}.desktop")));
-    for id in LEGACY_DESKTOP_IDS {
-        targets.push(apps.join(format!("{id}.desktop")));
-    }
-    targets.push(apps.join(format!("{APP_NAME}.desktop")));
+    targets.push(apps.join(format!("{APP_DIR_NAME}.desktop")));
     // Autostart entry.
     targets.push(
         home.join(".config/autostart")
-            .join(format!("{APP_NAME}.desktop")),
+            .join(format!("{APP_DIR_NAME}.desktop")),
     );
-    // Hicolor icons (current + legacy names).
+    // Hicolor icons.
     let theme = home.join(".local/share/icons/hicolor");
     for size in ICON_SIZES {
         let dir = theme.join(format!("{size}x{size}/apps"));
-        targets.push(dir.join(format!("{APP_NAME}.png")));
-        for id in LEGACY_DESKTOP_IDS {
-            targets.push(dir.join(format!("{id}.png")));
-        }
+        targets.push(dir.join(format!("{APP_DIR_NAME}.png")));
     }
     let scalable = theme.join("scalable/apps");
-    targets.push(scalable.join(format!("{APP_NAME}.svg")));
-    for id in LEGACY_DESKTOP_IDS {
-        targets.push(scalable.join(format!("{id}.svg")));
-    }
+    targets.push(scalable.join(format!("{APP_DIR_NAME}.svg")));
     // Config (incl. plaintext API key when no keyring is in use).
-    targets.push(home.join(".config").join(APP_NAME));
+    targets.push(home.join(".config").join(APP_DIR_NAME));
     // Job/state dir.
     targets.push(state_dir.to_path_buf());
     targets
@@ -117,20 +102,20 @@ pub fn remove_all(home: &Path, state_dir: &Path, exe: &Path) -> Vec<PathBuf> {
 fn best_effort(cmd: &str, args: &[&str]) {
     let _ = std::process::Command::new(cmd)
         .args(args)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status();
 }
 
 /// Stop any running daemon/window (best-effort, never fails the uninstall).
 fn stop_running() {
     for role in ["--daemon", "--window"] {
-        // Installed / mounted binary: ".../meeting-recorder --daemon"
-        best_effort("pkill", &["-f", &format!("{APP_NAME} {role}")]);
-        // AppImage file: ".../meeting-recorder-<ver>-<arch>.AppImage --daemon"
+        // Installed / mounted binary: ".../gravaai --daemon"
+        best_effort("pkill", &["-f", &format!("{APP_DIR_NAME} {role}")]);
+        // AppImage file: ".../gravaai-<ver>-<arch>.AppImage --daemon"
         best_effort(
             "pkill",
-            &["-f", &format!("{APP_NAME}-.*\\.AppImage {role}")],
+            &["-f", &format!("{APP_DIR_NAME}-.*\\.AppImage {role}")],
         );
     }
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -143,10 +128,10 @@ pub fn run_uninstall() -> i32 {
     // Prefer our own AppImage file (never a host IDE's APPIMAGE). The mounted
     // squashfs binary is not deletable; removing the .AppImage is.
     let exe = crate::utils::exe::own_appimage().unwrap_or_else(|| {
-        std::env::current_exe().unwrap_or_else(|_| home.join(".local/bin").join(APP_NAME))
+        std::env::current_exe().unwrap_or_else(|_| home.join(".local/bin").join(APP_DIR_NAME))
     });
 
-    println!("Stopping {APP_NAME}…");
+    println!("Stopping {APP_DIR_NAME}…");
     stop_running();
 
     let state_dir = default_state_dir();
@@ -156,7 +141,7 @@ pub fn run_uninstall() -> i32 {
     }
 
     // System log dir: only removable as root; never escalate, just try.
-    let system_log = Path::new("/var/log").join(APP_NAME);
+    let system_log = Path::new("/var/log").join(APP_DIR_NAME);
     if system_log.exists() {
         if remove_path(&system_log) {
             println!("Removed {}", system_log.display());
@@ -196,24 +181,20 @@ mod tests {
     #[test]
     fn plan_covers_install_artifacts() {
         let home = PathBuf::from("/home/tester");
-        let state = PathBuf::from("/home/tester/.local/state/meeting-recorder");
+        let state = PathBuf::from(format!("/home/tester/.local/state/{APP_DIR_NAME}"));
         let targets = plan(&home, &state);
         let has = |suffix: &str| {
             targets
                 .iter()
                 .any(|p| p.to_string_lossy().ends_with(suffix))
         };
-        assert!(has(".local/bin/meeting-recorder"));
-        assert!(has("applications/io.github.jmarceno.Gravaai.desktop"));
-        assert!(has(
-            "applications/io.github.dipakmdhrm.MeetingRecorder.desktop"
-        ));
-        assert!(has("applications/com.github.mint-meeting-recorder.desktop"));
-        assert!(has(".config/autostart/meeting-recorder.desktop"));
-        assert!(has("hicolor/48x48/apps/meeting-recorder.png"));
-        assert!(has("hicolor/scalable/apps/meeting-recorder.svg"));
-        assert!(has(".local/share/meeting-recorder"));
-        assert!(has(".config/meeting-recorder"));
+        assert!(has(&format!(".local/bin/{APP_DIR_NAME}")));
+        assert!(has(&format!("applications/{APP_ID}.desktop")));
+        assert!(has(&format!(".config/autostart/{APP_DIR_NAME}.desktop")));
+        assert!(has(&format!("hicolor/48x48/apps/{APP_DIR_NAME}.png")));
+        assert!(has(&format!("hicolor/scalable/apps/{APP_DIR_NAME}.svg")));
+        assert!(has(&format!(".local/share/{APP_DIR_NAME}")));
+        assert!(has(&format!(".config/{APP_DIR_NAME}")));
         assert!(targets.contains(&state));
     }
 
@@ -221,8 +202,8 @@ mod tests {
     fn remove_all_clears_fake_home() {
         let dir = fake_home();
         let home = dir.path();
-        let state = home.join(".local/state/meeting-recorder");
-        let exe = home.join(".local/bin").join(APP_NAME);
+        let state = home.join(format!(".local/state/{APP_DIR_NAME}"));
+        let exe = home.join(".local/bin").join(APP_DIR_NAME);
         // Plant every planned target.
         for target in plan(home, &state) {
             if target == exe {

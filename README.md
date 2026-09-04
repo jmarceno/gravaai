@@ -1,4 +1,4 @@
-# Meeting Recorder
+# GravaAi
 
 A meeting recorder that transcribes audio and generates structured notes using
 any OpenAI-compatible API, fully local Whisper/Ollama engines, or a mix of both.
@@ -55,7 +55,7 @@ Each recording session creates a folder:
   The Rust toolchain is only required to build from source (see below).
 
 > **Look & theming:** the app uses **libadwaita**, so it follows your system **light/dark** preference and renders in the Adwaita style. On non-GNOME desktops (KDE, XFCE, Cinnamon, …) it still runs perfectly but keeps the Adwaita look rather than matching a custom desktop theme — this is libadwaita's intended behavior.
-- Delivery is a single **AppImage** (`meeting-recorder-<version>-<arch>.AppImage`) that bundles the app binary and icons; GTK4/libadwaita and the helper programs above stay on the host.
+- Delivery is a single **AppImage** (`gravaai-<version>-<arch>.AppImage`) that bundles the app binary and icons; GTK4/libadwaita and the helper programs above stay on the host.
 
 The base install is **cloud-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
 
@@ -69,13 +69,13 @@ The base install is **cloud-only and minimal** — no local engines or GPU libra
 
 ### Installation
 
-Download `meeting-recorder-<version>-<arch>.AppImage` from the
+Download `gravaai-<version>-<arch>.AppImage` from the
 [Releases](../../releases) page, make it executable, and run it — that single
 file is the whole app (daemon, window, tray, bundled icons):
 
 ```bash
-chmod +x meeting-recorder-*-x86_64.AppImage
-./meeting-recorder-*-x86_64.AppImage
+chmod +x gravaai-*-x86_64.AppImage
+./gravaai-*-x86_64.AppImage
 ```
 
 Optional: move it somewhere on your `PATH` (e.g. `~/.local/bin/`) or integrate
@@ -91,7 +91,7 @@ icons, autostart entry, engines, models, logs, config and the stored API key —
 recordings are kept):
 
 ```bash
-./meeting-recorder-*.AppImage --uninstall
+./gravaai-*.AppImage --uninstall
 ```
 
 > **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. Install your distro's package for it (e.g. on Arch `sudo pacman -S gnome-shell-extension-appindicator`), then enable it in the GNOME Extensions app and log out/in.
@@ -104,18 +104,18 @@ Building from source requires the Rust toolchain and is only needed for
 development — regular installs never compile anything:
 
 ```bash
-cd meeting-recorder
+cd gravaai
 cargo build --manifest-path linux/Cargo.toml
-./linux/target/debug/meeting-recorder
+./linux/target/debug/gravaai
 
 # Pack a local AppImage (release build + assets):
 ./linux/packaging/appimage/build-appimage.sh
 ```
 
-`meeting-recorder` (no flag) is **client** mode: it starts the background
+`gravaai` (no flag) is **client** mode: it starts the background
 daemon if needed and opens a window. To run the pieces directly, use
-`meeting-recorder --daemon` (the GTK-free tray daemon) and
-`meeting-recorder --window` (the GTK window, normally spawned by the daemon).
+`gravaai --daemon` (the GTK-free tray daemon) and
+`gravaai --window` (the GTK window, normally spawned by the daemon).
 
 ### Recording Modes
 
@@ -144,7 +144,7 @@ Mix and match freely — e.g. whisper.cpp for transcription + Ollama for summari
 
 ### First-Time Setup
 
-Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear icon also has an **About Meeting Recorder** entry showing the app version and project links.
+Open **Settings** (gear icon → **Preferences**, or the tray menu). The gear icon also has an **About GravaAi** entry showing the app version and project links.
 
 1. **General tab** — choose your transcription and summarization services; set output folder and recording quality
 2. **Models tab** — configure the selected services:
@@ -254,7 +254,7 @@ systemctl --user restart pipewire pipewire-pulse
 
 ### Logs
 
-Application logs written to `/var/log/meeting-recorder/` (fallback: `~/.local/share/meeting-recorder/`):
+Application logs written to `/var/log/gravaai/` (fallback: `~/.local/share/gravaai/`):
 
 ```
 app.log    — DEBUG and INFO messages
@@ -269,7 +269,7 @@ error.log  — WARNING and above
 
 ```
 linux/
-├── src/                   # Rust app (single `meeting-recorder` binary)
+├── src/                   # Rust app (single `gravaai` binary)
 │   ├── main.rs            # role dispatch: --daemon / --window / --process / --install / --uninstall / client
 │   ├── config/            # defaults + settings + keyring
 │   ├── core/              # state machine, jobs, recording controller, retry, wire format

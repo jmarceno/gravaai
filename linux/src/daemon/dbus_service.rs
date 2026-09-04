@@ -1,6 +1,6 @@
 //! The D-Bus Engine service: the daemon↔window boundary.
 //!
-//! Exposes `io.github.jmarceno.Gravaai.Engine` on the session bus. Method
+//! Exposes `io.github.jmarceno.GravaAi.Engine` on the session bus. Method
 //! calls from the window process are routed to the in-daemon [`Engine`];
 //! state changes are pushed back as `SnapshotChanged` signals (plus `Error` /
 //! `Output` / `PresentWindow` / install signals) by the daemon loop, which
@@ -17,7 +17,7 @@ use crate::daemon::install_manager::InstallManager;
 use crate::daemon::window_supervisor::WindowSupervisor;
 
 pub const ENGINE_NAME: &str = APP_ID;
-pub const ENGINE_PATH: &str = "/io/github/jmarceno/Gravaai";
+pub const ENGINE_PATH: &str = "/io/github/jmarceno/GravaAi";
 
 /// Shared daemon state behind the D-Bus interface.
 pub struct ServiceCtx {
@@ -38,7 +38,7 @@ impl EngineIface {
     }
 }
 
-#[zbus::interface(name = "io.github.jmarceno.Gravaai.Engine")]
+#[zbus::interface(name = "io.github.jmarceno.GravaAi.Engine")]
 impl EngineIface {
     async fn start_recording(&self, mode: String) {
         let mut engine = self.ctx.engine.lock().await;

@@ -52,7 +52,7 @@ fn emit(prefix: &str, text: &str) {
     println!("{prefix}{}", text.replace('\n', " "));
 }
 
-/// Entry for `meeting-recorder --process <audio> <transcript> <notes>`.
+/// Entry for `gravaai --process <audio> <transcript> <notes>`.
 /// Internal daemon plumbing only: refuses to run unless spawned by the
 /// daemon (see `core::run_mode::CHILD_ENV`). Returns the process exit code.
 pub fn run_processor_child(args: &[String]) -> i32 {

@@ -2,23 +2,23 @@
 //!
 //! The engine is fetched as an official upstream binary release — never built
 //! from source, so the user machine needs no compiler. Binaries land in
-//! `~/.local/share/meeting-recorder/whisper.cpp/` (`whisper-cli` plus its
+//! `~/.local/share/gravaai/whisper.cpp/` (`whisper-cli` plus its
 //! `.so` libraries, run with `LD_LIBRARY_PATH` pointed there); GGML models
-//! live in `~/.local/share/meeting-recorder/whisper-cpp-models/`.
+//! live in `~/.local/share/gravaai/whisper-cpp-models/`.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::config::defaults::{
-    whisper_cpp_engine_asset, whisper_cpp_engine_url, whisper_cpp_ggml_file,
+    whisper_cpp_engine_asset, whisper_cpp_engine_url, whisper_cpp_ggml_file, APP_DIR_NAME,
     WHISPER_CPP_GGML_BASE_URL,
 };
 
 pub fn whisper_cpp_home() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("~"))
-        .join(".local/share/meeting-recorder/whisper.cpp")
+        .join(format!(".local/share/{APP_DIR_NAME}/whisper.cpp"))
 }
 
 pub fn whisper_cpp_binary() -> PathBuf {
@@ -28,7 +28,7 @@ pub fn whisper_cpp_binary() -> PathBuf {
 pub fn whisper_cpp_models_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("~"))
-        .join(".local/share/meeting-recorder/whisper-cpp-models")
+        .join(format!(".local/share/{APP_DIR_NAME}/whisper-cpp-models"))
 }
 
 /// Best engine flavor for this machine: `"cuda"` when an NVIDIA GPU is

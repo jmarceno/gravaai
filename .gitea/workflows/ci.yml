@@ -61,7 +61,7 @@ jobs:
         run: |
           unset APPIMAGE APPDIR || true
           export APPIMAGE_EXTRACT_AND_RUN=1
-          IMG="appimage-out/meeting-recorder-0.0.0-${{ matrix.arch }}.AppImage"
+          IMG="appimage-out/gravaai-0.0.0-${{ matrix.arch }}.AppImage"
           test -x "$IMG"
           "$IMG" --install 'garbage' || test $? -eq 2
           echo "AppImage runs OK"

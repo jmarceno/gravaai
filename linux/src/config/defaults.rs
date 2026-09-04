@@ -5,8 +5,11 @@
 //! OpenAI, Ollama, llama.cpp server, vLLM, LiteLLM, ...).
 
 /// D-Bus / desktop application id.
-pub const APP_ID: &str = "io.github.jmarceno.Gravaai";
-pub const APP_NAME: &str = "Meeting Recorder";
+pub const APP_ID: &str = "io.github.jmarceno.GravaAi";
+/// User-facing display name.
+pub const APP_NAME: &str = "GravaAi";
+/// Filesystem / binary / icon / XDG directory basename.
+pub const APP_DIR_NAME: &str = "gravaai";
 pub const DEFAULT_OUTPUT_FOLDER: &str = "~/meetings";
 
 pub fn whisper_cpp_model_info(model: &str) -> (&'static str, &'static str) {

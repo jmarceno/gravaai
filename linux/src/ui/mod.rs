@@ -5,6 +5,7 @@ pub mod engine_proxy;
 pub mod notifications;
 pub mod settings_visibility;
 pub mod tray;
+pub mod tray_icon;
 pub mod tray_model;
 
 #[cfg(feature = "ui")]

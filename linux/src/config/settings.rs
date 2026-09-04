@@ -1,7 +1,7 @@
 //! Persistent application configuration.
 //!
 //! Config lives in
-//! `~/.config/meeting-recorder/config.json` (`chmod 600`), written atomically
+//! `~/.config/gravaai/config.json` (`chmod 600`), written atomically
 //! via tmp+rename. The OpenAI-compatible API key lives in the Secret Service
 //! keyring when one is reachable; `config.json` then only carries the
 //! `@keyring` sentinel.
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde_json::Value;
 
-use super::defaults::Config;
+use super::defaults::{Config, APP_DIR_NAME};
 use super::keyring_store::KeyringStore;
 
 /// Written to config.json in place of the real key when it lives in the keyring.
@@ -25,14 +25,14 @@ pub fn config_path() -> PathBuf {
 
 fn shellexpand_config_file() -> String {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-    home.join(".config/meeting-recorder/config.json")
+    home.join(format!(".config/{APP_DIR_NAME}/config.json"))
         .to_string_lossy()
         .into_owned()
 }
 
 fn config_dir() -> PathBuf {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-    home.join(".config/meeting-recorder")
+    home.join(format!(".config/{APP_DIR_NAME}"))
 }
 
 /// Load config: defaults merged with stored values.

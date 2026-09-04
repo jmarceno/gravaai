@@ -2,16 +2,18 @@
 
 use std::path::PathBuf;
 
+use crate::config::defaults::APP_DIR_NAME;
+
 pub const DESCRIPTION: &str =
     "Records meetings and generates transcripts and structured notes using AI.";
 pub const REPOSITORY: &str = "https://github.com/jmarceno/gravaai";
 pub const ISSUE_URL: &str = "https://github.com/jmarceno/gravaai/issues";
 pub const DEVELOPER_NAME: &str = "jmarceno";
 pub const DEVELOPERS: &[&str] = &["jmarceno <https://github.com/jmarceno>"];
-pub const COPYRIGHT: &str = "© 2026 jmarceno (hard fork of Dipak Yadav's meeting-recorder)";
-pub const PACKAGE_NAME: &str = "meeting-recorder";
+pub const COPYRIGHT: &str = "© 2026 jmarceno";
+pub const PACKAGE_NAME: &str = APP_DIR_NAME;
 
-/// Read the installed pacman package version (`pacman -Q meeting-recorder`
+/// Read the installed pacman package version (`pacman -Q gravaai`
 /// prints `<name> <version>`). Returns None on a source checkout or when
 /// pacman is unavailable. The command runner is injectable for tests.
 pub fn resolve_version(run: &dyn Fn() -> Option<String>) -> Option<String> {
@@ -31,12 +33,13 @@ pub fn resolve_version(run: &dyn Fn() -> Option<String>) -> Option<String> {
 }
 
 /// Version stamped into the AppImage at pack time
-/// (`usr/share/meeting-recorder/VERSION`). Only consulted when we are
+/// (`usr/share/gravaai/VERSION`). Only consulted when we are
 /// actually running from our own AppImage (host IDE AppImages are ignored).
 fn version_from_appimage() -> Option<String> {
     let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
     crate::utils::exe::own_appimage()?;
-    let text = std::fs::read_to_string(appdir.join("usr/share/meeting-recorder/VERSION")).ok()?;
+    let text =
+        std::fs::read_to_string(appdir.join(format!("usr/share/{APP_DIR_NAME}/VERSION"))).ok()?;
     let version = text.trim();
     if version.is_empty() {
         None
@@ -65,7 +68,7 @@ mod tests {
 
     #[test]
     fn parses_pacman_output() {
-        let v = resolve_version(&|| Some("meeting-recorder 1.2.0-1\n".to_string()));
+        let v = resolve_version(&|| Some(format!("{PACKAGE_NAME} 1.2.0-1\n")));
         assert_eq!(v.as_deref(), Some("1.2.0-1"));
     }
 
@@ -76,6 +79,10 @@ mod tests {
         assert_eq!(resolve_version(&|| Some("   \n".to_string())), None);
         assert_eq!(
             resolve_version(&|| Some("error: package not found\n".to_string())),
+            None
+        );
+        assert_eq!(
+            resolve_version(&|| Some("other-pkg 1.0\n".to_string())),
             None
         );
     }

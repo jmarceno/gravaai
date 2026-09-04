@@ -1,4 +1,4 @@
-//! The GTK window process (`meeting-recorder --window`).
+//! The GTK window process (`gravaai --window`).
 //!
 //!
 //! A short-lived [`adw::Application`] showing the recorder window and talking
@@ -243,25 +243,25 @@ fn setup_app_icon() {
             gtk::IconTheme::for_display(&display).add_search_path(dir);
         }
     }
-    gtk::Window::set_default_icon_name("meeting-recorder");
+    gtk::Window::set_default_icon_name(crate::config::defaults::APP_DIR_NAME);
 }
 
 fn icon_search_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Ok(appdir) = std::env::var("APPDIR") {
         if crate::utils::exe::own_appimage().is_some() {
-            dirs.push(PathBuf::from(&appdir).join("usr/share/meeting-recorder/icons"));
+            dirs.push(PathBuf::from(&appdir).join("usr/share/gravaai/icons"));
         }
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             dirs.push(dir.join("assets/icons"));
-            dirs.push(dir.join("../share/meeting-recorder/icons"));
+            dirs.push(dir.join("../share/gravaai/icons"));
         }
     }
-    dirs.push(PathBuf::from("/usr/share/meeting-recorder/icons"));
+    dirs.push(PathBuf::from("/usr/share/gravaai/icons"));
     if let Some(home) = dirs::home_dir() {
-        dirs.push(home.join(".local/share/meeting-recorder/icons"));
+        dirs.push(home.join(".local/share/gravaai/icons"));
     }
     // Source-checkout fallbacks (dev).
     dirs.push(PathBuf::from("linux/assets/icons"));

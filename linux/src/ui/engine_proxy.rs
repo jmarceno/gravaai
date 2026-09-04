@@ -9,9 +9,9 @@ use crate::daemon::dbus_service::ENGINE_NAME;
 
 /// Generated proxy struct is `EngineProxy` (from trait `Engine`).
 #[zbus::proxy(
-    interface = "io.github.jmarceno.Gravaai.Engine",
-    default_service = "io.github.jmarceno.Gravaai",
-    default_path = "/io/github/jmarceno/Gravaai"
+    interface = "io.github.jmarceno.GravaAi.Engine",
+    default_service = "io.github.jmarceno.GravaAi",
+    default_path = "/io/github/jmarceno/GravaAi"
 )]
 pub trait Engine {
     fn start_recording(&self, mode: &str) -> zbus::Result<()>;

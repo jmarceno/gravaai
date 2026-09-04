@@ -75,7 +75,7 @@ new build.**
 
 Delivery is the Type-2 AppImage produced by
 `linux/packaging/appimage/build-appimage.sh` (release artifact
-`meeting-recorder-<version>-<arch>.AppImage`). After code changes that need a
+`gravaai-<version>-<arch>.AppImage`). After code changes that need a
 fresh binary, run the script (it builds `--release` unless `SKIP_BUILD=1`) and
 smoke-check the result before considering the work done. Clear a host IDE's
 `APPIMAGE`/`APPDIR` when packaging or testing so Cursor (or similar) does not
@@ -164,9 +164,9 @@ On-disk recording format:
 `<output>/YYYY-MM-DD_HH-MM[_title]/recording.mp3 + transcript.md + notes.md`.
 
 App identity:
-- `APP_ID = "io.github.jmarceno.Gravaai"` (`config/defaults.rs`)
-- D-Bus: `io.github.jmarceno.Gravaai.Engine`
-- Desktop file: `io.github.jmarceno.Gravaai.desktop` (with `StartupWMClass`)
+- `APP_ID = "io.github.jmarceno.GravaAi"` (`config/defaults.rs`)
+- D-Bus: `io.github.jmarceno.GravaAi.Engine`
+- Desktop file: `io.github.jmarceno.GravaAi.desktop` (with `StartupWMClass`)
 - Repository: `https://github.com/jmarceno/gravaai`
 
 ---
@@ -202,7 +202,7 @@ cargo feature (default) pulls in GTK4/libadwaita; `cargo check
 
 ### Install / uninstall (AppImage, no scripts)
 
-Users download `meeting-recorder-<version>-<arch>.AppImage`, mark it executable,
+Users download `gravaai-<version>-<arch>.AppImage`, mark it executable,
 and run it. The AppImage carries the binary plus tray/icon assets; system
 helpers (`ffmpeg`, `pactl`, `curl`, `tar`) and GTK4/libadwaita stay on the host
 (same contract as before). Uninstall is built in — it removes the AppImage
@@ -210,7 +210,7 @@ file (when running from one), desktop entries, icons, autostart entry, engines,
 models, logs, config and the stored API key, and keeps recordings:
 
 ```bash
-./meeting-recorder-*.AppImage --uninstall   # see utils/self_uninstall.rs
+./gravaai-*.AppImage --uninstall   # see utils/self_uninstall.rs
 ```
 
 ---
@@ -254,7 +254,7 @@ is open. `main.rs` dispatches on `core/run_mode.rs:resolve_run_mode(argv)`:
 - **no flag** (`client.rs`): client mode — ensure the daemon is running (spawn
   `--daemon` detached via setsid if not), then call `OpenWindow`.
 
-The daemon↔window boundary is the `io.github.jmarceno.Gravaai.Engine` D-Bus
+The daemon↔window boundary is the `io.github.jmarceno.GravaAi.Engine` D-Bus
 interface (`daemon/dbus_service.rs`, zbus 5 `#[interface]`); the JSON snapshot
 payload is `core/wire.rs` (`Snapshot`/`JobView`, serde, tolerant parsing). The
 daemon spawns the window as a detached child process and supervises a single
@@ -274,7 +274,7 @@ to in-flight installs (`reflect_running_installs`). An Ollama model download
 starts `ollama serve` automatically when the binary is present and the host
 is local (`ensure_ollama_serving`, with readiness wait); remote hosts and
 missing binaries fail with guidance instead. An auto-started server's pid is
-recorded in `$XDG_STATE_HOME/meeting-recorder/ollama-server.json` and the
+recorded in `$XDG_STATE_HOME/gravaai/ollama-server.json` and the
 daemon stops exactly that process on exit (verified via `/proc` cmdline) —
 a pre-existing server has no record and is never interfered with. Install failures are
 surfaced, never silent: the Models page writes the reason into the row
@@ -320,7 +320,7 @@ Retry, Library re-summarize, Use Existing) still process explicitly. Fully
 unit-tested headless with a fake recorder.
 
 **Job queue & persistence** (`core/job_manager.rs`): `JobManager` owns the job
-list and persists every change to `$XDG_STATE_HOME/meeting-recorder/jobs.json`
+list and persists every change to `$XDG_STATE_HOME/gravaai/jobs.json`
 (atomic tmp+rename; cancelled jobs excluded). On startup `load_persisted()`
 re-offers interrupted work: jobs that were PROCESSING when the app died come
 back as ERROR rows ("Interrupted…") with Retry (pure policy
@@ -376,7 +376,7 @@ are installed on demand from **Settings → Models**:
   `config/defaults.rs`; CPU prebuilts for x86_64/aarch64 — upstream ships no
   CUDA prebuilt for Linux, so `resolve_backend()` routes `auto` to `cpu` and
   rejects explicit `cuda` before any download). Lands in
-  `~/.local/share/meeting-recorder/whisper.cpp/` with a `--help` smoke test;
+  `~/.local/share/gravaai/whisper.cpp/` with a `--help` smoke test;
   GGML models download from HuggingFace via the status/downloader helpers.
 - **Installer security conventions** (`services/system_installer.rs`): no
   shell execution — commands are argv lists run without a shell and logged
@@ -384,7 +384,7 @@ are installed on demand from **Settings → Models**:
   size + logged SHA-256 for the Ollama script) — never `curl | sh`. No
   privilege escalation and no system packages anywhere in the install path.
 
-**Config:** `~/.config/meeting-recorder/config.json`, `chmod 600`. Empty string
+**Config:** `~/.config/gravaai/config.json`, `chmod 600`. Empty string
 for any prompt key = use built-in default (defined in `config/defaults.rs`).
 Clean-install defaults: transcription `whisper_cpp`, summarization `openai`
 (chat model `gpt-5.6-luna`), auto-process on. Existing installs keep their
@@ -417,7 +417,7 @@ errors surfaced via the pure `core/errors.rs:error_presentation()` policy —
 actionable configuration problems get a modal dialog, transient/runtime
 failures get a toast; `present_window()` re-shows + `unminimize()` +
 `present()`; the header-bar gear is a `Gtk.MenuButton` offering
-**Preferences** → settings dialog and **About Meeting Recorder** → an
+**Preferences** → settings dialog and **About GravaAi** → an
 `Adw.AboutDialog` — app identity lives in `core/app_info.rs` plus a
 `resolve_version()` that reads the installed distro package version (pacman
 today, others later), returning
@@ -437,12 +437,14 @@ the pure Models-tab visibility policy; `on_saved` callback runs
 `model_row_grid.rs` (model `ActionRow`s with Download/Retry/progress states),
 `meeting_explorer.rs` (past meetings browser; `.boxed-list` rows;
 double-click-to-rename via `GestureClick`, AI re-summarize per meeting),
-`tray.rs` (ksni StatusNotifierItem; branded per-state `IconPixmap` artwork
-from `assets/tray/`, decoded with the `png` crate, with embedded 48px
-fallbacks plus an `icon_name` theme fallback so the tray never renders empty
-even when the artwork directory is missing). The app/launcher/window
+`tray.rs` (ksni StatusNotifierItem; a single branded `IconPixmap` from
+`assets/tray/gravaai-*.png`, decoded with the `png` crate; recording /
+paused / processing visuals are composed at runtime by `tray_icon` —
+breathing opacity, grayscale pause bars, sweeping highlight — with an
+embedded 48px fallback plus an `icon_name` theme fallback so the tray never
+renders empty even when the artwork directory is missing). The app/launcher/window
 icon ships in `assets/icons/hicolor/` and is bundled into the AppImage under
-`usr/share/icons/hicolor/` (+ `usr/share/meeting-recorder/`); at startup
+`usr/share/icons/hicolor/` (+ `usr/share/gravaai/`); at startup
 `ui/window_app.rs:setup_app_icon()` also adds the bundled tree to the GTK
 icon-theme search path and sets it as the default icon so it resolves from
 source and from the AppImage mount. `MainWindow` import-existing delegates its
@@ -478,15 +480,16 @@ Linux desktop app:
   system dependency. Left-click opens the window where the SNI host delivers
   `Activate`, otherwise opens the menu. GNOME needs the
   AppIndicator/KStatusNotifierItem extension to provide the SNI host. The tray
-  shows branded per-state artwork (idle microphone / record-dot / pause /
-  processing) bundled in `assets/tray/` and sent as a raw ARGB `IconPixmap` so
-  it renders on every host and from source, with embedded 48px fallbacks plus
-  an `icon_name` theme fallback so it never renders empty when the artwork
-  directory is missing (e.g. a stripped payload).
+  uses one branded logo (`assets/tray/gravaai-*.png`) sent as a raw ARGB
+  `IconPixmap`; recording (slow breathing opacity), paused (grayscale + pause
+  bars), and processing (side-to-side highlight sweep) are composed at runtime
+  by `tray_icon` and pushed on a daemon anim tick, with an embedded 48px
+  fallback plus an `icon_name` theme fallback so it never renders empty when
+  the artwork directory is missing (e.g. a stripped payload).
 - **Delivery:** Type-2 AppImage (`linux/packaging/appimage/`) bundling the
   binary + assets; GTK4/libadwaita/ffmpeg/pactl remain host dependencies.
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
-  (scalable SVG + PNG sizes, named `meeting-recorder` — the `Icon=` key) and
+  (scalable SVG + PNG sizes, named `gravaai` — the `Icon=` key) and
   is bundled into the AppImage; `setup_app_icon()` also registers the bundled
   tree on the GTK icon-theme search path so it resolves from source and from
   the AppImage mount.
@@ -494,7 +497,7 @@ Linux desktop app:
 **Linux runs as cooperating processes from one binary:** a GTK-free **daemon**
 (`--daemon`) owns the recording engine, jobs, installs, call detection and
 tray; the GTK **window** (`--window`) is spawned as a child on demand and
-renders a snapshot fetched over the `io.github.jmarceno.Gravaai.Engine` D-Bus
+renders a snapshot fetched over the `io.github.jmarceno.GravaAi.Engine` D-Bus
 interface. Launching with no flag is **client** mode: ensure the daemon is up,
 then open a window. Two more short-lived child roles keep heavy/long work out
 of the daemon: `--process` (one AI transcription+summarization job) and
@@ -528,7 +531,7 @@ are supported.
    ```bash
    cargo run --manifest-path linux/Cargo.toml
    # or: cargo build --release --manifest-path linux/Cargo.toml
-   #      ./linux/target/release/meeting-recorder
+   #      ./linux/target/release/gravaai
    ```
 
 **Running checks:**
@@ -544,7 +547,7 @@ cargo test --manifest-path linux/Cargo.toml
 Users run the release AppImage directly. Uninstall is built in:
 
 ```bash
-./meeting-recorder-*.AppImage --uninstall
+./gravaai-*.AppImage --uninstall
 ```
 
 ---
@@ -625,8 +628,9 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   dedup/progress/finished routing (`install_manager`), headless `Engine`
   snapshot/lifecycle/child-event handling with a fake backend (`engine`,
   including recording without an API key and auto-process-off saves audio only).
-- `ui/` — pure tray policy (`tray_model`: icon priority, per-state menus,
-  never-reused menu ids), Models-tab visibility (`settings_visibility`),
+- `ui/` — pure tray policy (`tray_model`: appearance priority, per-state menus,
+  never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
+  pause bars / processing sweep), Models-tab visibility (`settings_visibility`),
   bundled artwork PNG decoding plus embedded fallback so the tray never
   renders empty (`tray`).
 

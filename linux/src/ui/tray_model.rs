@@ -4,21 +4,22 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// Bundled icon basename for the current state.
+use super::tray_icon::TrayAppearance;
+
+/// Appearance for the current recording state + job activity.
 ///
-/// Priority: recording > paused > jobs processing > idle. The name is the
-/// basename `tray.rs` uses to locate `assets/tray/<name>-<size>.png` pixmaps.
-pub fn icon_for_state(recording_state: &str, jobs_processing: usize) -> &'static str {
+/// Priority: recording > paused > jobs processing > idle.
+pub fn appearance_for_state(recording_state: &str, jobs_processing: usize) -> TrayAppearance {
     if recording_state == "recording" {
-        return "meeting-recorder-recording";
+        return TrayAppearance::Recording;
     }
     if recording_state == "paused" {
-        return "meeting-recorder-paused";
+        return TrayAppearance::Paused;
     }
     if jobs_processing > 0 {
-        return "meeting-recorder-processing";
+        return TrayAppearance::Processing;
     }
-    "meeting-recorder"
+    TrayAppearance::Idle
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -131,12 +132,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn icon_priority() {
-        assert_eq!(icon_for_state("recording", 3), "meeting-recorder-recording");
-        assert_eq!(icon_for_state("paused", 3), "meeting-recorder-paused");
-        assert_eq!(icon_for_state("idle", 2), "meeting-recorder-processing");
-        assert_eq!(icon_for_state("idle", 0), "meeting-recorder");
-        assert_eq!(icon_for_state("countdown", 0), "meeting-recorder");
+    fn appearance_priority() {
+        assert_eq!(
+            appearance_for_state("recording", 3),
+            TrayAppearance::Recording
+        );
+        assert_eq!(appearance_for_state("paused", 3), TrayAppearance::Paused);
+        assert_eq!(appearance_for_state("idle", 2), TrayAppearance::Processing);
+        assert_eq!(appearance_for_state("idle", 0), TrayAppearance::Idle);
+        assert_eq!(appearance_for_state("countdown", 0), TrayAppearance::Idle);
     }
 
     #[test]

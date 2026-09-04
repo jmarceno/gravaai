@@ -77,11 +77,31 @@ Delivery is the Type-2 AppImage produced by
 `linux/packaging/appimage/build-appimage.sh` (release artifact
 `gravaai-<version>-<arch>.AppImage`). After code changes that need a
 fresh binary, run the script (it builds `--release` unless `SKIP_BUILD=1`) and
-smoke-check the result before considering the work done. Clear a host IDE's
-`APPIMAGE`/`APPDIR` when packaging or testing so Cursor (or similar) does not
-leak into the packager — the script already `unset`s them; tests and
-`utils::exe::own_appimage` only trust `$APPIMAGE` when `current_exe()` lives
-under `$APPDIR`.
+smoke-check the result before considering the work done.
+
+### Host IDE AppImages (Cursor / OpenCode) — always check `APPIMAGE` / `APPDIR`
+
+Agent sessions often run **inside** another AppImage:
+
+- **Cursor** is distributed as an AppImage and exports `APPIMAGE` / `APPDIR`
+  (and related vars) into every integrated terminal and agent shell.
+- **OpenCode** is likewise an AppImage and does the same.
+
+Those variables refer to the **host IDE**, not GravaAI. Treating them as
+ours would re-exec Cursor/OpenCode, point autostart/uninstall at the wrong
+file, or confuse packaging. Whenever you work on AppImage delivery, spawn
+paths, autostart, uninstall, asset lookup, or smoke-tests:
+
+1. **Never trust `$APPIMAGE` / `$APPDIR` alone.** Confirm the running binary
+   actually lives under `$APPDIR` (see `utils::exe::own_appimage` /
+   `own_appimage_from`). If `current_exe()` is outside `$APPDIR`, ignore the
+   host exports.
+2. **Clear host exports when packaging or testing our AppImage** so they do
+   not leak into `appimagetool` or into a child that should only see GravaAI's
+   mount. `build-appimage.sh` already `unset`s `APPIMAGE` / `APPDIR` / `OWD` /
+   `ARGV0`; do the same in ad-hoc shell checks (`unset APPIMAGE APPDIR …`).
+3. **Unit tests must not mutate process env** for these vars (parallel tests
+   would race the host IDE). Prefer pure helpers that take paths as arguments.
 
 ```bash
 ./linux/packaging/appimage/build-appimage.sh           # version from Cargo.toml

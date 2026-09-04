@@ -12,7 +12,14 @@ pub fn is_transient_status(status: u16) -> bool {
 ///
 /// Matches reqwest timeout/connect errors by message, and HTTP status errors
 /// carrying a `status` in the 5xx/429 range.
+///
+/// Permanent markers win over everything: a model the server refuses to load
+/// (or a missing model) will never succeed on retry, so those fail fast
+/// instead of burning through the backoff.
 pub fn is_transient(err: &anyhow::Error) -> bool {
+    if is_permanent(err) {
+        return false;
+    }
     if let Some(e) = err.downcast_ref::<reqwest::Error>() {
         if e.is_timeout() || e.is_connect() || e.is_body() || e.is_decode() {
             return true;
@@ -41,6 +48,19 @@ pub fn is_transient(err: &anyhow::Error) -> bool {
         }
     }
     false
+}
+
+/// True when the error chain describes a failure retrying cannot fix:
+/// the server cannot (or will not) load the requested model. Retrying those
+/// just burns through the backoff while the job looks hung.
+fn is_permanent(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        let msg = format!("{cause:?}").to_lowercase();
+        msg.contains("unable to load model")
+            || msg.contains("model not found")
+            || msg.contains("unknown architecture")
+            || msg.contains("unsupported architecture")
+    })
 }
 
 /// Call `f()`, retrying up to `retries` times on transient failures.
@@ -120,5 +140,27 @@ mod tests {
         );
         assert!(r.is_err());
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn unloadable_model_fails_without_retry() {
+        // An Ollama 500 caused by a model the server cannot load must not
+        // burn through the backoff — retrying can never succeed.
+        let calls = Arc::new(AtomicUsize::new(0));
+        let c = calls.clone();
+        let r: anyhow::Result<()> = retry_on_transient(
+            || {
+                c.fetch_add(1, Ordering::SeqCst);
+                Err(anyhow::anyhow!(
+                    "transient HTTP 500: unable to load model: /home/u/.ollama/models/blobs/sha256-abc"
+                ))
+            },
+            "test op",
+            3,
+        );
+        assert!(r.is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(is_transient(&anyhow::anyhow!("transient HTTP 503: busy")));
+        assert!(!is_transient(&anyhow::anyhow!("model not found: foo")));
     }
 }

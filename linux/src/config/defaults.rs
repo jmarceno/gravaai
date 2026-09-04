@@ -158,7 +158,7 @@ pub const OLLAMA_MODELS: &[&str] = &[
     "qwen2.5:7b",
     "llama3.1:8b",
     "gemma3:12b",
-    "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0",
+    "granite4:350m",
 ];
 
 pub const OLLAMA_DEFAULT_HOST: &str = "http://localhost:11434";
@@ -245,7 +245,7 @@ pub fn ollama_model_info(model: &str) -> (&'static str, &'static str) {
         "qwen2.5:7b" => ("~5 GB", "Very capable"),
         "llama3.1:8b" => ("~5 GB", "Very capable"),
         "gemma3:12b" => ("~8 GB", "Best quality, high RAM required"),
-        "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0" => ("~380 MB", "Tiny, fast local notes"),
+        "granite4:350m" => ("~700 MB", "Tiny Granite 4, fast local notes"),
         _ => ("", ""),
     }
 }

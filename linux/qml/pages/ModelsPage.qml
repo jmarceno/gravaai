@@ -182,7 +182,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 10
                         Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: ollamaModel; model: ["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0"]; currentIndex: root.indexOfValue(["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0"], root.cfg.ollama_model || "phi4-mini"); Layout.fillWidth: true }
+                        AppComboBox { id: ollamaModel; model: ["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "granite4:350m"]; currentIndex: root.indexOfValue(["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "granite4:350m"], root.cfg.ollama_model || "phi4-mini"); Layout.fillWidth: true }
                     }
                     AppField { id: ollamaHost; label: "Ollama host"; text: root.cfg.ollama_host || "http://localhost:11434"; visible: chat.currentText === "ollama"; Layout.fillWidth: true }
                     RowLayout {

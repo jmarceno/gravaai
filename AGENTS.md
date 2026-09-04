@@ -541,7 +541,8 @@ whisper.cpp (prebuilt binary download, the default transcription backend) for
 transcription, experimental local CrispASR (Nemotron 3.5 ASR, all three
 cpu/vulkan/cuda flavors installable) as a third transcription option,
 and local Ollama for summarization (including the tiny
-`jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0` option). A Settings → General
+`granite4:350m` option; the Granite-4.0-H hybrid GGUFs need a newer Ollama —
+0.11.4 reports `unknown model architecture: 'granitehybrid'`). A Settings → General
 **Auto-process recordings** toggle (on by default) controls whether stopping a
 recording auto-starts transcription/summarization or saves audio only for
 manual processing. Local engines are not in the base install —

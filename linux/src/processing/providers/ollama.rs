@@ -126,6 +126,11 @@ impl OllamaProvider {
                         .filter(|s| !s.is_empty())
                         .unwrap_or_else(|| format!("HTTP {status}"));
                     if status == 429 || (500..600).contains(&status) {
+                        if detail.to_lowercase().contains("unable to load model") {
+                            anyhow::bail!(
+                                "Ollama cannot load model {model:?} ({detail}). The download may be corrupt — remove it (`ollama rm {model}`) and re-download — or the model may be unsupported by this Ollama version, in which case pick another model in Settings → Models."
+                            );
+                        }
                         anyhow::bail!("transient HTTP {status}: {detail}");
                     }
                     anyhow::bail!("Ollama error: {detail}");

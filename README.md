@@ -277,7 +277,7 @@ Available Ollama models:
 | `qwen2.5:7b` | ~5 GB | Very capable |
 | `llama3.1:8b` | ~5 GB | Very capable |
 | `gemma3:12b` | ~8 GB | Best quality, high RAM required |
-| `jewelzufo/granite-4.0-h-350m-base-GGUF:Q8_0` | ~380 MB | Tiny, fast local notes |
+| `granite4:350m` | ~700 MB | Tiny Granite 4, fast local notes |
 
 #### Prompts tab
 

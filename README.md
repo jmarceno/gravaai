@@ -217,7 +217,7 @@ Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 
 |---|---|
 | Ollama model | Free-text model name to use for local summarization (`phi4-mini` default) |
 | Ollama host | Ollama server address (default: `http://localhost:11434`) |
-| Model list | Download status and one-click download for each available model. A down server starts automatically for downloads when the Ollama binary is present and the host is local |
+| Model list | Download status and one-click download for each available model. A down server starts automatically for downloads when the Ollama binary is present and the host is local; a server the app started is stopped again on app exit (a pre-existing server is never touched) |
 
 Available Ollama models:
 

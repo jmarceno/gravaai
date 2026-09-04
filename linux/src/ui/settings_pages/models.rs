@@ -649,7 +649,7 @@ impl ModelsPage {
 
     fn set_ollama_unreachable(&self) {
         if let Some(row) = self.ollama_status_row.borrow().as_ref() {
-            row.set_subtitle("Not running — it starts automatically when needed");
+            row.set_subtitle("Not running — starts automatically when needed, stops on app exit");
         }
         if let Some(grid) = self.ollama_grid.borrow().as_ref() {
             for model in OLLAMA_MODELS {

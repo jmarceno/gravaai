@@ -518,6 +518,16 @@ async fn async_main() {
         engine.prepare_quit();
         engine.shutdown_tasks();
     }
+    // Stop an Ollama server this app auto-started (recorded pid only — a
+    // server that was already running has no record and is left alone).
+    if crate::services::ollama_service::shutdown_owned_server()
+        == crate::services::ollama_service::OwnedServerStop::Stopped
+    {
+        notify(
+            "Meeting Recorder",
+            "Stopped the Ollama server started automatically (it was not running before).",
+        );
+    }
     if let Some(h) = tray_handle {
         h.shutdown().await;
     }

@@ -185,14 +185,166 @@ fn spawn_ollama_serve() -> anyhow::Result<()> {
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| anyhow::anyhow!("Failed to start `ollama serve`: {e:#}"))?;
-    log::info!(
-        "Started `ollama serve` automatically (pid {}); leaving it running for future use",
-        child.id()
-    );
+    let pid = child.id();
+    log::info!("Started `ollama serve` automatically (pid {pid}); it will be stopped on app exit");
     // Intentionally not waited on: the starter is a short-lived child while
     // the server keeps running (reparented) for future pulls and jobs.
+    // Ownership is recorded so daemon shutdown stops exactly this server —
+    // a server that was already running is never touched (see below).
     std::mem::forget(child);
+    record_spawned_server(&ollama_state_path(), pid);
     Ok(())
+}
+
+/// State file recording a server this app started (for stop-on-exit).
+/// A server that was already running gets no record and is left alone.
+pub fn ollama_state_path() -> std::path::PathBuf {
+    crate::core::job_manager::default_state_dir().join("ollama-server.json")
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct OwnedServerRecord {
+    pid: u32,
+    started_at: String,
+}
+
+/// Best-effort ownership record. Failures only log — a missing record merely
+/// means the server won't be stopped on exit (the safe direction is to never
+/// stop what isn't recorded).
+fn record_spawned_server(path: &std::path::Path, pid: u32) {
+    if let Some(dir) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            log::warn!("Could not record auto-started Ollama server: {e:#}");
+            return;
+        }
+    }
+    let record = OwnedServerRecord {
+        pid,
+        started_at: chrono::Local::now().to_rfc3339(),
+    };
+    match serde_json::to_string(&record) {
+        Ok(text) => {
+            if let Err(e) = std::fs::write(path, text) {
+                log::warn!("Could not record auto-started Ollama server: {e:#}");
+            }
+        }
+        Err(e) => log::warn!("Could not record auto-started Ollama server: {e:#}"),
+    }
+}
+
+/// Outcome of stopping an app-started server (see [`shutdown_owned_server`]).
+#[derive(Debug, PartialEq)]
+pub enum OwnedServerStop {
+    /// No record — either nothing was started or the server was already
+    /// running (that path records nothing and is never interfered with).
+    NothingToDo,
+    /// The recorded server was verified (via /proc cmdline) and stopped.
+    Stopped,
+    /// The recorded pid is already gone; the stale record was removed.
+    AlreadyGone,
+    /// The recorded pid is alive but is no longer our `ollama serve`
+    /// (pid reuse or manual replacement) — left alone, record removed.
+    NotOurs,
+}
+
+/// Stop the auto-started Ollama server, if any. Only ever stops the exact
+/// process this app recorded: a pre-existing server has no record
+/// ([`NothingToDo`][OwnedServerStop::NothingToDo]), and a live pid whose
+/// `/proc` cmdline is not our `ollama serve` is left running.
+pub fn shutdown_owned_server() -> OwnedServerStop {
+    shutdown_owned_server_at(&ollama_state_path())
+}
+
+pub fn shutdown_owned_server_at(path: &std::path::Path) -> OwnedServerStop {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(_) => return OwnedServerStop::NothingToDo,
+    };
+    let record: OwnedServerRecord = match serde_json::from_str(&text) {
+        Ok(r) => r,
+        Err(_) => {
+            let _ = std::fs::remove_file(path);
+            return OwnedServerStop::NothingToDo;
+        }
+    };
+    let pid = record.pid;
+    match proc_cmdline(pid) {
+        // Nobody there (or unreadable): stale record, nothing to stop.
+        None => {
+            let _ = std::fs::remove_file(path);
+            OwnedServerStop::AlreadyGone
+        }
+        Some(cmdline) => {
+            if !(cmdline.contains("ollama") && cmdline.contains("serve")) {
+                log::warn!(
+                    "Recorded Ollama server pid {pid} is now `{cmdline}` — leaving it alone"
+                );
+                let _ = std::fs::remove_file(path);
+                return OwnedServerStop::NotOurs;
+            }
+            let gone = stop_pid(pid);
+            let _ = std::fs::remove_file(path);
+            if gone {
+                log::info!("Stopped auto-started Ollama server (pid {pid})");
+                OwnedServerStop::Stopped
+            } else {
+                log::error!(
+                    "Could not stop auto-started Ollama server (pid {pid}) — leaving it running"
+                );
+                OwnedServerStop::NotOurs
+            }
+        }
+    }
+}
+
+/// Raw `/proc/<pid>/cmdline` with NULs as spaces, or None when the process
+/// is gone/unreadable.
+fn proc_cmdline(pid: u32) -> Option<String> {
+    std::fs::read(format!("/proc/{pid}/cmdline"))
+        .ok()
+        .map(|bytes| String::from_utf8_lossy(&bytes).replace('\0', " "))
+}
+
+fn pid_gone(pid: u32) -> bool {
+    match proc_cmdline(pid) {
+        // Unreadable: reaped or inaccessible.
+        None => true,
+        // Empty cmdline: zombie (or kernel thread) — no command left running.
+        // Note the ownership check above runs first and requires the
+        // `ollama serve` markers, so this only treats a *confirmed-ours*
+        // pid as gone once it starts dying.
+        Some(cmd) => cmd.trim().is_empty(),
+    }
+}
+
+/// TERM, wait, then KILL. Returns true when the process is gone.
+fn stop_pid(pid: u32) -> bool {
+    use std::process::{Command, Stdio};
+    let signal = |sig: &str| {
+        Command::new("kill")
+            .args([format!("-{sig}"), pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    };
+    signal("TERM");
+    for _ in 0..30 {
+        if pid_gone(pid) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    signal("KILL");
+    for _ in 0..10 {
+        if pid_gone(pid) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    pid_gone(pid)
 }
 
 fn ensure_ollama_serving_with(
@@ -205,6 +357,9 @@ fn ensure_ollama_serving_with(
     wait: &dyn Fn(),
 ) -> anyhow::Result<()> {
     if is_serving() {
+        // Already active: follow the original path — use it as-is, record
+        // nothing, and never interfere with it on exit.
+        log::info!("Ollama already serving at {host} — using it as-is");
         return Ok(());
     }
     if !is_local_host(host) {
@@ -389,5 +544,60 @@ mod tests {
         .unwrap_err();
         assert_eq!(spawns.get(), 1);
         assert!(format!("{err:#}").contains("not responding"));
+    }
+
+    #[test]
+    fn owned_server_lifecycle() {
+        use std::os::unix::process::CommandExt as _;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ollama-server.json");
+
+        // No record → nothing to do.
+        assert_eq!(
+            shutdown_owned_server_at(&path),
+            OwnedServerStop::NothingToDo
+        );
+        // Corrupt record → cleared, nothing to do.
+        std::fs::write(&path, "garbage").unwrap();
+        assert_eq!(
+            shutdown_owned_server_at(&path),
+            OwnedServerStop::NothingToDo
+        );
+        assert!(!path.exists());
+
+        // Dead pid → stale record cleared, nothing killed.
+        let mut dead = std::process::Command::new("true").spawn().unwrap();
+        let dead_pid = dead.id();
+        dead.wait().unwrap();
+        record_spawned_server(&path, dead_pid);
+        assert_eq!(
+            shutdown_owned_server_at(&path),
+            OwnedServerStop::AlreadyGone
+        );
+        assert!(!path.exists());
+
+        // Foreign live pid (this test process) → left alone, record cleared.
+        let me = std::process::id();
+        record_spawned_server(&path, me);
+        assert_eq!(shutdown_owned_server_at(&path), OwnedServerStop::NotOurs);
+        assert!(!path.exists());
+        // Still alive (this assertion running proves it).
+        assert!(proc_cmdline(me).is_some());
+
+        // Owned server (argv[0] faked to `ollama serve`) → stopped.
+        let mut child = std::process::Command::new("sleep");
+        child.arg0("ollama serve").arg("60");
+        let mut child = match child.spawn() {
+            Ok(c) => c,
+            Err(_) => return, // no `sleep` binary — skip kill-path coverage
+        };
+        let pid = child.id();
+        // Reap lazily: shutdown kills it; take care not to leave a zombie if
+        // the assertion path changes — wait() after kill reaps.
+        record_spawned_server(&path, pid);
+        assert_eq!(shutdown_owned_server_at(&path), OwnedServerStop::Stopped);
+        assert!(!path.exists());
+        assert!(pid_gone(pid), "owned server must be gone");
+        let _ = child.wait();
     }
 }

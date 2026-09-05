@@ -41,6 +41,12 @@ pub type SavedCallback = Box<dyn Fn(PendingRecording) + Send>;
 pub type VoidCallback = Box<dyn Fn() + Send>;
 pub type CountdownCallback = Box<dyn Fn(u64) + Send>;
 
+/// Builds a recorder backend: output path, mode
+/// (`headphones`/`speaker`/`custom`), Custom-mode device list, quality value.
+#[allow(clippy::type_complexity)]
+pub type RecorderFactory<R> =
+    Box<dyn Fn(PathBuf, String, Vec<String>, String) -> anyhow::Result<R> + Send>;
+
 pub struct Callbacks {
     pub on_state: StateCallback,
     pub on_error: TextCallback,
@@ -69,7 +75,7 @@ pub struct RecordingController<R> {
     recorder: Option<R>,
     runner: TaskRunner,
     callbacks: Arc<Mutex<Callbacks>>,
-    recorder_factory: Box<dyn Fn(PathBuf, String, String) -> anyhow::Result<R> + Send>,
+    recorder_factory: RecorderFactory<R>,
     validate_devices: Box<dyn Fn() -> Result<(), String> + Send>,
     /// Request a countdown tick in ~1s. The owner (daemon event loop) delivers
     /// it by calling [`Self::countdown_tick`]; headless tests call the tick
@@ -83,7 +89,9 @@ impl<R: RecorderBackend> RecordingController<R> {
     pub fn new(
         runner: TaskRunner,
         callbacks: Callbacks,
-        recorder_factory: impl Fn(PathBuf, String, String) -> anyhow::Result<R> + Send + 'static,
+        recorder_factory: impl Fn(PathBuf, String, Vec<String>, String) -> anyhow::Result<R>
+            + Send
+            + 'static,
         validate_devices: impl Fn() -> Result<(), String> + Send + 'static,
         request_tick: impl Fn() + Send + 'static,
     ) -> Self {
@@ -123,7 +131,17 @@ impl<R: RecorderBackend> RecordingController<R> {
         if self.state() != State::Idle {
             return;
         }
-        if let Err(e) = (self.validate_devices)() {
+        if mode == "custom" {
+            // Custom mode records the user's explicit device list, so the
+            // default-device check must not gate it — non-standard setups may
+            // not even have defaults. An empty selection is a usage error.
+            if cfg.custom_devices.is_empty() {
+                (self.callbacks.lock().unwrap().on_error)(
+                    "No custom audio devices selected. Open the Recorder and choose devices for Custom mode.",
+                );
+                return;
+            }
+        } else if let Err(e) = (self.validate_devices)() {
             (self.callbacks.lock().unwrap().on_error)(&format!("Audio device error: {e}"));
             return;
         }
@@ -136,7 +154,12 @@ impl<R: RecorderBackend> RecordingController<R> {
             label,
         });
         let (_, q_val) = defaults::recording_quality_label(&cfg.recording_quality);
-        let recorder = match (self.recorder_factory)(audio, mode.to_string(), q_val.to_string()) {
+        let recorder = match (self.recorder_factory)(
+            audio,
+            mode.to_string(),
+            cfg.custom_devices.clone(),
+            q_val.to_string(),
+        ) {
             Ok(r) => r,
             Err(e) => {
                 self.inner.lock().unwrap().pending = None;
@@ -149,10 +172,11 @@ impl<R: RecorderBackend> RecordingController<R> {
         self.recorder = Some(recorder);
         self.inner.lock().unwrap().has_recorder = true;
         // NOTE: start() on the backend may fail (e.g. ffmpeg missing).
-        let mode_label = if mode == "headphones" {
-            "headphones"
-        } else {
-            "speaker"
+        let mode_label = match mode {
+            "headphones" => "headphones",
+            "speaker" => "speaker",
+            "custom" => "custom",
+            _ => "headphones",
         };
         self.set_state(State::Recording, &format!("Recording… ({mode_label} mode)"));
     }
@@ -414,6 +438,9 @@ mod tests {
         stopped: mpsc::Receiver<()>,
     }
 
+    /// (mode, custom device list) pairs the factory was called with.
+    type SeenModes = std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>;
+
     fn harness(fail_start: bool) -> (RecordingController<FakeRecorder>, Events) {
         let (stx, srx) = mpsc::channel();
         let (etx, erx) = mpsc::channel();
@@ -434,7 +461,7 @@ mod tests {
         let c = RecordingController::new(
             runner,
             cbs,
-            move |_, _, _| {
+            move |_, _, _, _| {
                 Ok(FakeRecorder {
                     stopped: false,
                     fail_start,
@@ -541,5 +568,79 @@ mod tests {
         c.backend_start().unwrap();
         c.cancel_and_discard();
         assert!(ev.discarded.recv_timeout(Duration::from_secs(5)).is_ok());
+    }
+
+    fn harness_with_capture() -> (RecordingController<FakeRecorder>, Events, SeenModes) {
+        let (stx, srx) = mpsc::channel();
+        let (etx, erx) = mpsc::channel();
+        let (ctx, crx) = mpsc::channel();
+        let (svtx, svrx) = mpsc::channel();
+        let (dtx, drx) = mpsc::channel();
+        let (sptx, sprx) = mpsc::channel();
+        let cbs = Callbacks {
+            on_state: Box::new(move |s: State, m: &str| stx.send((s, m.to_string())).unwrap()),
+            on_error: Box::new(move |m| etx.send(m.to_string()).unwrap()),
+            on_commit: Box::new(move |p| ctx.send(p).unwrap()),
+            on_saved: Box::new(move |p| svtx.send(p).unwrap()),
+            on_discarded: Box::new(move || dtx.send(()).unwrap()),
+            on_countdown: Box::new(|_| {}),
+            on_stopped: Box::new(move || sptx.send(()).unwrap()),
+        };
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen_c = seen.clone();
+        let c = RecordingController::new(
+            TaskRunner::default(),
+            cbs,
+            move |_, mode: String, custom: Vec<String>, _| {
+                seen_c.lock().unwrap().push((mode, custom));
+                Ok(FakeRecorder {
+                    stopped: false,
+                    fail_start: false,
+                })
+            },
+            || Ok(()),
+            || {},
+        );
+        (
+            c,
+            Events {
+                states: srx,
+                errors: erx,
+                commits: crx,
+                saved: svrx,
+                discarded: drx,
+                stopped: sprx,
+            },
+            seen,
+        )
+    }
+
+    #[test]
+    fn custom_without_devices_errors_and_never_builds_a_recorder() {
+        let (mut c, ev, seen) = harness_with_capture();
+        let cfg = test_cfg();
+        assert!(cfg.custom_devices.is_empty());
+        c.start(&cfg, "custom", None);
+        assert_eq!(c.state(), State::Idle);
+        let err = ev.errors.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(err.contains("No custom audio devices selected"));
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn custom_forwards_the_device_list_to_the_recorder() {
+        let (mut c, ev, seen) = harness_with_capture();
+        let mut cfg = test_cfg();
+        cfg.custom_devices = vec!["mic-a".to_string(), "sink.monitor".to_string()];
+        c.start(&cfg, "custom", None);
+        c.backend_start().unwrap();
+        assert_eq!(c.state(), State::Recording);
+        let (state, status) = ev.states.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(state, State::Recording);
+        assert!(status.contains("custom"));
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].0, "custom");
+        assert_eq!(seen[0].1, vec!["mic-a", "sink.monitor"]);
     }
 }

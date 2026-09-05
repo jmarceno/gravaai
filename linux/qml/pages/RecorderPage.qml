@@ -10,6 +10,8 @@ Item {
     property var snapshot: ({})
     property var cfg: ({})
     property var meetings: []
+    property var audioSources: []
+    property var selectedDevices: []
     property string captureMode: "headphones"
     Layout.fillWidth: true
     Layout.fillHeight: true
@@ -21,6 +23,26 @@ Item {
     function updateCfg() {
         try { root.cfg = JSON.parse(controller.settings_json) } catch (e) { root.cfg = {} }
         try { root.meetings = JSON.parse(controller.meetings_json) } catch (e2) { root.meetings = [] }
+        if (root.cfg.custom_devices) root.selectedDevices = root.cfg.custom_devices.slice()
+    }
+    function updateAudioSources() {
+        try { root.audioSources = JSON.parse(controller.audio_sources_json) } catch (e) { root.audioSources = [] }
+    }
+    function isSelected(name) {
+        return root.selectedDevices.indexOf(name) >= 0
+    }
+    function toggleDevice(name, checked) {
+        var cur = root.selectedDevices.slice()
+        var i = cur.indexOf(name)
+        if (checked && i < 0) cur.push(name)
+        if (!checked && i >= 0) cur.splice(i, 1)
+        root.selectedDevices = cur
+        root.controller.saveCustomDevices(JSON.stringify(cur))
+    }
+    function startCustom() {
+        root.controller.setTitle(titleField.text)
+        root.controller.saveCustomDevices(JSON.stringify(root.selectedDevices))
+        root.controller.startCustomRecording(JSON.stringify(root.selectedDevices))
     }
     function timeLabel(seconds) {
         var s = Math.max(0, Math.floor(Number(seconds || 0)))
@@ -92,12 +114,13 @@ Item {
         root.controller.summarizeMeeting(audioFor(m), transcriptFor(m), notesFor(m), meetingTitle(m))
     }
 
-    Component.onCompleted: { updateSnapshot(); updateCfg() }
+    Component.onCompleted: { updateSnapshot(); updateCfg(); updateAudioSources(); controller.refreshAudioSources() }
     property Connections controllerConnection: Connections {
         target: root.controller
         function onSnapshot_jsonChanged() { root.updateSnapshot() }
         function onSettings_jsonChanged() { root.updateCfg() }
         function onMeetings_jsonChanged() { root.updateCfg() }
+        function onAudio_sources_jsonChanged() { root.updateAudioSources() }
     }
 
     property FileDialog importDialog: FileDialog {
@@ -200,10 +223,67 @@ Item {
                                 }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.captureMode = "speaker" }
                             }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 58
+                                radius: Theme.radiusSm
+                                color: root.captureMode === "custom" ? Theme.accentSoft : Theme.inputBg
+                                border.color: root.captureMode === "custom" ? Theme.accent : Theme.borderSubtle
+                                border.width: 1
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 10
+                                    Text { text: "🎛️"; font.pixelSize: 18 }
+                                    ColumnLayout {
+                                        spacing: 1
+                                        Label { text: "Custom"; color: Theme.textPrimary; font.pixelSize: 13; font.bold: true }
+                                        Label { text: "Choose devices"; color: Theme.textMuted; font.pixelSize: 11 }
+                                    }
+                                }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.captureMode = "custom"; root.controller.refreshAudioSources() } }
+                            }
                         }
                         Label {
-                            text: "Use Headphones for calls; Speaker avoids capturing the same audio twice."
+                            text: "Headphones captures mic + system; Speaker is mic-only; Custom records every device you select below."
                             color: Theme.textMuted; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                        }
+                        ColumnLayout {
+                            visible: root.captureMode === "custom"
+                            Layout.fillWidth: true
+                            spacing: 6
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Label { text: "AUDIO DEVICES"; color: Theme.textDim; font.pixelSize: 10; font.bold: true; font.letterSpacing: 0.8; Layout.fillWidth: true }
+                                Label { text: root.selectedDevices.length + " selected"; color: Theme.textMuted; font.pixelSize: 11 }
+                                AppButton { text: "Refresh"; variant: "secondary"; implicitHeight: 30; onClicked: root.controller.refreshAudioSources() }
+                            }
+                            Label {
+                                visible: root.audioSources.length === 0
+                                text: "No audio devices found — check that PipeWire/PulseAudio is running, then press Refresh."
+                                color: Theme.warning; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                            }
+                            Repeater {
+                                model: root.audioSources
+                                delegate: ColumnLayout {
+                                    required property var modelData
+                                    property string devName: modelData.name || ""
+                                    Layout.fillWidth: true
+                                    spacing: 0
+                                    AppCheckBox {
+                                        text: (modelData.description || devName) + (modelData.is_monitor ? " (monitor)" : "")
+                                        checked: root.isSelected(devName)
+                                        onToggled: root.toggleDevice(devName, checked)
+                                    }
+                                    Label { text: devName; color: Theme.textDim; font.pixelSize: 10; elide: Text.ElideMiddle; Layout.fillWidth: true; leftPadding: 30 }
+                                }
+                            }
+                            Label {
+                                visible: root.audioSources.length > 0 && root.selectedDevices.length === 0
+                                text: "Select at least one device to record."
+                                color: Theme.warning; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                            }
                         }
                         Rectangle {
                             Layout.fillWidth: true
@@ -258,9 +338,15 @@ Item {
                                 visible: (snapshot.state || "idle") === "idle"
                                 Layout.fillWidth: true
                                 implicitHeight: 44
+                                enabled: root.captureMode !== "custom" || root.selectedDevices.length > 0
+                                opacity: enabled ? 1.0 : 0.45
                                 onClicked: {
-                                    root.controller.setTitle(titleField.text)
-                                    root.controller.startRecording(root.captureMode === "speaker" ? "speaker" : "headphones")
+                                    if (root.captureMode === "custom") {
+                                        root.startCustom()
+                                    } else {
+                                        root.controller.setTitle(titleField.text)
+                                        root.controller.startRecording(root.captureMode === "speaker" ? "speaker" : "headphones")
+                                    }
                                 }
                             }
                             AppButton { text: "Pause"; variant: "secondary"; visible: snapshot.state === "recording"; Layout.fillWidth: true; onClicked: root.controller.pauseRecording() }

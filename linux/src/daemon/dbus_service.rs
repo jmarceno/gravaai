@@ -50,6 +50,20 @@ impl EngineIface {
         engine.start_recording(&mode);
     }
 
+    /// Custom-mode start from the window with an explicit device list
+    /// (JSON array of source names). Returns an error string, or "" on success
+    /// — the worker surfaces a non-empty reply as a toast.
+    async fn start_custom_recording(&self, devices_json: String) -> String {
+        let devices: Vec<String> = match serde_json::from_str(&devices_json) {
+            Ok(devices) => devices,
+            Err(e) => return format!("Invalid custom device list: {e}"),
+        };
+        let mut engine = self.ctx.engine.lock().await;
+        engine.reload_config();
+        engine.start_recording_custom(devices);
+        String::new()
+    }
+
     async fn set_title(&self, title: String) {
         self.ctx.engine.lock().await.set_title(&title);
     }

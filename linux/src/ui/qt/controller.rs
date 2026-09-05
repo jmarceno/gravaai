@@ -26,6 +26,9 @@ type CommandTx = tokio::sync::mpsc::UnboundedSender<Command>;
 #[derive(Debug)]
 enum Command {
     StartRecording(String),
+    StartCustomRecording(String),
+    SaveCustomDevices(String),
+    RefreshAudioSources,
     SetTitle(String),
     Pause,
     Resume,
@@ -84,6 +87,7 @@ enum Event {
     Ready,
     Snapshot(String),
     Settings(String),
+    AudioSources(String),
     Meetings(String),
     Installs(String),
     EngineStatus(String),
@@ -406,6 +410,29 @@ async fn handle_command(
     match command {
         Command::StartRecording(mode) => {
             call_unit(tx, proxy.start_recording(&mode).await, "StartRecording")
+        }
+        Command::StartCustomRecording(devices_json) => {
+            match proxy.start_custom_recording(&devices_json).await {
+                Ok(message) if !message.trim().is_empty() => {
+                    let _ = tx.send(Event::Toast(message));
+                }
+                Ok(_) => {}
+                Err(err) => send_error(tx, format!("Engine.StartCustomRecording failed: {err:#}")),
+            }
+        }
+        Command::SaveCustomDevices(devices_json) => {
+            save_custom_devices(&devices_json, proxy, tx).await;
+        }
+        Command::RefreshAudioSources => {
+            let sources_tx = tx.clone();
+            tokio::spawn(async move {
+                match tokio::task::spawn_blocking(crate::audio::devices::list_sources_json).await {
+                    Ok(json) => {
+                        let _ = sources_tx.send(Event::AudioSources(json));
+                    }
+                    Err(err) => log::warn!("Could not list audio sources: {err:#}"),
+                }
+            });
         }
         Command::SetTitle(title) => call_unit(tx, proxy.set_title(&title).await, "SetTitle"),
         Command::Pause => call_unit(tx, proxy.pause().await, "Pause"),
@@ -909,10 +936,10 @@ async fn save_settings(
     tx: &Sender<Event>,
     pending: &mut Option<Config>,
 ) {
-    let cfg: Config = match serde_json::from_str(json) {
+    let cfg = match merge_settings(json) {
         Ok(cfg) => cfg,
-        Err(err) => {
-            send_error(tx, format!("Settings are invalid: {err:#}"));
+        Err(message) => {
+            send_error(tx, message);
             return;
         }
     };
@@ -929,6 +956,57 @@ async fn save_settings(
     persist_settings(cfg, proxy, tx).await;
 }
 
+/// Merge a (possibly partial) settings patch onto the stored config.
+///
+/// QML pages each persist the whole form today, but a new field must survive
+/// saves from pages that do not know it yet — unknown keys are ignored and
+/// missing keys keep their stored values, mirroring `settings::load`.
+/// Pure and unit-tested.
+fn merge_settings(patch_json: &str) -> Result<Config, String> {
+    let base = settings::load();
+    let mut value =
+        serde_json::to_value(&base).map_err(|e| format!("Settings are invalid: {e:#}"))?;
+    let patch: serde_json::Value =
+        serde_json::from_str(patch_json).map_err(|e| format!("Settings are invalid: {e:#}"))?;
+    let serde_json::Value::Object(patch) = &patch else {
+        return Err("Settings are invalid: expected a JSON object".to_string());
+    };
+    if let serde_json::Value::Object(map) = &mut value {
+        for (key, val) in patch {
+            if map.contains_key(key) {
+                map.insert(key.clone(), val.clone());
+            }
+        }
+    }
+    serde_json::from_value(value).map_err(|e| format!("Settings are invalid: {e:#}"))
+}
+
+/// Persist a Custom-mode device selection without touching anything else.
+///
+/// Unlike `save_settings` this never raises the API-key confirmation: toggling
+/// a checkbox must not pop an unrelated dialog under a default cloud config.
+async fn save_custom_devices(devices_json: &str, proxy: &EngineProxy<'static>, tx: &Sender<Event>) {
+    let devices: Vec<String> = match serde_json::from_str(devices_json) {
+        Ok(devices) => devices,
+        Err(err) => {
+            send_error(tx, format!("Custom devices are invalid: {err:#}"));
+            return;
+        }
+    };
+    let mut cfg = settings::load();
+    cfg.custom_devices = devices;
+    if let Err(err) = settings::save(&cfg) {
+        send_error(tx, format!("Could not save custom devices: {err:#}"));
+        return;
+    }
+    if let Err(err) = proxy.reload_config().await {
+        send_error(
+            tx,
+            format!("Custom devices saved but daemon reload failed: {err:#}"),
+        );
+    }
+    send_settings(tx);
+}
 async fn persist_settings(cfg: Config, proxy: &EngineProxy<'static>, tx: &Sender<Event>) {
     if let Err(err) = settings::save(&cfg) {
         send_error(tx, format!("Could not save settings: {err:#}"));
@@ -1007,6 +1085,7 @@ mod qobject {
         #[qproperty(QString, selected_page)]
         #[qproperty(QString, snapshot_json)]
         #[qproperty(QString, settings_json)]
+        #[qproperty(QString, audio_sources_json)]
         #[qproperty(QString, meetings_json)]
         #[qproperty(QString, installs_json)]
         #[qproperty(QString, engine_status_json)]
@@ -1059,6 +1138,15 @@ mod qobject {
         #[qinvokable]
         #[cxx_name = "startRecording"]
         fn start_recording(self: Pin<&mut Self>, mode: QString);
+        #[qinvokable]
+        #[cxx_name = "startCustomRecording"]
+        fn start_custom_recording(self: Pin<&mut Self>, devices_json: QString);
+        #[qinvokable]
+        #[cxx_name = "saveCustomDevices"]
+        fn save_custom_devices(self: Pin<&mut Self>, devices_json: QString);
+        #[qinvokable]
+        #[cxx_name = "refreshAudioSources"]
+        fn refresh_audio_sources(self: Pin<&mut Self>);
         #[qinvokable]
         #[cxx_name = "pauseRecording"]
         fn pause_recording(self: Pin<&mut Self>);
@@ -1184,6 +1272,7 @@ pub struct AppControllerRust {
     selected_page: QString,
     snapshot_json: QString,
     settings_json: QString,
+    audio_sources_json: QString,
     meetings_json: QString,
     installs_json: QString,
     engine_status_json: QString,
@@ -1210,6 +1299,7 @@ impl Default for AppControllerRust {
             selected_page: QString::from("recorder"),
             snapshot_json: QString::from("{}"),
             settings_json: QString::from("{}"),
+            audio_sources_json: QString::from("[]"),
             meetings_json: QString::from("[]"),
             installs_json: QString::from("[]"),
             engine_status_json: QString::from("{}"),
@@ -1254,6 +1344,7 @@ impl qobject::AppController {
             }
             Event::Snapshot(json) => self.as_mut().set_snapshot_json(QString::from(&json)),
             Event::Settings(json) => self.as_mut().set_settings_json(QString::from(&json)),
+            Event::AudioSources(json) => self.as_mut().set_audio_sources_json(QString::from(&json)),
             Event::Meetings(json) => self.as_mut().set_meetings_json(QString::from(&json)),
             Event::Installs(json) => self.as_mut().set_installs_json(QString::from(&json)),
             Event::EngineStatus(json) => self.as_mut().set_engine_status_json(QString::from(&json)),
@@ -1360,6 +1451,20 @@ impl qobject::AppController {
     fn start_recording(self: Pin<&mut Self>, mode: QString) {
         self.rust()
             .send(Command::StartRecording(String::from(mode)));
+    }
+
+    fn start_custom_recording(self: Pin<&mut Self>, devices_json: QString) {
+        self.rust()
+            .send(Command::StartCustomRecording(String::from(devices_json)));
+    }
+
+    fn save_custom_devices(self: Pin<&mut Self>, devices_json: QString) {
+        self.rust()
+            .send(Command::SaveCustomDevices(String::from(devices_json)));
+    }
+
+    fn refresh_audio_sources(self: Pin<&mut Self>) {
+        self.rust().send(Command::RefreshAudioSources);
     }
 
     fn pause_recording(self: Pin<&mut Self>) {
@@ -1509,6 +1614,32 @@ impl qobject::AppController {
 mod tests {
     use super::*;
 
+    #[test]
+    fn merge_settings_partial_patch_keeps_stored_values() {
+        let before = settings::load();
+        let merged = merge_settings(r#"{"output_folder": "/tmp/merge-test"}"#).unwrap();
+        assert_eq!(merged.output_folder, "/tmp/merge-test");
+        assert_eq!(merged.recording_quality, before.recording_quality);
+        assert_eq!(merged.custom_devices, before.custom_devices);
+    }
+
+    #[test]
+    fn merge_settings_custom_devices_round_trip() {
+        let merged = merge_settings(r#"{"custom_devices": ["mic-a", "sink.monitor"]}"#).unwrap();
+        assert_eq!(merged.custom_devices, vec!["mic-a", "sink.monitor"]);
+        // An explicit empty list clears the selection (checkboxes all off).
+        let cleared = merge_settings(r#"{"custom_devices": []}"#).unwrap();
+        assert!(cleared.custom_devices.is_empty());
+    }
+
+    #[test]
+    fn merge_settings_ignores_unknown_keys_and_rejects_garbage() {
+        let before = settings::load();
+        let merged = merge_settings(r#"{"no_such_field": 1}"#).unwrap();
+        assert_eq!(merged.output_folder, before.output_folder);
+        assert!(merge_settings("not json").is_err());
+        assert!(merge_settings(r#"["array", "not", "object"]"#).is_err());
+    }
     #[test]
     fn meeting_json_is_an_array() {
         let json = meeting_json();

@@ -196,22 +196,26 @@ async fn async_main() -> i32 {
 
     let msg2 = msg_tx.clone();
     let msg3 = msg_tx.clone();
-    let factory =
-        move |output: PathBuf, mode: String, quality: String| -> anyhow::Result<Recorder> {
-            let t = msg2.clone();
-            let e = msg3.clone();
-            Ok(Recorder::new(
-                output,
-                mode,
-                quality,
-                Some(Box::new(move |elapsed| {
-                    let _ = t.send(DaemonMsg::TimerTick(elapsed));
-                })),
-                Some(Box::new(move |msg| {
-                    let _ = e.send(DaemonMsg::RecorderError(msg));
-                })),
-            ))
-        };
+    let factory = move |output: PathBuf,
+                        mode: String,
+                        custom: Vec<String>,
+                        quality: String|
+          -> anyhow::Result<Recorder> {
+        let t = msg2.clone();
+        let e = msg3.clone();
+        Ok(Recorder::new(
+            output,
+            mode,
+            custom,
+            quality,
+            Some(Box::new(move |elapsed| {
+                let _ = t.send(DaemonMsg::TimerTick(elapsed));
+            })),
+            Some(Box::new(move |msg| {
+                let _ = e.send(DaemonMsg::RecorderError(msg));
+            })),
+        ))
+    };
     let tick_tx = msg_tx.clone();
     let request_tick = move || {
         let tick_tx = tick_tx.clone();
@@ -732,6 +736,7 @@ async fn handle_tray_command(ctx: &Arc<dbus_service::ServiceCtx>, cmd: &str) -> 
     match cmd {
         RECORD_HEADPHONES => engine.start_recording("headphones"),
         RECORD_SPEAKER => engine.start_recording("speaker"),
+        RECORD_CUSTOM => engine.start_recording("custom"),
         PAUSE => engine.pause(),
         RESUME => engine.resume(),
         STOP => engine.stop(),

@@ -141,6 +141,7 @@ companion. Running `gravaai-ui` directly without a live daemon/tray is refused.
 |------|-----------------|-------------|
 | **Record (Headphones)** | Microphone + system audio (calls, browser, etc.) | You're wearing headphones — no echo risk |
 | **Record (Speaker)** | Microphone only | Laptop speakers — avoids loopback echo |
+| **Record (Custom)** | Every audio device you select (any microphones and/or system monitors) | Non-standard setups — pick exactly what to capture |
 
 ### Services
 
@@ -301,7 +302,9 @@ no manual Refresh needed (the button is still there if you want one).
 
 ### Workflow
 
-1. Click **Record (Headphones)** or **Record (Speaker)** to start
+1. Click **Record (Headphones)**, **Record (Speaker)** or **Record (Custom)** to start
+   (Custom records the devices ticked in the Recorder — the list shows every
+   PulseAudio/PipeWire source, and the tray reuses the last saved selection)
 2. The timer shows elapsed recording time; **Pause** / **Resume** as needed
 3. Click **Stop** — a 5-second countdown begins when enabled in Settings (click **Cancel** to abort)
 4. After stopping, transcription starts automatically when **Auto-process recordings** is on (default); when off, only the audio is saved and you start processing manually from Jobs or the Library

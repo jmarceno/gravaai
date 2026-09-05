@@ -84,6 +84,7 @@ pub fn build_menu_model(recording_state: &str, processing: &[(i64, String)]) -> 
         _ => {
             items.push(action("Record (Headphones)", RECORD_HEADPHONES));
             items.push(action("Record (Speaker)", RECORD_SPEAKER));
+            items.push(action("Record (Custom)", RECORD_CUSTOM));
             items.push(action("Use Existing Recording", USE_EXISTING));
         }
     }
@@ -148,6 +149,8 @@ mod tests {
         let idle = build_menu_model("idle", &[]);
         let labels: Vec<&str> = idle.iter().map(|i| i.label.as_str()).collect();
         assert!(labels.contains(&"Record (Headphones)"));
+        assert!(labels.contains(&"Record (Speaker)"));
+        assert!(labels.contains(&"Record (Custom)"));
         assert!(labels.contains(&"Use Existing Recording"));
         assert!(labels.contains(&"Open"));
         assert!(labels.contains(&"Quit"));

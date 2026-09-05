@@ -47,6 +47,7 @@ Item {
             crisp_asr_backend: crispBackend.currentText,
             ollama_model: ollamaModel.currentText,
             ollama_host: ollamaHost.text,
+            custom_devices: root.cfg.custom_devices || [],
             transcription_prompt: root.cfg.transcription_prompt || "",
             summarization_prompt: root.cfg.summarization_prompt || "",
             title_prompt: root.cfg.title_prompt || ""

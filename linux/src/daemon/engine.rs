@@ -88,7 +88,9 @@ impl<R: RecorderBackend + Send> Engine<R> {
     pub fn new(
         config: Config,
         runner: TaskRunner,
-        recorder_factory: impl Fn(PathBuf, String, String) -> anyhow::Result<R> + Send + 'static,
+        recorder_factory: impl Fn(PathBuf, String, Vec<String>, String) -> anyhow::Result<R>
+            + Send
+            + 'static,
         validate_devices: impl Fn() -> Result<(), String> + Send + 'static,
         request_tick: impl Fn() + Send + 'static,
         job_manager: JobManager,
@@ -240,12 +242,31 @@ impl<R: RecorderBackend + Send> Engine<R> {
         // in-memory copy so headless tests stay hermetic.
         let title = self.pending_title.clone();
         let cfg = self.config.clone();
-        self.controller.start(&cfg, mode, title.as_deref());
-        if self.controller.backend_start().is_err() {
-            // backend_start failed after start() prepared state: surface and reset.
-            let msg = "Failed to start recording (audio backend error).";
+        self.begin_recording(&cfg, mode, title.as_deref());
+    }
+
+    /// Start a Custom-mode recording with an explicit device list (window).
+    /// The list overrides the persisted `custom_devices` for this recording;
+    /// persistence itself travels over the settings channel so a tray-initiated
+    /// start later reuses the last saved selection.
+    pub fn start_recording_custom(&mut self, devices: Vec<String>) {
+        if self.controller.state() != State::Idle {
+            return;
+        }
+        let title = self.pending_title.clone();
+        let mut cfg = self.config.clone();
+        cfg.custom_devices = devices;
+        self.begin_recording(&cfg, "custom", title.as_deref());
+    }
+
+    fn begin_recording(&mut self, cfg: &Config, mode: &str, title: Option<&str>) {
+        self.controller.start(cfg, mode, title);
+        if let Err(e) = self.controller.backend_start() {
+            // backend_start failed after start() prepared state: surface the
+            // detail (missing device, no ffmpeg, …) and reset.
+            let msg = format!("Failed to start recording: {e:#}");
             self.controller.abort_to_idle();
-            self.emit_error(msg);
+            self.emit_error(&msg);
         }
         self.drain_events();
     }
@@ -797,7 +818,7 @@ mod tests {
         let engine = Engine::new(
             cfg,
             TaskRunner::default(),
-            |_, _, _| Ok(FakeRecorder { fail_start: false }),
+            |_, _, _, _| Ok(FakeRecorder { fail_start: false }),
             || Ok(()),
             || {},
             JobManager::new(Some(jm_path)),
@@ -964,5 +985,39 @@ mod tests {
             !f.engine.snapshot_json().contains("processing"),
             "no job may be queued when auto-process is off"
         );
+    }
+
+    #[test]
+    fn custom_mode_uses_the_saved_device_list() {
+        let mut f = fixture();
+        let cfg = Config {
+            custom_devices: vec!["mic-a".to_string(), "sink.monitor".to_string()],
+            ..Config::default()
+        };
+        f.engine.set_config(cfg);
+        // Tray path: persisted selection drives the recording.
+        f.engine.start_recording("custom");
+        assert_eq!(f.engine.state(), State::Recording);
+    }
+
+    #[test]
+    fn custom_mode_without_devices_stays_idle_with_guidance() {
+        let mut f = fixture();
+        f.engine.set_config(Config::default());
+        assert!(f.engine.snapshot_json().contains("\"state\":\"idle\""));
+        f.engine.start_recording("custom");
+        assert_eq!(f.engine.state(), State::Idle);
+        let err = f.errors.recv_timeout(Duration::from_millis(500)).unwrap();
+        assert!(err.contains("No custom audio devices selected"));
+    }
+
+    #[test]
+    fn explicit_custom_list_overrides_the_saved_one() {
+        let mut f = fixture();
+        // An explicit window selection wins even when nothing is persisted.
+        f.engine.set_config(Config::default());
+        f.engine
+            .start_recording_custom(vec!["mic-a".to_string(), "mic-b".to_string()]);
+        assert_eq!(f.engine.state(), State::Recording);
     }
 }

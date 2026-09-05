@@ -321,8 +321,17 @@ is opened, after every finished install and after Settings are saved.
   true-stereo MP3 with a `highpass=f=80` + per-channel `dynaudnorm` filter
   (realtime-safe loudness normalization that lifts quiet microphones; each
   channel is normalized independently, boost capped at 20 dB), preserving
-  speaker separation for transcription. Device names are resolved once in
-  `start()` via `devices.rs` (`pactl`).
+  speaker separation for transcription. Custom mode (`build_ffmpeg_command_multi`)
+  records the explicit `custom_devices` list instead: 1 source like mic-only,
+  2 sources `amerge`d to stereo, 3+ mixed down with `amix` and forced to
+  stereo (MP3 has no multichannel layout). Device names are resolved once in
+  `start()` via `devices.rs` (`pactl`): the fixed modes use the default
+  source/sink, Custom mode uses the saved selection verbatim (deduped) and
+  fails fast naming any selected source `pactl` no longer reports.
+- `devices.rs` enumerates **every** recordable source (`pactl list sources`
+  parsed by the pure `parse_pactl_list_sources` into `AudioSource`
+  name/description/is-monitor rows, exposed to the window as JSON) for the
+  Custom multi-select list — nothing is hardcoded to the default device.
 - Pause/resume works via **segments**: pause terminates ffmpeg cleanly
   (SIGTERM, saving the current segment), resume spawns a new ffmpeg writing
   the next segment, and stop concatenates all segments with ffmpeg's concat
@@ -330,7 +339,12 @@ is opened, after every finished install and after Settings are saved.
   and segments are merged; a monitor thread reports unexpected ffmpeg death
   via `on_error`.
 - Two modes: mic+system (`Record (Headphones)`) and mic-only
-  (`Record (Speaker)` — the monitor is skipped to avoid echo).
+  (`Record (Speaker)` — the monitor is skipped to avoid echo), plus `Custom`
+  (`Record (Custom)`): the Recorder lists every source from
+  `devices::list_sources` with multi-select checkboxes persisted to
+  `Config::custom_devices`; starting Custom records the whole selection via
+  `build_ffmpeg_command_multi` (explicit list over D-Bus
+  `StartCustomRecording`, saved selection for tray starts).
 
 **Recording state machine** (`core/state_machine.rs`): `State`
 (IDLE/RECORDING/PAUSED/COUNTDOWN) plus the pure `can_transition()` legality
@@ -641,7 +655,9 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `core/errors.rs` — dialog-vs-toast `error_presentation` policy.
 - `core/recording_controller.rs` — full lifecycle headless (start/pause/
   resume, stop with and without countdown, countdown tick/cancel,
-  cancel+save, cancel+discard) with a fake recorder.
+  cancel+save, cancel+discard) with a fake recorder, plus Custom-mode
+  gating (empty selection errors without building a recorder, device list
+  forwarded to the factory).
 - `core/install_spec.rs`, `core/run_mode.rs`, `core/window_close.rs`,
   `core/daemon_watch.rs`, `core/wire.rs`, `core/app_info.rs`,
   `core/commands.rs` — key/install-key JSON round-trips (including the
@@ -664,7 +680,9 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `config/settings.rs` — key presence/URL warnings, effective-prompt
   fallback.
 - `audio/mixer.rs`, `audio/devices.rs`, `audio/recorder.rs` — stereo command
-  layout, monitor naming, segment naming.
+  layout, monitor naming, segment naming, Custom multi-source commands
+  (1/2/3+ inputs), `pactl list sources` parsing, missing-source detection,
+  selection dedup, empty-selection rejection.
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
   autostart entry management (`autostart`), AppImage-aware exe resolution
@@ -688,10 +706,12 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   (`window_supervisor`), install dedup/progress/finished routing
   (`install_manager`), headless `Engine` snapshot/lifecycle/child-event
   handling with a fake backend (`engine`, including recording without an API
-  key, auto-process-off saves audio only, and Library job mode selection:
+  key, auto-process-off saves audio only, Custom mode from the saved list /
+  an explicit override / empty-selection guidance, and Library job mode
+  selection:
   summarize-only with a transcript, transcribe-only via Transcribe).
 - `ui/` — pure tray policy (`tray_model`: appearance priority, per-state menus,
-  never-reused menu ids), runtime pixmap effects (`tray_icon`: breathe /
+  never-reused menu ids, `Record (Custom)` row), runtime pixmap effects (`tray_icon`: breathe /
   pause bars / processing sweep), Models-tab visibility (`settings_visibility`,
   now a 4-tuple with the CrispASR section),
   bundled artwork PNG decoding plus embedded fallback so the tray never
@@ -699,7 +719,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   unless the StatusNotifier registration is live (`notifications`), and the
   Qt controller library payload (`qt/controller`: meetings JSON carries
   resolved audio/transcript/notes paths + `has_audio`, validated file-open
-  allow-list, data-folder allow-list, the snapshot-driven
+  allow-list, data-folder allow-list, partial-settings merge preserving
+  unknown-to-the-page fields like `custom_devices`, the snapshot-driven
   `MeetingRefreshTracker` that keeps the meeting lists fresh, AppImage-safe
   opener environment, portal `file://` percent-encoding).
 

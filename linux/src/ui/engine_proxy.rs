@@ -15,6 +15,7 @@ use crate::daemon::dbus_service::ENGINE_NAME;
 )]
 pub trait Engine {
     fn start_recording(&self, mode: &str) -> zbus::Result<()>;
+    fn start_custom_recording(&self, devices_json: &str) -> zbus::Result<String>;
     fn set_title(&self, title: &str) -> zbus::Result<()>;
     fn pause(&self) -> zbus::Result<()>;
     fn resume(&self) -> zbus::Result<()>;

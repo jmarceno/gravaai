@@ -295,6 +295,12 @@ pub struct Config {
     pub crisp_asr_backend: String,
     pub ollama_model: String,
     pub ollama_host: String,
+    /// Custom recording mode: explicit PulseAudio/PipeWire source names to
+    /// record (microphones and/or sink monitors, multi-select in the
+    /// Recorder). Empty by default; `#[serde(default)]` keeps older
+    /// config.json files loading.
+    #[serde(default)]
+    pub custom_devices: Vec<String>,
     pub transcription_prompt: String,
     pub summarization_prompt: String,
     pub title_prompt: String,
@@ -328,6 +334,7 @@ impl Default for Config {
             crisp_asr_backend: "auto".to_string(),
             ollama_model: "phi4-mini".to_string(),
             ollama_host: OLLAMA_DEFAULT_HOST.to_string(),
+            custom_devices: Vec::new(),
             transcription_prompt: String::new(),
             summarization_prompt: String::new(),
             title_prompt: String::new(),

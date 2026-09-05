@@ -8,8 +8,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use super::devices::{get_default_sink, get_default_source, monitor_of_sink};
-use super::mixer::{build_ffmpeg_command, build_ffmpeg_command_mic_only};
+use super::devices::{
+    get_default_sink, get_default_source, list_sources, missing_sources, monitor_of_sink,
+};
+use super::mixer::{
+    build_ffmpeg_command, build_ffmpeg_command_mic_only, build_ffmpeg_command_multi,
+};
 use crate::core::recording_controller::RecorderBackend;
 use crate::utils::exe::runtime_program;
 
@@ -46,22 +50,37 @@ struct Flags {
     elapsed: AtomicU64,
 }
 
+/// Deduplicate a Custom-mode selection, preserving the user's order.
+/// Pure so double-toggled devices never spawn duplicate ffmpeg inputs.
+pub fn dedupe_sources(selected: &[String]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    selected
+        .iter()
+        .filter(|s| seen.insert((*s).clone()))
+        .cloned()
+        .collect()
+}
+
 /// Full recording lifecycle over a single ffmpeg subprocess per segment.
 ///
 /// Pause terminates ffmpeg cleanly (saving the segment), resume spawns a new
 /// ffmpeg writing the next segment, and stop concatenates all segments with
 /// ffmpeg's concat demuxer so paused intervals are excluded.
+///
+/// Modes: `headphones` (default mic + default sink monitor),
+/// `speaker` (default mic only) and `custom` (the explicit
+/// [`Recorder::custom_sources`] list — every selected device is recorded).
 pub struct Recorder {
     output_path: PathBuf,
     mode: String,
+    custom_sources: Vec<String>,
     quality: String,
     on_tick: TickCb,
     on_error: ErrorCb,
     child: Arc<Mutex<Option<Child>>>,
     segments: Vec<PathBuf>,
     segment_index: u64,
-    mic_source: Option<String>,
-    monitor_source: Option<String>,
+    sources: Vec<String>,
     flags: Arc<Flags>,
 }
 
@@ -69,6 +88,7 @@ impl Recorder {
     pub fn new(
         output_path: PathBuf,
         mode: String,
+        custom_sources: Vec<String>,
         quality: String,
         on_tick: Option<Box<dyn Fn(u64) + Send>>,
         on_error: Option<Box<dyn Fn(String) + Send>>,
@@ -76,14 +96,14 @@ impl Recorder {
         Self {
             output_path,
             mode,
+            custom_sources,
             quality,
             on_tick: Arc::new(Mutex::new(on_tick)),
             on_error: Arc::new(Mutex::new(on_error)),
             child: Arc::new(Mutex::new(None)),
             segments: Vec::new(),
             segment_index: 0,
-            mic_source: None,
-            monitor_source: None,
+            sources: Vec::new(),
             flags: Arc::new(Flags {
                 paused: AtomicBool::new(false),
                 stop: AtomicBool::new(false),
@@ -97,16 +117,24 @@ impl Recorder {
         if let Some(parent) = seg.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let mic = self.mic_source.clone().ok_or_else(|| {
-            anyhow::anyhow!("Audio devices are not resolved — cannot start a segment")
-        })?;
-        let cmd: Vec<String> = if self.mode == "speaker" {
-            build_ffmpeg_command_mic_only(&mic, &seg, &self.quality)
-        } else {
-            let mon = self.monitor_source.clone().ok_or_else(|| {
+        if self.sources.is_empty() {
+            anyhow::bail!("Audio devices are not resolved — cannot start a segment");
+        }
+        // Custom mode records the explicit multi-source list; the fixed modes
+        // keep their exact historical commands.
+        let cmd: Vec<String> = if self.mode == "custom" {
+            build_ffmpeg_command_multi(&self.sources, &seg, &self.quality)
+        } else if self.mode == "speaker" {
+            let mic = self.sources.first().ok_or_else(|| {
                 anyhow::anyhow!("Audio devices are not resolved — cannot start a segment")
             })?;
-            build_ffmpeg_command(&mic, &mon, &seg, &self.quality)
+            build_ffmpeg_command_mic_only(mic, &seg, &self.quality)
+        } else {
+            let (mic, mon) = match self.sources.as_slice() {
+                [mic, mon, ..] => (mic, mon),
+                _ => anyhow::bail!("Audio devices are not resolved — cannot start a segment"),
+            };
+            build_ffmpeg_command(mic, mon, &seg, &self.quality)
         };
         let mut child = Command::new(runtime_program(&cmd[0]))
             .args(&cmd[1..])
@@ -300,14 +328,39 @@ fn terminate(child: &mut Child) {
 
 impl RecorderBackend for Recorder {
     fn start(&mut self) -> anyhow::Result<()> {
-        let mic = get_default_source()
-            .ok_or_else(|| anyhow::anyhow!("No microphone found. Check audio setup."))?;
-        self.mic_source = Some(mic);
-        if self.mode != "speaker" {
+        // Custom mode never touches the defaults: non-standard setups may not
+        // even have one, and the user already picked explicit sources.
+        if self.mode == "custom" {
+            let selected = dedupe_sources(&self.custom_sources);
+            if selected.is_empty() {
+                anyhow::bail!(
+                    "No custom audio devices selected. Open the Recorder and choose devices for Custom mode."
+                );
+            }
+            // Fail fast on a stale selection (e.g. an unplugged USB mic)
+            // instead of dying mid-segment inside ffmpeg.
+            let available = list_sources();
+            if !available.is_empty() {
+                let missing = missing_sources(&selected, &available);
+                if !missing.is_empty() {
+                    anyhow::bail!(
+                        "Selected audio devices not found: {}. Refresh the device list and try again.",
+                        missing.join(", ")
+                    );
+                }
+            }
+            self.sources = selected;
+        } else if self.mode == "speaker" {
+            let mic = get_default_source()
+                .ok_or_else(|| anyhow::anyhow!("No microphone found. Check audio setup."))?;
+            self.sources = vec![mic];
+        } else {
+            let mic = get_default_source()
+                .ok_or_else(|| anyhow::anyhow!("No microphone found. Check audio setup."))?;
             let sink = get_default_sink().ok_or_else(|| {
                 anyhow::anyhow!("No audio output device found. Check audio setup.")
             })?;
-            self.monitor_source = Some(monitor_of_sink(&sink));
+            self.sources = vec![mic, monitor_of_sink(&sink)];
         }
         self.flags.stop.store(false, Ordering::SeqCst);
         self.flags.paused.store(false, Ordering::SeqCst);
@@ -386,5 +439,27 @@ mod tests {
             segment_path_for(&out, 2),
             std::path::PathBuf::from("/m/2026-03-01_14-30/recording_seg002.mp3")
         );
+    }
+
+    #[test]
+    fn dedupe_preserves_order() {
+        let in_list = vec!["b".to_string(), "a".to_string(), "b".to_string()];
+        assert_eq!(dedupe_sources(&in_list), vec!["b", "a"]);
+        assert!(dedupe_sources(&[]).is_empty());
+    }
+
+    #[test]
+    fn custom_start_rejects_empty_selection_without_touching_hardware() {
+        // No ffmpeg is spawned: start() bails during source resolution.
+        let mut r = Recorder::new(
+            std::path::PathBuf::from("/tmp/x.mp3"),
+            "custom".to_string(),
+            Vec::new(),
+            "5".to_string(),
+            None,
+            None,
+        );
+        let err = r.start().unwrap_err().to_string();
+        assert!(err.contains("No custom audio devices selected"));
     }
 }

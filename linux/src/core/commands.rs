@@ -3,6 +3,7 @@
 /// Recording lifecycle commands (no arguments).
 pub const RECORD_HEADPHONES: &str = "record_headphones";
 pub const RECORD_SPEAKER: &str = "record_speaker";
+pub const RECORD_CUSTOM: &str = "record_custom";
 pub const PAUSE: &str = "pause";
 pub const RESUME: &str = "resume";
 pub const STOP: &str = "stop";

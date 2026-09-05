@@ -37,6 +37,7 @@ Item {
             crisp_asr_backend: cfg.crisp_asr_backend || "auto",
             ollama_model: cfg.ollama_model || "phi4-mini",
             ollama_host: cfg.ollama_host || "http://localhost:11434",
+            custom_devices: cfg.custom_devices || [],
             transcription_prompt: cfg.transcription_prompt || "",
             summarization_prompt: cfg.summarization_prompt || "",
             title_prompt: cfg.title_prompt || ""

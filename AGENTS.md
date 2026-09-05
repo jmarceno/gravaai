@@ -1,5 +1,3 @@
-Memory (Graphiti): at session end, register an episode via the `graphiti-memory` MCP server (`add_memory`, group_id `gravaai`) summarizing what changed and what was learned; whenever a task needs context from prior sessions, search Graphiti first (`search_nodes` / `search_memory_facts`). The Graphiti MCP server (`Graphiti Agent Memory` v1.29.1) answers at `http://192.168.0.59:8000/mcp` (remote MCP, Streamable HTTP). If the `graphiti-memory` tools are missing from the session tool catalog (e.g. after an app/MCP restart), the server itself is usually still up: shake hands directly — POST `initialize` (`protocolVersion` `2024-11-05`), capture the `mcp-session-id` response header, send it back on every follow-up call (`tools/list`, `tools/call`). Do not treat a missing tool catalog entry as a dead server; probe the URL first.
-
 # AGENTS.md
 
 Repository: https://github.com/jmarceno/gravaai
@@ -522,7 +520,7 @@ in full size (`qml/components/AudioLevelMeter.qml` — a flat meter while
 recording means nothing is reaching the recorder). It is opt-out via `show_recording_pill`
 (Settings → General, on by default so upgrades keep it). `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
-its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
+its Tokio worker handles D-Bus, filesystem, portals, network and
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
 composes the branded icon (`tray_icon`) with an embedded fallback. The app icon,
 QML resources and both binaries are bundled in the AppImage; `utils::exe`

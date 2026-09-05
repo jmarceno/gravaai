@@ -1,39 +1,57 @@
-# GravaAi
+# GravaAI
 
-A meeting recorder that transcribes audio and generates structured notes using
-any OpenAI-compatible API, fully local Whisper/CrispASR/Ollama engines, or a mix of both.
+Record your meetings, get your notes done.
 
-This repository holds the Linux desktop app (Rust, Qt 6/QML):
+GravaAI is a Linux desktop app that records a meeting's audio, transcribes it,
+and turns it into structured Markdown notes — minutes, decisions, action items
+and follow-ups — so you can stay in the conversation instead of taking notes.
 
-| Path | Contents |
-|---|---|
-| `linux/` | Rust daemon plus Qt 6/QML window (Linux) |
-| `linux/assets/` | Tray artwork + hicolor app icons |
-| `linux/packaging/appimage/` | AppImage build script + desktop entry |
+It works with any OpenAI-compatible API, with local engines that run entirely
+on your machine (whisper.cpp for transcription, Ollama for summarization), or
+any mix of the two. Choose cloud for convenience, local for privacy — nothing
+is locked in.
 
----
+<p align="center">
+  <img src="docs/Screenshot.png" alt="GravaAI main window: recorder dashboard with capture mode, timer, live input level and processing pipeline" width="800">
+</p>
 
-## Linux App
+## Features
 
-### Features
+- **Record the whole conversation** — capture your microphone and system audio
+  at the same time (calls, browser audio, presentations), or pick exactly which
+  devices to record. Each channel is loudness-normalized during capture, so a
+  quiet microphone still lands at a healthy level.
+- **Transcribe your way** — any OpenAI-compatible endpoint, or locally with
+  whisper.cpp (timestamped transcript). An experimental CrispASR backend
+  (Nemotron 3.5 ASR) is also available.
+- **Notes that read like a secretary wrote them** — summarization turns the
+  transcript into structured Markdown notes, and every meeting gets a title
+  automatically when you don't name it.
+- **A real meeting library** — browse past recordings and re-run transcribe or
+  summarize on any of them at any time, without re-recording.
+- **Pick your engines independently** — transcribe with one service and
+  summarize with another. Mix cloud and local freely; local-only runs fully
+  offline with no API key.
+- **Lives in your tray** — the app starts tray-only, keeps recording and
+  processing while the window is closed, and reopens instantly. A small
+  recording pill shows elapsed time, live input level and pause/stop controls
+  while you record (optional).
+- **Never lose work** — background jobs keep processing if the window is
+  closed, and interrupted jobs come back with a Retry button after a crash.
+- **Call detection** — optionally watch for active calls and get notified when
+  it's time to hit record.
+- **Local engines without the hassle** — whisper.cpp, CrispASR and Ollama are
+  downloaded as prebuilt, checksum-verified binaries from Settings → Models.
+  No compiler, no system packages, no terminal.
 
-- **Record** system audio + microphone simultaneously, or microphone only — each channel is automatically loudness-normalized during capture, so quiet microphones are boosted into healthy levels (up to 20 dB, applied independently to mic and system audio)
-- **Transcribe** with any OpenAI-compatible endpoint, local whisper.cpp (timestamped transcript) or experimental local CrispASR (Nemotron 3.5 ASR)
-- **Summarize** into structured Markdown notes with any OpenAI-compatible endpoint or local Ollama
-- **Summarize from the library** — re-run summarization for any past meeting from the meetings browser
-- **Local models** — run fully offline with no API key required
-- **Customizable prompts** — edit transcription and summarization prompts in Settings
-- **System tray** integration — a StatusNotifierItem (SNI) exposed over D-Bus; left-click opens the window where the host supports it, otherwise opens the menu. The app starts tray-only with the window closed; closing the window (X) hides it back to the tray while recording, jobs and installs keep running in the daemon
-- **Recording pill overlay** — while recording, paused or processing, a small Handy-style pill sits in the bottom-right corner just above the taskbar: status dot, elapsed time, a live input-level strip, pause/resume and stop buttons. Click it to reopen the full window, or drag it anywhere you like. On by default; opt out in Settings → General
-- **Graphical daemon + window pair** — the app always owns one StatusNotifier tray icon and one supervised Qt window. The daemon keeps recording, transcription, and model installs running while the window is hidden; it refuses to start when no graphical tray host is available, so there is never a usable headless instance.
-- **Single-instance guarantee** — a D-Bus singleton guard prevents concurrent daemons and the UI claims a second guard before creating a window. The first launch starts the tray-only daemon; launching the AppImage again while it runs presents the existing window instead of creating another instance.
-- **Low memory mode** — by default the window stays loaded in the background so reopening is instant; enable Low memory mode (Settings → General) to unload it on close instead, so the tray daemon idles at roughly a fifth of the memory at the cost of a brief delay when you reopen
-- **Call detection** — optionally monitor for active calls and get notified to start recording
-- **Start at system startup** — optionally launch the tray daemon automatically on login
+## How it works
 
-### Output Structure
-
-Each recording session creates a folder:
+1. Pick a capture mode — headphones (mic + system audio), speaker (mic only),
+   or a custom device selection — and press **Start recording**.
+2. Pause and resume as needed; only the recorded parts are kept.
+3. Press **Stop**. Transcription and summarization start automatically and run
+   in the background — even if you close the window.
+4. Find the results in your meetings folder:
 
 ```
 ~/meetings/
@@ -46,283 +64,110 @@ Each recording session creates a folder:
                 └── notes.md
 ```
 
-### Requirements
-
-- Linux, x86_64 or arm64, with a system tray (or an AppIndicator extension) for the tray icon.
-- The AppImage bundles `ffmpeg`, `ffprobe`, `pactl`, Qt 6/QML and their
-  non-platform libraries, so these programs and toolkits are not required on
-  the host. Source builds still need the Rust toolchain, Qt 6 development
-  packages and the audio utilities.
-  The Rust toolchain is only required to build from source (see below).
-
-> **Look & theming:** Qt Quick Controls uses the built-in **Basic** style and
-> GravaAI's own QML primitives. `linux/qml/Theme.qml` is the single palette
-> source, based on the Lepramim identity and the supplied GravaAI mock.
-- Delivery is a single **Type-2 AppImage** (`gravaai-<version>-<arch>.AppImage`)
-  containing the daemon, `gravaai-ui`, Qt/QML modules/plugins, icons, FFmpeg,
-  FFprobe and `pactl`. No host Qt, FFmpeg or pactl installation is needed.
-- The host must provide a graphical Linux session: a compatible kernel/glibc,
-  X11 or Wayland compositor, session D-Bus, a StatusNotifier/AppIndicator host,
-  PipeWire/PulseAudio, Freedesktop portals and a notification service. Without
-  the tray host the daemon exits before exporting its Engine service; no window,
-  recording or notification can be started.
-
-The base install is **cloud-only and minimal** — no local engines or GPU libraries are installed by default. Each local option below is installed **on demand** from **Settings → Models** when you choose it.
-
-| Service | Requirement |
-|---|---|
-| **OpenAI-compatible** (transcription + summarization) | Base URL + API key for any `/v1`-style endpoint (OpenAI, Azure OpenAI, LiteLLM, llama.cpp server, …) — no local install |
-
-> Your API key is stored in the system keyring (GNOME Keyring / KWallet) when one is available, falling back to a permission-restricted config file otherwise.
-| **whisper.cpp** (local transcription) | Engine downloaded as an official prebuilt CPU binary on opt-in; GGML model downloaded from HuggingFace. No compiler or system packages needed |
-| **CrispASR** (experimental local transcription) | Engine downloaded as an official prebuilt binary on opt-in (CPU / Vulkan / CUDA flavors); Nemotron GGUF model downloaded from HuggingFace. No compiler or system packages needed |
-| **Ollama** (local summarization) | [Ollama](https://ollama.com) installed and running (`ollama serve`); uses NVIDIA/AMD GPU automatically |
-
-### Installation
+## Installation
 
 Download `gravaai-<version>-<arch>.AppImage` from the
 [Releases](../../releases) page, make it executable, and run it — that single
-file is the whole app (daemon, window, tray, bundled icons):
+file is the whole app:
 
 ```bash
 chmod +x gravaai-*-x86_64.AppImage
 ./gravaai-*-x86_64.AppImage
 ```
 
-Optional: move it somewhere on your `PATH` (e.g. `~/.local/bin/`) or integrate
-it with [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) so
-it appears in your application menu.
+The AppImage bundles FFmpeg, Qt and everything else the app needs, so there is
+nothing else to install. Optionally move it somewhere on your `PATH` (e.g.
+`~/.local/bin/`) or use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher)
+so it shows up in your application menu.
 
-The AppImage ships the complete desktop runtime and cloud path. The local
-transcription engines (whisper.cpp, experimental CrispASR), Ollama and model weights are intentionally
-installed later, on demand, from **Settings → Models**; they remain outside the
-base image so updates stay small and user data is preserved.
+**Requirements:** Linux (x86_64 or arm64) with a graphical session, an audio
+server (PipeWire/PulseAudio) and a system tray. [GNOME needs the
+AppIndicator/KStatusNotifierItem extension](#gnome-notes) for the tray icon.
 
-To uninstall (removes the AppImage when launched from one, desktop entries,
-icons, autostart entry, engines, models, logs, config and the stored API key —
-recordings are kept):
+**Local engines** (whisper.cpp, CrispASR, Ollama and model weights) are not in
+the base download — you install exactly what you want, when you want it, from
+**Settings → Models**. Nothing runs or downloads until you choose it.
+
+To uninstall, remove the AppImage file and run:
 
 ```bash
 ./gravaai-*.AppImage --uninstall
 ```
 
-> **GNOME users:** The tray is a StatusNotifierItem (SNI), and GNOME has no built-in SNI host, so the icon needs the AppIndicator/KStatusNotifierItem extension to appear. Install your distro's package for it (e.g. on Arch `sudo pacman -S gnome-shell-extension-appindicator`), then enable it in the GNOME Extensions app and log out/in.
->
-> Whether **left-click focuses the window** or **opens the menu** is decided by the SNI host: hosts that deliver the `Activate` action (e.g. KDE Plasma) focus the window, while the GNOME extension typically opens the menu on any click. KStatusNotifierItem-capable panels on XFCE, MATE, Cinnamon, KDE, LXQt, … show the icon natively without an extension.
+This removes desktop entries, icons, autostart, downloaded engines and models,
+logs, config and the stored API key. **Your recordings are kept.**
 
-### Running from Source (developers)
+## Choosing your services
 
-Building from source requires the Rust toolchain, Qt 6 development headers
-(`qt6-base-dev`, `qt6-declarative-dev`, `qt6-tools-dev-tools`, `qt6-svg-dev` on
-Ubuntu) and the audio utilities. This is only needed for development — regular
-installs never compile anything:
+Open **Models & services** in the app to pick and configure each stage. The
+Status card there shows what's installed and running, and the Downloads tab
+lists every file the app has downloaded with its location and size.
 
-```bash
-cd gravaai
-# Build the toolkit-free daemon and the Qt companion separately.
-cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
-cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
-./linux/target/debug/gravaai
+### Transcription
 
-# Pack a local AppImage (release build + assets):
-./linux/packaging/appimage/build-appimage.sh
-```
+| Service | Runs | Notes |
+|---|---|---|
+| **OpenAI-compatible** | Cloud | Any `/v1`-style endpoint: OpenAI, Azure OpenAI, LiteLLM, llama.cpp server, … |
+| **whisper.cpp** *(default)* | Local | Official prebuilt CPU binary + GGML models from HuggingFace |
+| **CrispASR** *(experimental)* | Local | Prebuilt binary with Nemotron 3.5 ASR; CPU, Vulkan or CUDA |
 
-`gravaai` (no flag) is **client** mode: it starts the singleton daemon tray-only
-(window closed) when none is running, and asks it to present the supervised Qt
-window when it is already running. `gravaai --daemon` is
-the internal tray/engine role; it exits immediately if a graphical
-StatusNotifier host is unavailable. `gravaai --window` remains a compatibility
-trampoline, while the daemon normally launches the separate `gravaai-ui`
-companion. Running `gravaai-ui` directly without a live daemon/tray is refused.
+### Summarization
 
-### Recording Modes
+| Service | Runs | Notes |
+|---|---|---|
+| **OpenAI-compatible** | Cloud | Any `/chat/completions`-style endpoint |
+| **Ollama** | Local | Installing Ollama from the app starts the server for you |
+
+Your API key is stored in the system keyring (GNOME Keyring / KWallet) when
+one is available, falling back to a permission-restricted config file
+otherwise.
+
+## Recording modes
 
 | Mode | What is captured | When to use |
 |------|-----------------|-------------|
-| **Record (Headphones)** | Microphone + system audio (calls, browser, etc.) | You're wearing headphones — no echo risk |
-| **Record (Speaker)** | Microphone only | Laptop speakers — avoids loopback echo |
-| **Record (Custom)** | Every audio device you select (any microphones and/or system monitors) | Non-standard setups — pick exactly what to capture |
+| **Headphones** | Microphone + system audio | You're wearing headphones — no echo risk |
+| **Speaker** | Microphone only | Laptop speakers — avoids loopback echo |
+| **Custom** | Every audio device you select | Multiple microphones or non-standard setups |
 
-### Services
+## Settings overview
 
-#### Transcription
+- **General** — output folder (default `~/meetings`), recording quality,
+  auto-process on stop, call detection, start at login, low-memory mode,
+  recording pill on/off.
+- **Models & services** — pick the transcription and summarization services,
+  install local engines, download models.
+- **Prompts** — customize the transcription, summarization and title prompts;
+  sensible defaults are built in and one click restores them.
+- **Downloads** — everything the app downloaded, with paths and sizes.
 
-| Service | How it works | Requires |
-|---|---|---|
-| **OpenAI-compatible** | Audio sent to `/audio/transcriptions` | Base URL + API key |
-| **whisper.cpp** | Runs locally via a prebuilt whisper.cpp binary (default) | Engine + GGML model downloaded in Settings → Models |
-| **CrispASR** (experimental) | Runs locally via a prebuilt `crispasr` binary (Nemotron 3.5 ASR 0.6B Q8 default) | Engine + GGUF model downloaded in Settings → Models |
+When **Auto-process recordings** is on (default), stopping a recording starts
+transcription and summarization automatically. Turn it off to only save the
+audio and process manually from the Recorder dashboard or the Library.
 
-#### Summarization
+## GNOME notes
 
-| Service | How it works | Requires |
-|---|---|---|
-| **OpenAI-compatible** | Text sent to `/chat/completions` | Base URL + API key |
-| **Ollama** | Runs locally via Ollama | Ollama running (`ollama serve`), model pulled in Settings → Models |
+GNOME has no built-in tray support, so the icon needs the
+AppIndicator/KStatusNotifierItem extension: install your distro's package
+(e.g. on Arch `sudo pacman -S gnome-shell-extension-appindicator`), enable it
+in the GNOME Extensions app and log out/in. Whether left-click focuses the
+window or opens the menu is decided by the tray host — KDE Plasma focuses the
+window, the GNOME extension typically opens the menu. XFCE, MATE, Cinnamon,
+KDE and LXQt show the icon natively.
 
-Mix and match freely — e.g. whisper.cpp for transcription + Ollama for summarization runs fully offline with no API key.
+## Tips
 
-### First-Time Setup
+### Microphone picks up too much noise?
 
-Open the window from the tray icon, then use the sidebar.
+If your microphone captures a lot of ambient noise, PipeWire's WebRTC echo
+cancellation can help. Load it for the current session:
 
-1. **Models & services tab** — choose your transcription and summarization services and configure them:
-   - *OpenAI-compatible*: set the base URL, paste your API key and choose models
-   - *whisper.cpp*: pick an acceleration backend and install the engine (first time), then download a GGML model
-   - *CrispASR* (experimental): pick a cpu/vulkan/cuda backend and install the engine (first time), then download a Nemotron model
-   - *Ollama*: set host and click Download next to your preferred model — installing Ollama starts `ollama serve` automatically
-   - The **Status** card on the same tab always shows what is installed and running: the whisper.cpp engine (path + size), downloaded GGML models, the CrispASR engine with its GGUF models, and the Ollama server (host, running state, pulled models with sizes)
-2. **General tab** — set output folder, recording quality and background behavior
-3. **Prompts tab** — optionally customize the transcription, summarization or title prompt (built-in defaults are shown)
-4. **Downloads tab** — every payload the app downloaded in one list, with its exact location on disk and size (engine, GGML models, the Ollama runtime and Ollama models)
-
-### Settings Reference
-
-#### General tab
-
-| Setting | Description |
-|---|---|
-| Start at system startup | Launch automatically on login |
-| Enable call detection | Monitor for active calls and notify you to start recording |
-| Low memory mode | Unload the window from memory when you close it (~20 MB vs. ~100 MB idle in the tray) at the cost of a brief delay when reopening. Off by default — enable on low-memory systems |
-| Auto-process recordings | Automatically start transcription and summarization when a recording stops (on by default). When off, only the audio is saved — start processing manually from the Recorder dashboard or the Library |
-| Output folder | Where recordings and notes are saved (default: `~/meetings`) |
-| Recording quality | Audio bitrate preset (Very High / High / Medium / Low) |
-
-#### Models & services tab
-
-Choose the transcription/summarization services here, then configure them below.
-
-**OpenAI-compatible**
-
-| Setting | Description |
-|---|---|
-| API key | Required when an OpenAI-compatible service is selected |
-| Base URL | `https://api.openai.com/v1` by default; point it at any compatible endpoint |
-| Transcription model | Free-text speech-to-text model name (`whisper-1` default; type any compatible name) |
-| Summarization model | Free-text chat model name (`gpt-5.6-luna` default; type any compatible name) |
-| Processing timeout | Max time to wait for a response (1–10 min) |
-
-**whisper.cpp (local)**
-
-A local transcription engine using the official prebuilt CPU binary. The engine is
-**downloaded as an official prebuilt binary on opt-in** — no compiler, no
-build toolchain, no system packages; until then the section shows an
-**Install whisper.cpp engine** button. (Upstream ships no CUDA prebuilt for
-Linux, so there is no GPU option: `auto` installs the CPU build, and an
-explicit `cuda` choice explains this instead of downloading.)
-
-| Setting | Description |
-|---|---|
-| Acceleration backend | `auto` (installs the CPU build) or force `cpu`. Upstream ships no CUDA prebuilt for Linux, so `cuda` is rejected with guidance. The detected hardware is shown next to the selector. |
-| Model | Free-text GGML model name to use for local transcription (`large-v3-turbo` default) |
-| Model list | Download status and one-click download for each available GGML model. Failures are shown inline on the row plus a dialog/notification with the reason |
-
-Available whisper.cpp (GGML) models: `large-v3-turbo` (~1.6 GB), `large-v3` (~3 GB), `medium` (~1.5 GB), `small` (~470 MB).
-
-**CrispASR (experimental, local)**
-
-A third transcription option using the official prebuilt `crispasr` binary
-with the Nemotron 3.5 ASR 0.6B model (Q8 default). All three GPU flavors are
-selectable: CPU (~25 MB download), Vulkan (~60 MB) and CUDA (~206–271 MB);
-`auto` picks CUDA on NVIDIA machines and CPU elsewhere. Like whisper.cpp it
-runs as a short-lived CLI call inside the processing job and unloads Ollama
-models first to free GPU memory — no persistent service to manage. Engine
-hashes are not pinned yet on this experimental branch.
-
-| Setting | Description |
-|---|---|
-| Acceleration backend | `auto`, `cpu`, `vulkan` or `cuda` (all three installable; Vulkan/CUDA Linux builds are x86_64-only) |
-| Model | Nemotron quant to use (`nemotron-3.5-asr-0.6b-q8_0` default; Q4_K / F16 available) |
-| Model list | Download status and one-click download for each Nemotron GGUF from HuggingFace |
-
-**Ollama**
-
-| Setting | Description |
-|---|---|
-| Ollama model | Free-text model name to use for local summarization (`phi4-mini` default) |
-| Ollama host | Ollama server address (default: `http://localhost:11434`) |
-| Model list | Download status and one-click download for each available model. A down server starts automatically for downloads when the Ollama binary is present and the host is local; a server the app started is stopped again on app exit (a pre-existing server is never touched). Installing Ollama itself also starts the server right away — no manual `ollama serve` |
-
-#### Status card (Models & services)
-
-The **Status** card shows the live state of the optional local engines: whether the
-whisper.cpp engine is installed (with its path and size), which GGML models are
-downloaded (with sizes), whether the CrispASR engine is installed (with its
-path, size and GGUF models), and whether Ollama is installed and serving (host,
-running state and pulled models with sizes). Click **Refresh** any time; the
-card also refreshes on its own after every install finishes.
-
-#### Downloads tab
-
-One list of **everything the app downloaded**, each row with name, kind
-(engine / model / runtime), exact location on disk and size:
-
-| Payload | Location |
-|---|---|
-| whisper.cpp engine (`whisper-cli` + libraries) | `~/.local/share/gravaai/whisper.cpp/` |
-| GGML models | `~/.local/share/gravaai/whisper-cpp-models/` |
-| CrispASR engine (`crispasr` + libraries) | `~/.local/share/gravaai/crisp-asr/` |
-| CrispASR (Nemotron GGUF) models | `~/.local/share/gravaai/crisp-asr-models/` |
-| Ollama runtime | `~/.local/share/gravaai/ollama/` |
-| Ollama models | Ollama's own store (`~/.ollama/models` by default) |
-
-Use **Open folder** on a row (or **Open data folder** for the root) to inspect
-the files in your file manager; **Refresh** re-scans sizes.
-
-Available Ollama models:
-
-| Model | Size | Notes |
-|---|---|---|
-| `phi4-mini` | ~3 GB | Lightest, good quality |
-| `gemma3:4b` | ~4 GB | Good quality |
-| `qwen2.5:7b` | ~5 GB | Very capable |
-| `llama3.1:8b` | ~5 GB | Very capable |
-| `gemma3:12b` | ~8 GB | Best quality, high RAM required |
-| `granite4:350m` | ~700 MB | Tiny Granite 4, fast local notes |
-
-#### Prompts tab
-
-Customize the transcription, summarization and title prompts. Built-in defaults are shown on first open. **Reset defaults** restores them; saving a default stores it as "use built-in". The `{transcript}` placeholder in the summarization prompt is replaced with the transcript text.
-
-Note: transcription prompts apply to the OpenAI-compatible service only — the local whisper.cpp and CrispASR engines do not use a prompt.
-
-#### Library
-
-Browse past meetings. Every row offers the actions that make sense for its
-state: **Transcribe** (audio-only meetings), **Summarize** (uses the existing
-transcript when there is one — the audio is never re-transcribed — otherwise it
-runs the full transcribe + summarize pipeline), **Transcript** / **Notes** to
-open the files, plus Rename and Open folder. Select rows to delete.
-
-The Recorder dashboard shows the same actions on its recent-meetings card and
-live background jobs with Cancel/Retry/Dismiss/Open actions. Both meeting lists
-refresh by themselves when a background job finishes or a recording is saved —
-no manual Refresh needed (the button is still there if you want one).
-
-### Workflow
-
-1. Click **Record (Headphones)**, **Record (Speaker)** or **Record (Custom)** to start
-   (Custom records the devices ticked in the Recorder — the list shows every
-   PulseAudio/PipeWire source, and the tray reuses the last saved selection)
-2. The timer shows elapsed recording time; **Pause** / **Resume** as needed
-3. Click **Stop** — a 5-second countdown begins when enabled in Settings (click **Cancel** to abort)
-4. After stopping, transcription starts automatically when **Auto-process recordings** is on (default); when off, only the audio is saved and you start processing manually from Jobs or the Library
-5. When done, links to the transcript and notes files appear in the window
-
-### Noise Reduction (Optional)
-
-If your microphone picks up too much ambient noise, enable PipeWire's WebRTC noise suppression:
-
-**Temporary (current session only):**
 ```bash
 pactl load-module module-echo-cancel aec_method=webrtc noise_suppression=true
 ```
 
-**Permanent:**
+To make it permanent, create `~/.config/pipewire/pipewire-pulse.conf.d/echo-cancel.conf`:
 
-Create `~/.config/pipewire/pipewire-pulse.conf.d/echo-cancel.conf`:
 ```
 pulse.cmd = [
   { cmd = "load-module" args = "module-echo-cancel aec_method=webrtc noise_suppression=true" flags = [] }
@@ -330,64 +175,32 @@ pulse.cmd = [
 ```
 
 Then restart PipeWire:
+
 ```bash
 systemctl --user restart pipewire pipewire-pulse
 ```
 
-### Logs
+### Where are the logs?
 
-Application logs written to `/var/log/gravaai/` (fallback: `~/.local/share/gravaai/`):
+`/var/log/gravaai/` (fallback: `~/.local/share/gravaai/`), in `app.log`
+(debug + info) and `error.log` (warnings and errors).
 
-```
-app.log    — DEBUG and INFO messages
-error.log  — WARNING and above
-```
+## Building from source (developers)
 
----
-
-## Development
-
-### Repository layout
-
-```
-linux/
-├── src/                   # Rust library + daemon and Qt companion binaries
-│   ├── main.rs            # daemon/client/compatibility role dispatch
-│   ├── bin/gravaai-ui.rs  # Qt/QML window companion entry point
-│   ├── config/            # defaults + settings + keyring
-│   ├── core/              # state machine, jobs, recording controller, retry, wire format
-│   ├── audio/             # ffmpeg recorder + mixer + pactl devices
-│   ├── detection/         # call detection
-│   ├── processing/        # pipeline + OpenAI-compatible / whisper.cpp / Ollama providers
-│   ├── services/          # opt-in engine/model installers + model clients
-│   ├── daemon/            # engine + D-Bus service + children + tray loop
-│   ├── ui/                # toolkit-free tray/proxy helpers and isolated Qt bridge
-│   ├── qml/               # Qt Quick shell, pages, components and Theme.qml
-│   └── utils/             # autostart, AppImage exe resolution, logging, meetings, self-uninstall
-├── assets/                # tray artwork + hicolor app icons
-├── packaging/appimage/    # AppDir desktop entry + build-appimage.sh
-└── Cargo.toml / Cargo.lock
-```
-
-### Running Linux checks
+Regular installs never compile anything. To hack on GravaAI you need the Rust
+toolchain, Qt 6 development packages (`qt6-base-dev`, `qt6-declarative-dev`,
+`qt6-tools-dev-tools`, `qt6-svg-dev` on Ubuntu) and `ffmpeg`/`pactl`:
 
 ```bash
-cargo fmt --check --manifest-path linux/Cargo.toml
-cargo clippy --manifest-path linux/Cargo.toml --all-targets --all-features -- -D warnings
-cargo test --manifest-path linux/Cargo.toml --no-default-features --lib
-cargo test --manifest-path linux/Cargo.toml --features ui --lib
-./linux/tests/qt_smoke.sh
-./linux/packaging/appimage/build-appimage.sh   # when a fresh AppImage is needed
+git clone https://github.com/jmarceno/gravaai
+cd gravaai
+cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+./linux/target/debug/gravaai
+
+# Pack a local AppImage:
+./linux/packaging/appimage/build-appimage.sh
 ```
-
-### Release
-
-Releases are cut manually via the `Release` / `Auto Release` workflows:
-
-| Trigger | Workflow | Output |
-|---|---|---|
-| Manual (`version`, e.g. `1.2.0`) | `release.yml` | AppImage(s) + source tarball attached to the Release |
-| Manual (`bump`) | `auto-release.yml` → `release.yml` | `v*` tag, then same as above |
 
 ## License
 

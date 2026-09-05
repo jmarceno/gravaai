@@ -53,6 +53,8 @@ ApplicationWindow {
         return "Ready"
     }
     function pillVisible() {
+        if (root.settingsData.show_recording_pill === false)
+            return false
         var st = snapshotData.state || "idle"
         return st === "recording" || st === "paused" || st === "countdown"
     }

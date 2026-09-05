@@ -505,7 +505,8 @@ Summarize actions (mode-aware, see below). A Handy-style recording pill
 `Qt.Tool` window in `Main.qml`) sits in the bottom-right corner just above
 the taskbar while recording/paused/countdown, showing status dot, elapsed
 time and pause/resume/stop controls; clicking it presents the main window
-and it can be dragged anywhere. `AppController`
+and it can be dragged anywhere. It is opt-out via `show_recording_pill`
+(Settings → General, on by default so upgrades keep it). `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and

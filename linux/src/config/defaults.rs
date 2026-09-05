@@ -288,6 +288,11 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub auto_process_enabled: bool,
     pub low_memory_mode: bool,
+    /// Handy-style mini pill overlay while recording/paused/countdown.
+    /// Opt-out: on by default; `#[serde(default)]` via `default_true` keeps
+    /// older config.json files (missing key) loading with the pill enabled.
+    #[serde(default = "default_true")]
+    pub show_recording_pill: bool,
     pub llm_request_timeout_minutes: u64,
     pub whisper_cpp_model: String,
     pub whisper_cpp_backend: String,
@@ -327,6 +332,7 @@ impl Default for Config {
             processing_countdown_enabled: false,
             auto_process_enabled: true,
             low_memory_mode: false,
+            show_recording_pill: true,
             llm_request_timeout_minutes: 5,
             whisper_cpp_model: "large-v3-turbo".to_string(),
             whisper_cpp_backend: "auto".to_string(),
@@ -339,5 +345,35 @@ impl Default for Config {
             summarization_prompt: String::new(),
             title_prompt: String::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recording_pill_is_opt_out() {
+        assert!(Config::default().show_recording_pill);
+    }
+
+    #[test]
+    fn legacy_config_without_pill_key_keeps_pill_enabled() {
+        // Pre-pill config.json files have no `show_recording_pill` key;
+        // the serde default must keep the overlay enabled on upgrade.
+        let mut value = serde_json::to_value(Config::default()).unwrap();
+        value.as_object_mut().unwrap().remove("show_recording_pill");
+        let cfg: Config = serde_json::from_value(value).unwrap();
+        assert!(cfg.show_recording_pill);
+    }
+
+    #[test]
+    fn explicit_pill_opt_out_round_trips() {
+        let cfg = Config {
+            show_recording_pill: false,
+            ..Config::default()
+        };
+        let back: Config = serde_json::from_value(serde_json::to_value(&cfg).unwrap()).unwrap();
+        assert!(!back.show_recording_pill);
     }
 }

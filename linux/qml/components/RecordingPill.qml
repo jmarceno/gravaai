@@ -106,7 +106,7 @@ Item {
                 implicitWidth: 30
                 implicitHeight: 30
                 focusPolicy: Qt.NoFocus
-                accessible.name: root.recState === "paused" ? "Resume recording" : "Pause recording"
+                Accessible.name: root.recState === "paused" ? "Resume recording" : "Pause recording"
                 ToolTip.text: root.recState === "paused" ? "Resume" : "Pause"
                 ToolTip.visible: hovered
                 visible: root.recState === "recording" || root.recState === "paused"
@@ -136,7 +136,7 @@ Item {
                 implicitWidth: 30
                 implicitHeight: 30
                 focusPolicy: Qt.NoFocus
-                accessible.name: "Stop recording"
+                Accessible.name: "Stop recording"
                 ToolTip.text: "Stop"
                 ToolTip.visible: hovered
                 visible: root.recState === "recording" || root.recState === "paused"
@@ -161,7 +161,7 @@ Item {
                 implicitWidth: 30
                 implicitHeight: 30
                 focusPolicy: Qt.NoFocus
-                accessible.name: "Open GravaAi window"
+                Accessible.name: "Open GravaAi window"
                 ToolTip.text: "Open window"
                 ToolTip.visible: hovered
                 contentItem: Label {

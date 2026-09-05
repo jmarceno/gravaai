@@ -30,6 +30,7 @@ Item {
             processing_countdown_enabled: countdown.checked,
             auto_process_enabled: autoProcess.checked,
             low_memory_mode: lowMemory.checked,
+            show_recording_pill: recordingPill.checked,
             llm_request_timeout_minutes: Number(cfg.llm_request_timeout_minutes || 5),
             whisper_cpp_model: cfg.whisper_cpp_model || "large-v3-turbo",
             whisper_cpp_backend: cfg.whisper_cpp_backend || "auto",
@@ -80,6 +81,7 @@ Item {
                     AppSwitch { id: autoTitle; text: "Generate meeting titles automatically"; checked: root.cfg.auto_title !== false; Layout.fillWidth: true }
                     AppSwitch { id: autoProcess; text: "Automatically transcribe and summarize after stopping"; checked: root.cfg.auto_process_enabled !== false; Layout.fillWidth: true }
                     AppSwitch { id: countdown; text: "Show processing countdown"; checked: root.cfg.processing_countdown_enabled || false; Layout.fillWidth: true }
+                    AppSwitch { id: recordingPill; text: "Show mini recording pill while recording"; checked: root.cfg.show_recording_pill !== false; Layout.fillWidth: true }
                     AppSwitch { id: lowMemory; text: "Low memory mode (exit window when closed)"; checked: root.cfg.low_memory_mode || false; Layout.fillWidth: true }
                     RowLayout {
                         Layout.fillWidth: true

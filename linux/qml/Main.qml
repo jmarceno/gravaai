@@ -55,10 +55,14 @@ ApplicationWindow {
     function beginResize(edges) { root.startSystemResize(edges) }
     function requestCloseWindow() {
         // Hide synchronously so the X button always closes the window even
-        // when the worker/D-Bus round-trip is slow or stuck. The async
-        // closeAction reply only matters for Low-memory mode (exit).
+        // when the worker/D-Bus round-trip is slow or stuck. In Low-memory
+        // mode quit the process directly: the async CloseAction reply is only
+        // a backup, so a lost worker reply can never leave a hidden window
+        // that ignores reopen requests. Otherwise the async reply (hide) is
+        // idempotent and the hidden window is presented on demand.
         root.hide()
         controller.requestClose()
+        if (settingsData.low_memory_mode) controller.requestAppQuit()
     }
 
     Component.onCompleted: {

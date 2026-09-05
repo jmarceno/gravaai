@@ -268,8 +268,10 @@ dispatches on `core/run_mode.rs::resolve_run_mode(argv)`:
   `AppController` sends only owned commands to a Tokio worker; D-Bus, file,
   network and model I/O never run on the Qt thread. Closing hides synchronously
   in QML (`requestCloseWindow`) so the X button always closes to the tray even
-  when the worker round-trip is slow; the async `CloseAction` reply only matters
-  for Low memory mode, which asks the companion to exit. A daemon-owner watch exits the UI when
+  when the worker round-trip is slow; Low-memory mode quits the companion
+  process directly (the async `CloseAction` reply is only a backup), so a lost
+  worker reply can never strand a hidden window that ignores reopen requests.
+  A daemon-owner watch exits the UI when
   the daemon disappears, and the daemon terminates the child gracefully on
   Quit.
 - **`--window`** is a compatibility trampoline to `gravaai-ui`; **no flag**

@@ -18,6 +18,7 @@ fn main() {
         QmlFile::from("qml/components/AppField.qml"),
         QmlFile::from("qml/components/AppSwitch.qml"),
         QmlFile::from("qml/components/StatusBadge.qml"),
+        QmlFile::from("qml/components/RecordingPill.qml"),
         QmlFile::from("qml/components/SidebarItem.qml"),
         QmlFile::from("qml/components/TitleBar.qml"),
         QmlFile::from("qml/pages/RecorderPage.qml"),

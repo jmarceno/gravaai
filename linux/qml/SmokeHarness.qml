@@ -89,6 +89,11 @@ ApplicationWindow {
         anchors.margins: 20
         spacing: 10
         Label { text: "QML smoke"; color: Theme.textPrimary; Layout.fillWidth: true }
+        RecordingPill {
+            recState: "recording"
+            elapsedSeconds: 73
+            countdownSeconds: 0
+        }
         StackLayout {
             id: pages
             Layout.fillWidth: true

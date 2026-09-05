@@ -52,6 +52,15 @@ ApplicationWindow {
         if (st === "countdown") return "Processing"
         return "Ready"
     }
+    function pillVisible() {
+        var st = snapshotData.state || "idle"
+        return st === "recording" || st === "paused" || st === "countdown"
+    }
+    function presentMain() {
+        root.showNormal()
+        root.raise()
+        root.requestActivate()
+    }
     function beginResize(edges) { root.startSystemResize(edges) }
     function requestCloseWindow() {
         // Hide synchronously so the X button always closes the window even
@@ -88,9 +97,7 @@ ApplicationWindow {
             if (message.length > 0) alertDialog.open()
         }
         function onPresentWindow() {
-            root.showNormal()
-            root.raise()
-            root.requestActivate()
+            root.presentMain()
         }
         function onOpenImport() { importDialog.open() }
         function onCloseAction(action) {
@@ -148,6 +155,64 @@ ApplicationWindow {
         z: 100
         Label { id: textLabel; anchors.centerIn: parent; width: parent.width - 32; color: Theme.textSecondary; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
         property Timer hideTimer: Timer { interval: 4200; onTriggered: toast.shown = false }
+    }
+
+    // Handy-style mini overlay: a small frameless always-on-top pill pinned
+    // to the bottom-right corner, just above the taskbar. It stays visible
+    // while recording (even with the main window closed to the tray) and
+    // offers pause/resume, stop and click-to-open without intruding.
+    property Window pillWindow: Window {
+        id: pillWindow
+        title: "GravaAi recording"
+        width: 300
+        height: 52
+        minimumWidth: 300
+        maximumWidth: 300
+        minimumHeight: 52
+        maximumHeight: 52
+        color: "transparent"
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        visible: root.pillVisible()
+        x: Math.max(0, Screen.width - width - 16)
+        y: Math.max(0, Screen.height - height - 48)
+
+        property point pressPos: Qt.point(0, 0)
+        property point pressWindowPos: Qt.point(0, 0)
+        property bool dragging: false
+
+        property MouseArea dragArea: MouseArea {
+            anchors.fill: parent
+            onPressed: function(mouse) {
+                pillWindow.pressPos = Qt.point(mouse.x, mouse.y)
+                pillWindow.pressWindowPos = Qt.point(pillWindow.x, pillWindow.y)
+                pillWindow.dragging = false
+            }
+            onPositionChanged: function(mouse) {
+                if (!pillWindow.dragging
+                        && Math.hypot(mouse.x - pillWindow.pressPos.x,
+                                      mouse.y - pillWindow.pressPos.y) > 4)
+                    pillWindow.dragging = true
+                if (pillWindow.dragging) {
+                    pillWindow.x = pillWindow.pressWindowPos.x + (mouse.x - pillWindow.pressPos.x)
+                    pillWindow.y = pillWindow.pressWindowPos.y + (mouse.y - pillWindow.pressPos.y)
+                }
+            }
+            onReleased: function(mouse) {
+                if (!pillWindow.dragging)
+                    root.presentMain()
+            }
+        }
+
+        RecordingPill {
+            anchors.centerIn: parent
+            recState: root.snapshotData.state || "idle"
+            elapsedSeconds: Number(root.snapshotData.elapsed || 0)
+            countdownSeconds: Number(root.snapshotData.countdown || 0)
+            onPauseRequested: root.controller.pauseRecording()
+            onResumeRequested: root.controller.resumeRecording()
+            onStopRequested: root.controller.stopRecording()
+            onOpenRequested: root.presentMain()
+        }
     }
 
     Rectangle {

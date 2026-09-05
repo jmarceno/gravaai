@@ -500,7 +500,12 @@ the Recorder dashboard. The meeting lists (Recorder recent card + Library)
 refresh themselves when a background job finishes or a recording is saved
 (`controller::MeetingRefreshTracker` on `SnapshotChanged`) and when the
 Library page is opened; the Library and recent card expose Transcribe and
-Summarize actions (mode-aware, see below). `AppController`
+Summarize actions (mode-aware, see below). A Handy-style recording pill
+(`qml/components/RecordingPill.qml`, hosted by a frameless always-on-top
+`Qt.Tool` window in `Main.qml`) sits in the bottom-right corner just above
+the taskbar while recording/paused/countdown, showing status dot, elapsed
+time and pause/resume/stop controls; clicking it presents the main window
+and it can be dragged anywhere. `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
@@ -731,5 +736,6 @@ The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by
 the QML/offscreen and AppImage smoke gates rather than ordinary unit tests.
 `linux/tests/qt_smoke.sh` runs qmllint/qmlimportscanner, loads every page at
-1332×820 and 960×640, and verifies direct UI refusal without a daemon/tray.
+1332×820 and 960×640 (the harness also instantiates the recording pill),
+and verifies direct UI refusal without a daemon/tray.
 The engine/manager/key logic they rely on is unit-tested via fakes.

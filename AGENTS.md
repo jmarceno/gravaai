@@ -318,10 +318,13 @@ is opened, after every finished install and after Settings are saved.
 - `recorder.rs` runs a single `ffmpeg` subprocess reading PulseAudio/PipeWire
   sources directly (`-f pulse`); `mixer.rs` builds the command — mic+system
   mode `amerge`s mic (left channel) and sink monitor (right channel) into a
-  true-stereo MP3 with a `highpass=f=80` + per-channel `dynaudnorm` filter
-  (realtime-safe loudness normalization that lifts quiet microphones; each
-  channel is normalized independently, boost capped at 20 dB), preserving
-  speaker separation for transcription. Custom mode (`build_ffmpeg_command_multi`)
+  true-stereo MP3 with a `highpass=f=80` + per-channel `speechnorm` filter
+  (causal speech normalization that lifts quiet microphones; each channel is
+  normalized independently, expansion capped at 20 dB, stereo pairs linked),
+  preserving
+  speaker separation for transcription. (`dynaudnorm` must never be used in
+  the live chain: its ~3 s Gaussian lookahead window is dropped, not flushed,
+  on stop, so every recording lost its last ~2.8 s.) Custom mode (`build_ffmpeg_command_multi`)
   records the explicit `custom_devices` list instead: 1 source like mic-only,
   2 sources `amerge`d to stereo, 3+ mixed down with `amix` and forced to
   stereo (MP3 has no multichannel layout). Device names are resolved once in

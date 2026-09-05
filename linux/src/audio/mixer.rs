@@ -4,11 +4,19 @@ use std::path::Path;
 
 /// Loudness normalization applied to every recorded channel.
 ///
-/// `dynaudnorm` adapts each channel to a healthy level in ~200 ms frames —
-/// cheap enough for real-time capture (measured >100× realtime on CPU) and
-/// it fixes very quiet microphones. `m=10` caps the boost at 20 dB so
-/// silence is not amplified into noise.
-const NORMALIZE: &str = "dynaudnorm=f=200:g=15:p=0.9:m=10";
+/// `speechnorm` is a causal speech normalizer (a sample-recursive peak
+/// follower with no lookahead), so it holds no audio back and flushes cleanly
+/// when ffmpeg stops — the file ends where the recording stopped. `e=10`
+/// caps the expansion at 20 dB so silence is not amplified into noise, and
+/// `l=1` links channels so a stereo pair keeps its balance (a dead channel is
+/// never boosted on its own).
+///
+/// Do NOT use `dynaudnorm` here: its Gaussian gain window (`g` frames of `f`
+/// ms — 15×200 ms ≈ 3 s) needs future context to emit, and on stop
+/// (SIGTERM or `q`, file or live input) it drops the whole buffered window
+/// instead of flushing it, so every recording lost its last ~2.8 s. Measured
+/// with the app's exact commands, not theorized.
+const NORMALIZE: &str = "speechnorm=e=10:l=1";
 
 /// Build ffmpeg command reading mic + system monitor into a stereo MP3.
 ///
@@ -23,8 +31,9 @@ pub fn build_ffmpeg_command(
 ) -> Vec<String> {
     // highpass=f=80: cut sub-80 Hz rumble. No denoiser: afftdn/anlmdn are too
     // slow for real-time use and make ffmpeg drop packets (file shorter than
-    // the wall-clock duration). dynaudnorm is realtime-safe and lifts quiet
-    // mics; each channel is normalized independently.
+    // the wall-clock duration). speechnorm is causal and realtime-safe
+    // (measured >100× realtime) and lifts quiet mics; each channel is
+    // normalized independently.
     let filter = format!(
         "[0:a]highpass=f=80,{NORMALIZE}[mic];\
          [1:a]{NORMALIZE}[sys];\
@@ -186,7 +195,7 @@ mod tests {
         // Both channels pass through the normalizer before amerge, and the
         // mic keeps its highpass.
         assert!(filter.contains("[0:a]highpass=f=80,"));
-        assert!(filter.contains("[1:a]dynaudnorm"));
+        assert!(filter.contains("[1:a]speechnorm"));
         assert!(filter.ends_with("[mic][sys]amerge=inputs=2[out]"));
     }
 
@@ -199,7 +208,7 @@ mod tests {
             .position(|a| a == "-af")
             .and_then(|i| cmd.get(i + 1))
             .unwrap();
-        assert_eq!(af, "highpass=f=80,dynaudnorm=f=200:g=15:p=0.9:m=10");
+        assert_eq!(af, "highpass=f=80,speechnorm=e=10:l=1");
     }
 
     fn multi(sources: &[&str]) -> Vec<String> {
@@ -227,7 +236,7 @@ mod tests {
             .and_then(|i| cmd.get(i + 1))
             .unwrap();
         assert!(af.contains("highpass=f=80"));
-        assert!(af.contains("dynaudnorm"));
+        assert!(af.contains("speechnorm"));
         assert_eq!(cmd.last().unwrap(), "o.mp3");
     }
 
@@ -236,8 +245,8 @@ mod tests {
         let cmd = multi(&["mic", "sink.monitor"]);
         assert_eq!(cmd.iter().filter(|a| *a == "-i").count(), 2);
         let filter = filter_of(&cmd);
-        assert!(filter.contains("[0:a]highpass=f=80,dynaudnorm"));
-        assert!(filter.contains("[1:a]highpass=f=80,dynaudnorm"));
+        assert!(filter.contains("[0:a]highpass=f=80,speechnorm"));
+        assert!(filter.contains("[1:a]highpass=f=80,speechnorm"));
         assert!(filter.ends_with("[a0][a1]amerge=inputs=2[out]"));
         let map = cmd
             .iter()
@@ -268,5 +277,34 @@ mod tests {
             .unwrap();
         assert_eq!(ac, "2");
         assert_eq!(cmd.last().unwrap(), "o.mp3");
+    }
+
+    #[test]
+    fn no_recording_command_uses_a_tail_dropping_filter() {
+        // Regression: `dynaudnorm` buffers its Gaussian gain window (~3 s)
+        // and drops it on stop instead of flushing, so every recording lost
+        // its last ~2.8 s. All live-chain filters must be causal (flush to
+        // the last sample on SIGTERM). This fails if dynaudnorm returns.
+        let cmds = vec![
+            build_ffmpeg_command("mic", "sink.monitor", &PathBuf::from("o.mp3"), "5"),
+            build_ffmpeg_command_mic_only("mic", &PathBuf::from("o.mp3"), "5"),
+            multi(&["mic"]),
+            multi(&["mic", "sink.monitor"]),
+            multi(&["mic1", "mic2", "sink.monitor"]),
+        ];
+        for cmd in &cmds {
+            assert!(
+                !cmd.iter().any(|a| a.contains("dynaudnorm")),
+                "tail-dropping filter in recording command: {cmd:?}"
+            );
+        }
+        // ...while the quiet-mic boost the normalizer is for must survive:
+        // every shape still carries the causal speech normalizer.
+        for cmd in &cmds {
+            assert!(
+                cmd.iter().any(|a| a.contains("speechnorm")),
+                "missing loudness normalization in recording command: {cmd:?}"
+            );
+        }
     }
 }

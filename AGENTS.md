@@ -335,6 +335,17 @@ is opened, after every finished install and after Settings are saved.
   parsed by the pure `parse_pactl_list_sources` into `AudioSource`
   name/description/is-monitor rows, exposed to the window as JSON) for the
   Custom multi-select list — nothing is hardcoded to the default device.
+- `levels.rs` reports the live capture level for the recording meter: a
+  sidecar ffmpeg process reads the **same** source names the recording uses,
+  mixes them with `amix` and parses `ebur128` momentary loudness (`M:` at
+  ~10 Hz) into a 0.0–1.0 level (`lufs_to_level`, pure and unit-tested). It
+  never touches the recording pipeline — monitor failure means a silent
+  meter (0), never a failed recording. The `Recorder` starts/stops the
+  monitor with its segments (pause/resume/stop) and forwards samples through
+  an `on_level` callback the daemon factory wires to the event loop; the
+  level rides the snapshot as `audio_level` (`core/wire.rs`) and renders in
+  the Recorder page (`AudioLevelMeter.qml`) and as a bottom-edge strip on
+  the recording pill.
 - Pause/resume works via **segments**: pause terminates ffmpeg cleanly
   (SIGTERM, saving the current segment), resume spawns a new ffmpeg writing
   the next segment, and stop concatenates all segments with ffmpeg's concat
@@ -504,8 +515,11 @@ Summarize actions (mode-aware, see below). A Handy-style recording pill
 (`qml/components/RecordingPill.qml`, hosted by a frameless always-on-top
 `Qt.Tool` window in `Main.qml`) sits in the bottom-right corner just above
 the taskbar while recording/paused/countdown, showing status dot, elapsed
-time and pause/resume/stop controls; clicking it presents the main window
-and it can be dragged anywhere. It is opt-out via `show_recording_pill`
+time, a live input-level strip (`audio_level` from the snapshot) and
+pause/resume/stop controls; clicking it presents the main window
+and it can be dragged anywhere. The Recorder page shows the same live level
+in full size (`qml/components/AudioLevelMeter.qml` — a flat meter while
+recording means nothing is reaching the recorder). It is opt-out via `show_recording_pill`
 (Settings → General, on by default so upgrades keep it). `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and Lepramim
@@ -692,6 +706,11 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   layout, monitor naming, segment naming, Custom multi-source commands
   (1/2/3+ inputs), `pactl list sources` parsing, missing-source detection,
   selection dedup, empty-selection rejection.
+- `audio/levels.rs` — `ebur128` momentary parsing, LUFS→level mapping,
+  all-sources-mixed level command shape; `core/wire.rs` — `audio_level`
+  round-trip + legacy (level-less) tolerance + clamping; `daemon/engine.rs` —
+  level tick into the snapshot, reset when leaving recording, late samples
+  dropped off-recording.
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
   autostart entry management (`autostart`), AppImage-aware exe resolution

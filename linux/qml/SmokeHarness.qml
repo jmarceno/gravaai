@@ -48,6 +48,7 @@ ApplicationWindow {
         controller.snapshot_json = JSON.stringify({
             state: "recording",
             elapsed: 73,
+            audio_level: 0.45,
             jobs: [
                 { job_id: 1, status: "processing", label: "A long meeting title that still fits", status_text: "Transcribing… 42%" },
                 { job_id: 2, status: "error", label: "A failed job", error_msg: "Network timeout" }
@@ -93,6 +94,7 @@ ApplicationWindow {
             recState: "recording"
             elapsedSeconds: 73
             countdownSeconds: 0
+            audioLevel: 0.45
         }
         StackLayout {
             id: pages

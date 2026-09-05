@@ -11,6 +11,7 @@ use std::time::Duration;
 use super::devices::{
     get_default_sink, get_default_source, list_sources, missing_sources, monitor_of_sink,
 };
+use super::levels::LevelMonitor;
 use super::mixer::{
     build_ffmpeg_command, build_ffmpeg_command_mic_only, build_ffmpeg_command_multi,
 };
@@ -31,6 +32,7 @@ pub fn segment_path_for(output_path: &std::path::Path, index: u64) -> PathBuf {
 
 type TickCb = Arc<Mutex<Option<Box<dyn Fn(u64) + Send>>>>;
 type ErrorCb = Arc<Mutex<Option<Box<dyn Fn(String) + Send>>>>;
+type LevelCb = Arc<Mutex<Option<Box<dyn Fn(f32) + Send>>>>;
 
 fn emit_tick(cb: &TickCb, elapsed: u64) {
     if let Some(f) = cb.lock().unwrap().as_ref() {
@@ -77,7 +79,9 @@ pub struct Recorder {
     quality: String,
     on_tick: TickCb,
     on_error: ErrorCb,
+    on_level: LevelCb,
     child: Arc<Mutex<Option<Child>>>,
+    level_monitor: Option<LevelMonitor>,
     segments: Vec<PathBuf>,
     segment_index: u64,
     sources: Vec<String>,
@@ -100,7 +104,9 @@ impl Recorder {
             quality,
             on_tick: Arc::new(Mutex::new(on_tick)),
             on_error: Arc::new(Mutex::new(on_error)),
+            on_level: Arc::new(Mutex::new(None)),
             child: Arc::new(Mutex::new(None)),
+            level_monitor: None,
             segments: Vec::new(),
             segment_index: 0,
             sources: Vec::new(),
@@ -109,6 +115,33 @@ impl Recorder {
                 stop: AtomicBool::new(false),
                 elapsed: AtomicU64::new(0),
             }),
+        }
+    }
+
+    /// Live-level callback for the recording meter (0.0–1.0, ~10 Hz).
+    ///
+    /// Wired by the daemon factory to the event loop; unit tests and other
+    /// embeds simply leave it unset. Monitor failures never surface here —
+    /// the meter just stays silent at 0.
+    pub fn set_on_level(&mut self, cb: impl Fn(f32) + Send + 'static) {
+        *self.on_level.lock().unwrap() = Some(Box::new(cb));
+    }
+
+    fn start_level_monitor(&mut self) {
+        let cb = self.on_level.clone();
+        let sources = self.sources.clone();
+        self.level_monitor = Some(LevelMonitor::start(sources, move |level| {
+            if let Some(f) = cb.lock().unwrap().as_ref() {
+                f(level);
+            }
+        }));
+    }
+
+    fn stop_level_monitor(&mut self) {
+        if let Some(mut monitor) = self.level_monitor.take() {
+            monitor.stop();
+        } else if let Some(f) = self.on_level.lock().unwrap().as_ref() {
+            f(0.0);
         }
     }
 
@@ -368,7 +401,7 @@ impl RecorderBackend for Recorder {
         self.segments.clear();
         self.segment_index = 0;
         self.start_ffmpeg_segment()?;
-        // Timer thread: +1s ticks while neither paused nor stopped.
+        self.start_level_monitor(); // Timer thread: +1s ticks while neither paused nor stopped.
         let flags = self.flags.clone();
         let on_tick = self.on_tick.clone();
         std::thread::Builder::new()
@@ -393,6 +426,7 @@ impl RecorderBackend for Recorder {
             return;
         }
         self.stop_ffmpeg_segment();
+        self.stop_level_monitor();
         log::info!("Recording paused — segment {} saved", self.segment_index);
     }
 
@@ -407,12 +441,14 @@ impl RecorderBackend for Recorder {
             emit_error(&self.on_error, format!("{e:#}"));
             return;
         }
+        self.start_level_monitor();
         log::info!("Recording resumed — segment {} started", self.segment_index);
     }
 
     fn stop(&mut self) {
         log::info!("Stopping recording...");
         self.flags.stop.store(true, Ordering::SeqCst);
+        self.stop_level_monitor();
         self.stop_ffmpeg_segment();
         if self.segments.is_empty() {
             log::warn!("No segments recorded.");

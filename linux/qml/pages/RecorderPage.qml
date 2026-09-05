@@ -287,7 +287,7 @@ Item {
                         }
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 62
+                            implicitHeight: 104
                             radius: Theme.radiusSm
                             color: Theme.inputBg
                             border.color: Theme.borderSubtle
@@ -301,21 +301,11 @@ Item {
                                     color: Theme.textPrimary; font.pixelSize: 26; font.bold: true
                                     font.family: "monospace"
                                 }
-                                Row {
+                                AudioLevelMeter {
                                     Layout.fillWidth: true
                                     Layout.alignment: Qt.AlignVCenter
-                                    spacing: 3
-                                    Repeater {
-                                        model: [10, 18, 26, 14, 30, 20, 36, 22, 14, 28, 12, 24, 18, 32, 14, 26, 20, 10, 22, 16, 28, 12, 24, 18, 30, 14, 20, 26, 12, 18]
-                                        delegate: Rectangle {
-                                            width: 3
-                                            height: modelData
-                                            radius: 2
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            color: (snapshot.state === "recording") ? Theme.danger : Theme.sliderTrack
-                                            opacity: (snapshot.state === "recording") ? 0.95 : 1.0
-                                        }
-                                    }
+                                    audioLevel: Number(snapshot.audio_level || 0)
+                                    recState: snapshot.state || "idle"
                                 }
                             }
                         }

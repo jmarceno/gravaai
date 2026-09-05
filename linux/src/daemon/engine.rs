@@ -50,6 +50,7 @@ enum CtlEvent {
     Discarded,
     Countdown(u64),
     Timer(u64),
+    Level(f32),
     RecorderError(String),
     Stopped,
 }
@@ -74,6 +75,10 @@ pub struct Engine<R> {
     status: String,
     elapsed: u64,
     countdown: u64,
+    /// Last live capture level (0.0–1.0). Updated at ~10 Hz while recording
+    /// via [`Self::level_tick`]; reset to 0 whenever the lifecycle leaves the
+    /// recording state so a stale bar never lingers.
+    level: f32,
     job_status_text: HashMap<i64, String>,
     /// Committed jobs waiting for the recorder file before the processor launches.
     awaiting_file: Vec<i64>,
@@ -141,6 +146,7 @@ impl<R: RecorderBackend + Send> Engine<R> {
             status: "Ready to record".to_string(),
             elapsed: 0,
             countdown: 0,
+            level: 0.0,
             job_status_text: HashMap::new(),
             awaiting_file: Vec::new(),
             pending_title: None,
@@ -203,6 +209,7 @@ impl<R: RecorderBackend + Send> Engine<R> {
             &self.status,
             self.elapsed,
             self.countdown,
+            self.level,
             &views,
         )
     }
@@ -330,6 +337,17 @@ impl<R: RecorderBackend + Send> Engine<R> {
     /// Deliver a recorder timer tick marshalled from a worker thread.
     pub fn timer_tick(&mut self, elapsed: u64) {
         self.queue.lock().unwrap().push(CtlEvent::Timer(elapsed));
+        self.drain_events();
+    }
+
+    /// Deliver a live audio-level sample (0.0–1.0) from the level monitor.
+    /// Samples arriving while not recording are dropped so a late monitor
+    /// thread can never leave a stale bar on an idle snapshot.
+    pub fn level_tick(&mut self, level: f32) {
+        self.queue
+            .lock()
+            .unwrap()
+            .push(CtlEvent::Level(level.clamp(0.0, 1.0)));
         self.drain_events();
     }
 
@@ -540,6 +558,9 @@ impl<R: RecorderBackend + Send> Engine<R> {
                     self.elapsed = 0;
                     self.countdown = 0;
                 }
+                if state != State::Recording {
+                    self.level = 0.0;
+                }
                 self.changed();
             }
             CtlEvent::Error(msg) => self.emit_error(&msg),
@@ -583,6 +604,18 @@ impl<R: RecorderBackend + Send> Engine<R> {
             CtlEvent::Timer(elapsed) => {
                 self.elapsed = elapsed;
                 self.changed();
+            }
+            CtlEvent::Level(level) => {
+                // Only live while recording; pause/countdown/idle snapshots
+                // stay at 0 (also enforced by the State reset above).
+                if self.controller.state() == State::Recording {
+                    // Skip the D-Bus round-trip when nothing visibly changed.
+                    let changed = (level - self.level).abs() >= 0.01;
+                    self.level = level;
+                    if changed {
+                        self.changed();
+                    }
+                }
             }
             CtlEvent::RecorderError(msg) => {
                 self.controller.abort_to_idle();
@@ -1019,5 +1052,24 @@ mod tests {
         f.engine
             .start_recording_custom(vec!["mic-a".to_string(), "mic-b".to_string()]);
         assert_eq!(f.engine.state(), State::Recording);
+    }
+
+    #[test]
+    fn level_tick_flows_into_the_snapshot_and_resets_off_recording() {
+        use crate::core::wire::snapshot_from_json;
+        let mut f = fixture();
+        f.engine.start_recording("headphones");
+        assert_eq!(f.engine.state(), State::Recording);
+        f.engine.level_tick(0.6);
+        let snap = snapshot_from_json(&f.engine.snapshot_json());
+        assert!((snap.audio_level - 0.6).abs() < 1e-6);
+        // Pausing drops the meter back to silence.
+        f.engine.pause();
+        let snap = snapshot_from_json(&f.engine.snapshot_json());
+        assert_eq!(snap.audio_level, 0.0);
+        // Late monitor samples while paused must not resurrect the bar.
+        f.engine.level_tick(0.9);
+        let snap = snapshot_from_json(&f.engine.snapshot_json());
+        assert_eq!(snap.audio_level, 0.0);
     }
 }

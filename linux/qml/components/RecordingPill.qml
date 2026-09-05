@@ -12,6 +12,8 @@ Item {
     required property string recState
     required property double elapsedSeconds
     property double countdownSeconds: 0
+    // Live capture level 0.0–1.0 from the daemon snapshot (`audio_level`).
+    property double audioLevel: 0
     signal pauseRequested()
     signal resumeRequested()
     signal stopRequested()
@@ -60,6 +62,27 @@ Item {
         color: Theme.cardBgRaised
         border.color: Theme.borderSubtle
         border.width: 1
+        clip: true
+
+        // Live capture meter along the pill's bottom edge: flat while
+        // recording means nothing is reaching the recorder.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 3
+            color: "transparent"
+            visible: root.recState === "recording" || root.recState === "paused"
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * Math.max(0, Math.min(1, Number(root.audioLevel) || 0))
+                color: root.dotColor()
+                opacity: root.recState === "recording" ? 0.9 : 0.4
+                Behavior on width { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+            }
+        }
 
         RowLayout {
             id: pillRow

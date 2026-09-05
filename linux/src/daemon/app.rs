@@ -37,6 +37,7 @@ enum DaemonMsg {
     TrayCommand(String),
     CountdownTick,
     TimerTick(u64),
+    LevelTick(f32),
     RecorderError(String),
     EmitPresent,
     EmitUseExisting,
@@ -196,6 +197,7 @@ async fn async_main() -> i32 {
 
     let msg2 = msg_tx.clone();
     let msg3 = msg_tx.clone();
+    let msg_level = msg_tx.clone();
     let factory = move |output: PathBuf,
                         mode: String,
                         custom: Vec<String>,
@@ -203,7 +205,8 @@ async fn async_main() -> i32 {
           -> anyhow::Result<Recorder> {
         let t = msg2.clone();
         let e = msg3.clone();
-        Ok(Recorder::new(
+        let l = msg_level.clone();
+        let mut recorder = Recorder::new(
             output,
             mode,
             custom,
@@ -214,7 +217,11 @@ async fn async_main() -> i32 {
             Some(Box::new(move |msg| {
                 let _ = e.send(DaemonMsg::RecorderError(msg));
             })),
-        ))
+        );
+        recorder.set_on_level(move |level| {
+            let _ = l.send(DaemonMsg::LevelTick(level));
+        });
+        Ok(recorder)
     };
     let tick_tx = msg_tx.clone();
     let request_tick = move || {
@@ -613,6 +620,10 @@ async fn async_main() -> i32 {
             }
             Wake::Msg(DaemonMsg::TimerTick(elapsed)) => {
                 ctx.engine.lock().await.timer_tick(elapsed);
+                refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
+            }
+            Wake::Msg(DaemonMsg::LevelTick(level)) => {
+                ctx.engine.lock().await.level_tick(level);
                 refresh(&ctx, &iface_ref, tray_handle.as_ref()).await;
             }
             Wake::Msg(DaemonMsg::RecorderError(m)) => {

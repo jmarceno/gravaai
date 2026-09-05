@@ -15,6 +15,7 @@ fn main() {
         QmlFile::from("qml/components/AppCheckBox.qml"),
         QmlFile::from("qml/components/AppComboBox.qml"),
         QmlFile::from("qml/components/AppProgressBar.qml"),
+        QmlFile::from("qml/components/AudioLevelMeter.qml"),
         QmlFile::from("qml/components/AppField.qml"),
         QmlFile::from("qml/components/AppSwitch.qml"),
         QmlFile::from("qml/components/StatusBadge.qml"),

@@ -210,6 +210,7 @@ ApplicationWindow {
             recState: root.snapshotData.state || "idle"
             elapsedSeconds: Number(root.snapshotData.elapsed || 0)
             countdownSeconds: Number(root.snapshotData.countdown || 0)
+            audioLevel: Number(root.snapshotData.audio_level || 0)
             onPauseRequested: root.controller.pauseRecording()
             onResumeRequested: root.controller.resumeRecording()
             onStopRequested: root.controller.stopRecording()

@@ -198,16 +198,23 @@ HERE="$(cd "$SCRIPT_DIR" && pwd -P)"
 
 # The AppImage runtime normally sets these to this mount. If a host IDE left
 # stale values behind, reject them and continue from the mount containing this
-# AppRun. Presence of both executables is the ownership check.
+# AppRun. A matching APPDIR proves ownership regardless of the file name, so
+# user renames keep working; otherwise the file name must mention us
+# (case-insensitive, e.g. gravaai.appimage) and exist on disk.
 if [[ -n "${APPDIR:-}" && "${APPDIR}" != "$HERE" ]]; then
   echo "GravaAI: ignoring foreign APPDIR=${APPDIR}" >&2
   unset APPDIR
 fi
 if [[ -n "${APPIMAGE:-}" ]]; then
-  APPIMAGE_NAME="${APPIMAGE##*/}"
-  if [[ ! -f "${APPIMAGE}" || "${APPIMAGE_NAME}" != gravaai-*.AppImage ]]; then
-    echo "GravaAI: ignoring foreign APPIMAGE=${APPIMAGE}" >&2
-    unset APPIMAGE
+  if [[ "${APPDIR:-}" == "$HERE" ]]; then
+    : # ours: the runtime mounted this AppImage at our own location
+  else
+    APPIMAGE_NAME="${APPIMAGE##*/}"
+    APPIMAGE_LOWER="$(printf '%s' "$APPIMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+    if [[ ! -f "${APPIMAGE}" || "$APPIMAGE_LOWER" != *gravaai* ]]; then
+      echo "GravaAI: ignoring foreign APPIMAGE=${APPIMAGE}" >&2
+      unset APPIMAGE
+    fi
   fi
 fi
 [[ -x "$HERE/usr/bin/gravaai" && -x "$HERE/usr/libexec/gravaai/gravaai-ui" ]] || {

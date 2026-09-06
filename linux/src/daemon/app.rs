@@ -261,6 +261,12 @@ async fn async_main() -> i32 {
         handles: HashMap::new(),
     };
     let cfg = settings::load();
+    // Repair a stale login entry (e.g. a transient AppImage mount path
+    // persisted by an older build) whenever startup-at-login is wanted; this
+    // is a no-op when the entry is already correct.
+    if cfg.start_at_startup {
+        crate::utils::autostart::update_autostart(true);
+    }
     let call_detection_enabled = cfg.call_detection_enabled;
     let mut engine = Engine::new(
         cfg,

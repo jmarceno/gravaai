@@ -283,7 +283,9 @@ interface (`daemon/dbus_service.rs`, zbus 5 `#[interface]`); the JSON snapshot
 payload is `core/wire.rs` (`Snapshot`/`JobView`, serde, tolerant parsing). The
 daemon spawns the window as a detached child process and supervises a single
 window via `daemon/window_supervisor.rs` (spawn-vs-present).
-`utils/autostart.rs` writes the login entry with `--daemon`.
+`utils/autostart.rs` writes the login entry with `--daemon`, persisting only
+stable executable paths (transient AppImage FUSE mounts are never written)
+and repairing a stale entry on enable and at daemon startup.
 
 **Model/GPU installs run in the daemon**, not the window: Settings → Models
 install/build/download requests are sent as `StartInstall(spec)` and each runs
@@ -711,7 +713,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   dropped off-recording.
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
-  autostart entry management (`autostart`), AppImage-aware exe resolution
+  autostart entry management with transient-mount rejection and stale-entry
+  repair (`autostart`), AppImage-aware exe resolution
   that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata +
   `has_audio` (`meeting_scanner`), payload inventory + dir sizes + status
   JSON shape (`payloads`, including the `crispasr` engine/model rows), in-tree-reuse vs. copy (`recording_import`),

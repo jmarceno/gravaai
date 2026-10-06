@@ -379,12 +379,31 @@ impl<R: RecorderBackend + Send> Engine<R> {
 
     /// Process an existing audio file already resolved to meeting paths.
     pub fn import_existing(&mut self, audio: &str, transcript: &str, notes: &str, label: &str) {
-        let id = self.jobs.create(
-            audio.into(),
-            transcript.into(),
-            notes.into(),
-            label.to_string(),
-        );
+        // The window only knows the picked audio file; resolve where its
+        // results belong (in place for library files, a fresh meeting dir
+        // for external files) so transcript/notes are actually written.
+        let (audio, transcript, notes) = if transcript.is_empty() || notes.is_empty() {
+            let output = PathBuf::from(self.output_folder());
+            match crate::utils::recording_import::prepare_import(
+                std::path::Path::new(audio),
+                &output,
+                &chrono::Local::now(),
+            ) {
+                Ok(paths) => paths,
+                Err(e) => {
+                    self.emit_error(&format!("Could not import recording: {e:#}"));
+                    return;
+                }
+            }
+        } else {
+            (audio.into(), transcript.into(), notes.into())
+        };
+        let label = if label.trim().is_empty() || label == "Imported recording" {
+            crate::utils::filename::make_job_label(&audio, None)
+        } else {
+            label.to_string()
+        };
+        let id = self.jobs.create(audio, transcript, notes, label);
         self.changed();
         self.launch_processor(id);
     }
@@ -702,7 +721,11 @@ impl<R: RecorderBackend + Send> Engine<R> {
         if job.cancelled {
             return;
         }
+        log::error!("Job {job_id} failed: {msg}");
         self.jobs.mark_error(job_id, msg);
+        // Drop the last progress line so the row shows the error, not a
+        // stale "Transcribing…" that looks like it is still running.
+        self.job_status_text.remove(&job_id);
         self.changed();
     }
 
@@ -966,8 +989,12 @@ mod tests {
         );
         // Error the job, then retry relaunches.
         f.engine
+            .handle_child_event(0, ChildEvent::Status("Transcribing… 40%".into()));
+        f.engine
             .handle_child_event(0, ChildEvent::Error("boom".into()));
         assert!(f.engine.snapshot_json().contains("boom"));
+        // The failed row must not keep advertising stale progress.
+        assert_eq!(f.engine.status_text_for(0), "");
         f.engine.retry_job(0);
         assert_eq!(f.launched.lock().unwrap().launched.len(), 2);
         // Cancel kills backend handle and removes the job.
@@ -975,6 +1002,39 @@ mod tests {
         assert!(f.launched.lock().unwrap().cancelled.contains(&0));
         assert!(!f.engine.snapshot_json().contains("boom"));
         let _ = (&f.changes, &f.errors, &f.outputs);
+    }
+
+    #[test]
+    fn import_of_an_external_file_copies_it_into_the_library() {
+        // Regression: the window sends only the audio path; the job used to
+        // run with empty transcript/notes paths and wrote nothing.
+        let mut f = fixture();
+        let src_dir = tempfile::tempdir().unwrap();
+        let src = src_dir.path().join("call.mp3");
+        std::fs::write(&src, b"audio").unwrap();
+        f.engine
+            .import_existing(&src.to_string_lossy(), "", "", "Imported recording");
+        let launched = f.launched.lock().unwrap();
+        assert_eq!(launched.launched.len(), 1);
+        let (_, audio, transcript, notes, _) = &launched.launched[0];
+        let out = PathBuf::from(f.engine.output_folder());
+        assert!(PathBuf::from(audio).starts_with(&out), "{audio}");
+        assert!(PathBuf::from(audio).is_file());
+        assert!(transcript.ends_with("transcript.md"));
+        assert!(notes.ends_with("notes.md"));
+        assert_eq!(
+            PathBuf::from(audio).parent(),
+            PathBuf::from(transcript).parent()
+        );
+    }
+
+    #[test]
+    fn import_of_a_missing_file_reports_an_error() {
+        let mut f = fixture();
+        f.engine.import_existing("/no/such/file.mp3", "", "", "");
+        assert!(f.launched.lock().unwrap().launched.is_empty());
+        let msg = f.errors.recv_timeout(Duration::from_millis(200)).unwrap();
+        assert!(msg.contains("Could not import"), "{msg}");
     }
 
     #[test]

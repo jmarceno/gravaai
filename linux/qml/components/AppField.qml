@@ -9,6 +9,7 @@ ColumnLayout {
     property alias text: field.text
     property alias placeholderText: field.placeholderText
     property bool password: false
+    signal editingFinished()
     spacing: 5
     implicitWidth: 300
     implicitHeight: label.implicitHeight + field.implicitHeight + spacing
@@ -26,6 +27,9 @@ ColumnLayout {
         color: Theme.textPrimary
         placeholderTextColor: Theme.textDim
         echoMode: root.password ? TextInput.Password : TextInput.Normal
+        leftPadding: 12
+        font.pixelSize: 13
+        onEditingFinished: root.editingFinished()
         background: Rectangle {
             radius: Theme.radiusSm
             color: Theme.inputBg

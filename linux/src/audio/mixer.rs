@@ -18,6 +18,15 @@ use std::path::Path;
 /// with the app's exact commands, not theorized.
 const NORMALIZE: &str = "speechnorm=e=10:l=1";
 
+/// Downmix one input to a single channel before it is merged. PipeWire
+/// sources and sink monitors are usually stereo: `amerge` of two stereo
+/// inputs yields a 4.0 stream that libmp3lame then downmixes, blending mic
+/// and system audio into both channels and destroying the separation.
+const MONO: &str = "aformat=channel_layouts=mono";
+
+/// Merge two mono branches into a true stereo pair (left = first input).
+const STEREO_PAIR: &str = "amerge=inputs=2,pan=stereo|c0=c0|c1=c1";
+
 /// Build ffmpeg command reading mic + system monitor into a stereo MP3.
 ///
 /// Channel layout: Left (ch 0) = mic, Right (ch 1) = system audio. `amerge`
@@ -35,9 +44,9 @@ pub fn build_ffmpeg_command(
     // (measured >100× realtime) and lifts quiet mics; each channel is
     // normalized independently.
     let filter = format!(
-        "[0:a]highpass=f=80,{NORMALIZE}[mic];\
-         [1:a]{NORMALIZE}[sys];\
-         [mic][sys]amerge=inputs=2[out]"
+        "[0:a]{MONO},highpass=f=80,{NORMALIZE}[mic];\
+         [1:a]{MONO},{NORMALIZE}[sys];\
+         [mic][sys]{STEREO_PAIR}[out]"
     );
     vec![
         "ffmpeg".into(),
@@ -137,10 +146,14 @@ pub fn build_ffmpeg_command_multi(
     } else {
         let mut filter = String::new();
         for (i, _) in sources.iter().enumerate() {
-            filter.push_str(&format!("[{i}:a]highpass=f=80,{NORMALIZE}[a{i}];"));
+            if sources.len() == 2 {
+                filter.push_str(&format!("[{i}:a]{MONO},highpass=f=80,{NORMALIZE}[a{i}];"));
+            } else {
+                filter.push_str(&format!("[{i}:a]highpass=f=80,{NORMALIZE}[a{i}];"));
+            }
         }
         if sources.len() == 2 {
-            filter.push_str("[a0][a1]amerge=inputs=2[out]");
+            filter.push_str(&format!("[a0][a1]{STEREO_PAIR}[out]"));
         } else {
             let mixed: String = (0..sources.len()).map(|i| format!("[a{i}]")).collect();
             filter.push_str(&format!(
@@ -194,9 +207,9 @@ mod tests {
             .unwrap();
         // Both channels pass through the normalizer before amerge, and the
         // mic keeps its highpass.
-        assert!(filter.contains("[0:a]highpass=f=80,"));
-        assert!(filter.contains("[1:a]speechnorm"));
-        assert!(filter.ends_with("[mic][sys]amerge=inputs=2[out]"));
+        assert!(filter.contains("[0:a]aformat=channel_layouts=mono,highpass=f=80,"));
+        assert!(filter.contains("[1:a]aformat=channel_layouts=mono,speechnorm"));
+        assert!(filter.ends_with("[mic][sys]amerge=inputs=2,pan=stereo|c0=c0|c1=c1[out]"));
     }
 
     #[test]
@@ -245,9 +258,11 @@ mod tests {
         let cmd = multi(&["mic", "sink.monitor"]);
         assert_eq!(cmd.iter().filter(|a| *a == "-i").count(), 2);
         let filter = filter_of(&cmd);
-        assert!(filter.contains("[0:a]highpass=f=80,speechnorm"));
-        assert!(filter.contains("[1:a]highpass=f=80,speechnorm"));
-        assert!(filter.ends_with("[a0][a1]amerge=inputs=2[out]"));
+        assert!(filter.contains("[0:a]aformat=channel_layouts=mono,highpass=f=80,speechnorm"));
+        assert!(filter.contains("[1:a]aformat=channel_layouts=mono,highpass=f=80,speechnorm"));
+        assert!(filter.ends_with("[a0][a1]amerge=inputs=2,pan=stereo|c0=c0|c1=c1[out]"));
+        // Each side is mono before the merge so the pair stays separated.
+        assert_eq!(filter.matches("aformat=channel_layouts=mono").count(), 2);
         let map = cmd
             .iter()
             .position(|a| a == "-map")

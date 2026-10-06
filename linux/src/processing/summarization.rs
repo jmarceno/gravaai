@@ -5,6 +5,10 @@ use crate::config::defaults::Config;
 use super::providers::ollama::OllamaProvider;
 use super::providers::openai_compat::OpenAiCompatProvider;
 
+/// Local models summarize long transcripts slowly (prompt evaluation alone
+/// can take many minutes on CPU), so they never get less than this.
+pub const LOCAL_LLM_MIN_TIMEOUT_MINUTES: u64 = 30;
+
 pub trait SummarizationProvider {
     fn summarize(
         &self,
@@ -48,7 +52,7 @@ pub fn create_summarization_provider(cfg: &Config) -> Box<dyn SummarizationProvi
             &cfg.ollama_model,
             &cfg.ollama_host,
             &cfg.summarization_prompt,
-            cfg.llm_request_timeout_minutes.max(10),
+            cfg.llm_request_timeout_minutes.max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
         ))),
         _ => Box::new(OpenAiSummarization(OpenAiCompatProvider::new(cfg))),
     }
@@ -68,7 +72,7 @@ pub fn create_prompt_provider(
             &cfg.ollama_model,
             &cfg.ollama_host,
             prompt_template,
-            cfg.llm_request_timeout_minutes.max(10),
+            cfg.llm_request_timeout_minutes.max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
         )))
     } else {
         // Clone the config with the template installed as the summarization prompt.

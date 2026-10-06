@@ -78,6 +78,11 @@ Delivery is the Type-2 AppImage produced by
 fresh binary, run the script (it builds `--release` unless `SKIP_BUILD=1`) and
 smoke-check the result before considering the work done.
 
+The script bundles the first `ffmpeg` on `PATH` that has the `pulse` demuxer
+(and its sibling `ffprobe`) and fails otherwise: static builds such as
+johnvansickle's in `/usr/local/bin` cannot capture from PulseAudio/PipeWire,
+and bundling one ships an app that cannot record.
+
 ### Host IDE AppImages (Cursor / OpenCode) — always check `APPIMAGE` / `APPDIR`
 
 Agent sessions often run **inside** another AppImage:
@@ -198,16 +203,15 @@ App identity:
 ### Linux app
 
 ```bash
-# Build the toolkit-free daemon and Qt companion separately (debug)
-cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
-cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
-# Run the client; it requires a graphical StatusNotifier host. A fresh start
-# stays tray-only (window closed); a second run while the daemon lives presents the window.
-./linux/target/debug/gravaai
-
-# Release build (the AppImage script performs these two builds automatically)
+# Build the toolkit-free daemon and Qt companion separately. Prefer --release:
+# debug builds are much slower to compile and leave far more build output.
+# `linux/target` is a (gitignored) symlink to a scratch drive on the main dev
+# machine — never point CARGO_TARGET_DIR at $HOME or /tmp there.
 cargo build --release --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
 cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+# Run the client; it requires a graphical StatusNotifier host. A fresh start
+# stays tray-only (window closed); a second run while the daemon lives presents the window.
+./linux/target/release/gravaai
 
 # Pack AppImage (builds --release unless SKIP_BUILD=1)
 ./linux/packaging/appimage/build-appimage.sh
@@ -317,8 +321,11 @@ is opened, after every finished install and after Settings are saved.
 **Audio recording** (`audio/`):
 - `recorder.rs` runs a single `ffmpeg` subprocess reading PulseAudio/PipeWire
   sources directly (`-f pulse`); `mixer.rs` builds the command — mic+system
-  mode `amerge`s mic (left channel) and sink monitor (right channel) into a
-  true-stereo MP3 with a `highpass=f=80` + per-channel `speechnorm` filter
+  mode downmixes each input to mono (`aformat=channel_layouts=mono` — Pulse
+  sources/monitors are usually stereo, and merging two stereo inputs made a
+  4.0 stream the MP3 encoder folded back, blending mic and system audio) and
+  `amerge`s them + `pan=stereo` into mic (left channel) / sink monitor (right
+  channel), a true-stereo MP3 with a `highpass=f=80` + per-channel `speechnorm` filter
   (causal speech normalization that lifts quiet microphones; each channel is
   normalized independently, expansion capped at 20 dB, stereo pairs linked),
   preserving
@@ -326,7 +333,7 @@ is opened, after every finished install and after Settings are saved.
   the live chain: its ~3 s Gaussian lookahead window is dropped, not flushed,
   on stop, so every recording lost its last ~2.8 s.) Custom mode (`build_ffmpeg_command_multi`)
   records the explicit `custom_devices` list instead: 1 source like mic-only,
-  2 sources `amerge`d to stereo, 3+ mixed down with `amix` and forced to
+  2 sources downmixed to mono and `amerge`d to stereo, 3+ mixed down with `amix` and forced to
   stereo (MP3 has no multichannel layout). Device names are resolved once in
   `start()` via `devices.rs` (`pactl`): the fixed modes use the default
   source/sink, Custom mode uses the saved selection verbatim (deduped) and
@@ -412,9 +419,11 @@ daemon), and `CancelToken` provides cooperative cancellation.
   retried with exponential backoff via `core/retry.rs` — used around the
   OpenAI-compatible and Ollama calls. Permanent errors (bad key, 4xx, model
   errors) fail immediately with actionable messages.
-- `config/settings.rs:api_key_warning()` is a soft presence/format check
-  surfaced when saving Settings, so a missing key is caught at save time
-  instead of as a failed job.
+- Settings pages save every change immediately as a **partial JSON patch**
+  (`saveSettings(patch, true)` → `controller::merge_settings` onto the stored
+  config), so no field is clobbered by a page that doesn't own it and there is
+  no Save button to forget. `config/settings.rs:api_key_warning()` remains for
+  the explicit-confirm path; the Models page shows a missing cloud key inline.
 - `transcription.rs` / `summarization.rs` expose factory functions returning
   `Box<dyn TranscriptionProvider>` / `Box<dyn SummarizationProvider>` based on
   config. The single cloud provider is
@@ -424,14 +433,34 @@ daemon), and `CancelToken` provides cooperative cancellation.
   `{transcript}` prompt rendering with append-fallback). The pipeline also
   auto-starts `ollama serve` before Ollama summarization when the server is
   down (ownership + stop-on-exit as above). Local providers:
-  `providers/whisper_cpp.rs` (`whisper-cli` subprocess run with
-  `LD_LIBRARY_PATH` pointed at its bundled `.so` libraries, plus the pure
-  `parse_whisper_cpp_output()`), `providers/crisp_asr.rs` (experimental
+  `providers/whisper_cpp.rs` (the recording is first decoded by ffmpeg to a
+  16 kHz **stereo** WAV, then `whisper-cli -l auto -di -pp -oj -of <tmp>/out`
+  runs with `LD_LIBRARY_PATH` pointed at its bundled `.so` libraries: `-l auto`
+  detects the spoken language — whisper defaults to English and otherwise
+  translates every other language; `-di` labels segments by the louder
+  channel, rendered as `**Me:**` (left = mic) / `**Remote:**` (right = system
+  audio); `-pp` progress lines are streamed into the job status; the JSON is
+  read from the output file and parsed by the pure `parse_whisper_cpp_output()`,
+  and `result.language` by `parse_whisper_cpp_language()`), `providers/crisp_asr.rs` (experimental
   `crispasr --backend nemotron` subprocess writing a `-ojf` JSON sidecar that
   is parsed into the same `[HH:MM:SS]` format, `--gpu-backend` forwarded for
   explicit backends, Ollama models unloaded first like the whisper path) and
   `providers/ollama.rs` (`/api/generate`
-  with retry, `/api/ps` eviction helpers).
+  with retry and `options.num_ctx` sized to the prompt by
+  `context_window_for` — Ollama otherwise silently truncates to 2–4k tokens —
+  `/api/ps` eviction helpers; local summarization gets at least
+  `LOCAL_LLM_MIN_TIMEOUT_MINUTES`).
+- Output language: the language whisper detected is stored in the meeting's
+  `meeting.json` (`language`) and `pipeline::with_language_instruction`
+  appends "Write your entire answer in <Language>" to the summary and title
+  prompts (also for `SummarizeOnly`, which reads it back from
+  `meeting.json`). `pipeline::drop_empty_sections` removes `##` sections whose
+  body is only a placeholder ("N/A", "None", "Nenhum", …).
+- OpenAI-compatible transcription re-encodes the recording into 10-minute mono
+  chunks (`openai_compat::chunk_command`, under the 25 MB upload cap), uses
+  `verbose_json` only for whisper models (`gpt-4o-*-transcribe` reject it),
+  never sends the built-in instruction prompt to whisper models, and shifts
+  chunk timestamps (`shift_timestamps`).
 
 **Call detection** (`detection/`): `AudioWatcher` runs `pactl subscribe` on
 its own thread and calls back on new mic-capture streams (pure matcher
@@ -471,7 +500,13 @@ are installed on demand from **Settings → Models**:
 - **Installer security conventions** (`services/system_installer.rs`): no
   shell execution — commands are argv lists run without a shell and logged
   before execution; downloads are verified (pinned SHA-256 for the engine;
-  `sha256sum.txt` for the Ollama archive) — never `curl | sh`. Tar extraction
+  `sha256sum.txt` for the Ollama archive, hashed with the streaming
+  `Sha256`/`sha256_file`) — never `curl | sh`. The Ollama archive is streamed
+  to disk and its whole tree is installed (`bin/ollama` + `lib/ollama/…` with
+  the CUDA/CPU runners; `ollama/ollama` is a relative symlink to
+  `bin/ollama`). Older versions kept only the bare binary, which runs
+  CPU-only; the status JSON flags that as `ollama.incomplete` and the Models
+  page offers Reinstall (an owned running server is stopped first). Tar extraction
   is path- and link-safe (relative symlinks like versioned `.so` names are
   kept; absolute/escaping targets rejected). Engine and GGML downloads
   stream to disk with progress instead of buffering multi-GB files in RAM. No
@@ -503,7 +538,11 @@ startup failures in `window-qt.log` (1 MiB plus one backup).
 
 **UI pages and integration:** `qml/pages/` implements Recorder (dashboard with
 recording, live processing-pipeline, background-jobs and recent-meetings
-cards), Library, Models & Services (with a live Status card), Downloads
+cards; responsive — the side column moves below the recorder when the page is
+narrower than 760 px), Library (confirm-before-delete, per-meeting
+"Processing" state from the snapshot jobs), Models & Services (one ready/not
+ready row per engine/model/server with its Install/Download action and inline
+progress), Downloads
 (payload inventory with paths/sizes), Prompts and General. There is no About
 page and no Local-tools section. `JobsPage.qml` is retained as a tested
 building block but is not in the sidebar navigation — jobs are managed from
@@ -608,9 +647,9 @@ are supported.
    bootstrapping appimagetool during a local package build.
 2. Build and run:
    ```bash
-   cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
-   cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
-   ./linux/target/debug/gravaai
+   cargo build --release --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+   cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+   ./linux/target/release/gravaai
    # or build both release binaries with the AppImage script:
    # ./linux/packaging/appimage/build-appimage.sh
    ```
@@ -690,11 +729,16 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `processing/pipeline.rs` — fail-fast without audio, cancel-before-start,
   pipeline modes (`SummarizeOnly` requires an existing transcript file and
   skips transcription, `TranscribeOnly` routes to the transcribe stage and
-  writes nothing when cancelled).
+  writes nothing when cancelled), output-language instruction, language read
+  back from `meeting.json`, placeholder-section removal.
 - `processing/providers/openai_compat.rs` — `{transcript}` prompt rendering +
-  append-fallback, verbose-JSON segment extraction, clear auth errors.
+  append-fallback, verbose-JSON segment extraction, clear auth errors, chunk
+  command shape, per-model response format/prompt, timestamp shifting.
 - `processing/providers/whisper_cpp.rs` — pure `parse_whisper_cpp_output`
-  plus the injected-runner transcribe flow.
+  (including `-di` speaker labels), language and `-pp` progress parsing, the
+  argv contract (`-l auto`, `-di`, JSON to a file — never `-of -`), missing
+  model guidance, plus the injected-runner transcribe flow.
+- `processing/providers/ollama.rs` — `context_window_for` sizing.
 - `processing/providers/crisp_asr.rs` (experimental) — pure
   `parse_crisp_asr_output` (JSON segments + plain-text/log-line fallback),
   `--gpu-backend` flag mapping, injected-runner transcribe flow reading the
@@ -703,7 +747,7 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `config/settings.rs` — key presence/URL warnings, effective-prompt
   fallback.
 - `audio/mixer.rs`, `audio/devices.rs`, `audio/recorder.rs` — stereo command
-  layout, monitor naming, segment naming, Custom multi-source commands
+  layout (mono-per-input before the merge), monitor naming, segment naming, Custom multi-source commands
   (1/2/3+ inputs), `pactl list sources` parsing, missing-source detection,
   selection dedup, empty-selection rejection.
 - `audio/levels.rs` — `ebur128` momentary parsing, LUFS→level mapping,
@@ -756,7 +800,11 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by
 the QML/offscreen and AppImage smoke gates rather than ordinary unit tests.
-`linux/tests/qt_smoke.sh` runs qmllint/qmlimportscanner, loads every page at
-1332×820 and 960×640 (the harness also instantiates the recording pill),
-and verifies direct UI refusal without a daemon/tray.
+`linux/tests/qt_smoke.sh` (release build by default, `GRAVAAI_PROFILE=debug`
+to override) runs qmllint/qmlimportscanner, renders the real window shell
+(`components/AppShell.qml`, shared with `Main.qml`) on every page at 1332×820
+and 960×640 (the harness also instantiates the recording pill and
+`JobsPage`), and verifies direct UI refusal without a daemon/tray. Set
+`GRAVAAI_QML_SHOTS=<dir>` to save a PNG of every page for visual layout
+review.
 The engine/manager/key logic they rely on is unit-tested via fakes.

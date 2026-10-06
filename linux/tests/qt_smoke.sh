@@ -6,13 +6,18 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LINUX="$ROOT/linux"
-UI_BIN="${GRAVAAI_UI_BIN:-$LINUX/target/debug/gravaai-ui}"
+# qtchooser shims (qmllint → Qt 5) shadow the Qt 6 tools on some distros.
+for qt6_bin in /usr/lib/qt6/bin /usr/lib/qt6/libexec; do
+  [[ -d "$qt6_bin" ]] && PATH="$qt6_bin:$PATH"
+done
+PROFILE="${GRAVAAI_PROFILE:-release}"
+UI_BIN="${GRAVAAI_UI_BIN:-$LINUX/target/$PROFILE/gravaai-ui}"
 [[ -x "$UI_BIN" ]] || {
-  echo "Qt smoke: missing UI binary $UI_BIN (build with --features ui)" >&2
+  echo "Qt smoke: missing UI binary $UI_BIN (build with --release --features ui)" >&2
   exit 1
 }
 
-QML_MODULE_ROOT="$(find "$LINUX/target/debug/build" -type d \
+QML_MODULE_ROOT="$(find "$LINUX/target/$PROFILE/build" -type d \
   -path '*/out/qt-build-utils/qml_modules' -print -quit)"
 [[ -n "$QML_MODULE_ROOT" ]] || {
   echo "Qt smoke: generated CXX-Qt module not found" >&2
@@ -34,8 +39,11 @@ for spec in 1332:820 960:640; do
   width="${spec%:*}"
   height="${spec#*:}"
   output="$(mktemp)"
+  shots_arg=()
+  # GRAVAAI_QML_SHOTS=<dir> saves a PNG of every page for visual review.
+  [[ -n "${GRAVAAI_QML_SHOTS:-}" ]] && mkdir -p "$GRAVAAI_QML_SHOTS" && shots_arg=(--smoke-shots="$GRAVAAI_QML_SHOTS")
   QT_QPA_PLATFORM=offscreen GRAVAAI_QML_SMOKE=1 \
-    "$UI_BIN" --smoke-width="$width" --smoke-height="$height" >"$output" 2>&1
+    "$UI_BIN" --smoke-width="$width" --smoke-height="$height" "${shots_arg[@]}" >"$output" 2>&1
   if grep -Eiq 'ReferenceError|TypeError|Binding loop|Cannot assign|not a type|default property|module .* not installed|QML smoke geometry' "$output"; then
     echo "Qt smoke: runtime diagnostic at ${width}x${height}" >&2
     cat "$output" >&2

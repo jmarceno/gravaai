@@ -210,7 +210,7 @@ pub struct StatusInput<'a> {
 /// Downloads page (payload table). Shape:
 /// `{"payloads":[…],"whisper":{"engine_installed","engine_path","engine_size_bytes","models_dir","models_url"},
 ///   "crispasr":{"engine_installed","engine_path","engine_size_bytes","models_dir","models_url"},
-///   "ollama":{"installed","binary_path","serving","host","models_dir","models":[{"name","size"}]}}`
+///   "ollama":{"installed","incomplete","binary_path","serving","host","models_dir","models":[{"name","size"}]}}`
 pub fn service_status_json(input: &StatusInput<'_>) -> String {
     let engine_dir = input.base.join("whisper.cpp");
     let engine_binary = engine_dir.join("whisper-cli");
@@ -236,8 +236,12 @@ pub fn service_status_json(input: &StatusInput<'_>) -> String {
         "models_url": CRISP_ASR_HF_BASE_URL,
     });
     let ollama_binary = input.base.join("ollama/ollama");
+    // Older installers kept only the binary and dropped `lib/ollama` (the
+    // GPU/CPU runners), leaving a CPU-only runtime that needs a reinstall.
+    let incomplete = ollama_binary.exists() && !input.base.join("ollama/lib/ollama").is_dir();
     let ollama = serde_json::json!({
         "installed": input.ollama_installed,
+        "incomplete": incomplete,
         "binary_path": ollama_binary.to_string_lossy(),
         "serving": input.ollama_serving,
         "host": input.ollama_host,
@@ -356,6 +360,25 @@ mod tests {
     }
 
     #[test]
+    fn bare_binary_ollama_install_is_flagged_incomplete() {
+        let base = tempfile::tempdir().unwrap();
+        write(&base.path().join("ollama/ollama"), b"bin");
+        let input = StatusInput {
+            base: base.path(),
+            ollama_host: "",
+            ollama_serving: false,
+            ollama_installed: true,
+            ollama_models: &[],
+            ollama_models_store: None,
+        };
+        let json: serde_json::Value = serde_json::from_str(&service_status_json(&input)).unwrap();
+        assert_eq!(json["ollama"]["incomplete"], true);
+        std::fs::create_dir_all(base.path().join("ollama/lib/ollama")).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&service_status_json(&input)).unwrap();
+        assert_eq!(json["ollama"]["incomplete"], false);
+    }
+
+    #[test]
     fn status_json_shape_and_flags() {
         let base = tempfile::tempdir().unwrap();
         let store = tempfile::tempdir().unwrap();
@@ -379,6 +402,7 @@ mod tests {
         assert_eq!(json["crispasr"]["engine_installed"], false);
         assert_eq!(json["crispasr"]["engine_size_bytes"], 0);
         assert_eq!(json["ollama"]["serving"], true);
+        assert_eq!(json["ollama"]["incomplete"], false);
         assert_eq!(json["ollama"]["models"][0]["size"], 100);
         assert_eq!(json["payloads"].as_array().unwrap().len(), 2); // engine + 1 ollama model
                                                                    // Engine missing → installed false, size 0.

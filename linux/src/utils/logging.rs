@@ -14,6 +14,13 @@ fn fallback_log_dir() -> PathBuf {
         .join(format!(".local/share/{APP_DIR_NAME}"))
 }
 
+/// Per-user log directory (`~/.local/share/gravaai`), created on demand.
+pub fn log_dir() -> PathBuf {
+    let dir = fallback_log_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
 /// Persistent stderr capture for the short-lived Qt companion. A bounded
 /// pair of files prevents a broken QML binding from filling user storage.
 pub fn window_stderr_path() -> PathBuf {

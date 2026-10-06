@@ -3,6 +3,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import io.github.jmarceno.gravaai
 
+// Models & services. Local engines first: every step a job needs (engine,
+// model, server) is a row that says whether it is ready and offers the one
+// action that makes it ready. Every control saves immediately as a partial
+// settings patch, so nothing is lost by forgetting a Save button.
 Item {
     id: root
     required property AppController controller
@@ -12,55 +16,74 @@ Item {
     Layout.fillWidth: true
     Layout.fillHeight: true
 
+    readonly property var sttServices: [
+        { value: "whisper_cpp", label: "Local · whisper.cpp (recommended)" },
+        { value: "crisp_asr", label: "Local · CrispASR Nemotron (experimental, English)" },
+        { value: "openai", label: "Cloud · OpenAI-compatible API" }
+    ]
+    readonly property var chatServices: [
+        { value: "ollama", label: "Local · Ollama" },
+        { value: "openai", label: "Cloud · OpenAI-compatible API" }
+    ]
+    readonly property var whisperModels: [
+        { value: "large-v3-turbo", label: "large-v3-turbo · ~1.6 GB · best speed/quality" },
+        { value: "large-v3", label: "large-v3 · ~3 GB · most accurate, slow on CPU" },
+        { value: "medium", label: "medium · ~1.5 GB · balanced" },
+        { value: "small", label: "small · ~470 MB · fastest, lower accuracy" }
+    ]
+    readonly property var crispModels: [
+        { value: "nemotron-3.5-asr-0.6b-q8_0", label: "Q8 · ~750 MB · default", file: "nemotron-3.5-asr-streaming-0.6b-q8_0.gguf" },
+        { value: "nemotron-3.5-asr-0.6b-q4_k", label: "Q4_K · ~430 MB · smaller", file: "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf" },
+        { value: "nemotron-3.5-asr-0.6b-f16", label: "F16 · ~1.3 GB · full precision", file: "nemotron-3.5-asr-streaming-0.6b-f16.gguf" }
+    ]
+    readonly property var crispBackends: ["auto", "cpu", "vulkan", "cuda"]
+    readonly property var ollamaModels: [
+        { value: "phi4-mini", label: "phi4-mini · ~3 GB · light, good quality" },
+        { value: "gemma3:4b", label: "gemma3:4b · ~4 GB · good quality" },
+        { value: "qwen2.5:7b", label: "qwen2.5:7b · ~5 GB · very capable" },
+        { value: "llama3.1:8b", label: "llama3.1:8b · ~5 GB · very capable" },
+        { value: "gemma3:12b", label: "gemma3:12b · ~8 GB · best, needs lots of RAM" },
+        { value: "granite4:350m", label: "granite4:350m · ~700 MB · tiny, fast" }
+    ]
+    readonly property var timeouts: [1, 2, 3, 5, 8, 10]
+
     function readData() {
         try { root.cfg = JSON.parse(controller.settings_json) } catch (error) { root.cfg = {} }
         try { root.installs = JSON.parse(controller.installs_json) } catch (error2) { root.installs = [] }
-        readStatus()
     }
     function readStatus() {
         try { root.status = JSON.parse(controller.engine_status_json) } catch (error) { root.status = {} }
     }
+    function patch(values) {
+        // Partial patch: the controller merges it onto the stored config.
+        controller.saveSettings(JSON.stringify(values), true)
+    }
+    function indexOf(list, value) {
+        for (var i = 0; i < list.length; i += 1)
+            if ((list[i].value !== undefined ? list[i].value : list[i]) === value) return i
+        return 0
+    }
+    function labels(list) {
+        return list.map(function(x) { return x.label !== undefined ? x.label : String(x) })
+    }
     function install(kind, model, backend, host) {
-        controller.startInstall(JSON.stringify({kind: kind || "", model: model || "", backend: backend || "", host: host || ""}))
+        controller.startInstall(JSON.stringify({ kind: kind, model: model || "", backend: backend || "", host: host || "" }))
         controller.refreshInstalls()
     }
-    function save() {
-        var c = {
-            transcription_service: stt.currentText,
-            summarization_service: chat.currentText,
-            openai_api_key: apiKey.text,
-            openai_base_url: baseUrl.text,
-            openai_transcription_model: sttModel.text,
-            openai_summarization_model: chatModel.text,
-            output_folder: root.cfg.output_folder || "~/meetings",
-            recording_quality: root.cfg.recording_quality || "high",
-            call_detection_enabled: root.cfg.call_detection_enabled || false,
-            start_at_startup: root.cfg.start_at_startup || false,
-            auto_title: root.cfg.auto_title !== false,
-            processing_countdown_enabled: root.cfg.processing_countdown_enabled || false,
-            auto_process_enabled: root.cfg.auto_process_enabled !== false,
-            low_memory_mode: root.cfg.low_memory_mode || false,
-            llm_request_timeout_minutes: Number(timeout.currentText || 5),
-            whisper_cpp_model: whisperModel.currentText,
-            whisper_cpp_backend: whisperBackend.currentText,
-            crisp_asr_model: crispModel.currentText,
-            crisp_asr_backend: crispBackend.currentText,
-            ollama_model: ollamaModel.currentText,
-            ollama_host: ollamaHost.text,
-            custom_devices: root.cfg.custom_devices || [],
-            transcription_prompt: root.cfg.transcription_prompt || "",
-            summarization_prompt: root.cfg.summarization_prompt || "",
-            title_prompt: root.cfg.title_prompt || ""
-        }
-        controller.saveSettings(JSON.stringify(c), false)
+    function installFor(key) {
+        for (var i = 0; i < root.installs.length; i += 1)
+            if (root.installs[i].key === key) return root.installs[i]
+        return null
     }
-    function indexOfValue(values, value) {
-        var i = values.indexOf(value)
-        return i < 0 ? 0 : i
+    function installText(key) {
+        var i = installFor(key)
+        return i ? (i.status || i.text || "Working…") : ""
     }
-    function installStatusText() {
-        if (root.installs.length === 0) return "No installs running."
-        return root.installs.map(function(i) { return (i.key || "?") + ": " + (i.status || "running") }).join("\n")
+    function payloadNamed(name) {
+        var p = root.status.payloads || []
+        for (var i = 0; i < p.length; i += 1)
+            if (p[i].name === name && p[i].present !== false) return p[i]
+        return null
     }
     function fmtSize(bytes) {
         var b = Number(bytes || 0)
@@ -69,231 +92,337 @@ Item {
         if (b < 1073741824) return (b / 1048576).toFixed(1) + " MB"
         return (b / 1073741824).toFixed(2) + " GB"
     }
-    function whisperStatus() {
-        var w = root.status.whisper || {}
-        if (!w.engine_path) return "Checking…"
-        return w.engine_installed ? "Installed · " + root.fmtSize(w.engine_size_bytes) : "Not installed"
-    }
-    function ggmlModels() {
-        return (root.status.payloads || []).filter(function(p) { return p.kind === "model" && p.name.indexOf("ggml-") === 0 })
-    }
-    function crispModels() {
-        return (root.status.payloads || []).filter(function(p) { return p.kind === "model" && p.name.indexOf(".gguf") >= 0 })
-    }
-    function crispStatus() {
-        var c = root.status.crispasr || {}
-        if (!c.engine_path) return "Checking…"
-        return c.engine_installed ? "Installed · " + root.fmtSize(c.engine_size_bytes) : "Not installed"
-    }
-    function ollamaModels() {
-        return (root.status.ollama || {}).models || []
-    }
-    function ollamaStatus() {
-        var o = root.status.ollama || {}
-        if (!root.status.base_dir) return "Checking…"
-        if (!o.installed) return "Not installed"
-        if (o.serving) return "Running at " + (o.host || "http://localhost:11434") + " · " + root.ollamaModels().length + " model(s)"
-        return "Installed — the server starts automatically when a job needs it"
+    readonly property bool statusKnown: !!root.status.base_dir
+    readonly property string sttService: root.cfg.transcription_service || "whisper_cpp"
+    readonly property string chatService: root.cfg.summarization_service || "openai"
+    readonly property string whisperModel: root.cfg.whisper_cpp_model || "large-v3-turbo"
+    readonly property string crispModel: root.cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0"
+    readonly property string crispBackend: root.cfg.crisp_asr_backend || "auto"
+    readonly property string ollamaModel: root.cfg.ollama_model || "phi4-mini"
+    readonly property string ollamaHost: root.cfg.ollama_host || "http://localhost:11434"
+    readonly property bool usesCloud: sttService === "openai" || chatService === "openai"
+
+    function whisperModelFile() { return "ggml-" + root.whisperModel + ".bin" }
+    function crispModelFile() { return root.crispModels[root.indexOf(root.crispModels, root.crispModel)].file }
+    function ollamaHasModel() {
+        var models = (root.status.ollama || {}).models || []
+        for (var i = 0; i < models.length; i += 1) {
+            var n = String(models[i].name || "")
+            if (n === root.ollamaModel || n === root.ollamaModel + ":latest") return true
+        }
+        return false
     }
 
-    Component.onCompleted: readData()
+    Component.onCompleted: { readData(); readStatus() }
     property Connections controllerConnection: Connections {
-        target: controller
+        target: root.controller
         function onSettings_jsonChanged() { root.readData() }
         function onInstalls_jsonChanged() { root.readData() }
         function onEngine_status_jsonChanged() { root.readStatus() }
     }
 
+    // One "is this ready?" row: state dot, title + detail, and an action.
+    component StepRow: RowLayout {
+        id: step
+        property string title: ""
+        property string detail: ""
+        property bool ready: false
+        property string busyText: ""
+        property string actionText: ""
+        signal action()
+        Layout.fillWidth: true
+        spacing: 12
+        Rectangle {
+            Layout.alignment: Qt.AlignVCenter
+            width: 10; height: 10; radius: 5
+            color: step.busyText.length > 0 ? Theme.warning : (step.ready ? Theme.statusGreen : Theme.textDim)
+        }
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 1
+            Label { text: step.title; color: Theme.textPrimary; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+            Label {
+                text: step.busyText.length > 0 ? step.busyText : step.detail
+                color: step.busyText.length > 0 ? Theme.warning : Theme.textMuted
+                font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                visible: text.length > 0
+            }
+        }
+        AppButton {
+            visible: step.actionText.length > 0 && step.busyText.length === 0
+            text: step.actionText
+            variant: step.ready ? "secondary" : "primary"
+            implicitHeight: 32
+            onClicked: step.action()
+        }
+    }
+
+    component FieldLabel: Label {
+        color: Theme.textSecondary
+        font.pixelSize: 12
+        Layout.preferredWidth: 110
+        Layout.alignment: Qt.AlignVCenter
+        elide: Text.ElideRight
+    }
+
     Flickable {
+        id: flick
         anchors.fill: parent
         contentWidth: width
-        contentHeight: contentColumn.implicitHeight
+        contentHeight: contentColumn.implicitHeight + 8
         clip: true
-        ScrollBar.vertical: ScrollBar {}
+        boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.vertical: ScrollBar { policy: flick.contentHeight > flick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
         ColumnLayout {
             id: contentColumn
-            width: root.width
+            width: flick.width - 14
             spacing: 14
 
+            // ---------------- Transcription ----------------
             AppCard {
                 Layout.fillWidth: true
-                ColumnLayout {
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Transcription"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true; Layout.fillWidth: true }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
                     spacing: 10
-                    Label { text: "Transcription"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                    FieldLabel { text: "Engine" }
+                    AppComboBox {
+                        Layout.fillWidth: true
+                        model: root.labels(root.sttServices)
+                        currentIndex: root.indexOf(root.sttServices, root.sttService)
+                        onActivated: function(i) { root.patch({ transcription_service: root.sttServices[i].value }) }
+                    }
+                }
+
+                // whisper.cpp
+                ColumnLayout {
+                    visible: root.sttService === "whisper_cpp"
+                    Layout.fillWidth: true
+                    spacing: 12
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 10
-                        Label { text: "Service"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: stt; model: ["openai", "whisper_cpp", "crisp_asr"]; currentIndex: root.indexOfValue(["openai", "whisper_cpp", "crisp_asr"], root.cfg.transcription_service || "whisper_cpp"); Layout.fillWidth: true }
+                        FieldLabel { text: "Model" }
+                        AppComboBox {
+                            Layout.fillWidth: true
+                            model: root.labels(root.whisperModels)
+                            currentIndex: root.indexOf(root.whisperModels, root.whisperModel)
+                            onActivated: function(i) { root.patch({ whisper_cpp_model: root.whisperModels[i].value }) }
+                        }
                     }
-                    AppField { id: apiKey; label: "OpenAI-compatible API key"; password: true; text: root.cfg.openai_api_key || ""; visible: stt.currentText === "openai"; Layout.fillWidth: true }
-                    AppField { id: baseUrl; label: "Base URL"; placeholderText: "https://api.openai.com/v1"; text: root.cfg.openai_base_url || ""; visible: stt.currentText === "openai" || chat.currentText === "openai"; Layout.fillWidth: true }
-                    AppField { id: sttModel; label: "Speech-to-text model"; text: root.cfg.openai_transcription_model || "whisper-1"; visible: stt.currentText === "openai"; Layout.fillWidth: true }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSubtle }
+                    StepRow {
+                        title: "whisper.cpp engine"
+                        ready: !!(root.status.whisper || {}).engine_installed
+                        detail: !root.statusKnown ? "Checking…" : (ready ? "Installed · " + root.fmtSize((root.status.whisper || {}).engine_size_bytes) : "Not installed — prebuilt CPU binary, no compiler needed")
+                        busyText: root.installText("whisper_cpp_engine")
+                        actionText: ready ? "Reinstall" : "Install"
+                        onAction: root.install("whisper_cpp_engine", "", "auto", "")
+                    }
+                    StepRow {
+                        property var payload: root.payloadNamed(root.whisperModelFile())
+                        title: "Model " + root.whisperModel
+                        ready: payload !== null
+                        detail: !root.statusKnown ? "Checking…" : (ready ? "Downloaded · " + root.fmtSize(payload.size_bytes) : "Not downloaded")
+                        busyText: root.installText("whisper_cpp_model:" + root.whisperModel)
+                        actionText: ready ? "" : "Download"
+                        onAction: root.install("whisper_cpp_model", root.whisperModel, "", "")
+                    }
+                    Label {
+                        text: "The spoken language is detected automatically. Transcription runs on the CPU; large models take a while on long meetings."
+                        color: Theme.textDim; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                    }
+                }
+
+                // CrispASR
+                ColumnLayout {
+                    visible: root.sttService === "crisp_asr"
+                    Layout.fillWidth: true
+                    spacing: 12
                     RowLayout {
-                        visible: stt.currentText === "whisper_cpp"
                         Layout.fillWidth: true
                         spacing: 10
-                        Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: whisperModel; model: ["large-v3-turbo", "large-v3", "medium", "small"]; currentIndex: root.indexOfValue(["large-v3-turbo", "large-v3", "medium", "small"], root.cfg.whisper_cpp_model || "large-v3-turbo"); Layout.fillWidth: true }
-                        AppComboBox { id: whisperBackend; model: ["auto", "cpu", "cuda"]; currentIndex: root.indexOfValue(["auto", "cpu", "cuda"], root.cfg.whisper_cpp_backend || "auto"); Layout.fillWidth: true }
+                        FieldLabel { text: "Model" }
+                        AppComboBox {
+                            Layout.fillWidth: true
+                            model: root.labels(root.crispModels)
+                            currentIndex: root.indexOf(root.crispModels, root.crispModel)
+                            onActivated: function(i) { root.patch({ crisp_asr_model: root.crispModels[i].value }) }
+                        }
                     }
                     RowLayout {
-                        visible: stt.currentText === "whisper_cpp"
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Label { text: "Engine"; color: Theme.textMuted; Layout.preferredWidth: 120 }
-                        AppButton { text: "Install whisper.cpp"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("whisper_cpp_engine", "", whisperBackend.currentText, "") }
-                        AppButton { text: "Download model"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("whisper_cpp_model", whisperModel.currentText, "", "") }
-                    }
-                    Label { visible: stt.currentText === "whisper_cpp"; text: "CPU prebuilt for Linux — no compiler needed. Upstream ships no CUDA prebuilt for Linux."; color: Theme.textDim; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                    RowLayout {
-                        visible: stt.currentText === "crisp_asr"
                         Layout.fillWidth: true
                         spacing: 10
-                        Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: crispModel; model: ["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q4_k", "nemotron-3.5-asr-0.6b-f16"]; currentIndex: root.indexOfValue(["nemotron-3.5-asr-0.6b-q8_0", "nemotron-3.5-asr-0.6b-q4_k", "nemotron-3.5-asr-0.6b-f16"], root.cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0"); Layout.fillWidth: true }
-                        AppComboBox { id: crispBackend; model: ["auto", "cpu", "vulkan", "cuda"]; currentIndex: root.indexOfValue(["auto", "cpu", "vulkan", "cuda"], root.cfg.crisp_asr_backend || "auto"); Layout.fillWidth: true }
+                        FieldLabel { text: "Backend" }
+                        AppComboBox {
+                            Layout.fillWidth: true
+                            model: root.crispBackends
+                            currentIndex: Math.max(0, root.crispBackends.indexOf(root.crispBackend))
+                            onActivated: function(i) { root.patch({ crisp_asr_backend: root.crispBackends[i] }) }
+                        }
                     }
-                    RowLayout {
-                        visible: stt.currentText === "crisp_asr"
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Label { text: "Engine"; color: Theme.textMuted; Layout.preferredWidth: 120 }
-                        AppButton { text: "Install CrispASR"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("crisp_asr_engine", "", crispBackend.currentText, "") }
-                        AppButton { text: "Download model"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("crisp_asr_model", crispModel.currentText, "", "") }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSubtle }
+                    StepRow {
+                        title: "CrispASR engine"
+                        ready: !!(root.status.crispasr || {}).engine_installed
+                        detail: !root.statusKnown ? "Checking…" : (ready ? "Installed · " + root.fmtSize((root.status.crispasr || {}).engine_size_bytes) : "Not installed")
+                        busyText: root.installText("crisp_asr_engine")
+                        actionText: ready ? "Reinstall" : "Install"
+                        onAction: root.install("crisp_asr_engine", "", root.crispBackend, "")
                     }
-                    Label { visible: stt.currentText === "crisp_asr"; text: "Experimental. Prebuilt, no compiler needed — CPU ~25 MB, Vulkan ~60 MB, CUDA ~206–271 MB. Auto picks CUDA on NVIDIA, CPU elsewhere."; color: Theme.textDim; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    StepRow {
+                        property var payload: root.payloadNamed(root.crispModelFile())
+                        title: "Model " + root.crispModel
+                        ready: payload !== null
+                        detail: !root.statusKnown ? "Checking…" : (ready ? "Downloaded · " + root.fmtSize(payload.size_bytes) : "Not downloaded")
+                        busyText: root.installText("crisp_asr_model:" + root.crispModel)
+                        actionText: ready ? "" : "Download"
+                        onAction: root.install("crisp_asr_model", root.crispModel, "", "")
+                    }
+                }
+
+                Label {
+                    visible: root.sttService === "openai"
+                    text: "Uses the cloud service configured below."
+                    color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
                 }
             }
 
+            // ---------------- Summarization ----------------
             AppCard {
                 Layout.fillWidth: true
-                ColumnLayout {
+                Label { text: "Summary & notes"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                RowLayout {
+                    Layout.fillWidth: true
                     spacing: 10
-                    Label { text: "Summarization"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                    FieldLabel { text: "Engine" }
+                    AppComboBox {
+                        Layout.fillWidth: true
+                        model: root.labels(root.chatServices)
+                        currentIndex: root.indexOf(root.chatServices, root.chatService)
+                        onActivated: function(i) { root.patch({ summarization_service: root.chatServices[i].value }) }
+                    }
+                }
+                ColumnLayout {
+                    visible: root.chatService === "ollama"
+                    Layout.fillWidth: true
+                    spacing: 12
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 10
-                        Label { text: "Service"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: chat; model: ["openai", "ollama"]; currentIndex: root.indexOfValue(["openai", "ollama"], root.cfg.summarization_service || "openai"); Layout.fillWidth: true }
+                        FieldLabel { text: "Model" }
+                        AppComboBox {
+                            Layout.fillWidth: true
+                            model: root.labels(root.ollamaModels)
+                            currentIndex: root.indexOf(root.ollamaModels, root.ollamaModel)
+                            onActivated: function(i) { root.patch({ ollama_model: root.ollamaModels[i].value }) }
+                        }
                     }
-                    AppField { id: chatModel; label: "Chat model"; text: root.cfg.openai_summarization_model || "gpt-5.6-luna"; visible: chat.currentText === "openai"; Layout.fillWidth: true }
                     RowLayout {
-                        visible: chat.currentText === "ollama"
                         Layout.fillWidth: true
                         spacing: 10
-                        Label { text: "Model"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: ollamaModel; model: ["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "granite4:350m"]; currentIndex: root.indexOfValue(["phi4-mini", "gemma3:4b", "qwen2.5:7b", "llama3.1:8b", "gemma3:12b", "granite4:350m"], root.cfg.ollama_model || "phi4-mini"); Layout.fillWidth: true }
+                        FieldLabel { text: "Server" }
+                        TextField {
+                            id: hostField
+                            Layout.fillWidth: true
+                            implicitHeight: 38
+                            text: root.ollamaHost
+                            color: Theme.textPrimary
+                            placeholderText: "http://localhost:11434"
+                            placeholderTextColor: Theme.textDim
+                            font.pixelSize: 13
+                            leftPadding: 12
+                            background: Rectangle { radius: Theme.radiusSm; color: Theme.inputBg; border.color: hostField.activeFocus ? Theme.accent : Theme.borderSubtle; border.width: hostField.activeFocus ? 2 : 1 }
+                            onEditingFinished: if (text.trim() !== root.ollamaHost) root.patch({ ollama_host: text.trim() })
+                        }
                     }
-                    AppField { id: ollamaHost; label: "Ollama host"; text: root.cfg.ollama_host || "http://localhost:11434"; visible: chat.currentText === "ollama"; Layout.fillWidth: true }
-                    RowLayout {
-                        visible: chat.currentText === "ollama"
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSubtle }
+                    StepRow {
+                        property var o: root.status.ollama || {}
+                        title: "Ollama runtime"
+                        ready: (!!o.installed || !!o.serving) && !o.incomplete
+                        detail: !root.statusKnown ? "Checking…"
+                              : (o.incomplete ? "Incomplete install without GPU support — reinstall to fix slow summaries"
+                              : (o.serving ? "Running at " + (o.host || root.ollamaHost)
+                              : (o.installed ? "Installed — starts automatically when a job needs it" : "Not installed")))
+                        busyText: root.installText("ollama")
+                        actionText: o.incomplete ? "Reinstall" : (ready ? "" : "Install")
+                        onAction: root.install("ollama", "", "", "")
+                    }
+                    StepRow {
+                        title: "Model " + root.ollamaModel
+                        ready: root.ollamaHasModel()
+                        detail: !root.statusKnown ? "Checking…" : (ready ? "Downloaded" : "Not downloaded")
+                        busyText: root.installText("ollama_model:" + root.ollamaModel)
+                        actionText: ready ? "" : "Download"
+                        onAction: root.install("ollama_model", root.ollamaModel, "", root.ollamaHost)
+                    }
+                }
+                Label {
+                    visible: root.chatService === "openai"
+                    text: "Uses the cloud service configured below."
+                    color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                }
+            }
+
+            // ---------------- Cloud ----------------
+            AppCard {
+                visible: root.usesCloud
+                Layout.fillWidth: true
+                Label { text: "Cloud service (OpenAI-compatible)"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                Label {
+                    visible: !root.cfg.openai_api_key
+                    text: "No API key set — cloud jobs will fail until you add one."
+                    color: Theme.warning; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                }
+                AppField {
+                    Layout.fillWidth: true
+                    label: "API key"
+                    password: true
+                    text: root.cfg.openai_api_key || ""
+                    onEditingFinished: if (text !== (root.cfg.openai_api_key || "")) root.patch({ openai_api_key: text.trim() })
+                }
+                AppField {
+                    Layout.fillWidth: true
+                    label: "Base URL"
+                    placeholderText: "https://api.openai.com/v1"
+                    text: root.cfg.openai_base_url || ""
+                    onEditingFinished: if (text !== (root.cfg.openai_base_url || "")) root.patch({ openai_base_url: text.trim() })
+                }
+                AppField {
+                    visible: root.sttService === "openai"
+                    Layout.fillWidth: true
+                    label: "Speech-to-text model"
+                    text: root.cfg.openai_transcription_model || "whisper-1"
+                    onEditingFinished: if (text !== root.cfg.openai_transcription_model) root.patch({ openai_transcription_model: text.trim() })
+                }
+                AppField {
+                    visible: root.chatService === "openai"
+                    Layout.fillWidth: true
+                    label: "Chat model"
+                    text: root.cfg.openai_summarization_model || "gpt-5.6-luna"
+                    onEditingFinished: if (text !== root.cfg.openai_summarization_model) root.patch({ openai_summarization_model: text.trim() })
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    FieldLabel { text: "Timeout" }
+                    AppComboBox {
                         Layout.fillWidth: true
-                        spacing: 8
-                        AppButton { text: "Install Ollama"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("ollama", "", "", "") }
-                        AppButton { text: "Download model"; variant: "secondary"; implicitHeight: 34; onClicked: root.install("ollama_model", ollamaModel.currentText, "", ollamaHost.text) }
+                        model: root.timeouts.map(function(m) { return m + (m === 1 ? " minute" : " minutes") })
+                        currentIndex: Math.max(0, root.timeouts.indexOf(Number(root.cfg.llm_request_timeout_minutes || 5)))
+                        onActivated: function(i) { root.patch({ llm_request_timeout_minutes: root.timeouts[i] }) }
                     }
                 }
             }
 
-            AppCard {
+            RowLayout {
                 Layout.fillWidth: true
-                ColumnLayout {
-                    spacing: 10
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Label { text: "Status"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true; Layout.fillWidth: true }
-                        AppButton { text: "Refresh"; variant: "secondary"; implicitHeight: 30; onClicked: controller.refreshEngineStatus() }
-                    }
-                    ColumnLayout {
-                        spacing: 2
-                        Layout.fillWidth: true
-                        Label { text: "whisper.cpp (transcription)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
-                        Label { text: root.whisperStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
-                        Label { text: (root.status.whisper || {}).engine_path || ""; visible: (root.status.whisper || {}).engine_installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                    }
-                    ColumnLayout {
-                        spacing: 2
-                        Layout.fillWidth: true
-                        Label { text: "GGML models"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
-                        Label {
-                            visible: root.ggmlModels().length === 0
-                            text: "No models downloaded."
-                            color: Theme.textMuted; font.pixelSize: 12
-                        }
-                        Repeater {
-                            model: root.ggmlModels()
-                            delegate: RowLayout {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                spacing: 8
-                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Label { text: root.fmtSize(modelData.size_bytes); color: Theme.textMuted; font.pixelSize: 11 }
-                            }
-                        }
-                        Label { text: "Models come from HuggingFace: " + ((root.status.whisper || {}).models_url || ""); color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                    }
-                    ColumnLayout {
-                        spacing: 2
-                        Layout.fillWidth: true
-                        Label { text: "CrispASR (transcription, experimental)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
-                        Label { text: root.crispStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
-                        Label { text: (root.status.crispasr || {}).engine_path || ""; visible: (root.status.crispasr || {}).engine_installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                        Label {
-                            visible: root.crispModels().length === 0
-                            text: "No models downloaded."
-                            color: Theme.textMuted; font.pixelSize: 12
-                        }
-                        Repeater {
-                            model: root.crispModels()
-                            delegate: RowLayout {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                spacing: 8
-                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Label { text: root.fmtSize(modelData.size_bytes); color: Theme.textMuted; font.pixelSize: 11 }
-                            }
-                        }
-                        Label { text: "Models come from HuggingFace: " + ((root.status.crispasr || {}).models_url || ""); color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                    }
-                    ColumnLayout {
-                        spacing: 2
-                        Layout.fillWidth: true
-                        Label { text: "Ollama (summarization)"; color: Theme.textSecondary; font.pixelSize: 13; font.bold: true }
-                        Label { text: root.ollamaStatus(); color: Theme.textPrimary; font.pixelSize: 12 }
-                        Label { text: (root.status.ollama || {}).binary_path || ""; visible: (root.status.ollama || {}).installed; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                        Repeater {
-                            model: root.ollamaModels()
-                            delegate: RowLayout {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                spacing: 8
-                                Label { text: modelData.name; color: Theme.textPrimary; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Label { text: root.fmtSize(modelData.size); color: Theme.textMuted; font.pixelSize: 11 }
-                            }
-                        }
-                    }
-                    Label { text: root.installStatusText(); color: Theme.textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
-                }
-            }
-
-            AppCard {
-                Layout.fillWidth: true
-                ColumnLayout {
-                    spacing: 10
-                    Label { text: "Request timeout"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-                        Label { text: "Minutes"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: timeout; model: ["1", "2", "3", "5", "8", "10"]; currentIndex: root.indexOfValue(["1", "2", "3", "5", "8", "10"], String(root.cfg.llm_request_timeout_minutes || 5)); Layout.fillWidth: true }
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Item { Layout.fillWidth: true }
-                        AppButton { text: "Save model settings"; onClicked: root.save() }
-                    }
-                }
+                Label { text: "Changes are saved automatically."; color: Theme.textDim; font.pixelSize: 11; Layout.fillWidth: true }
+                AppButton { text: "Refresh status"; variant: "secondary"; implicitHeight: 30; onClicked: root.controller.refreshEngineStatus() }
             }
         }
     }

@@ -34,34 +34,13 @@ Item {
         return text
     }
     function save() {
+        // Partial patch: only the prompt keys this page owns.
         var c = {
-            transcription_service: cfg.transcription_service || "whisper_cpp",
-            summarization_service: cfg.summarization_service || "openai",
-            openai_api_key: cfg.openai_api_key || "",
-            openai_base_url: cfg.openai_base_url || "https://api.openai.com/v1",
-            openai_transcription_model: cfg.openai_transcription_model || "whisper-1",
-            openai_summarization_model: cfg.openai_summarization_model || "gpt-5.6-luna",
-            output_folder: cfg.output_folder || "~/meetings",
-            recording_quality: cfg.recording_quality || "high",
-            call_detection_enabled: cfg.call_detection_enabled || false,
-            start_at_startup: cfg.start_at_startup || false,
-            auto_title: cfg.auto_title !== false,
-            processing_countdown_enabled: cfg.processing_countdown_enabled || false,
-            auto_process_enabled: cfg.auto_process_enabled !== false,
-            low_memory_mode: cfg.low_memory_mode || false,
-            llm_request_timeout_minutes: Number(cfg.llm_request_timeout_minutes || 5),
-            whisper_cpp_model: cfg.whisper_cpp_model || "large-v3-turbo",
-            whisper_cpp_backend: cfg.whisper_cpp_backend || "auto",
-            crisp_asr_model: cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0",
-            crisp_asr_backend: cfg.crisp_asr_backend || "auto",
-            ollama_model: cfg.ollama_model || "phi4-mini",
-            ollama_host: cfg.ollama_host || "http://localhost:11434",
-            custom_devices: cfg.custom_devices || [],
             transcription_prompt: storedValue(transcription.text, builtinTranscription()),
             summarization_prompt: storedValue(summarization.text, builtinSummarization()),
             title_prompt: storedValue(title.text, builtinTitle())
         }
-        controller.saveSettings(JSON.stringify(c), false)
+        controller.saveSettings(JSON.stringify(c), true)
         // Refresh local view to reflect stored-vs-default state.
         loaded = false
     }
@@ -91,7 +70,7 @@ Item {
         ScrollBar.vertical: ScrollBar {}
         ColumnLayout {
             id: column
-            width: root.width
+            width: root.width - 14
             spacing: 14
             Label { text: "Prompt templates"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
             Label { text: "Defaults are shown below. Edit to customize — Reset restores the built-in defaults. Empty is stored as default. Changes apply to the next job."; color: Theme.textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }

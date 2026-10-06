@@ -12,6 +12,7 @@ fn main() {
         QmlFile::from("qml/Theme.qml").singleton(true),
         QmlFile::from("qml/components/AppButton.qml"),
         QmlFile::from("qml/components/AppCard.qml"),
+        QmlFile::from("qml/components/AppShell.qml"),
         QmlFile::from("qml/components/AppCheckBox.qml"),
         QmlFile::from("qml/components/AppComboBox.qml"),
         QmlFile::from("qml/components/AppProgressBar.qml"),

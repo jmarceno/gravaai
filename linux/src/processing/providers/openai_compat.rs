@@ -66,19 +66,50 @@ impl OpenAiCompatProvider {
     // ------------------------------------------------------------------
 
     /// Transcribe an audio file via `/audio/transcriptions`.
+    ///
+    /// OpenAI-compatible endpoints cap uploads (25 MB on OpenAI) and the
+    /// request timeout is bounded, so a meeting is first re-encoded into
+    /// small mono chunks of [`CHUNK_SECONDS`] each; every chunk is
+    /// transcribed separately and its timestamps are shifted by the chunk
+    /// offset so the merged transcript keeps meeting-relative times.
     pub fn transcribe(
         &self,
         audio_path: &Path,
         on_status: Option<&dyn Fn(&str)>,
     ) -> anyhow::Result<String> {
         if let Some(cb) = on_status {
-            cb("Uploading audio for transcription…");
+            cb("Preparing audio for upload…");
         }
         log::info!(
             "Transcribing {} via {}",
             audio_path.display(),
             self.base_url
         );
+        let work = tempfile::tempdir()?;
+        let chunks = split_audio_for_upload(audio_path, work.path())?;
+        let total = chunks.len();
+        let mut parts = Vec::with_capacity(total);
+        for (i, chunk) in chunks.iter().enumerate() {
+            if let Some(cb) = on_status {
+                if total > 1 {
+                    cb(&format!("Transcribing audio (part {} of {total})…", i + 1));
+                } else {
+                    cb("Transcribing audio…");
+                }
+            }
+            let text = self.transcribe_file(chunk)?;
+            parts.push(shift_timestamps(&text, i as u64 * CHUNK_SECONDS));
+        }
+        let merged = parts
+            .into_iter()
+            .filter(|p| !p.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        require_text(&merged, "transcription")
+    }
+
+    /// Upload one (already size-bounded) audio file.
+    fn transcribe_file(&self, audio_path: &Path) -> anyhow::Result<String> {
         let client = self.client();
         let url = format!("{}/audio/transcriptions", self.base_url);
         let file_name = audio_path
@@ -91,21 +122,21 @@ impl OpenAiCompatProvider {
         let mime = mime_for(audio_path);
         let api_key = self.api_key.clone();
         let stt_model = self.stt_model.clone();
-        let prompt = self.transcription_prompt.clone();
+        let prompt = transcription_prompt_for(&stt_model, &self.transcription_prompt);
+        let response_format = response_format_for(&stt_model);
         let minutes = self.timeout_minutes();
-        if let Some(cb) = on_status {
-            cb("Transcribing audio…");
-        }
         let text = retry_on_transient(
             || -> anyhow::Result<String> {
                 let part = reqwest::blocking::multipart::Part::bytes(bytes.clone())
                     .file_name(file_name.clone())
                     .mime_str(&mime)?;
-                let form = reqwest::blocking::multipart::Form::new()
+                let mut form = reqwest::blocking::multipart::Form::new()
                     .text("model", stt_model.clone())
-                    .text("prompt", prompt.clone())
-                    .text("response_format", "verbose_json")
-                    .part("file", part);
+                    .text("response_format", response_format);
+                if let Some(p) = &prompt {
+                    form = form.text("prompt", p.clone());
+                }
+                let form = form.part("file", part);
                 let resp = client
                     .post(&url)
                     .bearer_auth(&api_key)
@@ -118,12 +149,14 @@ impl OpenAiCompatProvider {
                     return Err(classify_http_error(status.as_u16(), &body, "transcription"));
                 }
                 let body = resp.text().unwrap_or_default();
-                extract_transcript_text(&body)
+                // A silent chunk legitimately yields no text; only the merged
+                // transcript must be non-empty.
+                Ok(extract_transcript_text(&body).unwrap_or_default())
             },
             "transcription",
             2,
         )?;
-        require_text(&text, "transcription")
+        Ok(text)
     }
 
     // ------------------------------------------------------------------
@@ -197,6 +230,149 @@ impl OpenAiCompatProvider {
             2,
         )
     }
+}
+
+/// Length of one upload chunk. 10 minutes of 16 kHz mono at 48 kbps is
+/// ~3.6 MB — far below OpenAI's 25 MB upload cap and the per-request
+/// duration limits of the `gpt-4o-*-transcribe` models.
+pub const CHUNK_SECONDS: u64 = 600;
+
+/// ffmpeg argv that re-encodes `input` into mono speech-quality MP3 chunks
+/// named by `pattern` (a `%03d` printf pattern). Pure; unit-tested.
+pub fn chunk_command(ffmpeg: &str, input: &Path, pattern: &Path) -> Vec<String> {
+    vec![
+        ffmpeg.to_string(),
+        "-nostdin".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+        "-i".into(),
+        input.to_string_lossy().into_owned(),
+        "-vn".into(),
+        "-ac".into(),
+        "1".into(),
+        "-ar".into(),
+        "16000".into(),
+        "-c:a".into(),
+        "libmp3lame".into(),
+        "-b:a".into(),
+        "48k".into(),
+        "-f".into(),
+        "segment".into(),
+        "-segment_time".into(),
+        CHUNK_SECONDS.to_string(),
+        "-reset_timestamps".into(),
+        "1".into(),
+        pattern.to_string_lossy().into_owned(),
+    ]
+}
+
+/// Split `audio` into upload-sized chunks inside `dir`, in playback order.
+fn split_audio_for_upload(audio: &Path, dir: &Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
+    let ffmpeg = crate::utils::exe::runtime_program("ffmpeg");
+    let cmd = chunk_command(
+        &ffmpeg.to_string_lossy(),
+        audio,
+        &dir.join("chunk-%03d.mp3"),
+    );
+    let out = std::process::Command::new(&cmd[0])
+        .args(&cmd[1..])
+        .output()
+        .map_err(|e| anyhow::anyhow!("Could not run ffmpeg to prepare the audio: {e}"))?;
+    if !out.status.success() {
+        anyhow::bail!(
+            "ffmpeg could not prepare the audio for upload: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    let mut chunks: Vec<_> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("chunk-") && n.ends_with(".mp3"))
+        })
+        .collect();
+    chunks.sort();
+    if chunks.is_empty() {
+        anyhow::bail!("The recording contains no audio to transcribe.");
+    }
+    Ok(chunks)
+}
+
+/// Only `whisper-1` (and other whisper-family models on compatible servers)
+/// return `verbose_json` with timestamped segments; the `gpt-4o-*-transcribe`
+/// models reject it and accept only `json`/`text`.
+pub fn response_format_for(model: &str) -> &'static str {
+    if model.to_lowercase().contains("whisper") {
+        "verbose_json"
+    } else {
+        "json"
+    }
+}
+
+/// Whisper treats `prompt` as preceding transcript text (≤224 tokens), not
+/// as instructions — sending the built-in LLM-style instructions makes it
+/// echo or imitate them. Whisper models therefore get a prompt only when the
+/// user wrote a custom one; instruction-following models always get it.
+pub fn transcription_prompt_for(model: &str, prompt: &str) -> Option<String> {
+    let prompt = prompt.trim();
+    if prompt.is_empty() {
+        return None;
+    }
+    if model.to_lowercase().contains("whisper") && prompt == TRANSCRIPTION_PROMPT.trim() {
+        return None;
+    }
+    Some(prompt.to_string())
+}
+
+/// Shift every leading `[HH:MM:SS]` timestamp in `text` by `offset` seconds.
+/// Text without any timestamps (plain `json`/`text` responses) gets a single
+/// `[HH:MM:SS]` marker for the chunk start so the merged transcript still
+/// carries coarse timing. Pure; unit-tested.
+pub fn shift_timestamps(text: &str, offset: u64) -> String {
+    let text = text.trim();
+    if text.is_empty() {
+        return String::new();
+    }
+    let mut any = false;
+    let lines: Vec<String> = text
+        .lines()
+        .map(|line| match parse_timestamp(line) {
+            Some((secs, rest)) => {
+                any = true;
+                format!("[{}]{rest}", format_hms(secs + offset))
+            }
+            None => line.to_string(),
+        })
+        .collect();
+    if any {
+        lines.join("\n")
+    } else {
+        format!("[{}] {text}", format_hms(offset))
+    }
+}
+
+fn parse_timestamp(line: &str) -> Option<(u64, &str)> {
+    let inner = line.strip_prefix('[')?;
+    let close = inner.find(']')?;
+    let parts: Vec<&str> = inner[..close].split(':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let mut secs = 0u64;
+    for p in parts {
+        if p.len() != 2 {
+            return None;
+        }
+        secs = secs * 60 + p.parse::<u64>().ok()?;
+    }
+    Some((secs, &inner[close + 1..]))
+}
+
+fn format_hms(secs: u64) -> String {
+    format!("{:02}:{:02}:{:02}", secs / 3600, secs % 3600 / 60, secs % 60)
 }
 
 fn mime_for(path: &Path) -> String {
@@ -336,6 +512,57 @@ mod tests {
         );
         assert!(extract_transcript_text("   ").is_err());
         assert!(extract_transcript_text(r#"{"text":""}"#).is_err());
+    }
+
+    #[test]
+    fn chunk_command_reencodes_into_bounded_mono_segments() {
+        let cmd = chunk_command(
+            "ffmpeg",
+            Path::new("/m/recording.mp3"),
+            Path::new("/w/chunk-%03d.mp3"),
+        );
+        let joined = cmd.join(" ");
+        assert!(joined.contains("-ac 1"), "{joined}");
+        assert!(joined.contains("-f segment"), "{joined}");
+        assert!(joined.contains(&format!("-segment_time {CHUNK_SECONDS}")));
+        assert_eq!(cmd[cmd.len() - 1], "/w/chunk-%03d.mp3");
+        // 10 min at 48 kbps must stay far below the 25 MB upload cap.
+        assert!(CHUNK_SECONDS * 48_000 / 8 < 25 * 1024 * 1024 / 2);
+    }
+
+    #[test]
+    fn response_format_depends_on_model() {
+        assert_eq!(response_format_for("whisper-1"), "verbose_json");
+        assert_eq!(response_format_for("gpt-4o-transcribe"), "json");
+        assert_eq!(response_format_for("gpt-4o-mini-transcribe"), "json");
+    }
+
+    #[test]
+    fn whisper_never_gets_the_builtin_instruction_prompt() {
+        assert_eq!(
+            transcription_prompt_for("whisper-1", TRANSCRIPTION_PROMPT),
+            None
+        );
+        assert_eq!(
+            transcription_prompt_for("whisper-1", "Glossary: GravaAI, Kache"),
+            Some("Glossary: GravaAI, Kache".to_string())
+        );
+        assert!(transcription_prompt_for("gpt-4o-transcribe", TRANSCRIPTION_PROMPT).is_some());
+        assert_eq!(transcription_prompt_for("gpt-4o-transcribe", "  "), None);
+    }
+
+    #[test]
+    fn timestamps_shift_by_chunk_offset() {
+        assert_eq!(
+            shift_timestamps("[00:00:05] hello\n[00:09:59] world", 600),
+            "[00:10:05] hello\n[00:19:59] world"
+        );
+        assert_eq!(shift_timestamps("[00:00:05] hi", 0), "[00:00:05] hi");
+        // Plain text gets one chunk-start marker.
+        assert_eq!(shift_timestamps("hello there", 3600), "[01:00:00] hello there");
+        assert_eq!(shift_timestamps("   ", 600), "");
+        // A bracket that is not a timestamp is left alone.
+        assert_eq!(shift_timestamps("[music] la", 60), "[00:01:00] [music] la");
     }
 
     #[test]

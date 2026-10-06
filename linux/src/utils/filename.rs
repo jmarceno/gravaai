@@ -6,13 +6,20 @@ use chrono::Local;
 use regex::Regex;
 
 /// Remove characters unsafe for filenames, collapse whitespace to `_`,
-/// truncate to 50 chars.
+/// truncate to 50 chars (at a word boundary when one is reasonably close).
 pub fn sanitize_title(title: &str) -> String {
-    let unsafe_chars = Regex::new(r#"[/\\:*?"<>|]"#).unwrap();
+    let unsafe_chars = Regex::new(r#"[/\\:*?"<>|;]"#).unwrap();
     let sanitized = unsafe_chars.replace_all(title, "");
     let ws = Regex::new(r"\s+").unwrap();
     let collapsed = ws.replace_all(sanitized.trim(), "_");
-    collapsed.chars().take(50).collect()
+    if collapsed.chars().count() <= 50 {
+        return collapsed.into_owned();
+    }
+    let cut: String = collapsed.chars().take(50).collect();
+    match cut.rfind('_') {
+        Some(i) if cut[..i].chars().count() >= 25 => cut[..i].to_string(),
+        _ => cut,
+    }
 }
 
 fn expanduser(p: &str) -> PathBuf {
@@ -79,6 +86,12 @@ mod tests {
         );
         assert_eq!(sanitize_title("  a  b\tc "), "a_b_c");
         assert_eq!(sanitize_title(&"x".repeat(100)).len(), 50);
+        // Long titles end on a whole word, and `;` never reaches a dir name.
+        assert_eq!(
+            sanitize_title("Resolucao problema da camara apos instalacao confusa do hardware"),
+            "Resolucao_problema_da_camara_apos_instalacao"
+        );
+        assert_eq!(sanitize_title("Camera fix; CrossFit"), "Camera_fix_CrossFit");
     }
 
     #[test]

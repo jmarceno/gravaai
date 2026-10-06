@@ -84,6 +84,11 @@ QT_QML="$("$QMAKE_BIN" -query QT_INSTALL_QML)"
   echo "qmake6 reported incomplete Qt paths" >&2
   exit 1
 }
+# Prefer the tools of the Qt we stage: a qtchooser `qmlimportscanner` shim on
+# PATH may point at Qt 5 (or nothing) on distros that ship both.
+for qt_tools in "$("$QMAKE_BIN" -query QT_INSTALL_LIBEXECS)" "$("$QMAKE_BIN" -query QT_INSTALL_BINS)"; do
+  [[ -x "$qt_tools/qmlimportscanner" ]] && PATH="$qt_tools:$PATH"
+done
 command -v qmlimportscanner >/dev/null 2>&1 || {
   echo "qmlimportscanner is required to validate QML staging" >&2
   exit 1
@@ -264,8 +269,30 @@ bundle_deps() {
 
 bundle_deps "$STAGE_APPDIR/usr/bin/$APP_NAME"
 bundle_deps "$STAGE_APPDIR/usr/libexec/$APP_NAME/$APP_NAME-ui"
+# Recording reads PulseAudio/PipeWire through ffmpeg's `pulse` demuxer. Static
+# ffmpeg builds (e.g. johnvansickle in /usr/local/bin) lack it, and bundling
+# one silently ships an app that cannot record — pick the first ffmpeg on PATH
+# that can capture from Pulse, and its sibling ffprobe.
+FFMPEG_SRC=""
+while IFS= read -r candidate; do
+  if "$candidate" -hide_banner -formats 2>/dev/null | grep -Eq '^ D.? +pulse '; then
+    FFMPEG_SRC="$candidate"
+    break
+  fi
+done < <(which -a ffmpeg 2>/dev/null | awk '!seen[$0]++')
+[[ -n "$FFMPEG_SRC" ]] || {
+  echo "No ffmpeg with PulseAudio capture (pulse demuxer) found on PATH" >&2
+  exit 1
+}
+FFPROBE_SRC="$(dirname "$FFMPEG_SRC")/ffprobe"
+[[ -x "$FFPROBE_SRC" ]] || FFPROBE_SRC="$(command -v ffprobe || true)"
+echo "Bundling ffmpeg from $FFMPEG_SRC"
 for helper in ffmpeg ffprobe pactl; do
-  source="$(command -v "$helper" || true)"
+  case "$helper" in
+    ffmpeg) source="$FFMPEG_SRC" ;;
+    ffprobe) source="$FFPROBE_SRC" ;;
+    *) source="$(command -v "$helper" || true)" ;;
+  esac
   [[ -n "$source" && -f "$source" ]] || {
     echo "Required runtime helper '$helper' is not installed on this build host" >&2
     exit 1
@@ -312,7 +339,7 @@ QtQuick Layouts, QtQuick Window, QtNetwork, QtSvg and platform plugins).
 See the Qt license notices shipped by the build distribution and
 https://www.qt.io/licensing/.
 
-FFmpeg/ffprobe: $(ffmpeg -version 2>/dev/null | head -n1)
+FFmpeg/ffprobe: $("$FFMPEG_SRC" -version 2>/dev/null | head -n1)
 PulseAudio pactl: $(pactl --version 2>/dev/null | head -n1)
 Rust dependencies are statically linked where possible; their licenses are
 recorded by Cargo.lock and the project license metadata.

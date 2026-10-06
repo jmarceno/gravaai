@@ -12,6 +12,10 @@ use super::providers::whisper_cpp::WhisperCppProvider;
 pub trait TranscriptionProvider {
     fn transcribe(&self, audio: &Path, on_status: Option<&dyn Fn(&str)>) -> anyhow::Result<String>;
     fn unload(&self) {}
+    /// Spoken-language code detected by the last `transcribe`, if known.
+    fn detected_language(&self) -> Option<String> {
+        None
+    }
 }
 
 struct OpenAiTranscription(OpenAiCompatProvider);
@@ -36,6 +40,10 @@ impl TranscriptionProvider for WhisperCppTranscription {
             super::providers::ollama::unload_all_models(&self.ollama_host);
         }
         self.inner.transcribe(audio, on_status)
+    }
+
+    fn detected_language(&self) -> Option<String> {
+        self.inner.detected_language()
     }
 }
 

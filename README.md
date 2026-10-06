@@ -21,12 +21,15 @@ is locked in.
   at the same time (calls, browser audio, presentations), or pick exactly which
   devices to record. Each channel is loudness-normalized during capture, so a
   quiet microphone still lands at a healthy level.
-- **Transcribe your way** — any OpenAI-compatible endpoint, or locally with
-  whisper.cpp (timestamped transcript). An experimental CrispASR backend
-  (Nemotron 3.5 ASR) is also available.
+- **Transcribe your way** — locally with whisper.cpp (timestamped transcript,
+  spoken language detected automatically, and "Me"/"Remote" speaker labels
+  when you record mic + system audio), or any OpenAI-compatible endpoint. An
+  experimental CrispASR backend (Nemotron 3.5 ASR, English) is also available.
 - **Notes that read like a secretary wrote them** — summarization turns the
-  transcript into structured Markdown notes, and every meeting gets a title
-  automatically when you don't name it.
+  transcript into structured Markdown notes (summary, key points, decisions,
+  action items with owners, open questions) written in the meeting's own
+  language, and every meeting gets a title automatically when you don't name
+  it.
 - **A real meeting library** — browse past recordings and re-run transcribe or
   summarize on any of them at any time, without re-recording.
 - **Pick your engines independently** — transcribe with one service and
@@ -55,14 +58,15 @@ is locked in.
 
 ```
 ~/meetings/
-└── 2026/
-    └── March/
-        └── 04/
-            └── 14-30_Standup/
-                ├── recording.mp3
-                ├── transcript.md
-                └── notes.md
+└── 2026-03-04_14-30_Standup/
+    ├── recording.mp3
+    ├── transcript.md
+    ├── notes.md
+    └── meeting.json
 ```
+
+You can also **Import** an existing audio file from the Recorder page: it is
+copied into a new meeting folder and processed like a recording.
 
 ## Installation
 
@@ -99,16 +103,17 @@ logs, config and the stored API key. **Your recordings are kept.**
 
 ## Choosing your services
 
-Open **Models & services** in the app to pick and configure each stage. The
-Status card there shows what's installed and running, and the Downloads tab
-lists every file the app has downloaded with its location and size.
+Open **Models & services** in the app to pick and configure each stage. Every
+step a job needs (engine, model, server) is listed with whether it is ready and
+a one-click Install/Download button; changes save automatically. The Downloads
+page lists every file the app has downloaded with its location and size.
 
 ### Transcription
 
 | Service | Runs | Notes |
 |---|---|---|
 | **OpenAI-compatible** | Cloud | Any `/v1`-style endpoint: OpenAI, Azure OpenAI, LiteLLM, llama.cpp server, … |
-| **whisper.cpp** *(default)* | Local | Official prebuilt CPU binary + GGML models from HuggingFace |
+| **whisper.cpp** *(default)* | Local | Official prebuilt CPU binary + GGML models from HuggingFace; detects the spoken language |
 | **CrispASR** *(experimental)* | Local | Prebuilt binary with Nemotron 3.5 ASR; CPU, Vulkan or CUDA |
 
 ### Summarization
@@ -116,7 +121,11 @@ lists every file the app has downloaded with its location and size.
 | Service | Runs | Notes |
 |---|---|---|
 | **OpenAI-compatible** | Cloud | Any `/chat/completions`-style endpoint |
-| **Ollama** | Local | Installing Ollama from the app starts the server for you |
+| **Ollama** | Local | Installed with its GPU (CUDA) runtime; the app starts the server for you |
+
+> Upgrading from an older version? If the Ollama row on Models & services says
+> **Incomplete install**, press **Reinstall** — older versions installed Ollama
+> without its GPU runtime, which made summaries run slowly on the CPU.
 
 Your API key is stored in the system keyring (GNOME Keyring / KWallet) when
 one is available, falling back to a permission-restricted config file
@@ -126,15 +135,15 @@ otherwise.
 
 | Mode | What is captured | When to use |
 |------|-----------------|-------------|
-| **Headphones** | Microphone + system audio | You're wearing headphones — no echo risk |
-| **Speaker** | Microphone only | Laptop speakers — avoids loopback echo |
+| **Mic + system** | Microphone (left channel) + system audio (right channel) | You're wearing headphones — no echo risk; transcripts label "Me" vs "Remote" |
+| **Mic only** | Microphone only | Laptop speakers — avoids loopback echo |
 | **Custom** | Every audio device you select | Multiple microphones or non-standard setups |
 
 ## Settings overview
 
 - **General** — output folder (default `~/meetings`), recording quality,
   auto-process on stop, call detection, start at login, low-memory mode,
-  recording pill on/off.
+  recording pill on/off. All settings save as soon as you change them.
 - **Models & services** — pick the transcription and summarization services,
   install local engines, download models.
 - **Prompts** — customize the transcription, summarization and title prompts;
@@ -194,9 +203,9 @@ toolchain, Qt 6 development packages (`qt6-base-dev`, `qt6-declarative-dev`,
 ```bash
 git clone https://github.com/jmarceno/gravaai
 cd gravaai
-cargo build --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
-cargo build --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
-./linux/target/debug/gravaai
+cargo build --release --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
+cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
+./linux/target/release/gravaai
 
 # Pack a local AppImage:
 ./linux/packaging/appimage/build-appimage.sh

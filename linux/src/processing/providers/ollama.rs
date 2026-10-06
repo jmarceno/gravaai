@@ -56,6 +56,14 @@ pub fn unload_all_models(host: &str) {
     }
 }
 
+/// Context window (tokens) large enough for a prompt of `prompt_chars`
+/// characters plus room for the notes: ~3 chars per token, +4096 output
+/// tokens, rounded up to a power of two within 8k–128k. Pure; unit-tested.
+pub fn context_window_for(prompt_chars: usize) -> u64 {
+    let needed = (prompt_chars as u64).div_ceil(3) + 4096;
+    needed.next_power_of_two().clamp(8192, 131_072)
+}
+
 pub struct OllamaProvider {
     model: String,
     host: String,
@@ -87,7 +95,14 @@ impl OllamaProvider {
             cb(&format!("Summarizing with Ollama ({})…", self.model));
         }
         let prompt = render_prompt(&self.summarization_prompt, transcript);
-        let body = serde_json::json!({"model": self.model, "prompt": prompt, "stream": false});
+        // Ollama silently truncates prompts to its small default context
+        // (2–4k tokens), which drops most of a meeting transcript.
+        let body = serde_json::json!({
+            "model": self.model,
+            "prompt": prompt,
+            "stream": false,
+            "options": {"num_ctx": context_window_for(prompt.chars().count())},
+        });
         let url = format!("{}/api/generate", self.host);
         let timeout = self.timeout;
         let timeout_minutes = timeout.as_secs() / 60;
@@ -168,6 +183,17 @@ impl OllamaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn context_window_fits_long_transcripts() {
+        assert_eq!(context_window_for(0), 8192);
+        assert_eq!(context_window_for(3_000), 8192);
+        // ~100 minutes of speech is ~90k characters → needs > 32k tokens.
+        let n = context_window_for(90_000);
+        assert!(n >= 90_000 / 3 + 4096, "{n}");
+        assert_eq!(n, 65_536);
+        assert_eq!(context_window_for(10_000_000), 131_072);
+    }
 
     #[test]
     fn unreachable_host_gives_empty_list() {

@@ -277,8 +277,9 @@ fn spawn_signal_tasks(proxy: EngineProxy<'static>, tx: Sender<Event>) {
             return;
         };
         while let Some(signal) = stream.next().await {
-            if let Ok(args) = signal.args() {
-                let _ = out.send(Event::Toast(format!("{}: {}", args.key, args.text)));
+            if signal.args().is_ok() {
+                // Progress is shown inline on the Models page; a toast per
+                // progress line would flood the window during a download.
                 if let Ok(json) = refresh_proxy.get_installs().await {
                     let _ = out.send(Event::Installs(json));
                 }
@@ -295,12 +296,19 @@ fn spawn_signal_tasks(proxy: EngineProxy<'static>, tx: Sender<Event>) {
         while let Some(signal) = stream.next().await {
             if let Ok(args) = signal.args() {
                 if args.ok {
-                    let _ = out.send(Event::Toast(format!("Install complete: {}", args.key)));
-                } else {
                     let _ = out.send(Event::Toast(format!(
-                        "Install failed ({}): {}",
-                        args.key, args.message
+                        "{} installed.",
+                        install_display_name(&args.key)
                     )));
+                } else {
+                    let _ = out.send(Event::Dialog {
+                        message: format!(
+                            "Install failed ({}):\n{}",
+                            install_display_name(&args.key),
+                            args.message
+                        ),
+                        confirm: false,
+                    });
                 }
                 if let Ok(json) = refresh_proxy.get_installs().await {
                     let _ = out.send(Event::Installs(json));
@@ -314,6 +322,26 @@ fn spawn_signal_tasks(proxy: EngineProxy<'static>, tx: Sender<Event>) {
             }
         }
     });
+}
+
+/// Human name for an install key (`whisper_cpp_model:small` →
+/// `whisper.cpp model small`). Pure; unit-tested.
+fn install_display_name(key: &str) -> String {
+    let (kind, model) = key.split_once(':').unwrap_or((key, ""));
+    let name = match kind {
+        "whisper_cpp_engine" => "whisper.cpp engine",
+        "whisper_cpp_model" => "whisper.cpp model",
+        "crisp_asr_engine" => "CrispASR engine",
+        "crisp_asr_model" => "CrispASR model",
+        "ollama" => "Ollama",
+        "ollama_model" => "Ollama model",
+        other => other,
+    };
+    if model.is_empty() {
+        name.to_string()
+    } else {
+        format!("{name} {model}")
+    }
 }
 
 /// Re-scan meetings off the Qt thread and publish them to the UI.
@@ -1025,7 +1053,8 @@ async fn persist_settings(cfg: Config, proxy: &EngineProxy<'static>, tx: &Sender
     tokio::spawn(async move {
         refresh_engine_status_event(status_tx).await;
     });
-    let _ = tx.send(Event::Toast("Settings saved.".into()));
+    // No toast: pages save every change immediately, a toast per toggle
+    // would be noise. Failures above still surface as dialogs.
 }
 
 async fn send_lepramim_status(tx: &Sender<Event>) {
@@ -1613,6 +1642,17 @@ impl qobject::AppController {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_keys_have_readable_names() {
+        assert_eq!(install_display_name("whisper_cpp_engine"), "whisper.cpp engine");
+        assert_eq!(
+            install_display_name("whisper_cpp_model:large-v3-turbo"),
+            "whisper.cpp model large-v3-turbo"
+        );
+        assert_eq!(install_display_name("ollama_model:phi4-mini"), "Ollama model phi4-mini");
+        assert_eq!(install_display_name("mystery"), "mystery");
+    }
 
     #[test]
     fn merge_settings_partial_patch_keeps_stored_values() {

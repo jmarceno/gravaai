@@ -200,11 +200,22 @@ fn spawn_ollama_serve() -> anyhow::Result<()> {
             crate::services::system_installer::which("ollama").map(std::path::PathBuf::from)
         })
         .ok_or_else(|| anyhow::anyhow!("Ollama is not installed"))?;
+    // Keep the server's own output: "it is not responding" is undebuggable
+    // without it.
+    let log_path = crate::utils::logging::log_dir().join("ollama-serve.log");
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path);
+    let (out, err) = match log.and_then(|f| Ok((f.try_clone()?, f))) {
+        Ok((a, b)) => (Stdio::from(a), Stdio::from(b)),
+        Err(_) => (Stdio::null(), Stdio::null()),
+    };
     let child = Command::new(&program)
         .arg("serve")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(out)
+        .stderr(err)
         .spawn()
         .map_err(|e| anyhow::anyhow!("Failed to start `ollama serve`: {e:#}"))?;
     let pid = child.id();

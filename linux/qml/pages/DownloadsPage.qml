@@ -54,6 +54,7 @@ Item {
         spacing: 12
         RowLayout {
             Layout.fillWidth: true
+            Layout.rightMargin: 14
             spacing: 8
             Label { text: root.payloads.length + " payload(s) · " + root.fmtSize(root.totalSize()) + " total"; color: Theme.textMuted; font.pixelSize: 12; Layout.fillWidth: true }
             AppButton { text: "Refresh"; variant: "secondary"; implicitHeight: 34; onClicked: controller.refreshEngineStatus() }
@@ -83,7 +84,7 @@ Item {
             ScrollBar.vertical: ScrollBar {}
             Column {
                 id: listColumn
-                width: parent.width
+                width: parent.width - 14
                 spacing: 10
                 Repeater {
                     model: root.payloads

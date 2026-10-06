@@ -38,6 +38,10 @@ fn run_install(spec: &InstallSpec, on_status: &dyn Fn(&str)) -> anyhow::Result<(
         install_spec::KIND_OLLAMA => {
             OllamaInstaller::install(on_status)
                 .map_err(|e| anyhow::anyhow!("Ollama install: {e:#}"))?;
+            // A server we started earlier still runs the old runtime (e.g. a
+            // CPU-only bare binary); stop it so the fresh one is used. A
+            // server we did not start is never touched.
+            let _ = crate::services::ollama_service::shutdown_owned_server();
             // Leave a working setup behind: start `ollama serve` right after
             // the download so the user doesn't have to run it by hand.
             // Ownership is recorded, so daemon shutdown stops exactly this

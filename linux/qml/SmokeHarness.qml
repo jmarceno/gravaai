@@ -13,21 +13,42 @@ ApplicationWindow {
     property int requestedWidth: 1332
     property int requestedHeight: 820
     property int pagesChecked: 0
+    // Optional: --smoke-shots=<dir> saves one PNG per page so layout can be
+    // reviewed by eye (overflow, clipping) without a daemon or tray.
+    property string shotsDir: ""
+    // --smoke-idle renders the idle recorder (no recording, no jobs).
+    property bool idle: false
+    readonly property var pageNames: ["recorder", "library", "models", "downloads", "prompts", "general"]
+    property int pageIndex: 0
     property Timer smokeTimer: Timer {
-        interval: 250
+        interval: 350
         repeat: false
         onTriggered: {
-            var current = pages.itemAt(pages.currentIndex)
+            var current = shell.currentPage()
             if (!current || current.width <= 0 || current.height <= 0) {
                 console.error("QML smoke geometry is not positive")
                 Qt.exit(1)
-            } else if (pages.currentIndex < pages.count - 1) {
-                pages.currentIndex += 1
-                pagesChecked += 1
-                restart()
-            } else {
-                Qt.exit(0)
+                return
             }
+            if (root.shotsDir.length > 0) {
+                var name = root.shotsDir + "/" + root.requestedWidth + "x" + root.requestedHeight + (root.idle ? "-idle" : "") + "-" + root.pageNames[root.pageIndex] + ".png"
+                shell.grabToImage(function(result) {
+                    result.saveToFile(name)
+                    root.advance()
+                })
+            } else {
+                root.advance()
+            }
+        }
+    }
+    function advance() {
+        if (pageIndex < pageNames.length - 1) {
+            pageIndex += 1
+            pagesChecked += 1
+            controller.selectPage(pageNames[pageIndex])
+            smokeTimer.restart()
+        } else {
+            Qt.exit(0)
         }
     }
 
@@ -44,8 +65,12 @@ ApplicationWindow {
                 requestedWidth = Number(arg.substring(14))
             if (arg.indexOf("--smoke-height=") === 0)
                 requestedHeight = Number(arg.substring(15))
+            if (arg.indexOf("--smoke-shots=") === 0)
+                shotsDir = arg.substring(14)
+            if (arg === "--smoke-idle")
+                idle = true
         }
-        controller.snapshot_json = JSON.stringify({
+        controller.snapshot_json = idle ? JSON.stringify({ state: "idle", elapsed: 0, audio_level: 0, jobs: [] }) : JSON.stringify({
             state: "recording",
             elapsed: 73,
             audio_level: 0.45,
@@ -82,31 +107,30 @@ ApplicationWindow {
             crispasr: { engine_installed: false, engine_path: "/tmp/gravaai-data/crisp-asr", engine_size_bytes: 0, models_dir: "/tmp/gravaai-data/crisp-asr-models", models_url: "https://example.invalid" },
             ollama: { installed: true, binary_path: "/tmp/gravaai-data/ollama/ollama", serving: true, host: "http://localhost:11434", models_dir: "/tmp/ollama-store", models: [{ name: "phi4-mini:latest", size: 2500000000 }] }
         })
+        controller.selectPage(pageNames[0])
         smokeTimer.start()
     }
 
-    ColumnLayout {
+    AppShell {
+        id: shell
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 10
-        Label { text: "QML smoke"; color: Theme.textPrimary; Layout.fillWidth: true }
+        window: root
+        controller: root.controller
+        snapshotData: JSON.parse(root.controller.snapshot_json || "{}")
+    }
+
+    // Building blocks that are not in the sidebar still get instantiated so
+    // their required-property contract is exercised.
+    Item {
+        visible: false
+        width: 900
+        height: 600
+        JobsPage { anchors.fill: parent; controller: root.controller }
         RecordingPill {
             recState: "recording"
             elapsedSeconds: 73
             countdownSeconds: 0
             audioLevel: 0.45
-        }
-        StackLayout {
-            id: pages
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            RecorderPage { id: recorderPage; controller: root.controller }
-            LibraryPage { id: libraryPage; controller: root.controller }
-            JobsPage { id: jobsPage; controller: root.controller }
-            ModelsPage { id: modelsPage; controller: root.controller }
-            DownloadsPage { id: downloadsPage; controller: root.controller }
-            PromptsPage { id: promptsPage; controller: root.controller }
-            GeneralPage { id: generalPage; controller: root.controller }
         }
     }
 }

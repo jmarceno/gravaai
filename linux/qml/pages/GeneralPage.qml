@@ -11,106 +11,111 @@ Item {
     Layout.fillWidth: true
     Layout.fillHeight: true
 
+    readonly property var qualities: [
+        { value: "low", label: "Low · ~64 kbps" },
+        { value: "medium", label: "Medium · ~100 kbps" },
+        { value: "high", label: "High · ~130 kbps (default)" },
+        { value: "very_high", label: "Very high · ~190 kbps" }
+    ]
+
     function readData() {
         try { cfg = JSON.parse(controller.settings_json) } catch (error) { cfg = {} }
     }
-    function save() {
-        var c = {
-            transcription_service: cfg.transcription_service || "whisper_cpp",
-            summarization_service: cfg.summarization_service || "openai",
-            openai_api_key: cfg.openai_api_key || "",
-            openai_base_url: cfg.openai_base_url || "https://api.openai.com/v1",
-            openai_transcription_model: cfg.openai_transcription_model || "whisper-1",
-            openai_summarization_model: cfg.openai_summarization_model || "gpt-5.6-luna",
-            output_folder: outputFolder.text,
-            recording_quality: quality.currentText,
-            call_detection_enabled: callDetection.checked,
-            start_at_startup: autostart.checked,
-            auto_title: autoTitle.checked,
-            processing_countdown_enabled: countdown.checked,
-            auto_process_enabled: autoProcess.checked,
-            low_memory_mode: lowMemory.checked,
-            show_recording_pill: recordingPill.checked,
-            llm_request_timeout_minutes: Number(cfg.llm_request_timeout_minutes || 5),
-            whisper_cpp_model: cfg.whisper_cpp_model || "large-v3-turbo",
-            whisper_cpp_backend: cfg.whisper_cpp_backend || "auto",
-            crisp_asr_model: cfg.crisp_asr_model || "nemotron-3.5-asr-0.6b-q8_0",
-            crisp_asr_backend: cfg.crisp_asr_backend || "auto",
-            ollama_model: cfg.ollama_model || "phi4-mini",
-            ollama_host: cfg.ollama_host || "http://localhost:11434",
-            custom_devices: cfg.custom_devices || [],
-            transcription_prompt: cfg.transcription_prompt || "",
-            summarization_prompt: cfg.summarization_prompt || "",
-            title_prompt: cfg.title_prompt || ""
-        }
-        controller.saveSettings(JSON.stringify(c), false)
+    function patch(values) {
+        controller.saveSettings(JSON.stringify(values), true)
     }
     function qualityIndex(value) {
-        var values = ["low", "medium", "high", "very_high"]
-        var i = values.indexOf(value)
-        return i < 0 ? 2 : i
+        for (var i = 0; i < qualities.length; i += 1)
+            if (qualities[i].value === value) return i
+        return 2
     }
 
     Component.onCompleted: readData()
     property Connections settingsConnection: Connections {
-        target: controller
+        target: root.controller
         function onSettings_jsonChanged() { root.readData() }
     }
     property FolderDialog folderDialog: FolderDialog {
         title: "Choose output folder"
-        onAccepted: outputFolder.text = selectedFolder.toLocalFile()
+        onAccepted: {
+            var path = decodeURIComponent(String(selectedFolder).replace(/^file:\/\//, ""))
+            outputFolder.text = path
+            root.patch({ output_folder: path })
+        }
+    }
+
+    component SettingSwitch: AppSwitch {
+        property string key: ""
+        property bool defaultValue: false
+        Layout.fillWidth: true
+        checked: root.cfg[key] === undefined ? defaultValue : !!root.cfg[key]
+        onToggled: {
+            var p = {}
+            p[key] = checked
+            root.patch(p)
+        }
     }
 
     Flickable {
+        id: flick
         anchors.fill: parent
         contentWidth: width
-        contentHeight: column.implicitHeight
+        contentHeight: column.implicitHeight + 8
         clip: true
-        ScrollBar.vertical: ScrollBar {}
+        boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.vertical: ScrollBar { policy: flick.contentHeight > flick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
         ColumnLayout {
             id: column
-            width: root.width
+            width: flick.width - 14
             spacing: 14
             AppCard {
                 Layout.fillWidth: true
-                ColumnLayout {
-                    spacing: 6
-                    Label { text: "Recording"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
-                    AppSwitch { id: autostart; text: "Start daemon with the desktop"; checked: root.cfg.start_at_startup || false; Layout.fillWidth: true }
-                    AppSwitch { id: callDetection; text: "Detect calls and notify me"; checked: root.cfg.call_detection_enabled || false; Layout.fillWidth: true }
-                    AppSwitch { id: autoTitle; text: "Generate meeting titles automatically"; checked: root.cfg.auto_title !== false; Layout.fillWidth: true }
-                    AppSwitch { id: autoProcess; text: "Automatically transcribe and summarize after stopping"; checked: root.cfg.auto_process_enabled !== false; Layout.fillWidth: true }
-                    AppSwitch { id: countdown; text: "Show processing countdown"; checked: root.cfg.processing_countdown_enabled || false; Layout.fillWidth: true }
-                    AppSwitch { id: recordingPill; text: "Show mini recording pill while recording"; checked: root.cfg.show_recording_pill !== false; Layout.fillWidth: true }
-                    AppSwitch { id: lowMemory; text: "Low memory mode (exit window when closed)"; checked: root.cfg.low_memory_mode || false; Layout.fillWidth: true }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 6
-                        spacing: 10
-                        Label { text: "Quality"; color: Theme.textSecondary; Layout.preferredWidth: 120 }
-                        AppComboBox { id: quality; model: ["low", "medium", "high", "very_high"]; currentIndex: root.qualityIndex(root.cfg.recording_quality || "high"); Layout.fillWidth: true }
-                    }
-                }
+                Label { text: "After recording"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                SettingSwitch { key: "auto_process_enabled"; defaultValue: true; text: "Transcribe and summarize automatically when a recording stops" }
+                SettingSwitch { key: "auto_title"; defaultValue: true; text: "Name meetings automatically from their notes" }
+                SettingSwitch { key: "processing_countdown_enabled"; text: "Wait a few seconds before processing (time to cancel)" }
             }
             AppCard {
                 Layout.fillWidth: true
-                ColumnLayout {
+                Label { text: "Recording"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                RowLayout {
+                    Layout.fillWidth: true
                     spacing: 10
-                    Label { text: "Storage"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
-                    RowLayout {
+                    Label { text: "Audio quality"; color: Theme.textSecondary; font.pixelSize: 12; Layout.preferredWidth: 110 }
+                    AppComboBox {
                         Layout.fillWidth: true
-                        spacing: 8
-                        AppField { id: outputFolder; label: "Default output folder"; text: root.cfg.output_folder || "~/meetings"; Layout.fillWidth: true }
-                        AppButton { text: "Browse"; variant: "secondary"; Layout.alignment: Qt.AlignBottom; onClicked: folderDialog.open() }
-                    }
-                    Label { text: "Recordings remain on disk when the UI or daemon is upgraded."; color: Theme.textMuted; font.pixelSize: 12 }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Item { Layout.fillWidth: true }
-                        AppButton { text: "Save general settings"; onClicked: root.save() }
+                        model: root.qualities.map(function(q) { return q.label })
+                        currentIndex: root.qualityIndex(root.cfg.recording_quality || "high")
+                        onActivated: function(i) { root.patch({ recording_quality: root.qualities[i].value }) }
                     }
                 }
+                SettingSwitch { key: "show_recording_pill"; defaultValue: true; text: "Show the floating recording pill" }
+                SettingSwitch { key: "call_detection_enabled"; text: "Notify me when a call starts using the microphone" }
             }
+            AppCard {
+                Layout.fillWidth: true
+                Label { text: "Storage"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    AppField {
+                        id: outputFolder
+                        Layout.fillWidth: true
+                        label: "Recordings folder"
+                        text: root.cfg.output_folder || "~/meetings"
+                        onEditingFinished: if (text.trim().length > 0 && text.trim() !== root.cfg.output_folder) root.patch({ output_folder: text.trim() })
+                    }
+                    AppButton { text: "Browse…"; variant: "secondary"; Layout.alignment: Qt.AlignBottom; onClicked: root.folderDialog.open() }
+                }
+                Label { text: "Each meeting gets its own folder with recording.mp3, transcript.md and notes.md."; color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            }
+            AppCard {
+                Layout.fillWidth: true
+                Label { text: "Background"; color: Theme.textPrimary; font.pixelSize: 16; font.bold: true }
+                SettingSwitch { key: "start_at_startup"; text: "Start GravaAI when I log in" }
+                SettingSwitch { key: "low_memory_mode"; text: "Low memory mode (fully close the window instead of hiding it)" }
+            }
+            Label { text: "Changes are saved automatically."; color: Theme.textDim; font.pixelSize: 11 }
         }
     }
 }

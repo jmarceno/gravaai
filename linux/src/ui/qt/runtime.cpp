@@ -26,6 +26,11 @@ bool gravaai_qt_load_engine(QQmlApplicationEngine &engine, const QUrl &url) {
             Q_UNUSED(engine);
         },
         Qt::DirectConnection);
+    // The CXX-Qt module is embedded under the `:/qt/qml` resource prefix,
+    // which only became a default QML import path in Qt 6.5. Without this,
+    // Qt 6.4 (Ubuntu 24.04 / Pop!_OS) finds no module qmldir and every
+    // component in qml/components and qml/pages is "not a type".
+    engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     engine.load(url);
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "GravaAI: QML engine produced no root object for" << url;

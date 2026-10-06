@@ -171,7 +171,16 @@ copy_plugin() {
   install -Dm755 "$source" "$STAGE_APPDIR/usr/plugins/$relative"
 }
 copy_plugin platforms/libqxcb.so
-copy_plugin platforms/libqwayland.so
+# Qt >= 6.7 ships one `libqwayland.so`; older Qt (e.g. 6.4) splits it into
+# `libqwayland-egl.so` + `libqwayland-generic.so`. Bundle whichever exists.
+wayland_platforms=0
+for plugin in libqwayland.so libqwayland-egl.so libqwayland-generic.so; do
+  if [[ -f "$QT_PLUGINS/platforms/$plugin" ]]; then
+    copy_plugin "platforms/$plugin"
+    wayland_platforms=$((wayland_platforms + 1))
+  fi
+done
+(( wayland_platforms > 0 )) || { echo "Required Qt plugin missing: Wayland platform plugin" >&2; exit 1; }
 copy_plugin platforms/libqoffscreen.so
 copy_plugin imageformats/libqsvg.so
 copy_plugin iconengines/libqsvgicon.so
@@ -275,7 +284,9 @@ bundle_deps "$STAGE_APPDIR/usr/libexec/$APP_NAME/$APP_NAME-ui"
 # that can capture from Pulse, and its sibling ffprobe.
 FFMPEG_SRC=""
 while IFS= read -r candidate; do
-  if "$candidate" -hide_banner -formats 2>/dev/null | grep -Eq '^ D.? +pulse '; then
+  # Capture first: `ffmpeg | grep -q` trips pipefail via SIGPIPE.
+  formats="$("$candidate" -hide_banner -formats 2>/dev/null || true)"
+  if grep -Eq '^ D.? +pulse ' <<<"$formats"; then
     FFMPEG_SRC="$candidate"
     break
   fi
@@ -303,6 +314,8 @@ done
 for plugin in \
   "$STAGE_APPDIR/usr/plugins/platforms/libqxcb.so" \
   "$STAGE_APPDIR/usr/plugins/platforms/libqwayland.so" \
+  "$STAGE_APPDIR/usr/plugins/platforms/libqwayland-egl.so" \
+  "$STAGE_APPDIR/usr/plugins/platforms/libqwayland-generic.so" \
   "$STAGE_APPDIR/usr/plugins/platforms/libqoffscreen.so" \
   "$STAGE_APPDIR/usr/plugins/imageformats/libqsvg.so" \
   "$STAGE_APPDIR/usr/plugins/iconengines/libqsvgicon.so" \

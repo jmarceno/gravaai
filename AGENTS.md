@@ -83,6 +83,15 @@ The script bundles the first `ffmpeg` on `PATH` that has the `pulse` demuxer
 johnvansickle's in `/usr/local/bin` cannot capture from PulseAudio/PipeWire,
 and bundling one ships an app that cannot record.
 
+Qt 6.4 (Ubuntu 24.04 / Pop!_OS) is a supported build Qt: the root loader adds
+`qrc:/qt/qml` as an import path (it only became a default in Qt 6.5; without
+it the embedded module's qmldir is not found and every component is "not a
+type"), and the script bundles either Qt ≥ 6.7's `libqwayland.so` or Qt 6.4's
+`libqwayland-egl.so` + `libqwayland-generic.so`. Building locally needs the
+QML packages `qml6-module-qtcore` and `qml6-module-qtquick-dialogs`. The
+script uses the staged Qt's `qmlimportscanner` (`qmake6 -query
+QT_INSTALL_LIBEXECS`) instead of a qtchooser shim.
+
 ### Host IDE AppImages (Cursor / OpenCode) — always check `APPIMAGE` / `APPDIR`
 
 Agent sessions often run **inside** another AppImage:

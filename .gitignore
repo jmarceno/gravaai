@@ -5,10 +5,8 @@ target/
 build/
 dist/
 
-# AppImage build scratch
-linux/packaging/appimage/out/
-linux/packaging/appimage/.tools/
-*.AppImage
+# Portable release artifacts
+*.run
 
 # Logs
 *.log

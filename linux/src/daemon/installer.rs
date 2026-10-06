@@ -170,7 +170,7 @@ impl InstallLauncher {
     }
 
     pub fn launch(&self, key: String, spec_json: &str) {
-        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
+        // Share the daemon's portable extraction tree — do not re-exec $GRAVAAI_PORTABLE_EXE.
         let exe = crate::utils::exe::internal_exe();
         let spec_json = spec_json.to_string();
         let tx = self.tx.clone();

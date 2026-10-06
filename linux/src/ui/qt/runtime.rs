@@ -4,6 +4,11 @@
 mod ffi {
     unsafe extern "C++" {
         include!("src/ui/qt/runtime.h");
+        include!("cxx-qt-lib/qguiapplication.h");
+        type QGuiApplication = cxx_qt_lib::QGuiApplication;
+        include!("cxx-qt-lib/core/qvector/qvector_QByteArray.h");
+        type QVector_QByteArray = cxx_qt_lib::QVector<cxx_qt_lib::QByteArray>;
+        fn gravaai_qt_application(args: &QVector_QByteArray) -> UniquePtr<QGuiApplication>;
 
         include!("cxx-qt-lib/qqmlapplicationengine.h");
         type QQmlApplicationEngine = cxx_qt_lib::QQmlApplicationEngine;
@@ -35,4 +40,14 @@ pub fn load_engine(
 
 pub fn request_exit(code: i32) {
     ffi::gravaai_qt_exit(code);
+}
+
+/// Preserve argv for Qt's lifetime, including offscreen smoke arguments.
+pub fn application() -> cxx::UniquePtr<cxx_qt_lib::QGuiApplication> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut args = cxx_qt_lib::QVector::<cxx_qt_lib::QByteArray>::default();
+    for arg in std::env::args_os() {
+        args.append(cxx_qt_lib::QByteArray::from(arg.as_bytes()));
+    }
+    ffi::gravaai_qt_application(&args)
 }

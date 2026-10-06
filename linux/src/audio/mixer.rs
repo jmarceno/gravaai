@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use super::devices::AudioSource;
+
 /// Loudness normalization applied to every recorded channel.
 ///
 /// `speechnorm` is a causal speech normalizer (a sample-recursive peak
@@ -58,12 +60,16 @@ pub fn build_ffmpeg_command(
         // filter/encode thread; without it ffmpeg silently drops audio.
         "-thread_queue_size".into(),
         "4096".into(),
+        "-fragment_size".into(),
+        "1024".into(),
         "-f".into(),
         "pulse".into(),
         "-i".into(),
         source.into(),
         "-thread_queue_size".into(),
         "4096".into(),
+        "-fragment_size".into(),
+        "1024".into(),
         "-f".into(),
         "pulse".into(),
         "-i".into(),
@@ -95,12 +101,14 @@ pub fn build_ffmpeg_command_mic_only(
         "-y".into(),
         "-thread_queue_size".into(),
         "4096".into(),
+        "-fragment_size".into(),
+        "1024".into(),
         "-f".into(),
         "pulse".into(),
         "-i".into(),
         source.into(),
         "-af".into(),
-        format!("highpass=f=80,{NORMALIZE}"),
+        format!("{MONO},highpass=f=80,{NORMALIZE},pan=stereo|c0=c0|c1=0*c0"),
         "-acodec".into(),
         "libmp3lame".into(),
         "-q:a".into(),
@@ -109,17 +117,12 @@ pub fn build_ffmpeg_command_mic_only(
     ]
 }
 
-/// Build ffmpeg command recording an arbitrary Custom-mode source list.
-///
-/// Every input is a PulseAudio/PipeWire source (microphones and/or sink
-/// monitors) normalized independently like the fixed modes:
-/// - 1 source: single input with the mic-only filter.
-/// - 2 sources: `amerge`d into a stereo file (left = first selected).
-/// - 3+ sources: mixed down with `amix` and forced to stereo — MP3 has no
-///   discrete multichannel layout, so a raw N-channel `amerge` would not
-///   encode. Callers guarantee a non-empty list.
+/// Record every selected source with microphones on the left and system
+/// monitors on the right, regardless of selection order. Multiple sources
+/// within one role are mixed only into that role's channel. A missing role
+/// gets silence, so diarization never mistakes a monitor-only capture for mic.
 pub fn build_ffmpeg_command_multi(
-    sources: &[String],
+    sources: &[AudioSource],
     output_path: &Path,
     quality: &str,
 ) -> Vec<String> {
@@ -135,41 +138,55 @@ pub fn build_ffmpeg_command_multi(
         cmd.extend([
             "-thread_queue_size".to_string(),
             "4096".into(),
+            "-fragment_size".into(),
+            "1024".into(),
             "-f".into(),
             "pulse".into(),
             "-i".into(),
-            source.clone(),
+            source.name.clone(),
         ]);
     }
-    if sources.len() == 1 {
-        cmd.extend(["-af".to_string(), format!("highpass=f=80,{NORMALIZE}")]);
-    } else {
-        let mut filter = String::new();
-        for (i, _) in sources.iter().enumerate() {
-            if sources.len() == 2 {
-                filter.push_str(&format!("[{i}:a]{MONO},highpass=f=80,{NORMALIZE}[a{i}];"));
-            } else {
-                filter.push_str(&format!("[{i}:a]highpass=f=80,{NORMALIZE}[a{i}];"));
-            }
-        }
-        if sources.len() == 2 {
-            filter.push_str(&format!("[a0][a1]{STEREO_PAIR}[out]"));
+    let mut filter = String::new();
+    let mut microphones = Vec::new();
+    let mut monitors = Vec::new();
+    for (index, source) in sources.iter().enumerate() {
+        filter.push_str(&format!(
+            "[{index}:a]{MONO},highpass=f=80,{NORMALIZE}[a{index}];"
+        ));
+        if source.is_monitor {
+            monitors.push(index);
         } else {
-            let mixed: String = (0..sources.len()).map(|i| format!("[a{i}]")).collect();
-            filter.push_str(&format!(
-                "{mixed}amix=inputs={}:duration=longest:dropout_transition=0:normalize=0[mix]",
-                sources.len()
-            ));
-        }
-        let out_label = if sources.len() == 2 { "[out]" } else { "[mix]" };
-        cmd.extend(["-filter_complex".to_string(), filter]);
-        cmd.extend(["-map".to_string(), out_label.to_string()]);
-        if sources.len() > 2 {
-            // The amix output channel count follows its inputs; pin stereo so
-            // libmp3lame always receives an encodable layout.
-            cmd.extend(["-ac".to_string(), "2".to_string()]);
+            microphones.push(index);
         }
     }
+    let mut group = |indices: &[usize], label: &str| {
+        if indices.is_empty() {
+            return;
+        }
+        let inputs: String = indices.iter().map(|index| format!("[a{index}]")).collect();
+        if indices.len() == 1 {
+            filter.push_str(&format!("{inputs}anull[{label}];"));
+        } else {
+            filter.push_str(&format!(
+                "{inputs}amix=inputs={}:duration=longest:dropout_transition=0:normalize=1[{label}];",
+                indices.len()
+            ));
+        }
+    };
+    group(&microphones, "mic");
+    group(&monitors, "sys");
+    match (microphones.is_empty(), monitors.is_empty()) {
+        (false, false) => filter.push_str(&format!("[mic][sys]{STEREO_PAIR}[out]")),
+        (false, true) => filter.push_str("[mic]pan=stereo|c0=c0|c1=0*c0[out]"),
+        (true, false) => filter.push_str("[sys]pan=stereo|c0=0*c0|c1=c0[out]"),
+        (true, true) => unreachable!("recording requires at least one source"),
+    }
+    cmd.extend([
+        "-filter_complex".into(),
+        filter,
+        "-map".into(),
+        "[out]".into(),
+    ]);
     cmd.extend([
         "-acodec".to_string(),
         "libmp3lame".into(),
@@ -183,6 +200,23 @@ pub fn build_ffmpeg_command_multi(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pulse_inputs_use_small_fragments_for_short_recordings() {
+        // The default fragment on FFmpeg 4.4 can buffer seconds of capture.
+        // SIGTERM then leaves a short recording with only an MP3 header.
+        let sources = audio_sources(&["mic", "sink.monitor", "extra"]);
+        for cmd in [
+            build_ffmpeg_command("mic", "monitor", Path::new("out.mp3"), "2"),
+            build_ffmpeg_command_mic_only("mic", Path::new("out.mp3"), "2"),
+            build_ffmpeg_command_multi(&sources, Path::new("out.mp3"), "2"),
+        ] {
+            for (index, arg) in cmd.iter().enumerate() {
+                if arg == "-f" && cmd[index + 1] == "pulse" {
+                    assert_eq!(&cmd[index - 2..index], ["-fragment_size", "1024"]);
+                }
+            }
+        }
+    }
     use std::path::PathBuf;
 
     #[test]
@@ -221,15 +255,22 @@ mod tests {
             .position(|a| a == "-af")
             .and_then(|i| cmd.get(i + 1))
             .unwrap();
-        assert_eq!(af, "highpass=f=80,speechnorm=e=10:l=1");
+        assert_eq!(af, "aformat=channel_layouts=mono,highpass=f=80,speechnorm=e=10:l=1,pan=stereo|c0=c0|c1=0*c0");
+    }
+
+    fn audio_sources(names: &[&str]) -> Vec<AudioSource> {
+        names
+            .iter()
+            .map(|name| AudioSource {
+                name: (*name).into(),
+                description: String::new(),
+                is_monitor: name.ends_with(".monitor"),
+            })
+            .collect()
     }
 
     fn multi(sources: &[&str]) -> Vec<String> {
-        build_ffmpeg_command_multi(
-            &sources.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
-            &PathBuf::from("o.mp3"),
-            "5",
-        )
+        build_ffmpeg_command_multi(&audio_sources(sources), &PathBuf::from("o.mp3"), "5")
     }
 
     fn filter_of(cmd: &[String]) -> &str {
@@ -238,60 +279,47 @@ mod tests {
     }
 
     #[test]
-    fn multi_single_source_matches_mic_only_shape() {
-        let cmd = multi(&["mic"]);
-        assert_eq!(cmd.iter().filter(|a| *a == "-i").count(), 1);
-        assert!(cmd.contains(&"mic".to_string()));
-        assert!(!cmd.contains(&"-filter_complex".to_string()));
-        let af = cmd
-            .iter()
-            .position(|a| a == "-af")
-            .and_then(|i| cmd.get(i + 1))
-            .unwrap();
-        assert!(af.contains("highpass=f=80"));
-        assert!(af.contains("speechnorm"));
+    fn single_role_keeps_the_other_channel_silent() {
+        let mic = multi(&["mic"]);
+        assert!(filter_of(&mic).ends_with("[mic]pan=stereo|c0=c0|c1=0*c0[out]"));
+        let system = multi(&["sink.monitor"]);
+        assert!(filter_of(&system).ends_with("[sys]pan=stereo|c0=0*c0|c1=c0[out]"));
+    }
+
+    #[test]
+    fn monitor_first_still_maps_microphone_left() {
+        let cmd = multi(&["sink.monitor", "mic"]);
+        let filter = filter_of(&cmd);
+        assert!(filter.contains("[a1]anull[mic]"));
+        assert!(filter.contains("[a0]anull[sys]"));
+        assert!(filter.ends_with("[mic][sys]amerge=inputs=2,pan=stereo|c0=c0|c1=c1[out]"));
+        assert_eq!(filter.matches(MONO).count(), 2);
+    }
+
+    #[test]
+    fn multiple_sources_mix_only_within_their_role() {
+        let cmd = multi(&["sink.monitor", "mic1", "other.monitor", "mic2"]);
+        let filter = filter_of(&cmd);
+        assert!(filter.contains(
+            "[a1][a3]amix=inputs=2:duration=longest:dropout_transition=0:normalize=1[mic]"
+        ));
+        assert!(filter.contains(
+            "[a0][a2]amix=inputs=2:duration=longest:dropout_transition=0:normalize=1[sys]"
+        ));
+        assert!(filter.ends_with("[mic][sys]amerge=inputs=2,pan=stereo|c0=c0|c1=c1[out]"));
+        assert_eq!(filter.matches(MONO).count(), 4);
         assert_eq!(cmd.last().unwrap(), "o.mp3");
     }
 
     #[test]
-    fn multi_two_sources_merge_to_stereo() {
-        let cmd = multi(&["mic", "sink.monitor"]);
-        assert_eq!(cmd.iter().filter(|a| *a == "-i").count(), 2);
-        let filter = filter_of(&cmd);
-        assert!(filter.contains("[0:a]aformat=channel_layouts=mono,highpass=f=80,speechnorm"));
-        assert!(filter.contains("[1:a]aformat=channel_layouts=mono,highpass=f=80,speechnorm"));
-        assert!(filter.ends_with("[a0][a1]amerge=inputs=2,pan=stereo|c0=c0|c1=c1[out]"));
-        // Each side is mono before the merge so the pair stays separated.
-        assert_eq!(filter.matches("aformat=channel_layouts=mono").count(), 2);
-        let map = cmd
-            .iter()
-            .position(|a| a == "-map")
-            .and_then(|i| cmd.get(i + 1))
-            .unwrap();
-        assert_eq!(map, "[out]");
-        // No forced channel count for the stereo merge.
-        assert!(!cmd.contains(&"-ac".to_string()));
-    }
-
-    #[test]
-    fn multi_three_sources_mix_down_to_stereo() {
-        let cmd = multi(&["mic1", "mic2", "sink.monitor"]);
-        assert_eq!(cmd.iter().filter(|a| *a == "-i").count(), 3);
-        let filter = filter_of(&cmd);
-        assert!(filter.contains("[a0][a1][a2]amix=inputs=3"));
-        let map = cmd
-            .iter()
-            .position(|a| a == "-map")
-            .and_then(|i| cmd.get(i + 1))
-            .unwrap();
-        assert_eq!(map, "[mix]");
-        let ac = cmd
-            .iter()
-            .position(|a| a == "-ac")
-            .and_then(|i| cmd.get(i + 1))
-            .unwrap();
-        assert_eq!(ac, "2");
-        assert_eq!(cmd.last().unwrap(), "o.mp3");
+    fn monitor_role_uses_metadata_even_without_monitor_suffix() {
+        let sources = [AudioSource {
+            name: "custom-loopback".into(),
+            description: String::new(),
+            is_monitor: true,
+        }];
+        let cmd = build_ffmpeg_command_multi(&sources, Path::new("o.mp3"), "5");
+        assert!(filter_of(&cmd).ends_with("[sys]pan=stereo|c0=0*c0|c1=c0[out]"));
     }
 
     #[test]

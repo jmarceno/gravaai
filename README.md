@@ -70,21 +70,30 @@ copied into a new meeting folder and processed like a recording.
 
 ## Installation
 
-Download `gravaai-<version>-<arch>.AppImage` from the
-[Releases](../../releases) page, make it executable, and run it — that single
-file is the whole app:
+Download `GravaAi-<version>-<arch>-portable.run` from the
+[Releases](../../releases) page. This single file contains both executables,
+Qt/QML, audio helpers and their shared-library dependencies:
 
 ```bash
-chmod +x gravaai-*-x86_64.AppImage
-./gravaai-*-x86_64.AppImage
+chmod +x GravaAi-*-x86_64-portable.run
+./GravaAi-*-x86_64-portable.run install
+./GravaAi-*-x86_64-portable.run
 ```
 
-The AppImage bundles FFmpeg, Qt and everything else the app needs, so there is
-nothing else to install. Optionally move it somewhere on your `PATH` (e.g.
-`~/.local/bin/`) or use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher)
-so it shows up in your application menu.
+`install` writes the menu entry pointing at the stable launcher. Keep the file
+at that location; `install --autostart` also enables login startup. Maintainers
+can use `./scripts/install.sh` to atomically install the latest bundle at
+`~/.local/bin/gravaai`. Existing config, API keys, model installs and recordings
+are preserved. Reinstall refreshes the menu and any enabled login entry.
 
-**Requirements:** Linux (x86_64 or arm64) with a graphical session, an audio
+The release container uses Ubuntu 22.04 (glibc 2.35). The daemon and Rust dependencies are
+statically linked (musl); Qt and its plugins stay dynamically linked and are bundled
+with their full library closure, plus fallback fonts for minimal environments.
+No system packages or compilation are needed
+on the target desktop. Rendering defaults to software; an explicit
+`QT_QUICK_BACKEND` or `QSG_RHI_BACKEND` overrides it.
+
+**Requirements:** Linux (x86_64 or arm64), glibc 2.35 or newer, a graphical session, an audio
 server (PipeWire/PulseAudio) and a system tray. [GNOME needs the
 AppIndicator/KStatusNotifierItem extension](#gnome-notes) for the tray icon.
 
@@ -92,10 +101,10 @@ AppIndicator/KStatusNotifierItem extension](#gnome-notes) for the tray icon.
 the base download — you install exactly what you want, when you want it, from
 **Settings → Models**. Nothing runs or downloads until you choose it.
 
-To uninstall, remove the AppImage file and run:
+To uninstall, run:
 
 ```bash
-./gravaai-*.AppImage --uninstall
+./GravaAi-*-portable.run --uninstall
 ```
 
 This removes desktop entries, icons, autostart, downloaded engines and models,
@@ -136,8 +145,13 @@ otherwise.
 | Mode | What is captured | When to use |
 |------|-----------------|-------------|
 | **Mic + system** | Microphone (left channel) + system audio (right channel) | You're wearing headphones — no echo risk; transcripts label "Me" vs "Remote" |
-| **Mic only** | Microphone only | Laptop speakers — avoids loopback echo |
-| **Custom** | Every audio device you select | Multiple microphones or non-standard setups |
+| **Mic only** | Microphone on the left; right channel silent | Laptop speakers — avoids loopback echo |
+| **Custom** | Selected microphones on the left; system monitors on the right | Multiple microphones or non-standard setups |
+
+Multiple Custom sources are mixed only within their own role. Microphone and
+system channels stay separate through pause/resume and the stereo WAV sent to
+Whisper. Whisper uses these channels to label "Me" and "Remote"; recognition
+accuracy still depends on the audio and model.
 
 ## Settings overview
 
@@ -207,8 +221,10 @@ cargo build --release --manifest-path linux/Cargo.toml --no-default-features --b
 cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
 ./linux/target/release/gravaai
 
-# Pack a local AppImage:
-./linux/packaging/appimage/build-appimage.sh
+# Build and verify the portable release:
+./scripts/build-portable.sh --container
+./scripts/smoke-portable.sh build/portable/*-portable.run
+./scripts/install.sh
 ```
 
 ## License

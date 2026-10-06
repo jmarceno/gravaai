@@ -57,3 +57,16 @@ impl Default for KeyringStore {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn credentials_use_persistent_secret_service_backend() {
+        // Constructing an entry performs no bus I/O and stores no secret.
+        // A missing feature silently selects an ephemeral mock backend.
+        let entry = keyring::Entry::new("gravaai-test", "backend-only").unwrap();
+        assert!(entry
+            .get_credential()
+            .is::<keyring::secret_service::SsCredential>());
+    }
+}

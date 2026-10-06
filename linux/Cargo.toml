@@ -37,7 +37,7 @@ png = "0.17"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1"
-keyring = "3"
+keyring = { version = "3", features = ["async-secret-service", "async-io", "crypto-rust"] }
 tempfile = "3"
 cxx = { version = "=1.0.176", optional = true }
 cxx-qt = { version = "=0.10.0", optional = true }

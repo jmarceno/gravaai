@@ -29,27 +29,35 @@ pub fn plan(home: &Path, state_dir: &Path) -> Vec<PathBuf> {
     targets.push(home.join(".local/bin").join(APP_DIR_NAME));
     // App data: tray artwork, icons copy, whisper.cpp engine + models, logs.
     targets.push(home.join(".local/share").join(APP_DIR_NAME));
-    // Desktop entries.
-    let apps = home.join(".local/share/applications");
-    targets.push(apps.join(format!("{APP_ID}.desktop")));
-    targets.push(apps.join(format!("{APP_DIR_NAME}.desktop")));
+    targets.extend(integration_targets(
+        &home.join(".local/share"),
+        &home.join(".cache"),
+    ));
     // Autostart entry.
     targets.push(
         home.join(".config/autostart")
             .join(format!("{APP_DIR_NAME}.desktop")),
     );
-    // Hicolor icons.
-    let theme = home.join(".local/share/icons/hicolor");
-    for size in ICON_SIZES {
-        let dir = theme.join(format!("{size}x{size}/apps"));
-        targets.push(dir.join(format!("{APP_DIR_NAME}.png")));
-    }
-    let scalable = theme.join("scalable/apps");
-    targets.push(scalable.join(format!("{APP_DIR_NAME}.svg")));
     // Config (incl. plaintext API key when no keyring is in use).
     targets.push(home.join(".config").join(APP_DIR_NAME));
     // Job/state dir.
     targets.push(state_dir.to_path_buf());
+    targets
+}
+
+/// Portable integration respects custom XDG data/cache directories too.
+fn integration_targets(data: &Path, cache: &Path) -> Vec<PathBuf> {
+    let mut targets = vec![
+        data.join(format!("applications/{APP_ID}.desktop")),
+        data.join(format!("applications/{APP_DIR_NAME}.desktop")),
+        cache.join("gravaai-portable"),
+    ];
+    for size in ICON_SIZES {
+        targets.push(data.join(format!(
+            "icons/hicolor/{size}x{size}/apps/{APP_DIR_NAME}.png"
+        )));
+    }
+    targets.push(data.join(format!("icons/hicolor/scalable/apps/{APP_DIR_NAME}.svg")));
     targets
 }
 
@@ -211,17 +219,20 @@ fn stop_running(exe: &Path) {
 /// individual misses are reported, never fatal.
 pub fn run_uninstall() -> i32 {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-    // Prefer our own AppImage file (never a host IDE's APPIMAGE). The mounted
-    // squashfs binary is not deletable; removing the .AppImage is.
-    let exe = crate::utils::exe::own_appimage().unwrap_or_else(|| {
-        std::env::current_exe().unwrap_or_else(|_| home.join(".local/bin").join(APP_DIR_NAME))
-    });
+    let exe = crate::utils::exe::persistent_exe();
 
     println!("Stopping {APP_DIR_NAME}…");
     stop_running(&exe);
 
     let state_dir = default_state_dir();
-    let removed = remove_all(&home, &state_dir, &exe);
+    let mut removed = remove_all(&home, &state_dir, &exe);
+    if let (Some(data), Some(cache)) = (dirs::data_local_dir(), dirs::cache_dir()) {
+        for path in integration_targets(&data, &cache) {
+            if remove_path(&path) {
+                removed.push(path);
+            }
+        }
+    }
     for path in &removed {
         println!("Removed {}", path.display());
     }
@@ -251,6 +262,19 @@ mod tests {
     }
 
     #[test]
+    fn integration_targets_cover_custom_xdg_locations() {
+        let data = Path::new("/custom/data");
+        let cache = Path::new("/custom/cache");
+        let targets = integration_targets(data, cache);
+        assert!(targets.contains(&data.join(format!("applications/{APP_ID}.desktop"))));
+        assert!(targets.contains(&cache.join("gravaai-portable")));
+        assert!(targets
+            .iter()
+            .all(|p| p.starts_with(data) || p.starts_with(cache)));
+        assert!(!targets.iter().any(|p| p.ends_with("recordings")));
+    }
+
+    #[test]
     fn plan_covers_install_artifacts() {
         let home = PathBuf::from("/home/tester");
         let state = PathBuf::from(format!("/home/tester/.local/state/{APP_DIR_NAME}"));
@@ -268,6 +292,7 @@ mod tests {
         assert!(has(&format!(".local/share/{APP_DIR_NAME}")));
         assert!(has(&format!(".config/{APP_DIR_NAME}")));
         assert!(targets.contains(&state));
+        assert!(targets.contains(&home.join(".cache/gravaai-portable")));
     }
 
     #[test]

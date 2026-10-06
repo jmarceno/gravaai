@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
+import Qt.labs.platform as Platform
 import io.github.jmarceno.gravaai
 
 Item {
@@ -35,10 +35,10 @@ Item {
         target: root.controller
         function onSettings_jsonChanged() { root.readData() }
     }
-    property FolderDialog folderDialog: FolderDialog {
+    property Platform.FolderDialog folderDialog: Platform.FolderDialog {
         title: "Choose output folder"
         onAccepted: {
-            var path = decodeURIComponent(String(selectedFolder).replace(/^file:\/\//, ""))
+            var path = decodeURIComponent(String(folder).replace(/^file:\/\//, ""))
             outputFolder.text = path
             root.patch({ output_folder: path })
         }

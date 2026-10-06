@@ -234,12 +234,13 @@ impl<R: RecorderBackend> RecordingController<R> {
             self.runner.submit(
                 move || {
                     recorder.stop();
-                    inner.lock().unwrap().stop_done = true;
-                    (cbs.lock().unwrap().on_stopped)();
                     Ok(())
                 },
                 "stop recorder",
-                None::<fn(())>,
+                Some(move |_| {
+                    inner.lock().unwrap().stop_done = true;
+                    (cbs.lock().unwrap().on_stopped)();
+                }),
                 None::<fn(anyhow::Error)>,
             );
         }
@@ -492,6 +493,24 @@ mod tests {
             output_folder: path,
             ..Config::default()
         }
+    }
+
+    #[test]
+    fn stop_completion_runs_through_owner_scheduler() {
+        let (mut controller, events) = harness(false);
+        let (tx, rx) = mpsc::channel::<crate::core::task_runner::MainCallback>();
+        controller.runner = TaskRunner::new(Some(std::sync::Arc::new(move |cb| {
+            tx.send(cb).unwrap();
+        })));
+        controller.start(&test_cfg(), "headphones", None);
+        controller.backend_start().unwrap();
+        controller.stop(false);
+        let completion = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(!controller.stop_finished());
+        assert!(events.stopped.try_recv().is_err());
+        completion();
+        assert!(controller.stop_finished());
+        events.stopped.recv_timeout(Duration::from_secs(2)).unwrap();
     }
 
     #[test]

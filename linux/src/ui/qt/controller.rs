@@ -656,12 +656,14 @@ async fn open_path(path: &str, tx: &Sender<Event>) {
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
-        // System openers link Qt/glib themselves; inheriting the AppImage's
+        // System openers link Qt/glib themselves; inheriting the portable bundle's
         // bundled libraries makes them crash instantly, so give them a
-        // clean environment (no-op outside an AppImage).
-        let appdir = crate::utils::exe::own_appdir();
-        cmd.env_clear()
-            .envs(clean_opener_env(std::env::vars_os(), appdir.as_deref()));
+        // clean environment (no-op outside a portable bundle).
+        let portable_root = crate::utils::exe::own_portable_root();
+        cmd.env_clear().envs(clean_opener_env(
+            std::env::vars_os(),
+            portable_root.as_deref(),
+        ));
         match cmd.spawn() {
             Ok(_) => {
                 let _ = tx.send(Event::Toast(format!("Opened {label}.")));
@@ -728,30 +730,42 @@ async fn open_path_via_portal(path: &Path, label: &str, tx: &Sender<Event>) {
 
 /// Pure environment cleaner for desktop-opener child processes (unit-tested).
 ///
-/// When running from an AppImage, AppRun exports `APPDIR`, `LD_LIBRARY_PATH`,
+/// When running from a portable bundle, portable launcher exports `GRAVAAI_PORTABLE_ROOT`, `LD_LIBRARY_PATH`,
 /// `QT_PLUGIN_PATH` and `QML2_IMPORT_PATH` into every process. System openers
 /// (`xdg-open`, `kde-open`, `gio`) link Qt/glib themselves, and an inherited
-/// `LD_LIBRARY_PATH` pointing at the AppImage's bundled libraries makes them
-/// crash instantly — the spawn "succeeds" but nothing ever opens. AppImage
+/// `LD_LIBRARY_PATH` pointing at the portable bundle's bundled libraries makes them
+/// crash instantly — the spawn "succeeds" but nothing ever opens. portable bundle
 /// identity variables are always dropped and any path-list entries inside
-/// `appdir` are stripped; everything else is preserved untouched.
+/// `portable_root` are stripped; everything else is preserved untouched.
 fn clean_opener_env(
     vars: impl IntoIterator<Item = (OsString, OsString)>,
-    appdir: Option<&Path>,
+    portable_root: Option<&Path>,
 ) -> Vec<(OsString, OsString)> {
     vars.into_iter()
         .filter_map(|(key, value)| {
-            if matches!(key.to_str(), Some("APPDIR" | "APPIMAGE" | "OWD" | "ARGV0")) {
+            if matches!(
+                key.to_str(),
+                Some("GRAVAAI_PORTABLE_ROOT" | "GRAVAAI_PORTABLE_EXE")
+            ) {
                 return None;
             }
             let is_path_list = matches!(
                 key.to_str(),
-                Some("LD_LIBRARY_PATH" | "QT_PLUGIN_PATH" | "QML2_IMPORT_PATH" | "XDG_DATA_DIRS")
+                Some(
+                    "LD_LIBRARY_PATH"
+                        | "QT_PLUGIN_PATH"
+                        | "QML2_IMPORT_PATH"
+                        | "QML_IMPORT_PATH"
+                        | "QT_QPA_PLATFORM_PLUGIN_PATH"
+                        | "XDG_DATA_DIRS"
+                        | "FONTCONFIG_FILE"
+                        | "PATH"
+                )
             );
             if !is_path_list {
                 return Some((key, value));
             }
-            let Some(dir) = appdir else {
+            let Some(dir) = portable_root else {
                 return Some((key, value));
             };
             let kept: Vec<_> = std::env::split_paths(&value)
@@ -1645,12 +1659,18 @@ mod tests {
 
     #[test]
     fn install_keys_have_readable_names() {
-        assert_eq!(install_display_name("whisper_cpp_engine"), "whisper.cpp engine");
+        assert_eq!(
+            install_display_name("whisper_cpp_engine"),
+            "whisper.cpp engine"
+        );
         assert_eq!(
             install_display_name("whisper_cpp_model:large-v3-turbo"),
             "whisper.cpp model large-v3-turbo"
         );
-        assert_eq!(install_display_name("ollama_model:phi4-mini"), "Ollama model phi4-mini");
+        assert_eq!(
+            install_display_name("ollama_model:phi4-mini"),
+            "Ollama model phi4-mini"
+        );
         assert_eq!(install_display_name("mystery"), "mystery");
     }
 
@@ -1808,20 +1828,16 @@ mod tests {
     }
 
     #[test]
-    fn opener_env_drops_appimage_identity_vars() {
+    fn opener_env_drops_portable_identity_vars() {
         let vars = vec![
-            ("APPDIR".into(), "/tmp/.mount_x".into()),
-            ("APPIMAGE".into(), "/home/u/GravaAi.AppImage".into()),
-            ("OWD".into(), "/home/u".into()),
-            ("ARGV0".into(), "./GravaAi.AppImage".into()),
+            ("GRAVAAI_PORTABLE_ROOT".into(), "/tmp/.mount_x".into()),
+            ("GRAVAAI_PORTABLE_EXE".into(), "/home/u/GravaAi.run".into()),
             ("HOME".into(), "/home/u".into()),
         ];
         let cleaned = clean_opener_env(vars, Some(Path::new("/tmp/.mount_x")));
         assert!(cleaned.contains(&("HOME".into(), "/home/u".into())));
-        assert!(!cleaned.iter().any(|(k, _)| k == "APPDIR"));
-        assert!(!cleaned.iter().any(|(k, _)| k == "APPIMAGE"));
-        assert!(!cleaned.iter().any(|(k, _)| k == "OWD"));
-        assert!(!cleaned.iter().any(|(k, _)| k == "ARGV0"));
+        assert!(!cleaned.iter().any(|(k, _)| k == "GRAVAAI_PORTABLE_ROOT"));
+        assert!(!cleaned.iter().any(|(k, _)| k == "GRAVAAI_PORTABLE_EXE"));
     }
 
     #[test]
@@ -1834,6 +1850,12 @@ mod tests {
             ),
             ("QT_PLUGIN_PATH".into(), "/tmp/.mount_x/usr/plugins".into()),
             ("QML2_IMPORT_PATH".into(), "/tmp/.mount_x/usr/qml".into()),
+            ("QML_IMPORT_PATH".into(), "/tmp/.mount_x/usr/qml".into()),
+            (
+                "QT_QPA_PLATFORM_PLUGIN_PATH".into(),
+                "/tmp/.mount_x/usr/plugins/platforms".into(),
+            ),
+            ("PATH".into(), "/tmp/.mount_x/usr/bin:/usr/bin".into()),
             (
                 "XDG_DATA_DIRS".into(),
                 "/tmp/.mount_x/usr/share:/usr/share".into(),
@@ -1857,6 +1879,9 @@ mod tests {
         // Only-mount lists are removed entirely rather than left empty.
         assert!(!cleaned.contains_key("QT_PLUGIN_PATH"));
         assert!(!cleaned.contains_key("QML2_IMPORT_PATH"));
+        assert!(!cleaned.contains_key("QML_IMPORT_PATH"));
+        assert!(!cleaned.contains_key("QT_QPA_PLATFORM_PLUGIN_PATH"));
+        assert_eq!(cleaned.get("PATH").map(String::as_str), Some("/usr/bin"));
         assert_eq!(
             cleaned.get("XDG_DATA_DIRS").map(String::as_str),
             Some("/usr/share")
@@ -1864,19 +1889,19 @@ mod tests {
     }
 
     #[test]
-    fn opener_env_untouched_outside_appimage() {
+    fn opener_env_untouched_outside_portable() {
         let vars = vec![
             ("LD_LIBRARY_PATH".into(), "/opt/qt/lib".into()),
-            ("APPDIR".into(), "/cursor-host-mount".into()),
+            ("GRAVAAI_PORTABLE_ROOT".into(), "/cursor-host-mount".into()),
             ("PATH".into(), "/usr/bin".into()),
         ];
         let cleaned = clean_opener_env(vars, None);
         // Foreign path lists are preserved...
         assert!(cleaned.contains(&("LD_LIBRARY_PATH".into(), "/opt/qt/lib".into())));
         assert!(cleaned.contains(&("PATH".into(), "/usr/bin".into())));
-        // ...while AppImage identity variables (e.g. a host IDE's APPDIR)
-        // are dropped even without our own AppImage mount.
-        assert!(!cleaned.iter().any(|(k, _)| k == "APPDIR"));
+        // ...while portable bundle identity variables (e.g. foreign root exports)
+        // are dropped even without our own portable bundle mount.
+        assert!(!cleaned.iter().any(|(k, _)| k == "GRAVAAI_PORTABLE_ROOT"));
     }
 
     #[test]
@@ -1885,6 +1910,6 @@ mod tests {
         assert_eq!(uri, "file:///meetings/2026%2009%2003_a%C3%A7/transcript.md");
         let plain = file_uri(Path::new("/meetings/plain")).unwrap();
         assert_eq!(plain, "file:///meetings/plain");
-        assert!(!file_uri(Path::new("relative/path")).is_some());
+        assert!(file_uri(Path::new("relative/path")).is_none());
     }
 }

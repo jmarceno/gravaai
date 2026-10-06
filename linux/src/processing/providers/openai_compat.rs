@@ -372,7 +372,12 @@ fn parse_timestamp(line: &str) -> Option<(u64, &str)> {
 }
 
 fn format_hms(secs: u64) -> String {
-    format!("{:02}:{:02}:{:02}", secs / 3600, secs % 3600 / 60, secs % 60)
+    format!(
+        "{:02}:{:02}:{:02}",
+        secs / 3600,
+        secs % 3600 / 60,
+        secs % 60
+    )
 }
 
 fn mime_for(path: &Path) -> String {
@@ -527,7 +532,8 @@ mod tests {
         assert!(joined.contains(&format!("-segment_time {CHUNK_SECONDS}")));
         assert_eq!(cmd[cmd.len() - 1], "/w/chunk-%03d.mp3");
         // 10 min at 48 kbps must stay far below the 25 MB upload cap.
-        assert!(CHUNK_SECONDS * 48_000 / 8 < 25 * 1024 * 1024 / 2);
+        let duration = std::hint::black_box(CHUNK_SECONDS);
+        assert!(duration * 48_000 / 8 < 25 * 1024 * 1024 / 2);
     }
 
     #[test]
@@ -559,7 +565,10 @@ mod tests {
         );
         assert_eq!(shift_timestamps("[00:00:05] hi", 0), "[00:00:05] hi");
         // Plain text gets one chunk-start marker.
-        assert_eq!(shift_timestamps("hello there", 3600), "[01:00:00] hello there");
+        assert_eq!(
+            shift_timestamps("hello there", 3600),
+            "[01:00:00] hello there"
+        );
         assert_eq!(shift_timestamps("   ", 600), "");
         // A bracket that is not a timestamp is left alone.
         assert_eq!(shift_timestamps("[music] la", 60), "[00:01:00] [music] la");

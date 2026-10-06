@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
+import Qt.labs.platform as Platform
 import io.github.jmarceno.gravaai
 
 // Recorder dashboard. Layout is responsive: the side column (pipeline +
@@ -124,11 +124,11 @@ Item {
         function onAudio_sources_jsonChanged() { root.updateAudioSources() }
     }
 
-    property FileDialog importDialog: FileDialog {
+    property Platform.FileDialog importDialog: Platform.FileDialog {
         title: "Import recording"
         nameFilters: ["Audio recordings (*.mp3 *.wav *.m4a *.ogg *.flac *.webm)", "All files (*)"]
         onAccepted: {
-            var audio = decodeURIComponent(String(selectedFile).replace(/^file:\/\//, ""))
+            var audio = decodeURIComponent(String(file).replace(/^file:\/\//, ""))
             root.controller.importExisting(audio, "", "", "Imported recording")
         }
     }
@@ -137,7 +137,7 @@ Item {
         id: flick
         anchors.fill: parent
         contentWidth: width
-        contentHeight: contentColumn.implicitHeight + 8
+        contentHeight: contentColumn.height + 8
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: flick.contentHeight > flick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }

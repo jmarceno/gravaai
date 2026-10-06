@@ -52,7 +52,8 @@ pub fn create_summarization_provider(cfg: &Config) -> Box<dyn SummarizationProvi
             &cfg.ollama_model,
             &cfg.ollama_host,
             &cfg.summarization_prompt,
-            cfg.llm_request_timeout_minutes.max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
+            cfg.llm_request_timeout_minutes
+                .max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
         ))),
         _ => Box::new(OpenAiSummarization(OpenAiCompatProvider::new(cfg))),
     }
@@ -72,7 +73,8 @@ pub fn create_prompt_provider(
             &cfg.ollama_model,
             &cfg.ollama_host,
             prompt_template,
-            cfg.llm_request_timeout_minutes.max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
+            cfg.llm_request_timeout_minutes
+                .max(LOCAL_LLM_MIN_TIMEOUT_MINUTES),
         )))
     } else {
         // Clone the config with the template installed as the summarization prompt.

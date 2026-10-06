@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use super::devices::{
     get_default_sink, get_default_source, list_sources, missing_sources, monitor_of_sink,
+    AudioSource,
 };
 use super::levels::LevelMonitor;
 use super::mixer::{
@@ -84,7 +85,7 @@ pub struct Recorder {
     level_monitor: Option<LevelMonitor>,
     segments: Vec<PathBuf>,
     segment_index: u64,
-    sources: Vec<String>,
+    sources: Vec<AudioSource>,
     flags: Arc<Flags>,
 }
 
@@ -129,7 +130,11 @@ impl Recorder {
 
     fn start_level_monitor(&mut self) {
         let cb = self.on_level.clone();
-        let sources = self.sources.clone();
+        let sources = self
+            .sources
+            .iter()
+            .map(|source| source.name.clone())
+            .collect();
         self.level_monitor = Some(LevelMonitor::start(sources, move |level| {
             if let Some(f) = cb.lock().unwrap().as_ref() {
                 f(level);
@@ -161,13 +166,13 @@ impl Recorder {
             let mic = self.sources.first().ok_or_else(|| {
                 anyhow::anyhow!("Audio devices are not resolved — cannot start a segment")
             })?;
-            build_ffmpeg_command_mic_only(mic, &seg, &self.quality)
+            build_ffmpeg_command_mic_only(&mic.name, &seg, &self.quality)
         } else {
             let (mic, mon) = match self.sources.as_slice() {
                 [mic, mon, ..] => (mic, mon),
                 _ => anyhow::bail!("Audio devices are not resolved — cannot start a segment"),
             };
-            build_ffmpeg_command(mic, mon, &seg, &self.quality)
+            build_ffmpeg_command(&mic.name, &mon.name, &seg, &self.quality)
         };
         let mut child = Command::new(runtime_program(&cmd[0]))
             .args(&cmd[1..])
@@ -382,18 +387,46 @@ impl RecorderBackend for Recorder {
                     );
                 }
             }
-            self.sources = selected;
+            self.sources = selected
+                .into_iter()
+                .map(|name| {
+                    available
+                        .iter()
+                        .find(|source| source.name == name)
+                        .cloned()
+                        .unwrap_or_else(|| AudioSource {
+                            is_monitor: name.ends_with(".monitor"),
+                            name,
+                            description: String::new(),
+                        })
+                })
+                .collect();
         } else if self.mode == "speaker" {
             let mic = get_default_source()
                 .ok_or_else(|| anyhow::anyhow!("No microphone found. Check audio setup."))?;
-            self.sources = vec![mic];
+            self.sources = vec![AudioSource {
+                name: mic,
+                description: String::new(),
+                is_monitor: false,
+            }];
         } else {
             let mic = get_default_source()
                 .ok_or_else(|| anyhow::anyhow!("No microphone found. Check audio setup."))?;
             let sink = get_default_sink().ok_or_else(|| {
                 anyhow::anyhow!("No audio output device found. Check audio setup.")
             })?;
-            self.sources = vec![mic, monitor_of_sink(&sink)];
+            self.sources = vec![
+                AudioSource {
+                    name: mic,
+                    description: String::new(),
+                    is_monitor: false,
+                },
+                AudioSource {
+                    name: monitor_of_sink(&sink),
+                    description: String::new(),
+                    is_monitor: true,
+                },
+            ];
         }
         self.flags.stop.store(false, Ordering::SeqCst);
         self.flags.paused.store(false, Ordering::SeqCst);

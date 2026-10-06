@@ -10,26 +10,26 @@ fn main() {
     CxxQtBuilder::new_qml_module(QmlModule::new("io.github.jmarceno.gravaai").qml_files([
         QmlFile::from("qml/Main.qml"),
         QmlFile::from("qml/Theme.qml").singleton(true),
-        QmlFile::from("qml/components/AppButton.qml"),
-        QmlFile::from("qml/components/AppCard.qml"),
-        QmlFile::from("qml/components/AppShell.qml"),
-        QmlFile::from("qml/components/AppCheckBox.qml"),
-        QmlFile::from("qml/components/AppComboBox.qml"),
-        QmlFile::from("qml/components/AppProgressBar.qml"),
-        QmlFile::from("qml/components/AudioLevelMeter.qml"),
-        QmlFile::from("qml/components/AppField.qml"),
-        QmlFile::from("qml/components/AppSwitch.qml"),
-        QmlFile::from("qml/components/StatusBadge.qml"),
-        QmlFile::from("qml/components/RecordingPill.qml"),
-        QmlFile::from("qml/components/SidebarItem.qml"),
-        QmlFile::from("qml/components/TitleBar.qml"),
-        QmlFile::from("qml/pages/RecorderPage.qml"),
-        QmlFile::from("qml/pages/LibraryPage.qml"),
-        QmlFile::from("qml/pages/JobsPage.qml"),
-        QmlFile::from("qml/pages/ModelsPage.qml"),
-        QmlFile::from("qml/pages/DownloadsPage.qml"),
-        QmlFile::from("qml/pages/PromptsPage.qml"),
-        QmlFile::from("qml/pages/GeneralPage.qml"),
+        QmlFile::from("qml/AppButton.qml"),
+        QmlFile::from("qml/AppCard.qml"),
+        QmlFile::from("qml/AppShell.qml"),
+        QmlFile::from("qml/AppCheckBox.qml"),
+        QmlFile::from("qml/AppComboBox.qml"),
+        QmlFile::from("qml/AppProgressBar.qml"),
+        QmlFile::from("qml/AudioLevelMeter.qml"),
+        QmlFile::from("qml/AppField.qml"),
+        QmlFile::from("qml/AppSwitch.qml"),
+        QmlFile::from("qml/StatusBadge.qml"),
+        QmlFile::from("qml/RecordingPill.qml"),
+        QmlFile::from("qml/SidebarItem.qml"),
+        QmlFile::from("qml/TitleBar.qml"),
+        QmlFile::from("qml/RecorderPage.qml"),
+        QmlFile::from("qml/LibraryPage.qml"),
+        QmlFile::from("qml/JobsPage.qml"),
+        QmlFile::from("qml/ModelsPage.qml"),
+        QmlFile::from("qml/DownloadsPage.qml"),
+        QmlFile::from("qml/PromptsPage.qml"),
+        QmlFile::from("qml/GeneralPage.qml"),
         // Test-only scene used by the offscreen geometry/contract smoke gate.
         QmlFile::from("qml/SmokeHarness.qml"),
     ]))
@@ -38,7 +38,7 @@ fn main() {
     .qt_module("Network")
     .qt_module("Quick")
     .qt_module("QuickControls2")
-    .qt_module("Svg")
+    .qt_module("Widgets")
     .qrc_resources(["assets/icons/hicolor/scalable/apps/gravaai.svg"])
     .build();
 }

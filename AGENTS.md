@@ -18,8 +18,8 @@ the user (see `utils/dependencies.rs`).
 ## Long-term target (GravaAI vision — we will get there in the long run)
 
 A meeting recorder, transcriber and organizer for Linux.
-Packed as an AppImage
-Written in Rust, with a webui that uses tauri for packing it. See item B.
+Packed as a portable `.run`
+Written in Rust with a Qt Quick/QML companion. See item B.
 
 A. It captures
 - Video of a region
@@ -51,7 +51,7 @@ G. Workflow:
 5. When done, User clicks stop recording at the tray icon context menu, or press a configured shortcut
 
 Current code is the Rust/Qt 6 app described below. The daemon and Qt window are
-separate executables in one AppImage; the persistent D-Bus, recording and
+separate executables in one portable bundle; the persistent D-Bus, recording and
 on-disk contracts remain unchanged.
 
 ---
@@ -62,64 +62,49 @@ on-disk contracts remain unchanged.
 exactly one branch. Commit directly on it.
 
 1. Commit changes locally.
-2. Releases are cut manually via the `Release` / `Auto Release` workflows in
-   `.gitea/workflows/` (version input; `v*` tags; AppImage artifacts).
+2. Releases are cut manually via the manual `release` workflow in
+   `.gitea/workflows/` (Cargo version; `v*` tags; portable artifacts).
 
 ---
 
-## AppImage builds — IMPORTANT
+## Portable builds — IMPORTANT
 
-**Always compile and build the appimage when done with changes that require a
-new build.**
+**After binary changes, always build and smoke-test the `.run`.**
 
-Delivery is the Type-2 AppImage produced by
-`linux/packaging/appimage/build-appimage.sh` (release artifact
-`gravaai-<version>-<arch>.AppImage`). After code changes that need a
-fresh binary, run the script (it builds `--release` unless `SKIP_BUILD=1`) and
-smoke-check the result before considering the work done.
+Follow `/home/jmarceno/Projects/rust-qml-desktop-template`: Rust + cxx-qt,
+flat embedded QML and a self-extracting portable launcher. Release builds use
+`./scripts/build-portable.sh --container` (Ubuntu 22.04, glibc 2.35, Qt 6.2).
+Native builds are only for development because they inherit the host ABI floor.
+The artifact is `build/portable/GravaAi-<version>-<arch>-portable.run`.
+The toolkit-free daemon is statically linked with musl; Rust dependencies are statically linked; Qt/plugins and native dependencies
+are bundled as a complete shared-library closure. Never install target system
+packages. Keep cxx/cxx-qt/cxx-qt-lib/cxx-qt-build pinned together.
 
-The script bundles the first `ffmpeg` on `PATH` that has the `pulse` demuxer
-(and its sibling `ffprobe`) and fails otherwise: static builds such as
-johnvansickle's in `/usr/local/bin` cannot capture from PulseAudio/PipeWire,
-and bundling one ships an app that cannot record.
+The payload is `bin/` (daemon, Qt companion, FFmpeg/FFprobe, pactl), `lib/`,
+`plugins/`, `qml/`, `share/`. The launcher extracts to
+`$XDG_CACHE_HOME/gravaai-portable/<version>-<payload-hash>` and exports
+`GRAVAAI_PORTABLE_EXE` (stable launcher) and `GRAVAAI_PORTABLE_ROOT` (payload).
+Only trust these when the running binary belongs to the root's `bin/` directory.
+Desktop/autostart entries must point at the stable launcher, never the cache.
+Use `scripts/lib/sanitize-host-env.sh` before ad-hoc build/probe commands to
+remove transient IDE library paths and inherited Qt search paths.
 
-Qt 6.4 (Ubuntu 24.04 / Pop!_OS) is a supported build Qt: the root loader adds
-`qrc:/qt/qml` as an import path (it only became a default in Qt 6.5; without
-it the embedded module's qmldir is not found and every component is "not a
-type"), and the script bundles either Qt ≥ 6.7's `libqwayland.so` or Qt 6.4's
-`libqwayland-egl.so` + `libqwayland-generic.so`. Building locally needs the
-QML packages `qml6-module-qtcore` and `qml6-module-qtquick-dialogs`. The
-script uses the staged Qt's `qmlimportscanner` (`qmake6 -query
-QT_INSTALL_LIBEXECS`) instead of a qtchooser shim.
-
-### Host IDE AppImages (Cursor / OpenCode) — always check `APPIMAGE` / `APPDIR`
-
-Agent sessions often run **inside** another AppImage:
-
-- **Cursor** is distributed as an AppImage and exports `APPIMAGE` / `APPDIR`
-  (and related vars) into every integrated terminal and agent shell.
-- **OpenCode** is likewise an AppImage and does the same.
-
-Those variables refer to the **host IDE**, not GravaAI. Treating them as
-ours would re-exec Cursor/OpenCode, point autostart/uninstall at the wrong
-file, or confuse packaging. Whenever you work on AppImage delivery, spawn
-paths, autostart, uninstall, asset lookup, or smoke-tests:
-
-1. **Never trust `$APPIMAGE` / `$APPDIR` alone.** Confirm the running binary
-   actually lives under `$APPDIR` (see `utils::exe::own_appimage` /
-   `own_appimage_from`). If `current_exe()` is outside `$APPDIR`, ignore the
-   host exports.
-2. **Clear host exports when packaging or testing our AppImage** so they do
-   not leak into `appimagetool` or into a child that should only see GravaAI's
-   mount. `build-appimage.sh` already `unset`s `APPIMAGE` / `APPDIR` / `OWD` /
-   `ARGV0`; do the same in ad-hoc shell checks (`unset APPIMAGE APPDIR …`).
-3. **Unit tests must not mutate process env** for these vars (parallel tests
-   would race the host IDE). Prefer pure helpers that take paths as arguments.
+The builder requires FFmpeg with the `pulse` demuxer and its sibling FFprobe;
+a static FFmpeg without PulseAudio capture support is unsuitable. Every QML
+file lives directly in `linux/qml/` and is listed in `linux/build.rs`. Use Qt
+6.2-compatible APIs: file/folder dialogs use `Qt.labs.platform`, backed by a
+`QApplication` in the companion only. Software rendering and Basic controls
+are the defaults. The daemon remains toolkit-free.
 
 ```bash
-./linux/packaging/appimage/build-appimage.sh           # version from Cargo.toml
-./linux/packaging/appimage/build-appimage.sh 1.2.0     # explicit version
+./scripts/build-portable.sh --container
+./scripts/smoke-portable.sh build/portable/*-portable.run
+./scripts/install.sh                   # stable user launcher + menu
+./scripts/install.sh --autostart       # also enable login startup
 ```
+
+Only `.gitea/workflows/release.yml` exists, with `workflow_dispatch` only.
+No automatic triggers and no CI workflows.
 
 ---
 
@@ -222,8 +207,8 @@ cargo build --release --manifest-path linux/Cargo.toml --features ui --bin grava
 # stays tray-only (window closed); a second run while the daemon lives presents the window.
 ./linux/target/release/gravaai
 
-# Pack AppImage (builds --release unless SKIP_BUILD=1)
-./linux/packaging/appimage/build-appimage.sh
+# Build portable release
+./scripts/build-portable.sh --container
 
 # Core tests (no Qt)
 cargo test --manifest-path linux/Cargo.toml --no-default-features --lib
@@ -244,25 +229,25 @@ cargo fmt --check --manifest-path linux/Cargo.toml
 the CXX-Qt bridge and window code; `cargo check --no-default-features` proves
 the daemon has no Qt dependency.
 
-### Install / uninstall (AppImage, no scripts)
+### Install / uninstall (portable bundle, no scripts)
 
-Users download `gravaai-<version>-<arch>.AppImage`, mark it executable,
-and run it. The AppImage carries both executables, Qt/QML, the platform
-plugins, tray/icon assets, FFmpeg/FFprobe and `pactl`; only legitimate platform
+Users download `GravaAi-<version>-<arch>-portable.run`, mark it executable,
+and run it. The portable bundle carries both executables, Qt/QML, the platform
+plugins, tray/icon assets, fallback fonts, FFmpeg/FFprobe and `pactl`; only legitimate platform
 services (kernel/glibc, compositor, session bus, audio server, portals and
-notification/tray hosts) remain on the host. Uninstall is built in — it removes the AppImage
+notification/tray hosts) remain on the host. Uninstall is built in — it removes the portable bundle
 file (when running from one), desktop entries, icons, autostart entry, engines,
 models, logs, config and the stored API key, and keeps recordings:
 
 ```bash
-./gravaai-*.AppImage --uninstall   # see utils/self_uninstall.rs
+./GravaAi-*-portable.run --uninstall   # see utils/self_uninstall.rs
 ```
 
 ---
 
 ## Linux architecture
 
-**Two-process daemon/UI split:** one AppImage contains a toolkit-free
+**Two-process daemon/UI split:** one portable bundle contains a toolkit-free
 `gravaai` daemon/client binary and a Qt-only `gravaai-ui` companion. `main.rs`
 dispatches on `core/run_mode.rs::resolve_run_mode(argv)`:
 - **`--daemon`** (`daemon/app.rs`): an always-on Tokio event loop owns the
@@ -297,7 +282,7 @@ payload is `core/wire.rs` (`Snapshot`/`JobView`, serde, tolerant parsing). The
 daemon spawns the window as a detached child process and supervises a single
 window via `daemon/window_supervisor.rs` (spawn-vs-present).
 `utils/autostart.rs` writes the login entry with `--daemon`, persisting only
-stable executable paths (transient AppImage FUSE mounts are never written)
+stable executable paths (transient portable bundle cache paths are never written)
 and repairing a stale entry on enable and at daemon startup.
 
 **Model/GPU installs run in the daemon**, not the window: Settings → Models
@@ -329,7 +314,9 @@ is opened, after every finished install and after Settings are saved.
 
 **Audio recording** (`audio/`):
 - `recorder.rs` runs a single `ffmpeg` subprocess reading PulseAudio/PipeWire
-  sources directly (`-f pulse`); `mixer.rs` builds the command — mic+system
+  sources directly (`-f pulse -fragment_size 1024` per input; the default
+  PulseAudio fragment in FFmpeg 4.4 buffers seconds and can leave short
+  recordings empty); `mixer.rs` builds the command — mic+system
   mode downmixes each input to mono (`aformat=channel_layouts=mono` — Pulse
   sources/monitors are usually stereo, and merging two stereo inputs made a
   4.0 stream the MP3 encoder folded back, blending mic and system audio) and
@@ -341,9 +328,11 @@ is opened, after every finished install and after Settings are saved.
   speaker separation for transcription. (`dynaudnorm` must never be used in
   the live chain: its ~3 s Gaussian lookahead window is dropped, not flushed,
   on stop, so every recording lost its last ~2.8 s.) Custom mode (`build_ffmpeg_command_multi`)
-  records the explicit `custom_devices` list instead: 1 source like mic-only,
-  2 sources downmixed to mono and `amerge`d to stereo, 3+ mixed down with `amix` and forced to
-  stereo (MP3 has no multichannel layout). Device names are resolved once in
+  records the explicit `custom_devices` list instead: source metadata groups
+  microphones into the left channel and sink monitors into the right, regardless
+  of selection order or source count. Each source is downmixed to mono before
+  normalization; `amix` combines sources only within the same role. A missing
+  role is silent. Mic-only mode also leaves the right channel silent. Device names are resolved once in
   `start()` via `devices.rs` (`pactl`): the fixed modes use the default
   source/sink, Custom mode uses the saved selection verbatim (deduped) and
   fails fast naming any selected source `pactl` no longer reports.
@@ -387,7 +376,8 @@ offers.
 countdown, and the authoritative lifecycle `State`. Callbacks
 (`on_state`/`on_error`/`on_commit`/`on_saved`/`on_discarded`/`on_countdown`/
 `on_stopped`); the blocking recorder stop runs on a `TaskRunner` worker and
-`on_stopped` lets the engine delay the processor launch until the file is
+`on_stopped` runs through the owner scheduler, waking the daemon after the
+worker finishes; it lets the engine delay the processor launch until the file is
 fully written (`awaiting_file`). The countdown is tick-driven by the owner
 (`countdown_tick()` + injected `request_tick`). When
 `auto_process_enabled` is off, `Engine::stop()` saves the audio only
@@ -530,6 +520,9 @@ stored values on upgrade (unknown keys ignored, missing keys keep defaults).
 Keyring/KWallet), `settings::save()` stores the key there via the `keyring`
 crate and writes only the `@keyring` sentinel to config.json;
 `settings::load()` resolves the sentinel back.
+The keyring crate explicitly enables its Secret Service backend (async I/O
+and Rust crypto, keeping the daemon statically linkable); without those
+features it silently selects an ephemeral mock and loses keys on restart.
 `settings::migrate_key_to_keyring()` runs once at startup to move a plaintext
 key into the keyring. Without a keyring everything falls back to plaintext-in-
 chmod-600 exactly as before.
@@ -538,14 +531,14 @@ chmod-600 exactly as before.
 `QQmlApplicationEngine` bootstrap helper and the Rust worker bridge. The QML
 module is registered as `io.github.jmarceno.gravaai` and loads `ApplicationWindow`
 from the embedded resource tree. Every page/component that touches the bridge
-declares `required property var controller`; timers, `Connections`, dialogs and
+declares `required property AppController controller`; timers, `Connections`, dialogs and
 file pickers are named properties so they cannot be interpreted as a default
 property. `Theme.qml` is the sole color source and `QT_QUICK_CONTROLS_STYLE=Basic`
 keeps rendering deterministic across desktops. The root helper observes
 `objectCreated`, calls native `QCoreApplication::quit/exit`, and records QML
 startup failures in `window-qt.log` (1 MiB plus one backup).
 
-**UI pages and integration:** `qml/pages/` implements Recorder (dashboard with
+**UI pages and integration:** `qml/` implements Recorder (dashboard with
 recording, live processing-pipeline, background-jobs and recent-meetings
 cards; responsive — the side column moves below the recorder when the page is
 narrower than 760 px), Library (confirm-before-delete, per-meeting
@@ -560,21 +553,21 @@ refresh themselves when a background job finishes or a recording is saved
 (`controller::MeetingRefreshTracker` on `SnapshotChanged`) and when the
 Library page is opened; the Library and recent card expose Transcribe and
 Summarize actions (mode-aware, see below). A Handy-style recording pill
-(`qml/components/RecordingPill.qml`, hosted by a frameless always-on-top
+(`qml/RecordingPill.qml`, hosted by a frameless always-on-top
 `Qt.Tool` window in `Main.qml`) sits in the bottom-right corner just above
 the taskbar while recording/paused/countdown, showing status dot, elapsed
 time, a live input-level strip (`audio_level` from the snapshot) and
 pause/resume/stop controls; clicking it presents the main window
 and it can be dragged anywhere. The Recorder page shows the same live level
-in full size (`qml/components/AudioLevelMeter.qml` — a flat meter while
+in full size (`qml/AudioLevelMeter.qml` — a flat meter while
 recording means nothing is reaching the recorder). It is opt-out via `show_recording_pill`
 (Settings → General, on by default so upgrades keep it). `AppController`
 keeps the exact snake_case property contract and explicit camelCase invokables;
 its Tokio worker handles D-Bus, filesystem, portals, network and
 desktop-entry operations. The daemon's `ui/tray.rs` remains toolkit-free and
 composes the branded icon (`tray_icon`) with an embedded fallback. The app icon,
-QML resources and both binaries are bundled in the AppImage; `utils::exe`
-resolves the companion and helpers only from the current mount before PATH.
+QML resources and both binaries are bundled in the portable bundle; `utils::exe`
+resolves the companion and helpers only from the current extraction tree before PATH.
 
 **Import/crate convention:** one binary crate (`linux/Cargo.toml`,
 `src/main.rs`) organized in modules (`config`, `core`,
@@ -609,14 +602,14 @@ Linux desktop app:
   by `tray_icon` and pushed on a daemon anim tick, with an embedded 48px
   fallback plus an `icon_name` theme fallback so it never renders empty when
   the artwork directory is missing (e.g. a stripped payload).
-- **Delivery:** Type-2 AppImage (`linux/packaging/appimage/`) bundling the
+- **Delivery:** portable `.run` (`linux/packaging/portable/`) bundling the
   daemon, `gravaai-ui`, Qt/QML/plugins, FFmpeg/FFprobe, `pactl`, assets and
   non-platform libraries. Only kernel/glibc, compositor, session D-Bus,
   PipeWire/PulseAudio, portals and tray/notification services remain on host.
 - **App icon:** the launcher/window icon ships in `assets/icons/hicolor/`
   (scalable SVG + PNG sizes, named `gravaai` — the `Icon=` key) and
-  is bundled into the AppImage and exposed through `XDG_DATA_DIRS` from the
-  current mount.
+  is bundled into the portable bundle and exposed through `XDG_DATA_DIRS` from the
+  current extraction tree.
 
 **Linux runs as cooperating processes:** `gravaai` owns the singleton daemon,
 recording engine, jobs, installs, call detection, tray and D-Bus service;
@@ -652,15 +645,15 @@ are supported.
 1. Install the toolchain + dependencies with your distro's packages:
    Rust (`rust`/`cargo`), Qt 6 development files/tools (`qt6-base-dev`,
    `qt6-declarative-dev`, `qt6-tools-dev-tools`, `qt6-svg-dev` on Ubuntu),
-   audio tools (`ffmpeg`, `pactl` via PipeWire/PulseAudio) and `curl` only for
-   bootstrapping appimagetool during a local package build.
+   audio tools (`ffmpeg`, `pactl` via PipeWire/PulseAudio), `lld`, and Docker
+   for the release container. The container supplies all build dependencies.
 2. Build and run:
    ```bash
    cargo build --release --manifest-path linux/Cargo.toml --no-default-features --bin gravaai
    cargo build --release --manifest-path linux/Cargo.toml --features ui --bin gravaai-ui
    ./linux/target/release/gravaai
-   # or build both release binaries with the AppImage script:
-   # ./linux/packaging/appimage/build-appimage.sh
+   # or build both release binaries with the portable bundle script:
+   # ./scripts/build-portable.sh --container
    ```
 
 **Running checks:**
@@ -673,12 +666,12 @@ cargo test --manifest-path linux/Cargo.toml --features ui --lib
 ./linux/tests/qt_smoke.sh
 ```
 
-**Install / uninstall (AppImage, no scripts):**
+**Install / uninstall (portable bundle, no scripts):**
 
-Users run the release AppImage directly. Uninstall is built in:
+Users run the release `.run` directly; `install` writes the menu entry. Uninstall is built in:
 
 ```bash
-./gravaai-*.AppImage --uninstall
+./GravaAi-*-portable.run --uninstall
 ```
 
 ---
@@ -687,20 +680,17 @@ Users run the release AppImage directly. Uninstall is built in:
 
 ### Release process
 
-Releases are manual with a version input:
-
-| Trigger | Workflow | Output |
-|---|---|---|
-| Manual (`version`, e.g. `1.2.0`) | `release.yml` | AppImage(s) + source tarball attached to Release |
-| Manual (`bump`) | `auto-release.yml` → `release.yml` | `v*` tag, then same as above |
+Releases are started manually from `release.yml`. Bump `linux/Cargo.toml`
+first; the workflow refuses an existing tag/release, builds in the container,
+smoke-tests and uploads the `.run` plus SHA256SUMS. No automatic workflows.
 
 ### Repository layout
 
 ```
 linux/
-├── src/                   # Rust app (single binary crate)
+├── src/                   # shared Rust library + daemon and UI binaries
 ├── assets/                # tray artwork + hicolor app icons
-├── packaging/appimage/    # AppDir desktop entry + build-appimage.sh
+├── packaging/portable/    # portable builder Containerfile
 └── Cargo.toml / Cargo.lock
 .gitea/workflows/          # release workflows
 ```
@@ -728,13 +718,14 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   resume, stop with and without countdown, countdown tick/cancel,
   cancel+save, cancel+discard) with a fake recorder, plus Custom-mode
   gating (empty selection errors without building a recorder, device list
-  forwarded to the factory).
+  forwarded to the factory), and stop completion delivered through the owner
+  scheduler so auto-processing cannot wait forever after the last audio tick.
 - `core/install_spec.rs`, `core/run_mode.rs`, `core/window_close.rs`,
   `core/daemon_watch.rs`, `core/wire.rs`, `core/app_info.rs`,
   `core/commands.rs` — key/install-key JSON round-trips (including the
   `crisp_asr_engine` / `crisp_asr_model` kinds), mode dispatch,
   close policy, owner-watch policy, snapshot round-trip + tolerant parsing,
-  pacman version parsing (AppImage VERSION file is read at runtime).
+  pacman version parsing (portable payload VERSION file is read at runtime).
 - `processing/pipeline.rs` — fail-fast without audio, cancel-before-start,
   pipeline modes (`SummarizeOnly` requires an existing transcript file and
   skips transcription, `TranscribeOnly` routes to the transcribe stage and
@@ -757,7 +748,8 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   fallback.
 - `audio/mixer.rs`, `audio/devices.rs`, `audio/recorder.rs` — stereo command
   layout (mono-per-input before the merge), monitor naming, segment naming, Custom multi-source commands
-  (1/2/3+ inputs), `pactl list sources` parsing, missing-source detection,
+  (1/2/3+ inputs, monitor-first selection, metadata-based roles and silent missing
+  channels), `pactl list sources` parsing, missing-source detection,
   selection dedup, empty-selection rejection.
 - `audio/levels.rs` — `ebur128` momentary parsing, LUFS→level mapping,
   all-sources-mixed level command shape; `core/wire.rs` — `audio_level`
@@ -767,11 +759,12 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
 - `detection/audio_watcher.rs` — `is_call_start_event` matcher.
 - `utils/` — `sanitize_title`/output-path layout/job labels (`filename`),
   autostart entry management with transient-mount rejection and stale-entry
-  repair (`autostart`), AppImage-aware exe resolution
-  that ignores host IDE `APPIMAGE`/`APPDIR` (`exe`), scan/rename/metadata +
+  repair (`autostart`), portable bundle-aware exe resolution
+  that ignores host IDE launcher/root exports (`exe`), scan/rename/metadata +
   `has_audio` (`meeting_scanner`), payload inventory + dir sizes + status
   JSON shape (`payloads`, including the `crispasr` engine/model rows), in-tree-reuse vs. copy (`recording_import`),
-  uninstall target plan + removal (`self_uninstall`).
+  menu install/upgrade without touching user data (`self_install`),
+  uninstall target plan + removal including portable cache (`self_uninstall`).
 - `services/` — SHA-256 helper (`system_installer`), engine asset table +
   backend detection + verified download/extract/smoke-test
   (`whisper_cpp_service`, including auto→cpu routing, cuda rejection, and
@@ -803,17 +796,19 @@ Unit tests live next to the code (`#[cfg(test)]` modules) and run with
   resolved audio/transcript/notes paths + `has_audio`, validated file-open
   allow-list, data-folder allow-list, partial-settings merge preserving
   unknown-to-the-page fields like `custom_devices`, the snapshot-driven
-  `MeetingRefreshTracker` that keeps the meeting lists fresh, AppImage-safe
+  `MeetingRefreshTracker` that keeps the meeting lists fresh, portable bundle-safe
   opener environment, portal `file://` percent-encoding).
 
 The `--process`/`--install` child entry points, the D-Bus service/tray host and
 the Qt scene need real subprocess/bus/display integration and are covered by
-the QML/offscreen and AppImage smoke gates rather than ordinary unit tests.
+the QML/offscreen and portable bundle smoke gates rather than ordinary unit tests.
 `linux/tests/qt_smoke.sh` (release build by default, `GRAVAAI_PROFILE=debug`
 to override) runs qmllint/qmlimportscanner, renders the real window shell
-(`components/AppShell.qml`, shared with `Main.qml`) on every page at 1332×820
-and 960×640 (the harness also instantiates the recording pill and
-`JobsPage`), and verifies direct UI refusal without a daemon/tray. Set
+(`qml/AppShell.qml`, shared with `Main.qml`) on every page at 1332×820
+and 960×640, rejects clipped cards and runtime binding errors (Qt 6.2
+metadata lint diagnostics for imports/types/properties are advisory; syntax,
+scanner imports and the real QML runtime remain gates). The harness also instantiates the recording pill and
+`JobsPage`, and verifies direct UI refusal without a daemon/tray. Set
 `GRAVAAI_QML_SHOTS=<dir>` to save a PNG of every page for visual layout
 review.
 The engine/manager/key logic they rely on is unit-tested via fakes.

@@ -336,8 +336,19 @@ pub fn drop_empty_sections(notes: &str) -> String {
             .to_lowercase();
         matches!(
             t.as_str(),
-            "" | "n/a" | "na" | "none" | "nenhum" | "nenhuma" | "nada" | "ninguno" | "ninguna"
-                | "aucun" | "aucune" | "keine" | "-" | "—"
+            "" | "n/a"
+                | "na"
+                | "none"
+                | "nenhum"
+                | "nenhuma"
+                | "nada"
+                | "ninguno"
+                | "ninguna"
+                | "aucun"
+                | "aucune"
+                | "keine"
+                | "-"
+                | "—"
         )
     }
     let mut out: Vec<String> = Vec::new();
@@ -456,10 +467,19 @@ mod tests {
     fn language_instruction_closes_the_prompt() {
         let p = with_language_instruction("Notes:\n{transcript}\n", Some("pt"));
         assert!(p.starts_with("Notes:\n{transcript}"));
-        assert!(p.ends_with("Write your entire answer in Portuguese."), "{p}");
+        assert!(
+            p.ends_with("Write your entire answer in Portuguese."),
+            "{p}"
+        );
         // Unknown or missing language → unchanged.
-        assert_eq!(with_language_instruction("X {transcript}", None), "X {transcript}");
-        assert_eq!(with_language_instruction("X {transcript}", Some("xx")), "X {transcript}");
+        assert_eq!(
+            with_language_instruction("X {transcript}", None),
+            "X {transcript}"
+        );
+        assert_eq!(
+            with_language_instruction("X {transcript}", Some("xx")),
+            "X {transcript}"
+        );
         // A template without the placeholder still gets the transcript
         // before the instruction.
         let p = with_language_instruction("Summarize", Some("en"));

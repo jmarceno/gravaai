@@ -23,11 +23,8 @@ use super::tray_model::{self, MenuKind};
 /// Locate the bundled tray artwork directory.
 pub fn tray_assets_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
-    if let Ok(appdir) = std::env::var("APPDIR") {
-        // Only trust APPDIR when our exe lives under it (ignore host AppImages).
-        if crate::utils::exe::own_appimage().is_some() {
-            candidates.push(PathBuf::from(&appdir).join(format!("usr/share/{APP_DIR_NAME}/tray")));
-        }
+    if let Some(root) = crate::utils::exe::own_portable_root() {
+        candidates.push(root.join(format!("share/{APP_DIR_NAME}/tray")));
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {

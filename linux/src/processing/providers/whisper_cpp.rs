@@ -160,7 +160,10 @@ fn run_whisper_cli(
     }
     let json = out_base.with_extension("json");
     std::fs::read_to_string(&json).map_err(|e| {
-        anyhow::anyhow!("whisper-cli produced no transcript ({}): {e}", json.display())
+        anyhow::anyhow!(
+            "whisper-cli produced no transcript ({}): {e}",
+            json.display()
+        )
     })
 }
 
@@ -354,8 +357,14 @@ mod tests {
             parse_progress("whisper_print_progress_callback: progress =  93%"),
             Some(93)
         );
-        assert_eq!(parse_progress("whisper_print_progress_callback: progress = 100%"), Some(100));
-        assert_eq!(parse_progress("output_json: saving output to 'out.json'"), None);
+        assert_eq!(
+            parse_progress("whisper_print_progress_callback: progress = 100%"),
+            Some(100)
+        );
+        assert_eq!(
+            parse_progress("output_json: saving output to 'out.json'"),
+            None
+        );
     }
 
     #[test]

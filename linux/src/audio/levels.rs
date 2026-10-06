@@ -66,6 +66,8 @@ pub fn build_level_command(sources: &[String]) -> Vec<String> {
         cmd.extend([
             "-thread_queue_size".to_string(),
             "1024".into(),
+            "-fragment_size".into(),
+            "1024".into(),
             "-f".into(),
             "pulse".into(),
             "-i".into(),
@@ -249,6 +251,9 @@ mod tests {
         assert!(one.iter().any(|a| a.contains("ebur128")));
         assert!(!one.iter().any(|a| a.contains("amix")));
         assert_eq!(one.last().unwrap(), "-");
+        assert!(one
+            .windows(2)
+            .any(|pair| pair == ["-fragment_size", "1024"]));
 
         let two = build_level_command(&["mic".to_string(), "sink.monitor".to_string()]);
         assert_eq!(two.iter().filter(|a| *a == "-i").count(), 2);

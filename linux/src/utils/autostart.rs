@@ -3,17 +3,13 @@
 //! The login entry launches the **daemon** (tray only) — its `Exec` carries
 //! `--daemon`.
 //!
-//! The persisted `Exec` path must stay valid across reboots: a transient
-//! AppImage FUSE mount (`/tmp/.mount_*`) disappears at shutdown, so writing
-//! one produces an entry the desktop shows but never launches. `find_exec`
-//! therefore only returns stable paths, and enabling autostart rewrites a
-//! stale entry instead of keeping it.
+//! Persist the stable portable launcher, never a versioned extraction path.
 
 use std::path::{Path, PathBuf};
 
 use crate::config::defaults::{APP_DIR_NAME, APP_ID, APP_NAME};
 use crate::core::run_mode::DAEMON_FLAG;
-use crate::utils::exe::own_appimage;
+use crate::utils::exe::own_portable_exe;
 
 pub const DESKTOP_FILENAME: &str = "gravaai.desktop";
 
@@ -28,20 +24,25 @@ fn autostart_file() -> PathBuf {
 }
 
 /// Quote a path for a desktop-file `Exec=` key when it contains whitespace.
-fn desktop_exec_path(path: &Path) -> String {
-    let s = path.to_string_lossy();
-    if s.chars().any(|c| c.is_whitespace()) {
-        format!("\"{s}\"")
+pub(crate) fn desktop_exec_path(path: &Path) -> String {
+    let s = path.to_string_lossy().replace('%', "%%");
+    if s.chars().any(|c| c.is_whitespace() || "\"`$\\".contains(c)) {
+        let escaped = s
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('`', "\\`")
+            .replace('$', "\\$");
+        format!("\"{escaped}\"")
     } else {
-        s.into_owned()
+        s
     }
 }
 
 fn find_exec() -> String {
-    // Prefer our own AppImage (never a host IDE's APPIMAGE — see own_appimage).
-    if let Some(appimage) = own_appimage() {
-        if !is_transient_runtime_path(&appimage) {
-            return desktop_exec_path(&appimage);
+    // Prefer the validated stable portable launcher.
+    if let Some(launcher) = own_portable_exe() {
+        if !is_transient_runtime_path(&launcher) {
+            return desktop_exec_path(&launcher);
         }
     }
     // Prefer known install locations, then PATH, then the running binary when
@@ -67,12 +68,16 @@ fn find_exec() -> String {
     }
 }
 
-/// Transient AppImage runtime locations (FUSE mounts, extract-and-run dirs)
+/// Transient portable runtime locations (extractions, extract-and-run dirs)
 /// that vanish on reboot/unmount and must never be persisted into the login
 /// entry.
 fn is_transient_runtime_path(path: &Path) -> bool {
     let s = path.to_string_lossy();
-    s.starts_with("/tmp/.mount_") || s.starts_with("/tmp/appimage-extract_")
+    s.starts_with("/tmp/.mount_")
+        || s.starts_with("/tmp/gravaai-extract_")
+        || path
+            .components()
+            .any(|c| c.as_os_str() == "gravaai-portable")
 }
 
 /// First absolute, existing, non-transient candidate wins. Pure for tests;
@@ -97,7 +102,7 @@ pub fn update_autostart(enabled: bool) {
     let file = autostart_file();
     if enabled {
         // Reconcile: rewrite a missing entry, and repair a stale one (e.g. a
-        // transient AppImage mount path persisted by an older build) instead
+        // transient portable mount path persisted by an older build) instead
         // of keeping a login entry that never launches.
         let desired = desktop_template(&find_exec());
         match std::fs::read_to_string(&file) {
@@ -131,19 +136,19 @@ mod tests {
     #[test]
     fn desktop_exec_quotes_whitespace() {
         assert_eq!(
-            desktop_exec_path(Path::new("/opt/GravaAi AppImage.AppImage")),
-            "\"/opt/GravaAi AppImage.AppImage\""
+            desktop_exec_path(Path::new("/opt/GravaAi portable.run")),
+            "\"/opt/GravaAi portable.run\""
         );
         assert_eq!(
-            desktop_exec_path(Path::new("/opt/gravaai.AppImage")),
-            "/opt/gravaai.AppImage"
+            desktop_exec_path(Path::new("/opt/gravaai.run")),
+            "/opt/gravaai.run"
         );
     }
 
     #[test]
     fn desktop_entry_launches_daemon() {
-        let content = desktop_template("/opt/gravaai.AppImage");
-        assert!(content.contains("Exec=/opt/gravaai.AppImage --daemon\n"));
+        let content = desktop_template("/opt/gravaai.run");
+        assert!(content.contains("Exec=/opt/gravaai.run --daemon\n"));
     }
 
     #[test]
@@ -152,15 +157,16 @@ mod tests {
             "/tmp/.mount_gravaaABC123/usr/bin/gravaai"
         )));
         assert!(is_transient_runtime_path(Path::new(
-            "/tmp/appimage-extract_abc/usr/bin/gravaai"
+            "/tmp/gravaai-extract_abc/usr/bin/gravaai"
         )));
         assert!(!is_transient_runtime_path(Path::new(
-            "/home/u/Software/AppImages/gravaai.appimage"
+            "/home/u/Software/gravaai.run"
         )));
         assert!(!is_transient_runtime_path(Path::new("/usr/bin/gravaai")));
-        assert!(!is_transient_runtime_path(Path::new(
-            "/tmp/gravaai.AppImage"
+        assert!(is_transient_runtime_path(Path::new(
+            "/home/u/.cache/gravaai-portable/1-hash/bin/gravaai"
         )));
+        assert!(!is_transient_runtime_path(Path::new("/tmp/gravaai.run")));
     }
 
     #[test]
@@ -179,7 +185,7 @@ mod tests {
 
     #[test]
     fn pick_stable_skips_existing_transient_mount() {
-        // A live FUSE mount path sorts first when AppRun prepends it to PATH;
+        // A live extraction path sorts first when portable launcher prepends it to PATH;
         // it must still lose to a stable on-disk binary.
         let mount = tempfile::Builder::new()
             .prefix(".mount_gravaai-test-")

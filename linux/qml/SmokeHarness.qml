@@ -30,6 +30,10 @@ ApplicationWindow {
                 Qt.exit(1)
                 return
             }
+            if (!root.checkCards(current)) {
+                Qt.exit(1)
+                return
+            }
             if (root.shotsDir.length > 0) {
                 var name = root.shotsDir + "/" + root.requestedWidth + "x" + root.requestedHeight + (root.idle ? "-idle" : "") + "-" + root.pageNames[root.pageIndex] + ".png"
                 shell.grabToImage(function(result) {
@@ -40,6 +44,17 @@ ApplicationWindow {
                 root.advance()
             }
         }
+    }
+    function checkCards(item) {
+        if (!item || !item.visible) return true
+        if (item.objectName === "appCard" && item.height + 1 < item.implicitHeight) {
+            console.error("QML smoke geometry: card clips its content")
+            return false
+        }
+        var children = item.children || []
+        for (var i = 0; i < children.length; i += 1)
+            if (!checkCards(children[i])) return false
+        return true
     }
     function advance() {
         if (pageIndex < pageNames.length - 1) {

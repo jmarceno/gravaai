@@ -7,4 +7,5 @@ pub mod logging;
 pub mod meeting_scanner;
 pub mod payloads;
 pub mod recording_import;
+pub mod self_install;
 pub mod self_uninstall;

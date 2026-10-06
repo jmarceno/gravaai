@@ -1,117 +1,63 @@
-name: Release
+name: release
 
-# AppImage hard fork: manual dispatch only. Provide a version (without the
-# leading v, e.g. 1.2.3) or, when called via workflow_call, pass it as input.
-
+# MANUAL ONLY: run it from the repo's Actions tab ("Run workflow").
+# Never add push / tag / schedule / pull_request triggers here or in any
+# other workflow: nothing in this repo may run without a human starting it.
+#
+# Releases the version in linux/Cargo.toml as tag v<version> on the selected
+# branch's current commit, with the portable .run and SHA256SUMS attached.
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (without v prefix, e.g. 1.2.3)'
-        required: true
-        type: string
-  workflow_call:
-    inputs:
-      version:
-        description: 'Release version (without v prefix, e.g. 1.2.3)'
-        required: true
-        type: string
+
+permissions:
+  contents: write
 
 jobs:
-  get-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.v.outputs.VERSION }}
-    steps:
-      - id: v
-        run: |
-          echo "VERSION=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-
-  build-appimage:
-    needs: get-version
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64
-            runner: ubuntu-latest
-          - arch: aarch64
-            runner: ubuntu-24.04-arm
-    env:
-      VERSION: ${{ needs.get-version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential curl file desktop-file-utils patchelf \
-            qt6-base-dev qt6-declarative-dev qt6-declarative-dev-tools \
-            qt6-tools-dev-tools qt6-svg-dev libpulse-dev pulseaudio-utils ffmpeg
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build AppImage
-        run: |
-          # Nested AppImage hosts / CI runners often lack usable FUSE.
-          export APPIMAGE_EXTRACT_AND_RUN=1
-          unset APPIMAGE APPDIR || true
-          ./linux/packaging/appimage/build-appimage.sh "$VERSION" \
-            "$PWD/appimage-out"
-
-      - name: Smoke-test AppImage
-        run: |
-          unset APPIMAGE APPDIR || true
-          export APPIMAGE_EXTRACT_AND_RUN=1
-          IMG="appimage-out/gravaai-${VERSION}-${{ matrix.arch }}.AppImage"
-          test -x "$IMG"
-          # Role flags refuse garbage outside the daemon — exit 2 means the
-          # binary ran and parsed argv (same check the old pacman smoke used).
-          "$IMG" --install 'garbage' || test $? -eq 2
-          echo "AppImage runs OK"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: appimage-${{ matrix.arch }}
-          path: appimage-out/gravaai-*.AppImage
-
   release:
-    needs: [get-version, build-appimage]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      VERSION: ${{ needs.get-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Download AppImage artifacts
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-
-      - name: Create source tarball
+      - name: Read version
+        id: version
         run: |
-          SRC=$(mktemp -d)
-          cp -r . "${SRC}/gravaai-${VERSION}"
-          rm -rf \
-            "${SRC}/gravaai-${VERSION}/.git" \
-            "${SRC}/gravaai-${VERSION}/.claude" \
-            "${SRC}/gravaai-${VERSION}/gh-pages-dir" \
-            "${SRC}/gravaai-${VERSION}/linux/target" \
-            "${SRC}/gravaai-${VERSION}/linux/packaging/appimage/out" \
-            "${SRC}/gravaai-${VERSION}/linux/packaging/appimage/.tools" \
-            "${SRC}/gravaai-${VERSION}/target"
-          tar -czf "gravaai_${VERSION}.tar.gz" -C "${SRC}" "gravaai-${VERSION}"
+          version="$(grep -m1 -E '^version\s*=' linux/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.get-version.outputs.version }}
-          files: |
-            gravaai-*.AppImage
-            gravaai_*.tar.gz
-          generate_release_notes: true
+      - name: Refuse to overwrite an existing release
+        env:
+          API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: token $TOKEN" "$API/releases/tags/$TAG")"
+          if [ "$code" = 200 ]; then
+            echo "Release $TAG already exists; bump version in linux/Cargo.toml first." >&2
+            exit 1
+          fi
+
+      - name: Build portable bundle (glibc 2.35 container)
+        run: ./scripts/build-portable.sh --container
+
+      - name: Smoke portable bundle
+        run: ./scripts/smoke-portable.sh build/portable/*-portable.run
+
+      - name: Create release and upload assets
+        env:
+          API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ gitea.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build/portable/*-portable.run dist/
+          (cd dist && sha256sum ./*.run > SHA256SUMS)
+          auth="Authorization: token $TOKEN"
+          body="$(jq -n --arg tag "$TAG" --arg sha "$SHA" '{tag_name: $tag, target_commitish: $sha, name: $tag}')"
+          id="$(curl -fsS -H "$auth" -H 'Content-Type: application/json' -d "$body" "$API/releases" | jq -er .id)"
+          for f in dist/*; do
+            name="$(basename "$f")"
+            curl -fsS -H "$auth" -H 'Content-Type: application/octet-stream' \
+              --data-binary "@$f" "$API/releases/$id/assets?name=$(jq -rn --arg n "$name" '$n|@uri')" >/dev/null
+          done

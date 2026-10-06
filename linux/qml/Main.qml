@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
+import Qt.labs.platform as Platform
 import QtQuick.Window
 import io.github.jmarceno.gravaai
 
@@ -91,10 +91,10 @@ ApplicationWindow {
         }
     }
 
-    property FileDialog importDialog: FileDialog {
+    property Platform.FileDialog importDialog: Platform.FileDialog {
         title: "Import existing recording"
         nameFilters: ["Audio recordings (*.mp3 *.wav *.m4a *.ogg *.flac *.webm)", "All files (*)"]
-        onAccepted: controller.importExisting(decodeURIComponent(String(selectedFile).replace(/^file:\/\//, "")), "", "", "Imported recording")
+        onAccepted: controller.importExisting(decodeURIComponent(String(file).replace(/^file:\/\//, "")), "", "", "Imported recording")
     }
 
     property Dialog alertDialog: Dialog {

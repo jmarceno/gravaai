@@ -1,14 +1,4 @@
-//! Resolve the on-disk path used to re-invoke this binary.
-//!
-//! Under AppImage the FUSE mount disappears when the launching process exits,
-//! so a detached daemon must be started from `$APPIMAGE` (a fresh mount) rather
-//! than from `current_exe()` inside the caller's mount. Short-lived children
-//! that share the daemon's lifetime keep using the mounted binary.
-//!
-//! `$APPIMAGE` / `$APPDIR` are only trusted when `current_exe()` lives under
-//! `$APPDIR`. Nested AppImage hosts (e.g. an IDE packaged as an AppImage)
-//! export those variables for *themselves*; without this check a cargo-run
-//! or standalone binary would incorrectly re-exec the host AppImage.
+//! Resolve portable launchers, companion binaries and bundled helpers.
 
 use std::path::{Path, PathBuf};
 
@@ -16,110 +6,108 @@ use crate::config::defaults::APP_DIR_NAME;
 
 const FALLBACK_NAME: &str = APP_DIR_NAME;
 
-/// Pure check: is `appimage`/`appdir` owned by the process whose exe is
+/// Pure check: is `portable_exe`/`portable_root` owned by the process whose exe is
 /// `current_exe`? Injectable for tests — never mutates process environment.
-pub fn own_appimage_from(
-    appimage: Option<&Path>,
-    appdir: Option<&Path>,
+pub fn own_portable_exe_from(
+    portable_exe: Option<&Path>,
+    portable_root: Option<&Path>,
     current_exe: &Path,
 ) -> Option<PathBuf> {
-    let appimage = appimage?;
-    let appdir = appdir?;
-    if !appimage.is_file() {
+    let portable_exe = portable_exe?;
+    let portable_root = portable_root?;
+    if !portable_exe.is_absolute() || !portable_exe.is_file() {
         return None;
     }
-    // Require the running binary to sit inside this AppImage's mount. A host
-    // AppImage (Cursor, etc.) sets APPIMAGE/APPDIR, but our exe is elsewhere.
-    if !path_is_under(current_exe, appdir) {
+    // Ignore inherited launcher exports when running from a source checkout.
+    if !path_is_under(current_exe, &portable_root.join("bin")) {
         return None;
     }
-    Some(appimage.to_path_buf())
+    Some(portable_exe.to_path_buf())
 }
 
-/// Absolute path of the AppImage that contains this process, if any.
-pub fn own_appimage() -> Option<PathBuf> {
-    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
-    let appdir = std::env::var_os("APPDIR").map(PathBuf::from);
+/// Absolute path of the portable bundle that contains this process, if any.
+pub fn own_portable_exe() -> Option<PathBuf> {
+    let portable_exe = std::env::var_os("GRAVAAI_PORTABLE_EXE").map(PathBuf::from);
+    let portable_root = std::env::var_os("GRAVAAI_PORTABLE_ROOT").map(PathBuf::from);
     let exe = std::env::current_exe().ok()?;
-    own_appimage_from(appimage.as_deref(), appdir.as_deref(), &exe)
+    own_portable_exe_from(portable_exe.as_deref(), portable_root.as_deref(), &exe)
 }
 
-/// Mount root of the AppImage containing this process, if any. Only an
-/// APPDIR that actually contains the running binary is accepted, so host
-/// AppImage exports (Cursor, OpenCode) are ignored.
-pub fn own_appdir() -> Option<PathBuf> {
-    let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
+/// Persistent extraction root of the bundle containing this process, if any. Only a
+/// GRAVAAI_PORTABLE_ROOT that actually contains the running binary is accepted.
+pub fn own_portable_root() -> Option<PathBuf> {
+    let portable_root = std::env::var_os("GRAVAAI_PORTABLE_ROOT").map(PathBuf::from)?;
     let exe = std::env::current_exe().ok()?;
-    path_is_under(&exe, &appdir).then_some(appdir)
+    path_is_under(&exe, &portable_root.join("bin")).then_some(portable_root)
 }
 
-/// Path for a process that must outlive the caller (and its AppImage mount).
-/// Prefer the owning AppImage file; otherwise `current_exe()`.
+/// Stable launcher for desktop entries and detached daemon launches.
 pub fn persistent_exe() -> PathBuf {
-    if let Some(appimage) = own_appimage() {
-        return appimage;
+    if let Some(portable_exe) = own_portable_exe() {
+        return portable_exe;
     }
     std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME))
 }
 
-/// Path for short-lived children that share this process's lifetime/mount.
+/// Path for internal children in the same persistent extraction tree.
 pub fn internal_exe() -> PathBuf {
     std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME))
 }
 
-/// Resolve the Qt companion executable without trusting a host AppImage's
-/// environment. The daemon binary lives in `usr/bin`, while the UI lives in
-/// `usr/libexec/gravaai` inside the same AppImage. Source builds keep both
+/// Resolve the Qt companion next to the daemon in the portable tree.
+/// Source builds keep both
 /// release/debug binaries side by side in Cargo's target directory.
 pub fn internal_ui_exe() -> PathBuf {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME));
-    let appdir = std::env::var_os("APPDIR").map(PathBuf::from);
-    resolve_ui_exe(&exe, appdir.as_deref()).unwrap_or_else(|| {
+    let portable_root = std::env::var_os("GRAVAAI_PORTABLE_ROOT").map(PathBuf::from);
+    resolve_ui_exe(&exe, portable_root.as_deref()).unwrap_or_else(|| {
         exe.parent()
             .map(|p| p.join("gravaai-ui"))
             .unwrap_or_else(|| PathBuf::from("gravaai-ui"))
     })
 }
 
-/// Resolve a helper executable from the current AppImage before consulting
-/// the host PATH. The AppRun script also puts this directory first, but
+/// Resolve a helper executable from the current portable bundle before consulting
+/// the host PATH. The portable launcher puts this directory first, but
 /// resolving here keeps source runs, direct daemon launches and contaminated
 /// IDE environments consistent.
 pub fn runtime_program(name: &str) -> PathBuf {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(FALLBACK_NAME));
-    let appdir = std::env::var_os("APPDIR").map(PathBuf::from);
-    resolve_runtime_program(&exe, appdir.as_deref(), name)
+    let portable_root = std::env::var_os("GRAVAAI_PORTABLE_ROOT").map(PathBuf::from);
+    resolve_runtime_program(&exe, portable_root.as_deref(), name)
         .or_else(|| crate::services::system_installer::which(name).map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from(name))
 }
 
 /// Pure helper resolver used by runtime code and unit tests.
-pub fn resolve_runtime_program(exe: &Path, appdir: Option<&Path>, name: &str) -> Option<PathBuf> {
+pub fn resolve_runtime_program(
+    exe: &Path,
+    portable_root: Option<&Path>,
+    name: &str,
+) -> Option<PathBuf> {
     let mut candidates = Vec::new();
-    if let Some(root) = appdir {
+    if let Some(root) = portable_root {
         if path_is_under(exe, root) {
-            candidates.push(root.join("usr/bin").join(name));
+            candidates.push(root.join("bin").join(name));
         }
     }
     if let Some(parent) = exe.parent() {
         candidates.push(parent.join(name));
-        candidates.push(parent.join("../libexec/gravaai").join(name));
     }
     candidates.into_iter().find(|path| path.is_file())
 }
 
 /// Pure UI companion resolver used by the daemon and tests.
-pub fn resolve_ui_exe(exe: &Path, appdir: Option<&Path>) -> Option<PathBuf> {
+pub fn resolve_ui_exe(exe: &Path, portable_root: Option<&Path>) -> Option<PathBuf> {
     let mut candidates = Vec::new();
-    if let Some(root) = appdir {
-        // Only accept an APPDIR that actually contains the current binary.
+    if let Some(root) = portable_root {
+        // Only accept a GRAVAAI_PORTABLE_ROOT that actually contains the current binary.
         if path_is_under(exe, root) {
-            candidates.push(root.join("usr/libexec/gravaai/gravaai-ui"));
+            candidates.push(root.join("bin/gravaai-ui"));
         }
     }
     if let Some(parent) = exe.parent() {
         candidates.push(parent.join("gravaai-ui"));
-        candidates.push(parent.join("../libexec/gravaai/gravaai-ui"));
         candidates.push(parent.join("../share/gravaai/gravaai-ui"));
     }
     candidates.into_iter().find(|p| p.is_file())
@@ -171,35 +159,40 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn own_appimage_ignores_host_when_exe_outside_appdir() {
+    fn own_portable_exe_ignores_host_when_exe_outside_portable_root() {
         let dir = tempfile::tempdir().unwrap();
-        let host_appdir = dir.path().join("cursor-mount");
-        let host_appimage = dir.path().join("Cursor.AppImage");
-        fs::create_dir_all(&host_appdir).unwrap();
-        fs::write(&host_appimage, b"x").unwrap();
+        let host_portable_root = dir.path().join("cursor-mount");
+        let host_portable_exe = dir.path().join("Host.run");
+        fs::create_dir_all(&host_portable_root).unwrap();
+        fs::write(&host_portable_exe, b"x").unwrap();
         let our_exe = dir.path().join(format!("elsewhere/{APP_DIR_NAME}"));
         fs::create_dir_all(our_exe.parent().unwrap()).unwrap();
         fs::write(&our_exe, b"x").unwrap();
 
         assert!(
-            own_appimage_from(Some(&host_appimage), Some(&host_appdir), &our_exe).is_none(),
-            "host IDE AppImage must not be treated as ours"
+            own_portable_exe_from(
+                Some(&host_portable_exe),
+                Some(&host_portable_root),
+                &our_exe
+            )
+            .is_none(),
+            "host IDE portable bundle must not be treated as ours"
         );
     }
 
     #[test]
-    fn own_appimage_accepts_when_exe_under_appdir() {
+    fn own_portable_exe_accepts_when_exe_under_portable_root() {
         let dir = tempfile::tempdir().unwrap();
-        let appdir = dir.path().join("mr-mount");
-        let bin_dir = appdir.join("usr/bin");
+        let portable_root = dir.path().join("mr-mount");
+        let bin_dir = portable_root.join("bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let fake_exe = bin_dir.join(APP_DIR_NAME);
         fs::write(&fake_exe, b"x").unwrap();
-        let appimage = dir.path().join("gravaai.AppImage");
-        fs::write(&appimage, b"x").unwrap();
+        let portable_exe = dir.path().join("gravaai.run");
+        fs::write(&portable_exe, b"x").unwrap();
 
-        let got = own_appimage_from(Some(&appimage), Some(&appdir), &fake_exe);
-        assert_eq!(got.as_deref(), Some(appimage.as_path()));
+        let got = own_portable_exe_from(Some(&portable_exe), Some(&portable_root), &fake_exe);
+        assert_eq!(got.as_deref(), Some(portable_exe.as_path()));
     }
 
     #[test]
@@ -215,11 +208,11 @@ mod tests {
     }
 
     #[test]
-    fn resolves_appimage_companion_only_inside_owned_mount() {
+    fn resolves_portable_exe_companion_only_inside_owned_mount() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("mount");
-        let bin = root.join("usr/bin");
-        let ui = root.join("usr/libexec/gravaai");
+        let bin = root.join("bin");
+        let ui = root.join("bin");
         fs::create_dir_all(&bin).unwrap();
         fs::create_dir_all(&ui).unwrap();
         let exe = bin.join(APP_DIR_NAME);
@@ -229,11 +222,11 @@ mod tests {
         assert_eq!(resolve_ui_exe(&exe, Some(&root)), Some(ui_exe.clone()));
 
         let host = dir.path().join("host-mount");
-        fs::create_dir_all(host.join("usr/libexec/gravaai")).unwrap();
-        fs::write(host.join("usr/libexec/gravaai/gravaai-ui"), b"x").unwrap();
+        fs::create_dir_all(host.join("bin")).unwrap();
+        fs::write(host.join("bin/gravaai-ui"), b"x").unwrap();
         assert_ne!(
             resolve_ui_exe(&exe, Some(&host)),
-            Some(host.join("usr/libexec/gravaai/gravaai-ui"))
+            Some(host.join("bin/gravaai-ui"))
         );
     }
 
@@ -241,7 +234,7 @@ mod tests {
     fn resolves_runtime_helper_inside_owned_mount() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("mount");
-        let bin = root.join("usr/bin");
+        let bin = root.join("bin");
         std::fs::create_dir_all(&bin).unwrap();
         let exe = bin.join(APP_DIR_NAME);
         let helper = bin.join("ffmpeg");

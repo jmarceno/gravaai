@@ -47,6 +47,19 @@ fn main() {
         core::run_mode::RunMode::Uninstall => {
             std::process::exit(utils::self_uninstall::run_uninstall());
         }
+        core::run_mode::RunMode::DesktopInstall => {
+            if argv.iter().skip(2).any(|arg| arg != "--autostart") {
+                eprintln!("Usage: gravaai install [--autostart]");
+                std::process::exit(2);
+            }
+            std::process::exit(utils::self_install::run_install(
+                argv.iter().any(|a| a == "--autostart"),
+            ));
+        }
+        core::run_mode::RunMode::Version => println!(
+            "GravaAi {}",
+            core::app_info::installed_version().unwrap_or_else(|| env!("CARGO_PKG_VERSION").into())
+        ),
         core::run_mode::RunMode::Client => client::run_client(),
     }
 }

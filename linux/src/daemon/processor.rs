@@ -218,7 +218,7 @@ impl ProcessorLauncher {
         notes: &str,
         mode: crate::core::job::JobMode,
     ) -> ProcessorHandle {
-        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE.
+        // Share the daemon's portable extraction tree — do not re-exec $GRAVAAI_PORTABLE_EXE.
         let exe = crate::utils::exe::internal_exe();
         let mut cmd = Command::new(&exe);
         cmd.env(crate::core::run_mode::CHILD_ENV, "1");

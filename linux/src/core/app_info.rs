@@ -1,7 +1,5 @@
 //! App identity + installed-version resolution.
 
-use std::path::PathBuf;
-
 use crate::config::defaults::APP_DIR_NAME;
 
 pub const DESCRIPTION: &str =
@@ -32,14 +30,10 @@ pub fn resolve_version(run: &dyn Fn() -> Option<String>) -> Option<String> {
     Some(version.to_string())
 }
 
-/// Version stamped into the AppImage at pack time
-/// (`usr/share/gravaai/VERSION`). Only consulted when we are
-/// actually running from our own AppImage (host IDE AppImages are ignored).
-fn version_from_appimage() -> Option<String> {
-    let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
-    crate::utils::exe::own_appimage()?;
-    let text =
-        std::fs::read_to_string(appdir.join(format!("usr/share/{APP_DIR_NAME}/VERSION"))).ok()?;
+/// Version stamped into the portable payload at build time.
+fn version_from_portable() -> Option<String> {
+    let root = crate::utils::exe::own_portable_root()?;
+    let text = std::fs::read_to_string(root.join(format!("share/{APP_DIR_NAME}/VERSION"))).ok()?;
     let version = text.trim();
     if version.is_empty() {
         None
@@ -49,7 +43,7 @@ fn version_from_appimage() -> Option<String> {
 }
 
 pub fn installed_version() -> Option<String> {
-    if let Some(v) = version_from_appimage() {
+    if let Some(v) = version_from_portable() {
         return Some(v);
     }
     resolve_version(&|| {

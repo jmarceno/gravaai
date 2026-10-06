@@ -1,0 +1,44 @@
+# Portable-builder image: old-glibc baseline (Ubuntu 22.04, glibc 2.35, Qt 6.2).
+#
+# Release bundles MUST be built here: a binary built on a newer distro
+# requires that distro's GLIBC_X.Y symbols and will not start on older ones.
+# Keep your code compatible with Qt 6.2 (the Qt this image ships).
+#
+# Build/run via: ./scripts/build-portable.sh --container
+FROM docker.io/library/ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:$PATH
+
+# lld is required: qt-build-utils refuses GNU ld.bfd and falls back to
+# ld.gold, which mislinks cxx-qt's generated module initializers
+# (undefined cxx_qt_init_* references at the final link).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential musl-tools clang lld cmake pkg-config git curl ca-certificates file binutils patchelf \
+    libfontconfig1-dev libfreetype6 libdbus-1-3 libglib2.0-0 libgl-dev \
+    libx11-6 libxext6 libxrender1 libxcb1 \
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-shm0 \
+    libxcb-sync1 libxcb-xfixes0 libxcb-xkb1 libxcb-xinerama0 \
+    libxkbcommon-x11-0 libxkbcommon0 \
+    libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+    qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-wayland libqt6svg6 \
+    qml6-module-qtquick qml6-module-qtquick-controls \
+    qml6-module-qtquick-layouts qml6-module-qtquick-templates \
+    qml6-module-qtquick-window qml6-module-qtqml-workerscript \
+    qml6-module-qt-labs-platform ffmpeg pulseaudio-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin the compiler used for portable release builds.
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.90.0 \
+    && /opt/cargo/bin/rustup component add clippy rustfmt \
+    && /opt/cargo/bin/rustup target add "$(uname -m)-unknown-linux-musl"
+
+# QML core metadata is needed by qmllint and the runtime's imported types.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    qml6-module-qtqml qml6-module-qtqml-models dbus fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace

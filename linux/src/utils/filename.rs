@@ -91,7 +91,10 @@ mod tests {
             sanitize_title("Resolucao problema da camara apos instalacao confusa do hardware"),
             "Resolucao_problema_da_camara_apos_instalacao"
         );
-        assert_eq!(sanitize_title("Camera fix; CrossFit"), "Camera_fix_CrossFit");
+        assert_eq!(
+            sanitize_title("Camera fix; CrossFit"),
+            "Camera_fix_CrossFit"
+        );
     }
 
     #[test]

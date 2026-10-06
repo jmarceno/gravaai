@@ -6,7 +6,7 @@ mod runtime;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQuickStyle, QString, QUrl};
+use cxx_qt_lib::{QQmlApplicationEngine, QQuickStyle, QString, QUrl};
 use zbus::blocking::Connection;
 
 use crate::config::defaults::{APP_ID, APP_NAME};
@@ -83,10 +83,15 @@ pub fn run_window() -> i32 {
         unsafe { std::env::set_var("QT_QUICK_CONTROLS_STYLE", "Basic") };
     }
 
+    if std::env::var_os("QT_QUICK_BACKEND").is_none()
+        && std::env::var_os("QSG_RHI_BACKEND").is_none()
+    {
+        std::env::set_var("QT_QUICK_BACKEND", "software");
+    }
     spawn_startup_watchdog();
     QQuickStyle::set_style(&QString::from("Basic"));
 
-    let mut app = QGuiApplication::new();
+    let mut app = runtime::application();
     if let Some(mut app_ref) = app.as_mut() {
         app_ref
             .as_mut()
@@ -111,7 +116,7 @@ pub fn run_window() -> i32 {
     let mut engine = QQmlApplicationEngine::new();
     if let Some(mut engine_ref) = engine.as_mut() {
         // cxx-qt embeds the module into the resource system. Keeping the URL
-        // module-based prevents source/AppImage path drift.
+        // module-based prevents source/bundle path drift.
         let url = if smoke_mode {
             QUrl::from("qrc:/qt/qml/io/github/jmarceno/gravaai/qml/SmokeHarness.qml")
         } else {

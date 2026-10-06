@@ -261,10 +261,10 @@ async fn async_main() -> i32 {
         handles: HashMap::new(),
     };
     let cfg = settings::load();
-    // Repair a stale login entry (e.g. a transient AppImage mount path
+    // Repair a stale login entry (e.g. a transient portable extraction tree path
     // persisted by an older build) whenever startup-at-login is wanted; this
     // is a no-op when the entry is already correct.
-    if cfg.start_at_startup {
+    if cfg.start_at_startup && crate::utils::exe::own_portable_exe().is_some() {
         crate::utils::autostart::update_autostart(true);
     }
     let call_detection_enabled = cfg.call_detection_enabled;
@@ -288,7 +288,7 @@ async fn async_main() -> i32 {
     let slot_clone = child_slot.clone();
     let tx_clone = msg_tx.clone();
     let spawn_fn = move || {
-        // Share the daemon's AppImage mount — do not re-exec $APPIMAGE. The
+        // Share the daemon's portable extraction tree — do not re-exec $GRAVAAI_PORTABLE_EXE. The
         // Qt process is a separate companion so this daemon remains free of
         // Qt dependencies in both the linker and the runtime.
         let exe = crate::utils::exe::internal_ui_exe();
@@ -344,7 +344,7 @@ async fn async_main() -> i32 {
             }
             Err(e) => {
                 let msg = format!(
-                    "Failed to start the Qt window: {e:#}. Check that the AppImage is complete."
+                    "Failed to start the Qt window: {e:#}. Check that the portable bundle is complete."
                 );
                 log::error!("{msg}");
                 let _ = tx_clone.send(DaemonMsg::EngineError(msg));

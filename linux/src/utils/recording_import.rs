@@ -73,9 +73,16 @@ pub fn prepare_import(
     let audio = session.join(format!("recording.{ext}"));
     if let Err(e) = std::fs::copy(selected, &audio) {
         let _ = std::fs::remove_dir_all(&session);
-        anyhow::bail!("Could not copy {} into the library: {e}", selected.display());
+        anyhow::bail!(
+            "Could not copy {} into the library: {e}",
+            selected.display()
+        );
     }
-    Ok((audio, session.join("transcript.md"), session.join("notes.md")))
+    Ok((
+        audio,
+        session.join("transcript.md"),
+        session.join("notes.md"),
+    ))
 }
 
 fn absolutize(p: &Path) -> PathBuf {
@@ -143,8 +150,12 @@ mod tests {
     #[test]
     fn prepare_import_rejects_missing_files() {
         let tmp = tempfile::tempdir().unwrap();
-        let err = prepare_import(&tmp.path().join("nope.mp3"), tmp.path(), &chrono::Local::now())
-            .unwrap_err();
+        let err = prepare_import(
+            &tmp.path().join("nope.mp3"),
+            tmp.path(),
+            &chrono::Local::now(),
+        )
+        .unwrap_err();
         assert!(format!("{err}").contains("not found"));
     }
 

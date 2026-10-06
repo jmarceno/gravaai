@@ -8,6 +8,8 @@ pub enum RunMode {
     Install,
     Uninstall,
     Client,
+    DesktopInstall,
+    Version,
 }
 
 pub const DAEMON_FLAG: &str = "--daemon";
@@ -46,6 +48,12 @@ pub fn resolve_run_mode(argv: &[String]) -> RunMode {
     if args.contains(&UNINSTALL_FLAG) {
         return RunMode::Uninstall;
     }
+    if args.first() == Some(&"install") {
+        return RunMode::DesktopInstall;
+    }
+    if args == ["--version"] {
+        return RunMode::Version;
+    }
     RunMode::Client
 }
 
@@ -62,6 +70,11 @@ mod tests {
     #[test]
     fn dispatch() {
         assert_eq!(resolve_run_mode(&argv(&[])), RunMode::Client);
+        assert_eq!(
+            resolve_run_mode(&argv(&["install", "--autostart"])),
+            RunMode::DesktopInstall
+        );
+        assert_eq!(resolve_run_mode(&argv(&["--version"])), RunMode::Version);
         assert_eq!(resolve_run_mode(&argv(&["--daemon"])), RunMode::Daemon);
         assert_eq!(resolve_run_mode(&argv(&["--window"])), RunMode::Window);
         assert_eq!(resolve_run_mode(&argv(&["--process"])), RunMode::Process);

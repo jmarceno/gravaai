@@ -1,63 +1,67 @@
 name: release
 
-# MANUAL ONLY: run it from the repo's Actions tab ("Run workflow").
-# Never add push / tag / schedule / pull_request triggers here or in any
-# other workflow: nothing in this repo may run without a human starting it.
+# MANUAL ONLY: start it from the Actions tab ("Run workflow") on the branch
+# to release. Never add push / tag / schedule / pull_request triggers.
 #
-# Releases the version in linux/Cargo.toml as tag v<version> on the selected
-# branch's current commit, with the portable .run and SHA256SUMS attached.
+# Everything else is automatic: the version (linux/Cargo.toml when newer than
+# every release tag, otherwise the latest tag with the patch bumped), the
+# portable build on Ubuntu 22.04 (glibc 2.35), its smoke test, and the
+# release with tag v<version> on the dispatched commit. A commit that
+# already has a release tag is refused.
 on:
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Read version
-        id: version
+      - name: Plan version
+        id: plan
+        run: .gitea/scripts/release-plan.sh "$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' linux/Cargo.toml | head -n1)"
+
+      - name: Stamp version
+        run: .gitea/scripts/release-stamp-cargo.sh linux/Cargo.toml linux/Cargo.lock gravaai "${{ steps.plan.outputs.version }}"
+
+      - name: Build portable bundle (Ubuntu 22.04)
         run: |
-          version="$(grep -m1 -E '^version\s*=' linux/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
-
-      - name: Refuse to overwrite an existing release
-        env:
-          API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
-          TOKEN: ${{ secrets.GITEA_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          code="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: token $TOKEN" "$API/releases/tags/$TAG")"
-          if [ "$code" = 200 ]; then
-            echo "Release $TAG already exists; bump version in linux/Cargo.toml first." >&2
-            exit 1
-          fi
-
-      - name: Build portable bundle (glibc 2.35 container)
-        run: ./scripts/build-portable.sh --container
+          set -euo pipefail
+          image=gravaai-portable-builder:22.04
+          docker build -t "$image" -f linux/packaging/portable/Containerfile linux/packaging/portable
+          .gitea/scripts/container-build.sh "$image" build/portable \
+            -v gravaai-release-cargo:/opt/cargo/registry \
+            -v gravaai-release-target:/workspace-target \
+            -e CARGO_TARGET_DIR=/workspace-target \
+            -e APP_VERSION="${{ steps.plan.outputs.version }}" \
+            -- ./scripts/build-portable.sh
 
       - name: Smoke portable bundle
-        run: ./scripts/smoke-portable.sh build/portable/*-portable.run
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends dbus
+          ./scripts/smoke-portable.sh build/portable/GravaAi-${{ steps.plan.outputs.version }}-x86_64-portable.run
 
-      - name: Create release and upload assets
-        env:
-          API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
-          TOKEN: ${{ secrets.GITEA_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          SHA: ${{ gitea.sha }}
+      - name: Collect assets
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp build/portable/*-portable.run dist/
+          cp build/portable/GravaAi-*-portable.run dist/
           (cd dist && sha256sum ./*.run > SHA256SUMS)
-          auth="Authorization: token $TOKEN"
-          body="$(jq -n --arg tag "$TAG" --arg sha "$SHA" '{tag_name: $tag, target_commitish: $sha, name: $tag}')"
-          id="$(curl -fsS -H "$auth" -H 'Content-Type: application/json' -d "$body" "$API/releases" | jq -er .id)"
-          for f in dist/*; do
-            name="$(basename "$f")"
-            curl -fsS -H "$auth" -H 'Content-Type: application/octet-stream' \
-              --data-binary "@$f" "$API/releases/$id/assets?name=$(jq -rn --arg n "$name" '$n|@uri')" >/dev/null
-          done
+
+      - name: Publish release
+        env:
+          GITEA_API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          RELEASE_SHA: ${{ gitea.sha }}
+        run: .gitea/scripts/release-publish.sh "${{ steps.plan.outputs.tag }}" "GravaAi ${{ steps.plan.outputs.version }}" "${{ steps.plan.outputs.notes }}" dist

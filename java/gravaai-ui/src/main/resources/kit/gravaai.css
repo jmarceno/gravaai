@@ -1,0 +1,1590 @@
+/*
+ * Gravaai JavaFX UI kit — design tokens and component styles (plan §5.12, P1.3).
+ *
+ * Ported from the React app (dark theme only, the app's only theme):
+ *   src/index.css                      (Gravaai dark palette + HeroUI theme overrides)
+ *   node_modules/@heroui/styles/dist   (default theme variables + component CSS)
+ *   src/components/launch/launchTheme.css
+ *   src/components/launch/LaunchWindow.module.css
+ *   src/components/launch/SourceSelector.css
+ *   src/components/launch/MarqueeText.css
+ *
+ * Colours are resolved to sRGB hex/rgba because JavaFX CSS has no oklch()/color-mix().
+ * Looked-up colours use the -g- prefix; the Tailwind class -> px mapping table is in
+ * dev/gravaai/ui/kit/README.md next to the components.
+ *
+ * Class names stay identical to HeroUI's (.button, .button--primary, .switch__track, ...) so the
+ * reviewer can diff a component against its React original line by line.
+ */
+
+/* ==========================================================================
+   Tokens — src/index.css ".dark" block + @heroui/styles dark theme, resolved
+   ========================================================================== */
+
+.root {
+	/* Base palette (src/index.css .dark). */
+	-g-bg: #121418;
+	-g-fg: #ffffff;
+	-g-surface: #1b1e25;
+	-g-surface-secondary: #232833;
+	-g-surface-tertiary: #2a303b;
+	-g-overlay: #1b1e25;
+	-g-muted: #8b929a;
+	-g-default: #232833;
+	-g-default-foreground: #ffffff;
+	-g-segment: #343b48;
+	-g-segment-foreground: #ffffff;
+	-g-field: #12151b;
+	-g-field-foreground: #ffffff;
+	-g-field-placeholder: #6b7280;
+	-g-border: #2a303b;
+	-g-separator: #2a303b;
+	-g-accent: #2fb3a3;
+	-g-accent-foreground: #0b0d10;
+	-g-accent-hover: #3fd4c1;
+	-g-accent-soft: rgba(47, 179, 163, 0.13);
+	-g-accent-soft-hover: rgba(47, 179, 163, 0.2);
+	-g-accent-soft-foreground: #3fd4c1;
+	-g-success: #3ecf8e;
+	-g-success-soft: rgba(62, 207, 142, 0.13);
+	-g-warning: #e8b339;
+	-g-warning-soft: rgba(232, 179, 57, 0.15);
+	-g-danger: #e5656e;
+	-g-danger-hover: #f07880;
+	-g-danger-soft: rgba(229, 101, 110, 0.15);
+	-g-danger-foreground: #fcfcfc;
+	-g-scrollbar-thumb: #2a2f38;
+
+	/* Derived colours (@heroui/styles variables.css dark block, color-mix resolved). */
+	-g-surface-hover: #2a2d34;
+	-g-surface-secondary-hover: #323741;
+	-g-bg-secondary: #191b1f;
+	-g-bg-tertiary: #212327;
+	-g-bg-inverse: #ffffff;
+	-g-default-hover: #2a2f3a;
+	-g-default-soft: rgba(35, 40, 51, 0.5);
+	-g-default-soft-hover: rgba(35, 40, 51, 0.6);
+	-g-success-hover: #5bd499;
+	-g-success-soft-hover: rgba(62, 207, 142, 0.16);
+	-g-success-soft-foreground: #82ddac;
+	-g-warning-hover: #ebbb55;
+	-g-warning-soft-hover: rgba(232, 179, 57, 0.16);
+	-g-warning-soft-foreground: #efc87b;
+	-g-danger-soft-hover: rgba(229, 101, 110, 0.2);
+	-g-danger-soft-foreground: #f19194;
+	-g-field-hover: #16191f;
+	-g-field-focus: #12151b;
+	-g-border-secondary: #46494f;
+	-g-border-tertiary: #5f6267;
+	-g-separator-secondary: #383a41;
+	-g-separator-tertiary: #404249;
+	-g-focus: #2fb3a3;
+	-g-link: #ffffff;
+	-g-backdrop: rgba(0, 0, 0, 0.6);
+	-g-icon-color: #ffffff;
+
+	/* Radii (@heroui/styles --radius: 0.5rem; index.css does not override it). */
+	-g-radius-xs: 2px;
+	-g-radius-sm: 4px;
+	-g-radius-md: 6px;
+	-g-radius-lg: 8px;
+	-g-radius-xl: 12px;
+	-g-radius-2xl: 16px;
+	-g-radius-3xl: 24px;
+	-g-radius-4xl: 32px;
+	-g-radius-field: 12px;
+
+	/* Typography (index.css @font-face "DM Sans", loaded by AppFonts before any scene). */
+	-fx-font-family: "DM Sans";
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-fg;
+	-fx-background-color: -g-bg;
+}
+
+/* JavaFX focus defaults: HeroUI owns the focus ring, so the modena ring is removed globally. */
+.root {
+	-fx-focus-color: transparent;
+	-fx-faint-focus-color: transparent;
+}
+
+/* ==========================================================================
+   Shared helpers
+   ========================================================================== */
+
+/* HeroUI no-highlight. */
+.no-highlight {
+	-fx-background-insets: 0;
+}
+
+/* Text helper classes used by the screens (Tailwind text-* equivalents). */
+.text-xs { -fx-font-size: 12px; }
+.text-sm { -fx-font-size: 14px; }
+.text-base { -fx-font-size: 16px; }
+.text-lg { -fx-font-size: 18px; }
+.text-xl { -fx-font-size: 20px; }
+.text-2xl { -fx-font-size: 24px; }
+.text-muted { -fx-text-fill: -g-muted; }
+.text-foreground { -fx-text-fill: -g-fg; }
+.font-normal { -fx-font-weight: 400; }
+.font-medium { -fx-font-weight: 500; }
+.font-semibold { -fx-font-weight: 600; }
+.font-bold { -fx-font-weight: 700; }
+
+/* Icon paths: "currentColor" in the extracted SVG maps to the -g-icon-color token. */
+.g-icon-fill { -fx-fill: -g-icon-color; }
+.g-icon-stroke { -fx-stroke: -g-icon-color; }
+
+.kit-root {
+	-fx-background-color: -g-bg;
+}
+
+/* ==========================================================================
+   Button — @heroui/styles components/button.css
+   h-9 (36px) desktop value, rounded-3xl (24px), px-4 (16px), gap-2 (8px), text-sm (14px)
+   ========================================================================== */
+
+.button {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 24px;
+	-fx-background-insets: 0;
+	-fx-text-fill: -g-accent-foreground;
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-padding: 0 16px 0 16px;
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-graphic-text-gap: 8px;
+	-fx-cursor: hand;
+}
+
+.button:disabled {
+	-fx-opacity: 0.5;
+	-fx-cursor: default;
+}
+
+/* Focus ring: ring-2 ring-focus, drawn as an outer background layer (no layout shift). */
+.button:focused {
+	-fx-background-color: -g-focus, -g-accent;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 26px, 24px;
+}
+
+.button .g-icon {
+	-g-icon-color: -g-accent-foreground;
+}
+
+/* Colours from button.css variants. */
+.button--primary {
+	-fx-background-color: -g-accent;
+	-fx-text-fill: -g-accent-foreground;
+}
+
+.button--secondary {
+	-fx-background-color: -g-default;
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+
+.button--tertiary {
+	-fx-background-color: -g-default;
+	-fx-text-fill: -g-default-foreground;
+}
+
+.button--ghost,
+.button--outline {
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-default-foreground;
+}
+
+.button--outline {
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 24px;
+}
+
+.button--danger {
+	-fx-background-color: -g-danger;
+	-fx-text-fill: -g-danger-foreground;
+}
+
+.button--danger .g-icon {
+	-g-icon-color: -g-danger-foreground;
+}
+
+.button--danger-soft {
+	-fx-background-color: -g-danger-soft;
+	-fx-text-fill: -g-danger-soft-foreground;
+}
+
+.button--danger-soft .g-icon {
+	-g-icon-color: -g-danger-soft-foreground;
+}
+
+.button--link {
+	-fx-background-color: transparent;
+	-fx-padding: 0;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+	-fx-text-fill: -g-default-foreground;
+	-fx-underline: true;
+}
+
+.button:hover {
+	-fx-background-color: -g-accent-hover;
+}
+
+.button--secondary:hover,
+.button--tertiary:hover {
+	-fx-background-color: -g-default-hover;
+}
+
+.button--ghost:hover {
+	-fx-background-color: -g-default;
+}
+
+.button--outline:hover {
+	-fx-background-color: rgba(35, 40, 51, 0.6);
+}
+
+.button--danger:hover {
+	-fx-background-color: -g-danger-hover;
+}
+
+.button--danger-soft:hover {
+	-fx-background-color: -g-danger-soft-hover;
+}
+
+.button--link:hover {
+	-fx-background-color: transparent;
+}
+
+.button:focused:hover {
+	-fx-background-color: -g-focus, -g-accent-hover;
+}
+
+.button--secondary:focused:hover,
+.button--tertiary:focused:hover {
+	-fx-background-color: -g-focus, -g-default-hover;
+}
+
+.button--ghost:focused:hover {
+	-fx-background-color: -g-focus, -g-default;
+}
+
+.button--outline:focused:hover {
+	-fx-background-color: -g-focus, rgba(35, 40, 51, 0.6);
+}
+
+.button--danger:focused:hover {
+	-fx-background-color: -g-focus, -g-danger-hover;
+}
+
+.button--danger-soft:focused:hover {
+	-fx-background-color: -g-focus, -g-danger-soft-hover;
+}
+
+.button--secondary:focused,
+.button--tertiary:focused {
+	-fx-background-color: -g-focus, -g-default;
+}
+
+.button--ghost:focused,
+.button--outline:focused {
+	-fx-background-color: -g-focus, transparent;
+}
+
+.button--danger:focused {
+	-fx-background-color: -g-focus, -g-danger;
+}
+
+.button--danger-soft:focused {
+	-fx-background-color: -g-focus, -g-danger-soft;
+}
+
+.button--link:focused,
+.button--link:focused:hover {
+	-fx-background-color: -g-focus, transparent;
+}
+
+/* Sizes. */
+.button--sm {
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+	-fx-padding: 0 12px 0 12px;
+}
+
+.button--lg {
+	-fx-min-height: 40px;
+	-fx-pref-height: 40px;
+	-fx-font-size: 16px;
+}
+
+.button--icon-only {
+	-fx-padding: 0;
+	-fx-min-width: 36px;
+	-fx-pref-width: 36px;
+}
+
+.button--icon-only.button--sm {
+	-fx-min-width: 32px;
+	-fx-pref-width: 32px;
+}
+
+.button--icon-only.button--lg {
+	-fx-min-width: 40px;
+	-fx-pref-width: 40px;
+}
+
+.button--full-width {
+	-fx-max-width: infinity;
+}
+
+/* ==========================================================================
+   ToggleButton / ToggleButtonGroup — toggle-button.css, toggle-button-group.css
+   ========================================================================== */
+
+.toggle-button {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 24px;
+	-fx-text-fill: -g-default-foreground;
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-padding: 0 16px 0 16px;
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-graphic-text-gap: 8px;
+	-fx-cursor: hand;
+}
+
+.toggle-button:selected {
+	-fx-background-color: -g-accent-soft;
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+
+.toggle-button:hover {
+	-fx-background-color: -g-default-hover;
+}
+
+.toggle-button:selected:hover {
+	-fx-background-color: -g-accent-soft-hover;
+}
+
+.toggle-button:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 26px, 24px;
+}
+
+.toggle-button:selected:focused {
+	-fx-background-color: -g-focus, -g-accent-soft;
+}
+
+.toggle-button:disabled {
+	-fx-opacity: 0.5;
+}
+
+.toggle-button--ghost {
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-default-foreground;
+}
+
+.toggle-button--ghost:hover {
+	-fx-background-color: -g-default;
+}
+
+.toggle-button--outline {
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 24px;
+}
+
+.toggle-button--sm {
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+	-fx-padding: 0 12px 0 12px;
+}
+
+.toggle-button--lg {
+	-fx-min-height: 40px;
+	-fx-pref-height: 40px;
+	-fx-font-size: 16px;
+}
+
+.toggle-button--icon-only {
+	-fx-padding: 0;
+	-fx-min-width: 36px;
+	-fx-pref-width: 36px;
+}
+
+.toggle-group {
+	-fx-background-color: transparent;
+	-fx-alignment: center-left;
+	-fx-spacing: 0;
+}
+
+/* Attached mode: only the outer edges are rounded. */
+.toggle-group .toggle-button {
+	-fx-background-radius: 0;
+}
+
+.toggle-group .toggle-button:first-child {
+	-fx-background-radius: 24px 0 0 24px;
+}
+
+.toggle-group .toggle-button:last-child {
+	-fx-background-radius: 0 24px 24px 0;
+}
+
+.toggle-group .toggle-button:first-child:last-child {
+	-fx-background-radius: 24px;
+}
+
+.toggle-group__separator {
+	-fx-background-color: -g-fg;
+	-fx-opacity: 0.15;
+	-fx-min-width: 1px;
+	-fx-pref-width: 1px;
+	-fx-max-width: 1px;
+	-fx-min-height: 18px;
+	-fx-pref-height: 18px;
+}
+
+.toggle-group--detached {
+	-fx-spacing: 4px;
+}
+
+.toggle-group--detached .toggle-button,
+.toggle-group--detached .toggle-button:first-child,
+.toggle-group--detached .toggle-button:last-child {
+	-fx-background-radius: 24px;
+}
+
+/* ==========================================================================
+   Switch — switch.css. Track 40x20 r12, thumb 22x16 r8, checked track accent.
+   ========================================================================== */
+
+.switch {
+	-fx-cursor: hand;
+	-fx-spacing: 12px;
+}
+
+.switch__control {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 12px;
+	-fx-min-width: 40px;
+	-fx-pref-width: 40px;
+	-fx-max-width: 40px;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+	-fx-max-height: 20px;
+}
+
+.switch__thumb {
+	-fx-background-color: #ffffff;
+	-fx-background-radius: 8px;
+	-fx-min-width: 22px;
+	-fx-pref-width: 22px;
+	-fx-max-width: 22px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+}
+
+.switch:selected .switch__control {
+	-fx-background-color: -g-accent;
+}
+
+.switch:hover .switch__control {
+	-fx-background-color: rgba(35, 40, 51, 0.8);
+}
+
+.switch:selected:hover .switch__control {
+	-fx-background-color: -g-accent-hover;
+}
+
+.switch:disabled {
+	-fx-opacity: 0.5;
+}
+
+.switch:focused .switch__control {
+	-fx-border-color: -g-focus;
+	-fx-border-width: 2px;
+	-fx-border-radius: 12px;
+}
+
+.switch__content {
+	-fx-alignment: center-left;
+	-fx-spacing: 12px;
+}
+
+.switch__label {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.switch--sm .switch__control {
+	-fx-min-width: 32px;
+	-fx-pref-width: 32px;
+	-fx-max-width: 32px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+	-fx-background-radius: 8px;
+}
+
+.switch--sm .switch__thumb {
+	-fx-min-width: 17px;
+	-fx-pref-width: 17px;
+	-fx-max-width: 17px;
+	-fx-min-height: 12px;
+	-fx-pref-height: 12px;
+	-fx-max-height: 12px;
+	-fx-background-radius: 6px;
+}
+
+.switch--lg .switch__control {
+	-fx-min-width: 48px;
+	-fx-pref-width: 48px;
+	-fx-max-width: 48px;
+	-fx-min-height: 24px;
+	-fx-pref-height: 24px;
+	-fx-max-height: 24px;
+	-fx-background-radius: 12px;
+}
+
+.switch--lg .switch__thumb {
+	-fx-min-width: 27px;
+	-fx-pref-width: 27px;
+	-fx-max-width: 27px;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+	-fx-max-height: 20px;
+}
+
+/* ==========================================================================
+   Slider — slider.css. Track h-5 (20px) r12, fill accent, thumb 28x20 with a
+   24x16 white pill, dragging scales the pill to 0.9.
+   ========================================================================== */
+
+.slider {
+	-fx-spacing: 8px;
+}
+
+.slider__track {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 12px;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+}
+
+.slider__fill {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 12px;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+}
+
+.slider__thumb {
+	-fx-background-color: transparent;
+}
+
+.slider__thumb-pill {
+	-fx-background-color: #ffffff;
+	-fx-background-radius: 8px;
+	-fx-min-width: 24px;
+	-fx-pref-width: 24px;
+	-fx-max-width: 24px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+}
+
+.slider:disabled {
+	-fx-opacity: 0.5;
+}
+
+.slider:focused .slider__track {
+	-fx-border-color: -g-focus;
+	-fx-border-width: 2px;
+	-fx-border-radius: 12px;
+}
+
+.slider__label {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.slider__output {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.slider-control .slider__label,
+.slider-control .slider__output {
+	-fx-font-size: 12px;
+}
+
+/* ==========================================================================
+   Label / Input / TextArea — label.css, input.css, textfield.css
+   ========================================================================== */
+
+/* JavaFX puts "label" on every Label, so this rule only sets the text colour (inheritance).
+   The HeroUI Label component styles live on .g-label below. */
+.label {
+	-fx-text-fill: -g-fg;
+}
+
+.g-label {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.label--invalid {
+	-fx-text-fill: -g-danger;
+}
+
+.label--disabled {
+	-fx-opacity: 0.5;
+}
+
+.textfield {
+	-fx-spacing: 4px;
+}
+
+.text-field,
+.input {
+	-fx-background-color: -g-field;
+	-fx-background-radius: 12px;
+	-fx-background-insets: 0;
+	-fx-text-fill: -g-field-foreground;
+	-fx-prompt-text-fill: -g-field-placeholder;
+	-fx-font-size: 14px;
+	-fx-padding: 8px 12px 8px 12px;
+	-fx-border-width: 0;
+	-fx-highlight-fill: -g-accent-soft;
+	-fx-highlight-text-fill: -g-fg;
+}
+
+.text-field:hover,
+.input:hover {
+	-fx-background-color: -g-field-hover;
+}
+
+.text-field:focused,
+.input:focused {
+	-fx-background-color: -g-focus, -g-field-focus;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+.text-field:disabled,
+.input:disabled {
+	-fx-opacity: 0.5;
+}
+
+.text-area,
+.textarea {
+	-fx-background-color: -g-field;
+	-fx-background-radius: 12px;
+	-fx-text-fill: -g-field-foreground;
+	-fx-prompt-text-fill: -g-field-placeholder;
+	-fx-font-size: 14px;
+	-fx-padding: 8px 12px 8px 12px;
+}
+
+.text-area .content {
+	-fx-background-color: transparent;
+	-fx-background-radius: 12px;
+}
+
+.text-area:focused {
+	-fx-background-color: -g-focus, -g-field-focus;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+/* ==========================================================================
+   Card — card.css. bg-surface, radius 24, p-4 (16), gap-3 (12).
+   ========================================================================== */
+
+.card {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 24px;
+	-fx-padding: 16px;
+	-fx-spacing: 12px;
+}
+
+.card__header {
+	-fx-spacing: 0;
+}
+
+.card__title {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.card__description {
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-muted;
+}
+
+.card__content {
+	-fx-spacing: 4px;
+}
+
+.card__footer {
+	-fx-spacing: 8px;
+	-fx-alignment: center-left;
+}
+
+.card--transparent {
+	-fx-background-color: transparent;
+}
+
+.card--secondary {
+	-fx-background-color: -g-surface-secondary;
+}
+
+.card--tertiary {
+	-fx-background-color: -g-surface-tertiary;
+}
+
+/* ==========================================================================
+   Separator — separator.css
+   ========================================================================== */
+
+.separator {
+	-fx-background-color: -g-separator;
+	-fx-background-radius: 4px;
+	-fx-min-height: 1px;
+	-fx-pref-height: 1px;
+	-fx-max-height: 1px;
+}
+
+.separator--vertical {
+	-fx-min-height: 8px;
+	-fx-pref-height: -1;
+	-fx-max-height: infinity;
+	-fx-min-width: 1px;
+	-fx-pref-width: 1px;
+	-fx-max-width: 1px;
+}
+
+.separator--secondary {
+	-fx-background-color: -g-separator-secondary;
+}
+
+.separator--tertiary {
+	-fx-background-color: -g-separator-tertiary;
+}
+
+/* ==========================================================================
+   Popover / Dropdown menu / Select list — popover.css, dropdown.css, menu.css,
+   list-box-item.css, menu-item.css
+   ========================================================================== */
+
+.popover {
+	-fx-background-color: -g-overlay;
+	-fx-background-radius: 24px;
+	-fx-padding: 0;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.15, 0, 8);
+}
+
+.popover__dialog {
+	-fx-padding: 16px;
+	-fx-spacing: 12px;
+}
+
+.popover__heading {
+	-fx-font-weight: 500;
+}
+
+.popover__trigger {
+	-fx-cursor: hand;
+}
+
+.menu {
+	-fx-padding: 4px;
+	-fx-spacing: 2px;
+	-fx-background-color: transparent;
+}
+
+.menu__label {
+	-fx-font-size: 9px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 6px 10px 4px 10px;
+}
+
+.menu-item {
+	-fx-background-color: transparent;
+	-fx-background-radius: 16px;
+	-fx-padding: 6px 8px 6px 8px;
+	-fx-spacing: 12px;
+	-fx-min-height: 36px;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+}
+
+.menu-item:hover {
+	-fx-background-color: -g-default;
+}
+
+.menu-item:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 18px, 16px;
+}
+
+.menu-item:disabled {
+	-fx-opacity: 0.5;
+}
+
+.menu-item--danger {
+	-fx-text-fill: -g-danger;
+}
+
+.menu-item__shortcut {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 6px;
+	-fx-padding: 2px 6px 2px 6px;
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-muted;
+}
+
+.menu__separator {
+	-fx-background-color: -g-separator;
+	-fx-background-radius: 2px;
+	-fx-min-height: 1px;
+	-fx-pref-height: 1px;
+	-fx-max-height: 1px;
+	-fx-max-width: 94%;
+	-fx-pref-width: 94%;
+}
+
+.list-box {
+	-fx-padding: 6px;
+	-fx-spacing: 2px;
+	-fx-background-color: transparent;
+}
+
+.list-box-item {
+	-fx-background-color: transparent;
+	-fx-background-radius: 16px;
+	-fx-padding: 6px 28px 6px 8px;
+	-fx-spacing: 12px;
+	-fx-min-height: 36px;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+}
+
+.list-box-item:hover {
+	-fx-background-color: -g-default;
+}
+
+.list-box-item:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 18px, 16px;
+}
+
+.list-box-item__indicator {
+	-g-icon-color: -g-default-foreground;
+}
+
+.list-box-item:disabled {
+	-fx-opacity: 0.5;
+}
+
+/* Select — select.css */
+.select {
+	-fx-spacing: 4px;
+}
+
+.select__trigger {
+	-fx-background-color: -g-field;
+	-fx-background-radius: 12px;
+	-fx-padding: 8px 28px 8px 12px;
+	-fx-min-height: 36px;
+	-fx-text-fill: -g-field-foreground;
+	-fx-font-size: 14px;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+	-fx-graphic-text-gap: 8px;
+}
+
+.select__trigger:hover {
+	-fx-background-color: -g-field-hover;
+}
+
+.select__trigger:focused,
+.select__trigger:showing {
+	-fx-background-color: -g-focus, -g-field-focus;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+.select__trigger:disabled {
+	-fx-opacity: 0.5;
+}
+
+.select__value {
+	-fx-text-fill: -g-field-foreground;
+	-fx-font-size: 14px;
+}
+
+.select__value--placeholder {
+	-fx-text-fill: -g-field-placeholder;
+}
+
+.select__indicator {
+	-g-icon-color: -g-field-placeholder;
+	-fx-translate-x: -4px;
+}
+
+.select__indicator--open {
+	-fx-rotate: 180;
+}
+
+/* ==========================================================================
+   Tooltip — tooltip.css. bg-overlay, p-2 (8), text-xs (12), radius-xl (12)
+   ========================================================================== */
+
+.tooltip {
+	-fx-background-color: -g-overlay;
+	-fx-background-radius: 12px;
+	-fx-padding: 8px;
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-fg;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 18, 0.15, 0, 6);
+}
+
+/* ==========================================================================
+   Dialog — modal.css. Backdrop rgba(0,0,0,0.6); dialog bg-overlay, radius 24,
+   p-6 (24), overlay shadow. In-window overlay, never an OS window (plan §5.12).
+   ========================================================================== */
+
+.dialog__backdrop {
+	-fx-background-color: -g-backdrop;
+}
+
+.dialog {
+	-fx-background-color: -g-overlay;
+	-fx-background-radius: 24px;
+	-fx-padding: 24px;
+	-fx-spacing: 16px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 40, 0.12, 0, 12);
+}
+
+.dialog__header {
+	-fx-spacing: 4px;
+}
+
+.dialog__title {
+	-fx-font-size: 18px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.dialog__description {
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-muted;
+}
+
+.dialog__footer {
+	-fx-spacing: 8px;
+	-fx-alignment: center-right;
+}
+
+.dialog__close-button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 24px;
+	-fx-padding: 6px;
+	-fx-cursor: hand;
+	-g-icon-color: -g-muted;
+}
+
+.dialog__close-button:hover {
+	-fx-background-color: -g-default;
+	-g-icon-color: -g-fg;
+}
+
+/* ==========================================================================
+   Tabs — tabs.css. Container bg-default r20, list p-1 (4), tab h-8 (32) r24
+   px-4 (16) text-sm (14) medium; indicator bg-segment r24, 250ms ease-out-fluid.
+   ========================================================================== */
+
+.tabs {
+	-fx-spacing: 8px;
+}
+
+.tabs__list-container {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 20px;
+	-fx-padding: 0;
+}
+
+.tabs__list {
+	-fx-padding: 4px;
+	-fx-spacing: 0;
+	-fx-background-color: transparent;
+}
+
+.tabs__tab {
+	-fx-background-color: transparent;
+	-fx-background-radius: 24px;
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+	-fx-padding: 0 16px 0 16px;
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-muted;
+	-fx-cursor: hand;
+}
+
+.tabs__tab:hover {
+	-fx-text-fill: -g-fg;
+	-fx-opacity: 0.7;
+}
+
+.tabs__tab:selected {
+	-fx-text-fill: -g-segment-foreground;
+}
+
+.tabs__indicator {
+	-fx-background-color: -g-segment;
+	-fx-background-radius: 24px;
+}
+
+.tabs__tab:disabled {
+	-fx-opacity: 0.5;
+}
+
+.tabs__tab:focused {
+	-fx-background-color: -g-focus;
+	-fx-background-insets: -2;
+	-fx-background-radius: 26px;
+	-fx-text-fill: -g-segment-foreground;
+}
+
+.tabs__panel {
+	-fx-padding: 8px;
+	-fx-spacing: 8px;
+	-fx-background-color: transparent;
+}
+
+/* ==========================================================================
+   Accordion — accordion.css. Trigger px-4 py-4 (16), text-sm medium; panel
+   height+opacity 200ms ease-out-quad; indicator 16px, rotated 180 when open.
+   ========================================================================== */
+
+.accordion {
+	-fx-background-color: transparent;
+}
+
+.accordion__item {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1px 0;
+}
+
+.accordion__item:last-child {
+	-fx-border-width: 0;
+}
+
+.accordion__trigger {
+	-fx-background-color: transparent;
+	-fx-padding: 16px;
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+}
+
+.accordion__trigger:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.03);
+}
+
+.accordion__trigger:focused {
+	-fx-background-color: -g-focus, transparent;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 4px;
+}
+
+.accordion__indicator {
+	-g-icon-color: -g-muted;
+}
+
+.accordion__panel {
+	-fx-padding: 0;
+	-fx-background-color: transparent;
+}
+
+.accordion__body {
+	-fx-padding: 0 16px 16px 16px;
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-muted;
+}
+
+/* ==========================================================================
+   Skeleton — skeleton.css. bg-surface-tertiary/70, rounded-sm (4px),
+   shimmer 2s linear infinite (translateX -100% -> 200%).
+   ========================================================================== */
+
+.skeleton {
+	-fx-background-color: rgba(42, 48, 59, 0.7);
+	-fx-background-radius: 4px;
+}
+
+.skeleton__shimmer {
+	-fx-background-color: linear-gradient(to right, transparent 0%, rgba(42, 48, 59, 0.85) 50%, transparent 100%);
+}
+
+/* ==========================================================================
+   Toast — toast.css. bg-surface, radius 24, px-4 py-3 (12/16), gap-1.5 (6),
+   title text-sm medium, description text-sm muted; enter 350ms ease-out-fluid,
+   exit 250ms, opacity 150ms.
+   ========================================================================== */
+
+.toast-region {
+	-fx-background-color: transparent;
+}
+
+.toast {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 24px;
+	-fx-padding: 12px 16px 12px 16px;
+	-fx-spacing: 6px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.15, 0, 8);
+	-fx-alignment: top-left;
+}
+
+.toast__content {
+	-fx-spacing: 2px;
+	-fx-alignment: center-left;
+}
+
+.toast__indicator {
+	-fx-padding: 4px;
+	-g-icon-color: -g-overlay;
+}
+
+.toast__title {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+
+.toast__description {
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-muted;
+}
+
+.toast__close-button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 12px;
+	-fx-padding: 4px;
+	-fx-cursor: hand;
+	-g-icon-color: -g-muted;
+}
+
+.toast__close-button:hover {
+	-fx-background-color: -g-default;
+	-g-icon-color: -g-fg;
+}
+
+.toast--accent .toast__title { -fx-text-fill: -g-accent-soft-foreground; }
+.toast--success .toast__title { -fx-text-fill: -g-success-soft-foreground; }
+.toast--warning .toast__title { -fx-text-fill: -g-warning-soft-foreground; }
+.toast--danger .toast__title { -fx-text-fill: -g-danger-soft-foreground; }
+.toast--success .toast__indicator { -g-icon-color: -g-success-soft-foreground; }
+.toast--warning .toast__indicator { -g-icon-color: -g-warning-soft-foreground; }
+.toast--danger .toast__indicator { -g-icon-color: -g-danger-soft-foreground; }
+.toast--accent .toast__indicator { -g-icon-color: -g-accent-soft-foreground; }
+
+/* ==========================================================================
+   Tag / ChoiceGroup — tag.css. r12, px-2 py-1 (8/4) text-xs (12) medium,
+   selected bg-accent-soft + accent-soft-foreground, min-h-8 (32).
+   ========================================================================== */
+
+.tag-group {
+	-fx-background-color: transparent;
+}
+
+.tag-group__list {
+	-fx-spacing: 8px;
+}
+
+.tag {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 12px;
+	-fx-padding: 4px 8px 4px 8px;
+	-fx-min-height: 32px;
+	-fx-font-size: 12px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-default-foreground;
+	-fx-alignment: center;
+	-fx-cursor: hand;
+	-fx-graphic-text-gap: 4px;
+}
+
+.tag:hover {
+	-fx-background-color: -g-default-hover;
+}
+
+.tag:selected {
+	-fx-background-color: -g-accent-soft;
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+
+.tag:selected:hover {
+	-fx-background-color: -g-accent-soft-hover;
+}
+
+.tag:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+.tag:disabled {
+	-fx-opacity: 0.5;
+}
+
+/* ==========================================================================
+   Meter / AudioLevelMeter — meter.css (size sm). Track h-1 (4px) r-xs (2px),
+   fill accent/warning/danger, width transition 300ms ease-out.
+   ========================================================================== */
+
+.meter {
+	-fx-spacing: 4px;
+}
+
+.meter__track {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 2px;
+	-fx-min-height: 4px;
+	-fx-pref-height: 4px;
+	-fx-max-height: 4px;
+}
+
+.meter__fill {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 2px;
+}
+
+.meter__fill--warning { -fx-background-color: -g-warning; }
+.meter__fill--danger { -fx-background-color: -g-danger; }
+
+/* ==========================================================================
+   Color picker — color-picker.css / color-area / color-slider / color-swatch
+   ========================================================================== */
+
+.color-picker__trigger {
+	-fx-min-height: 36px;
+	-fx-padding: 0 12px 0 12px;
+	-fx-font-size: 13px;
+	-fx-graphic-text-gap: 8px;
+	-fx-alignment: center-left;
+}
+
+.color-swatch {
+	-fx-background-radius: 4px;
+	-fx-min-width: 16px;
+	-fx-pref-width: 16px;
+	-fx-max-width: 16px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+}
+
+.color-swatch--checker {
+	-fx-background-color: #ffffff, #c8c8c8;
+	-fx-background-insets: 0, 2;
+}
+
+.color-area {
+	-fx-background-radius: 8px;
+	-fx-min-height: 160px;
+	-fx-pref-height: 160px;
+}
+
+.color-area__thumb {
+	-fx-background-color: transparent;
+	-fx-border-color: #ffffff;
+	-fx-border-width: 2px;
+	-fx-border-radius: 10px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 6, 0.2, 0, 1);
+	-fx-min-width: 20px;
+	-fx-pref-width: 20px;
+	-fx-max-width: 20px;
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+	-fx-max-height: 20px;
+}
+
+.color-slider__track {
+	-fx-min-height: 20px;
+	-fx-pref-height: 20px;
+	-fx-background-radius: 12px;
+}
+
+.color-slider__thumb {
+	-fx-background-color: transparent;
+	-fx-border-color: #ffffff;
+	-fx-border-width: 2px;
+	-fx-border-radius: 8px;
+	-fx-min-width: 24px;
+	-fx-pref-width: 24px;
+	-fx-max-width: 24px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+}
+
+.color-picker__swatches {
+	-fx-spacing: 8px;
+}
+
+.color-picker__swatch-button {
+	-fx-background-color: transparent;
+	-fx-padding: 2px;
+	-fx-cursor: hand;
+	-fx-background-radius: 8px;
+}
+
+.color-picker__swatch-button:hover {
+	-fx-background-color: -g-default;
+}
+
+.color-picker__swatch-button:selected {
+	-fx-background-color: -g-accent-soft;
+}
+
+/* ==========================================================================
+   ContentClamp / MarqueeText — SourceSelector.css, MarqueeText.css
+   ========================================================================== */
+
+.content-clamp {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+}
+
+.content-clamp--truncated {
+	-fx-cursor: help;
+}
+
+.source-selector-marquee {
+	-fx-background-color: transparent;
+}
+
+.source-selector-marquee-static {
+	-fx-text-fill: -g-fg;
+}
+
+.source-selector-marquee-animated {
+	-fx-opacity: 0;
+}
+
+.source-selector-marquee--hovered .source-selector-marquee-static {
+	-fx-opacity: 0;
+}
+
+.source-selector-marquee--hovered .source-selector-marquee-animated {
+	-fx-opacity: 1;
+}
+
+.source-selector-marquee-duplicate {
+	-fx-padding: 0 0 0 20px;
+}
+
+/* Launch theme aliases — launchTheme.css. */
+.launch-theme {
+	-g-launch-surface: -g-overlay;
+	-g-launch-panel: -g-surface;
+	-g-launch-border: -g-border;
+	-g-launch-border-strong: -g-separator;
+	-g-launch-text: -g-fg;
+	-g-launch-text-muted: -g-muted;
+	-g-launch-label: -g-muted;
+	-g-launch-hover: -g-default-hover;
+	-g-launch-selected: -g-accent-soft;
+	-g-launch-accent: -g-accent;
+	-g-launch-accent-soft: -g-accent-soft;
+	-g-launch-bar-bg: -g-surface;
+	-g-launch-bar-border: -g-border;
+	-fx-text-fill: -g-fg;
+}
+
+/* Source selector classes from SourceSelector.css. */
+.source-selector-thumb-fallback { -fx-background-color: -g-surface; }
+.source-selector-text { -fx-text-fill: -g-fg; }
+.source-selector-muted { -fx-text-fill: -g-muted; }
+.source-selector-subtle { -fx-text-fill: -g-muted; -fx-opacity: 0.7; }
+.source-selector-label { -fx-text-fill: -g-muted; }
+.source-selector-dot { -fx-background-color: -g-accent; }
+.source-selector-dot-inner { -fx-background-color: #f8fbff; }
+.source-selector-accent-border { -fx-border-color: -g-accent; }
+.source-selector-scroll { -fx-background-color: transparent; }
+.source-selector-scroll .scroll-bar:vertical { -fx-pref-width: 5px; }
+.source-selector-scroll .scroll-bar:horizontal { -fx-pref-height: 5px; }
+.source-selector-scroll .scroll-bar .thumb {
+	-fx-background-color: rgba(107, 107, 120, 0.4);
+	-fx-background-radius: 20px;
+}
+
+/* ==========================================================================
+   Scrollbars — index.css .custom-scrollbar / HeroUI scrollbar
+   ========================================================================== */
+
+.scroll-bar {
+	-fx-background-color: transparent;
+	-fx-padding: 0;
+}
+
+.scroll-bar .track {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+}
+
+.scroll-bar .thumb {
+	-fx-background-color: -g-scrollbar-thumb;
+	-fx-background-radius: 8px;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+	-fx-background-color: transparent;
+	-fx-padding: 0;
+	-fx-opacity: 0;
+}
+
+.scroll-bar:vertical {
+	-fx-pref-width: 8px;
+}
+
+.scroll-bar:horizontal {
+	-fx-pref-height: 8px;
+}
+
+.scroll-pane {
+	-fx-background-color: transparent;
+	-fx-background: transparent;
+	-fx-padding: 0;
+}
+
+.scroll-pane > .viewport {
+	-fx-background-color: transparent;
+}
+
+/* ==========================================================================
+   Showcase window (UiKitShowcase)
+   ========================================================================== */
+
+.showcase-root {
+	-fx-background-color: -g-bg;
+}
+
+.showcase-section {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 24px;
+	-fx-padding: 16px;
+	-fx-spacing: 12px;
+}
+
+.showcase-section-title {
+	-fx-font-size: 12px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-muted;
+}
+
+.showcase-row {
+	-fx-spacing: 8px;
+	-fx-alignment: center-left;
+}
+
+.showcase-state {
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-muted;
+}
+
+/* ==========================================================================
+   Kit additions: state classes that HeroUI expresses with pseudo-elements or
+   data attributes, mapped onto JavaFX classes/pseudo-classes.
+   ========================================================================== */
+
+/* Label required marker (label.css ::after content "*"). */
+.g-label__required { -fx-fill: -g-danger; }
+
+/* Icon colour tokens: looked-up colours inherit down the scene graph. */
+.button { -g-icon-color: -g-accent-foreground; }
+.button--secondary { -g-icon-color: -g-accent-soft-foreground; }
+.button--tertiary { -g-icon-color: -g-default-foreground; }
+.button--ghost, .button--outline, .button--link { -g-icon-color: -g-default-foreground; }
+.button--danger { -g-icon-color: -g-danger-foreground; }
+.button--danger-soft { -g-icon-color: -g-danger-soft-foreground; }
+.toggle-button { -g-icon-color: -g-default-foreground; }
+.toggle-button:selected { -g-icon-color: -g-accent-soft-foreground; }
+.tag { -g-icon-color: -g-default-foreground; }
+.tag:selected { -g-icon-color: -g-accent-soft-foreground; }
+.menu-item { -g-icon-color: -g-fg; }
+.menu-item--danger { -g-icon-color: -g-danger; }
+
+/* Keyboard highlight for the in-window list/menu popups. */
+.list-box-item--highlighted { -fx-background-color: -g-default; }
+.menu-item--highlighted { -fx-background-color: -g-default; }
+
+/* Tabs: keep the selected colour while hovered (tabs.css only dims unselected tabs). */
+.tabs__tab:selected:hover { -fx-text-fill: -g-segment-foreground; -fx-opacity: 1; }
+
+/* MarqueeText hover state (SourceSelector.css: only while overflowing). */
+.source-selector-marquee--overflowing:hover .source-selector-marquee-static { -fx-opacity: 0; }
+.source-selector-marquee--overflowing:hover .source-selector-marquee-animated { -fx-opacity: 1; }
+
+/* Accordion indicator rotation (accordion.css [data-expanded] -rotate-180). */
+.accordion__trigger:selected .accordion__indicator { -fx-rotate: 180; }
+
+/* Dialog layer host. */
+.dialog-layer { -fx-background-color: transparent; }
+
+/* Toast stack host (toast.css .toast-region, placement bottom end). */
+.toast-host {
+	-fx-padding: 16px;
+	-fx-spacing: 12px;
+	-fx-alignment: bottom-right;
+	-fx-background-color: transparent;
+}
+
+/* ProgressBar: HeroUI ProgressBar / the caption download bar (h-2 rounded-full bg-foreground/5,
+   fill bg-accent). */
+.progress-bar {
+	-fx-pref-height: 8px;
+	-fx-min-height: 8px;
+	-fx-max-height: 8px;
+	-fx-indeterminate-bar-length: 80;
+	-fx-indeterminate-bar-escape: true;
+	-fx-indeterminate-bar-flip: false;
+	-fx-indeterminate-bar-animation-time: 1.4;
+}
+
+.progress-bar > .track {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-insets: 0;
+	-fx-background-radius: 999px;
+}
+
+.progress-bar > .bar {
+	-fx-background-color: -g-accent;
+	-fx-background-insets: 0;
+	-fx-background-radius: 999px;
+	-fx-padding: 4px;
+}

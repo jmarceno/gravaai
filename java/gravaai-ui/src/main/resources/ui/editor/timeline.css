@@ -1,0 +1,83 @@
+/*
+ * Timeline scroll bars (TimelineView loads this itself, so they are themed in every scene).
+ * Slim dark pills on the #121418 timeline: a faint inset track, a soft white thumb that brightens
+ * on hover and turns the app accent (#2fb3a3) while dragged. No arrow buttons.
+ */
+
+.timeline-view {
+	-fx-background-color: #121418;
+}
+
+.timeline-view .timeline-scroll-bar {
+	-fx-background-color: #121418;
+	-fx-background-insets: 0;
+	-fx-padding: 2px;
+}
+
+.timeline-view .timeline-scroll-bar:horizontal {
+	-fx-pref-height: 12px;
+	-fx-min-height: 12px;
+}
+
+.timeline-view .timeline-scroll-bar:vertical {
+	-fx-pref-width: 12px;
+	-fx-min-width: 12px;
+}
+
+.timeline-view .timeline-scroll-bar > .track-background,
+.timeline-view .timeline-scroll-bar > .track {
+	-fx-background-color: rgba(255, 255, 255, 0.045);
+	-fx-background-insets: 0;
+	-fx-background-radius: 999px;
+	-fx-border-color: transparent;
+	-fx-effect: null;
+}
+
+.timeline-view .timeline-scroll-bar > .thumb {
+	-fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.30),
+			rgba(255, 255, 255, 0.22));
+	-fx-background-insets: 0;
+	-fx-background-radius: 999px;
+	-fx-border-color: transparent;
+	-fx-effect: null;
+}
+
+.timeline-view .timeline-scroll-bar:vertical > .thumb {
+	-fx-background-color: linear-gradient(to right, rgba(255, 255, 255, 0.30),
+			rgba(255, 255, 255, 0.22));
+}
+
+.timeline-view .timeline-scroll-bar > .thumb:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.46);
+}
+
+.timeline-view .timeline-scroll-bar > .thumb:pressed {
+	-fx-background-color: #2fb3a3;
+	-fx-effect: dropshadow(gaussian, rgba(47, 179, 163, 0.55), 6, 0.2, 0, 0);
+}
+
+.timeline-view .timeline-scroll-bar > .increment-button,
+.timeline-view .timeline-scroll-bar > .decrement-button {
+	-fx-background-color: transparent;
+	-fx-padding: 0;
+	-fx-pref-width: 0;
+	-fx-pref-height: 0;
+	-fx-min-width: 0;
+	-fx-min-height: 0;
+	visibility: hidden;
+}
+
+.timeline-view .timeline-scroll-bar > .increment-button > .increment-arrow,
+.timeline-view .timeline-scroll-bar > .decrement-button > .decrement-arrow {
+	-fx-shape: null;
+	-fx-padding: 0;
+}
+
+/* Whole timeline in view: keep the track, fade the full-length thumb. */
+.timeline-view .timeline-scroll-bar:disabled {
+	-fx-opacity: 1;
+}
+
+.timeline-view .timeline-scroll-bar:disabled > .thumb {
+	-fx-background-color: rgba(255, 255, 255, 0.10);
+}

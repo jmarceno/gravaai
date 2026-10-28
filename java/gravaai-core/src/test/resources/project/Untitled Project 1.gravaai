@@ -1,0 +1,139 @@
+{
+  "version": 2,
+  "projectId": "03f3dfa1-3d36-4937-bdca-e06a3c4f2deb",
+  "videoPath": "/home/jmarceno/.config/Grava AI/recordings/recording-1793004888668.mp4",
+  "editor": {
+    "wallpaper": "/wallpapers/tahoe-light.jpg",
+    "shadowIntensity": 0.67,
+    "backgroundBlur": 0,
+    "zoomMotionBlur": 0.35,
+    "connectZooms": true,
+    "zoomInDurationMs": 200,
+    "zoomInOverlapMs": 200,
+    "zoomOutDurationMs": 200,
+    "connectedZoomGapMs": 1500,
+    "connectedZoomDurationMs": 1000,
+    "zoomInEasing": "gravaai",
+    "zoomOutEasing": "gravaai",
+    "connectedZoomEasing": "glide",
+    "showCursor": true,
+    "loopCursor": false,
+    "cursorStyle": "tahoe",
+    "cursorSize": 2.5,
+    "cursorSmoothing": 0.67,
+    "cursorSpringStiffnessMultiplier": 1.35,
+    "cursorSpringDampingMultiplier": 0.79,
+    "cursorSpringMassMultiplier": 1.29,
+    "cameraSpringStiffnessMultiplier": 1,
+    "cameraSpringDampingMultiplier": 1.13,
+    "cameraSpringMassMultiplier": 1.12,
+    "zoomSmoothness": 0.5,
+    "zoomClassicMode": false,
+    "cursorMotionBlur": 0.6,
+    "cursorClickEffect": "none",
+    "cursorClickEffectColor": "#2563EB",
+    "cursorClickEffectScale": 1,
+    "cursorClickEffectOpacity": 1,
+    "cursorClickEffectDurationMs": 600,
+    "cursorClickBounce": 2,
+    "cursorClickBounceDuration": 350,
+    "cursorSway": 0.4,
+    "borderRadius": 0,
+    "padding": {
+      "top": 20,
+      "bottom": 20,
+      "left": 20,
+      "right": 20,
+      "linked": true
+    },
+    "cropRegion": {
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1
+    },
+    "webcam": {
+      "enabled": false,
+      "sourcePath": null,
+      "mirror": true,
+      "cropRegion": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "positionPreset": "bottom-right",
+      "positionX": 1,
+      "positionY": 1,
+      "corner": "bottom-right",
+      "size": 40,
+      "width": 40,
+      "height": 40,
+      "reactToZoom": true,
+      "roundness": 100,
+      "shadow": 0.3,
+      "timeOffsetMs": 0,
+      "margin": 24
+    },
+    "zoomRegions": [
+      {
+        "id": "zoom-1",
+        "startMs": 1762,
+        "endMs": 2262,
+        "depth": 3,
+        "focus": {
+          "cx": 0.8520833333333333,
+          "cy": 0.005555555555555556
+        },
+        "mode": "auto"
+      }
+    ],
+    "trimRegions": [],
+    "clipRegions": [
+      {
+        "id": "clip-1",
+        "startMs": 0,
+        "endMs": 2262,
+        "speed": 1,
+        "muted": false,
+        "showSourceAudio": false
+      }
+    ],
+    "speedRegions": [],
+    "annotationRegions": [],
+    "audioRegions": [],
+    "autoCaptions": [],
+    "autoCaptionSettings": {
+      "enabled": false,
+      "timelineQuickAdd": true,
+      "language": "auto",
+      "fontFamily": "\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif",
+      "fontSize": 30,
+      "bottomOffset": 3,
+      "maxWidth": 62,
+      "maxRows": 1,
+      "animationStyle": "fade",
+      "boxRadius": 17.5,
+      "textColor": "#FFFFFF",
+      "inactiveTextColor": "#A3A3A3",
+      "backgroundOpacity": 0.9
+    },
+    "keystrokeOverlay": {
+      "enabled": true,
+      "position": "bottom-center",
+      "fontSize": 34,
+      "lingerMs": 900,
+      "fadeMs": 150,
+      "groupingMs": 600,
+      "bottomOffset": 12
+    },
+    "aspectRatio": "16:9",
+    "sourceAudioTrackSettingsByClip": {},
+    "defaultSourceAudioTrackSettings": {
+      "mixed": {
+        "volume": 1,
+        "normalize": false
+      }
+    }
+  }
+}

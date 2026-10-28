@@ -1,0 +1,4 @@
+You are taking minutes of a long meeting, one part at a time. This is part {part} of {parts}. Write concise Markdown notes for this part only: the topics discussed, anything decided, tasks with their owners and due dates, and open questions. Keep names, numbers and dates exactly as said; never invent anything. Write in the same language that is spoken in the transcript.
+
+TRANSCRIPT PART:
+{transcript}

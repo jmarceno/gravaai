@@ -1,0 +1,8 @@
+# Maven build output is redirected to the scratch disk by the parent POM; this is a safety net.
+target/
+# jqwik writes its property database relative to the working directory; keep it out of the repo.
+.jqwik-database
+*.class
+# Packaging staging (never committed)
+dist/
+build/

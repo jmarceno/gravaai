@@ -1,0 +1,4229 @@
+{
+  "version": 2,
+  "projectId": "8dfcdc27-ef00-4f02-b05f-c6624daae0f1",
+  "videoPath": "/home/jmarceno/.config/Gravaai/recordings/recording-1793101680762.mp4",
+  "editor": {
+    "wallpaper": "/wallpapers/tahoe-light.jpg",
+    "shadowIntensity": 0.67,
+    "backgroundBlur": 0,
+    "zoomMotionBlur": 0.35,
+    "connectZooms": true,
+    "zoomInDurationMs": 200,
+    "zoomInOverlapMs": 200,
+    "zoomOutDurationMs": 200,
+    "connectedZoomGapMs": 1500,
+    "connectedZoomDurationMs": 1000,
+    "zoomInEasing": "gravaai",
+    "zoomOutEasing": "gravaai",
+    "connectedZoomEasing": "glide",
+    "showCursor": true,
+    "loopCursor": false,
+    "cursorStyle": "tahoe",
+    "cursorSize": 2.5,
+    "cursorSmoothing": 0.67,
+    "cursorSpringStiffnessMultiplier": 1.35,
+    "cursorSpringDampingMultiplier": 0.79,
+    "cursorSpringMassMultiplier": 1.29,
+    "cameraSpringStiffnessMultiplier": 1,
+    "cameraSpringDampingMultiplier": 1.13,
+    "cameraSpringMassMultiplier": 1.12,
+    "zoomSmoothness": 0.5,
+    "zoomClassicMode": false,
+    "cursorMotionBlur": 0.6,
+    "cursorClickEffect": "none",
+    "cursorClickEffectColor": "#2563EB",
+    "cursorClickEffectScale": 1,
+    "cursorClickEffectOpacity": 1,
+    "cursorClickEffectDurationMs": 600,
+    "cursorClickBounce": 2,
+    "cursorClickBounceDuration": 350,
+    "cursorSway": 0.4,
+    "borderRadius": 0,
+    "padding": {
+      "top": 20,
+      "bottom": 20,
+      "left": 20,
+      "right": 20,
+      "linked": true
+    },
+    "cropRegion": {
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1
+    },
+    "webcam": {
+      "enabled": false,
+      "sourcePath": null,
+      "mirror": true,
+      "cropRegion": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "positionPreset": "bottom-right",
+      "positionX": 1,
+      "positionY": 1,
+      "corner": "bottom-right",
+      "size": 40,
+      "width": 40,
+      "height": 40,
+      "reactToZoom": true,
+      "roundness": 100,
+      "shadow": 0.3,
+      "timeOffsetMs": 0,
+      "margin": 24
+    },
+    "zoomRegions": [
+      {
+        "id": "zoom-1",
+        "startMs": 21501,
+        "endMs": 22501,
+        "depth": 3,
+        "focus": {
+          "cx": 0.6510416666666666,
+          "cy": 0.3685185185185185
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-2",
+        "startMs": 30314,
+        "endMs": 31314,
+        "depth": 3,
+        "focus": {
+          "cx": 0.3859375,
+          "cy": 0.46296296296296297
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-3",
+        "startMs": 33146,
+        "endMs": 34146,
+        "depth": 3,
+        "focus": {
+          "cx": 0.8848958333333333,
+          "cy": 0.5212962962962963
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-4",
+        "startMs": 36666,
+        "endMs": 37666,
+        "depth": 3,
+        "focus": {
+          "cx": 0.9713541666666666,
+          "cy": 0.3398148148148148
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-5",
+        "startMs": 40379,
+        "endMs": 41379,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7130208333333333,
+          "cy": 0.4148148148148148
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-6",
+        "startMs": 49343,
+        "endMs": 50343,
+        "depth": 3,
+        "focus": {
+          "cx": 0.6973958333333333,
+          "cy": 0.5851851851851851
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-7",
+        "startMs": 53440,
+        "endMs": 54440,
+        "depth": 3,
+        "focus": {
+          "cx": 0.9145833333333333,
+          "cy": 0.5879629629629629
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-8",
+        "startMs": 56980,
+        "endMs": 63549,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7791666666666667,
+          "cy": 0.38981481481481484
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-9",
+        "startMs": 65534,
+        "endMs": 66534,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7473958333333334,
+          "cy": 0.4925925925925926
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-11",
+        "startMs": 79543,
+        "endMs": 91310,
+        "depth": 3,
+        "focus": {
+          "cx": 0.2864583333333333,
+          "cy": 0.5583333333333333
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-14",
+        "startMs": 95429,
+        "endMs": 97501,
+        "depth": 3,
+        "focus": {
+          "cx": 0.8067708333333333,
+          "cy": 0.07777777777777778
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-15",
+        "startMs": 102965,
+        "endMs": 103965,
+        "depth": 3,
+        "focus": {
+          "cx": 0.3921875,
+          "cy": 0.32407407407407407
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-16",
+        "startMs": 106182,
+        "endMs": 111214,
+        "depth": 3,
+        "focus": {
+          "cx": 0.35833333333333334,
+          "cy": 0.2759259259259259
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-17",
+        "startMs": 115299,
+        "endMs": 116299,
+        "depth": 3,
+        "focus": {
+          "cx": 0.19947916666666668,
+          "cy": 0.2824074074074074
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-18",
+        "startMs": 122032,
+        "endMs": 124448,
+        "depth": 3,
+        "focus": {
+          "cx": 0.5020833333333333,
+          "cy": 0.4638888888888889
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-19",
+        "startMs": 126392,
+        "endMs": 127392,
+        "depth": 3,
+        "focus": {
+          "cx": 0.6947916666666667,
+          "cy": 0.46944444444444444
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-20",
+        "startMs": 129149,
+        "endMs": 130149,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7072916666666667,
+          "cy": 0.5388888888888889
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-23",
+        "startMs": 145822,
+        "endMs": 156490,
+        "depth": 3,
+        "focus": {
+          "cx": 0.6432291666666666,
+          "cy": 0.2222222222222222
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-30",
+        "startMs": 176344,
+        "endMs": 191810,
+        "depth": 3,
+        "focus": {
+          "cx": 0.9598958333333333,
+          "cy": 0.2953703703703704
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-32",
+        "startMs": 207296,
+        "endMs": 209875,
+        "depth": 3,
+        "focus": {
+          "cx": 0.4859375,
+          "cy": 0.5101851851851852
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-33",
+        "startMs": 212004,
+        "endMs": 213859,
+        "depth": 3,
+        "focus": {
+          "cx": 0.11770833333333333,
+          "cy": 0.1787037037037037
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-36",
+        "startMs": 221371,
+        "endMs": 249269,
+        "depth": 3,
+        "focus": {
+          "cx": 0.42083333333333334,
+          "cy": 0.8796296296296297
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-38",
+        "startMs": 253497,
+        "endMs": 255623,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7114583333333333,
+          "cy": 0.5018518518518519
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-39",
+        "startMs": 257220,
+        "endMs": 261412,
+        "depth": 3,
+        "focus": {
+          "cx": 0.8078125,
+          "cy": 0.5814814814814815
+        },
+        "mode": "auto"
+      },
+      {
+        "id": "zoom-40",
+        "startMs": 265532,
+        "endMs": 269720,
+        "depth": 3,
+        "focus": {
+          "cx": 0.7911458333333333,
+          "cy": 0.43148148148148147
+        },
+        "mode": "auto"
+      }
+    ],
+    "trimRegions": [],
+    "clipRegions": [
+      {
+        "id": "clip-1",
+        "startMs": 0,
+        "endMs": 292442,
+        "speed": 1,
+        "muted": false,
+        "showSourceAudio": false
+      }
+    ],
+    "speedRegions": [],
+    "annotationRegions": [],
+    "audioRegions": [],
+    "autoCaptions": [
+      {
+        "id": "caption-1",
+        "startMs": 0,
+        "endMs": 4710,
+        "text": "Como eu utilizo o Unbound Mark no dia a dia?",
+        "words": [
+          {
+            "text": "Como",
+            "startMs": 0,
+            "endMs": 1130
+          },
+          {
+            "text": "eu",
+            "startMs": 1240,
+            "endMs": 1700,
+            "leadingSpace": true
+          },
+          {
+            "text": "utilizo",
+            "startMs": 1700,
+            "endMs": 2380,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 2380,
+            "endMs": 2470,
+            "leadingSpace": true
+          },
+          {
+            "text": "Unbound",
+            "startMs": 2510,
+            "endMs": 3260,
+            "leadingSpace": true
+          },
+          {
+            "text": "Mark",
+            "startMs": 3260,
+            "endMs": 3630,
+            "leadingSpace": true
+          },
+          {
+            "text": "no",
+            "startMs": 3690,
+            "endMs": 3920,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia",
+            "startMs": 3940,
+            "endMs": 4250,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 4250,
+            "endMs": 4360,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia?",
+            "startMs": 4360,
+            "endMs": 4710,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-2",
+        "startMs": 4640,
+        "endMs": 11600,
+        "text": "Esse aqui é um quadro onde eu estou gerenciando esse próprio",
+        "words": [
+          {
+            "text": "Esse",
+            "startMs": 4720,
+            "endMs": 5180
+          },
+          {
+            "text": "aqui",
+            "startMs": 5180,
+            "endMs": 5640,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 5640,
+            "endMs": 5860,
+            "leadingSpace": true
+          },
+          {
+            "text": "um",
+            "startMs": 5960,
+            "endMs": 6100,
+            "leadingSpace": true
+          },
+          {
+            "text": "quadro",
+            "startMs": 6100,
+            "endMs": 6820,
+            "leadingSpace": true
+          },
+          {
+            "text": "onde",
+            "startMs": 6820,
+            "endMs": 7420,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 7420,
+            "endMs": 7720,
+            "leadingSpace": true
+          },
+          {
+            "text": "estou",
+            "startMs": 7720,
+            "endMs": 8460,
+            "leadingSpace": true
+          },
+          {
+            "text": "gerenciando",
+            "startMs": 8470,
+            "endMs": 10150,
+            "leadingSpace": true
+          },
+          {
+            "text": "esse",
+            "startMs": 10410,
+            "endMs": 10720,
+            "leadingSpace": true
+          },
+          {
+            "text": "próprio",
+            "startMs": 10750,
+            "endMs": 11520,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-3",
+        "startMs": 12290,
+        "endMs": 12820,
+        "text": "projeto",
+        "words": [
+          {
+            "text": "projeto",
+            "startMs": 12370,
+            "endMs": 12820
+          }
+        ]
+      },
+      {
+        "id": "caption-4",
+        "startMs": 12740,
+        "endMs": 15340,
+        "text": "que eu estou gravando aqui, essa sessão."
+      },
+      {
+        "id": "caption-5",
+        "startMs": 15340,
+        "endMs": 18800,
+        "text": "Ele está sendo gerenciado, o desenvolvimento dele por aqui."
+      },
+      {
+        "id": "caption-6",
+        "startMs": 18800,
+        "endMs": 20970,
+        "text": "São as atividades que eu já fiz.",
+        "words": [
+          {
+            "text": "São",
+            "startMs": 18880,
+            "endMs": 19180
+          },
+          {
+            "text": "as",
+            "startMs": 19180,
+            "endMs": 19330,
+            "leadingSpace": true
+          },
+          {
+            "text": "atividades",
+            "startMs": 19330,
+            "endMs": 20080,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 20120,
+            "endMs": 20300,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 20300,
+            "endMs": 20450,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 20450,
+            "endMs": 20660,
+            "leadingSpace": true
+          },
+          {
+            "text": "fiz.",
+            "startMs": 20670,
+            "endMs": 20890,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-7",
+        "startMs": 21060,
+        "endMs": 23080,
+        "text": "Ele é um software derivado do Recordly.",
+        "words": [
+          {
+            "text": "Ele",
+            "startMs": 21140,
+            "endMs": 21310
+          },
+          {
+            "text": "é",
+            "startMs": 21310,
+            "endMs": 21420,
+            "leadingSpace": true
+          },
+          {
+            "text": "um",
+            "startMs": 21420,
+            "endMs": 21530,
+            "leadingSpace": true
+          },
+          {
+            "text": "software",
+            "startMs": 21530,
+            "endMs": 21990,
+            "leadingSpace": true
+          },
+          {
+            "text": "derivado",
+            "startMs": 21990,
+            "endMs": 22440,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 22440,
+            "endMs": 22550,
+            "leadingSpace": true
+          },
+          {
+            "text": "Recordly.",
+            "startMs": 22550,
+            "endMs": 23000,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-8",
+        "startMs": 24410,
+        "endMs": 26930,
+        "text": "passo é que eu quero terminar o meu MCP,",
+        "words": [
+          {
+            "text": "passo",
+            "startMs": 24490,
+            "endMs": 24752
+          },
+          {
+            "text": "é",
+            "startMs": 24752,
+            "endMs": 25014,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 25014,
+            "endMs": 25277,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 25277,
+            "endMs": 25539,
+            "leadingSpace": true
+          },
+          {
+            "text": "quero",
+            "startMs": 25539,
+            "endMs": 25801,
+            "leadingSpace": true
+          },
+          {
+            "text": "terminar",
+            "startMs": 25801,
+            "endMs": 26063,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 26063,
+            "endMs": 26326,
+            "leadingSpace": true
+          },
+          {
+            "text": "meu",
+            "startMs": 26326,
+            "endMs": 26588,
+            "leadingSpace": true
+          },
+          {
+            "text": "MCP,",
+            "startMs": 26588,
+            "endMs": 26850,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-9",
+        "startMs": 27020,
+        "endMs": 30561,
+        "text": "a gente tá vídeo, vê que ele tem um requerimento"
+      },
+      {
+        "id": "caption-10",
+        "startMs": 33041,
+        "endMs": 36940,
+        "text": "aqui de criar skill, o que ele diz aqui, as minhas notas,"
+      },
+      {
+        "id": "caption-11",
+        "startMs": 36940,
+        "endMs": 44180,
+        "text": "essa daqui foi colocada pelo agente, não foi eu que coloquei, foi o próprio IA que escreveu, quando ela fez as primeiras fases,",
+        "words": [
+          {
+            "text": "essa",
+            "startMs": 37020,
+            "endMs": 37290
+          },
+          {
+            "text": "daqui",
+            "startMs": 37290,
+            "endMs": 37620,
+            "leadingSpace": true
+          },
+          {
+            "text": "foi",
+            "startMs": 37620,
+            "endMs": 37820,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocada",
+            "startMs": 37820,
+            "endMs": 38350,
+            "leadingSpace": true
+          },
+          {
+            "text": "pelo",
+            "startMs": 38350,
+            "endMs": 38620,
+            "leadingSpace": true
+          },
+          {
+            "text": "agente,",
+            "startMs": 38620,
+            "endMs": 39010,
+            "leadingSpace": true
+          },
+          {
+            "text": "não",
+            "startMs": 39140,
+            "endMs": 39410,
+            "leadingSpace": true
+          },
+          {
+            "text": "foi",
+            "startMs": 39410,
+            "endMs": 39610,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 39610,
+            "endMs": 39740,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 39740,
+            "endMs": 39820,
+            "leadingSpace": true
+          },
+          {
+            "text": "coloquei,",
+            "startMs": 39950,
+            "endMs": 40460,
+            "leadingSpace": true
+          },
+          {
+            "text": "foi",
+            "startMs": 40590,
+            "endMs": 40790,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 40790,
+            "endMs": 40850,
+            "leadingSpace": true
+          },
+          {
+            "text": "próprio",
+            "startMs": 40850,
+            "endMs": 41390,
+            "leadingSpace": true
+          },
+          {
+            "text": "IA",
+            "startMs": 41390,
+            "endMs": 41510,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 41510,
+            "endMs": 41710,
+            "leadingSpace": true
+          },
+          {
+            "text": "escreveu,",
+            "startMs": 41710,
+            "endMs": 42360,
+            "leadingSpace": true
+          },
+          {
+            "text": "quando",
+            "startMs": 42700,
+            "endMs": 42720,
+            "leadingSpace": true
+          },
+          {
+            "text": "ela",
+            "startMs": 42720,
+            "endMs": 42850,
+            "leadingSpace": true
+          },
+          {
+            "text": "fez",
+            "startMs": 42850,
+            "endMs": 43000,
+            "leadingSpace": true
+          },
+          {
+            "text": "as",
+            "startMs": 43000,
+            "endMs": 43480,
+            "leadingSpace": true
+          },
+          {
+            "text": "primeiras",
+            "startMs": 43480,
+            "endMs": 43820,
+            "leadingSpace": true
+          },
+          {
+            "text": "fases,",
+            "startMs": 43840,
+            "endMs": 44120,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-12",
+        "startMs": 44180,
+        "endMs": 51010,
+        "text": "esse daqui é um comentário meu, ó, tá faltando só a última fase, porque eu preciso fazer a skill antes.",
+        "words": [
+          {
+            "text": "esse",
+            "startMs": 44260,
+            "endMs": 44550
+          },
+          {
+            "text": "daqui",
+            "startMs": 44550,
+            "endMs": 44920,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 44920,
+            "endMs": 45060,
+            "leadingSpace": true
+          },
+          {
+            "text": "um",
+            "startMs": 45060,
+            "endMs": 45200,
+            "leadingSpace": true
+          },
+          {
+            "text": "comentário",
+            "startMs": 45500,
+            "endMs": 45980,
+            "leadingSpace": true
+          },
+          {
+            "text": "meu,",
+            "startMs": 46000,
+            "endMs": 46210,
+            "leadingSpace": true
+          },
+          {
+            "text": "ó,",
+            "startMs": 46360,
+            "endMs": 46500,
+            "leadingSpace": true
+          },
+          {
+            "text": "tá",
+            "startMs": 46640,
+            "endMs": 46860,
+            "leadingSpace": true
+          },
+          {
+            "text": "faltando",
+            "startMs": 46860,
+            "endMs": 47440,
+            "leadingSpace": true
+          },
+          {
+            "text": "só",
+            "startMs": 47440,
+            "endMs": 47650,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 47660,
+            "endMs": 47730,
+            "leadingSpace": true
+          },
+          {
+            "text": "última",
+            "startMs": 47730,
+            "endMs": 48240,
+            "leadingSpace": true
+          },
+          {
+            "text": "fase,",
+            "startMs": 48240,
+            "endMs": 48520,
+            "leadingSpace": true
+          },
+          {
+            "text": "porque",
+            "startMs": 48670,
+            "endMs": 49060,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 49080,
+            "endMs": 49240,
+            "leadingSpace": true
+          },
+          {
+            "text": "preciso",
+            "startMs": 49240,
+            "endMs": 49760,
+            "leadingSpace": true
+          },
+          {
+            "text": "fazer",
+            "startMs": 49950,
+            "endMs": 50130,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 50130,
+            "endMs": 50200,
+            "leadingSpace": true
+          },
+          {
+            "text": "skill",
+            "startMs": 50200,
+            "endMs": 50560,
+            "leadingSpace": true
+          },
+          {
+            "text": "antes.",
+            "startMs": 50570,
+            "endMs": 50930,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-13",
+        "startMs": 52020,
+        "endMs": 53870,
+        "text": "Ah, qual é a última fase?",
+        "words": [
+          {
+            "text": "Ah,",
+            "startMs": 52100,
+            "endMs": 52250
+          },
+          {
+            "text": "qual",
+            "startMs": 52400,
+            "endMs": 52710,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 52710,
+            "endMs": 52860,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 52860,
+            "endMs": 52930,
+            "leadingSpace": true
+          },
+          {
+            "text": "última",
+            "startMs": 53340,
+            "endMs": 53480,
+            "leadingSpace": true
+          },
+          {
+            "text": "fase?",
+            "startMs": 53480,
+            "endMs": 53790,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-14",
+        "startMs": 54000,
+        "endMs": 54830,
+        "text": "Vamos lá ver.",
+        "words": [
+          {
+            "text": "Vamos",
+            "startMs": 54080,
+            "endMs": 54390
+          },
+          {
+            "text": "lá",
+            "startMs": 54390,
+            "endMs": 54550,
+            "leadingSpace": true
+          },
+          {
+            "text": "ver.",
+            "startMs": 54560,
+            "endMs": 54750,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-15",
+        "startMs": 54880,
+        "endMs": 58810,
+        "text": "Aí eu tenho um documento relacionado, eu passei rápido por ele, mas está aqui.",
+        "words": [
+          {
+            "text": "Aí",
+            "startMs": 54960,
+            "endMs": 55100
+          },
+          {
+            "text": "eu",
+            "startMs": 55100,
+            "endMs": 55190,
+            "leadingSpace": true
+          },
+          {
+            "text": "tenho",
+            "startMs": 55190,
+            "endMs": 55430,
+            "leadingSpace": true
+          },
+          {
+            "text": "um",
+            "startMs": 55430,
+            "endMs": 55520,
+            "leadingSpace": true
+          },
+          {
+            "text": "documento",
+            "startMs": 55520,
+            "endMs": 55940,
+            "leadingSpace": true
+          },
+          {
+            "text": "relacionado,",
+            "startMs": 56200,
+            "endMs": 56460,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 56600,
+            "endMs": 56700,
+            "leadingSpace": true
+          },
+          {
+            "text": "passei",
+            "startMs": 56730,
+            "endMs": 57090,
+            "leadingSpace": true
+          },
+          {
+            "text": "rápido",
+            "startMs": 57090,
+            "endMs": 57530,
+            "leadingSpace": true
+          },
+          {
+            "text": "por",
+            "startMs": 57530,
+            "endMs": 57720,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele,",
+            "startMs": 57720,
+            "endMs": 57910,
+            "leadingSpace": true
+          },
+          {
+            "text": "mas",
+            "startMs": 58060,
+            "endMs": 58230,
+            "leadingSpace": true
+          },
+          {
+            "text": "está",
+            "startMs": 58230,
+            "endMs": 58510,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui.",
+            "startMs": 58510,
+            "endMs": 58730,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-16",
+        "startMs": 60740,
+        "endMs": 64340,
+        "text": "relacionado, eu posso atachar qualquer documento aqui,",
+        "words": [
+          {
+            "text": "relacionado,",
+            "startMs": 60820,
+            "endMs": 61720
+          },
+          {
+            "text": "eu",
+            "startMs": 61900,
+            "endMs": 62060,
+            "leadingSpace": true
+          },
+          {
+            "text": "posso",
+            "startMs": 62060,
+            "endMs": 62530,
+            "leadingSpace": true
+          },
+          {
+            "text": "atachar",
+            "startMs": 62540,
+            "endMs": 62960,
+            "leadingSpace": true
+          },
+          {
+            "text": "qualquer",
+            "startMs": 62960,
+            "endMs": 63450,
+            "leadingSpace": true
+          },
+          {
+            "text": "documento",
+            "startMs": 63450,
+            "endMs": 64020,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui,",
+            "startMs": 64020,
+            "endMs": 64270,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-17",
+        "startMs": 64340,
+        "endMs": 66300,
+        "text": "ele fica como relacionado.",
+        "words": [
+          {
+            "text": "ele",
+            "startMs": 64420,
+            "endMs": 64670
+          },
+          {
+            "text": "fica",
+            "startMs": 64670,
+            "endMs": 65000,
+            "leadingSpace": true
+          },
+          {
+            "text": "como",
+            "startMs": 65000,
+            "endMs": 65330,
+            "leadingSpace": true
+          },
+          {
+            "text": "relacionado.",
+            "startMs": 65660,
+            "endMs": 66220,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-18",
+        "startMs": 66420,
+        "endMs": 68940,
+        "text": "Eu clico, ele já abre.",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 66500,
+            "endMs": 66750
+          },
+          {
+            "text": "clico,",
+            "startMs": 66750,
+            "endMs": 67370,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 67740,
+            "endMs": 67990,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 67990,
+            "endMs": 68360,
+            "leadingSpace": true
+          },
+          {
+            "text": "abre.",
+            "startMs": 68360,
+            "endMs": 68860,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-19",
+        "startMs": 69180,
+        "endMs": 71690,
+        "text": "Ah, qual é o meu plano então para o MCP?",
+        "words": [
+          {
+            "text": "Ah,",
+            "startMs": 69260,
+            "endMs": 69400
+          },
+          {
+            "text": "qual",
+            "startMs": 69540,
+            "endMs": 69830,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 69830,
+            "endMs": 69970,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 69970,
+            "endMs": 70040,
+            "leadingSpace": true
+          },
+          {
+            "text": "meu",
+            "startMs": 70040,
+            "endMs": 70250,
+            "leadingSpace": true
+          },
+          {
+            "text": "plano",
+            "startMs": 70500,
+            "endMs": 70610,
+            "leadingSpace": true
+          },
+          {
+            "text": "então",
+            "startMs": 70610,
+            "endMs": 71040,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 71040,
+            "endMs": 71330,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 71330,
+            "endMs": 71400,
+            "leadingSpace": true
+          },
+          {
+            "text": "MCP?",
+            "startMs": 71400,
+            "endMs": 71610,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-20",
+        "startMs": 71800,
+        "endMs": 73220,
+        "text": "Falta só a última fase.",
+        "words": [
+          {
+            "text": "Falta",
+            "startMs": 71880,
+            "endMs": 72190
+          },
+          {
+            "text": "só",
+            "startMs": 72190,
+            "endMs": 72380,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 72380,
+            "endMs": 72440,
+            "leadingSpace": true
+          },
+          {
+            "text": "última",
+            "startMs": 72440,
+            "endMs": 72890,
+            "leadingSpace": true
+          },
+          {
+            "text": "fase.",
+            "startMs": 73120,
+            "endMs": 73140,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-21",
+        "startMs": 73280,
+        "endMs": 73980,
+        "text": "É",
+        "words": [
+          {
+            "text": "É",
+            "startMs": 73360,
+            "endMs": 73900
+          }
+        ]
+      },
+      {
+        "id": "caption-22",
+        "startMs": 75450,
+        "endMs": 76970,
+        "text": "fases.",
+        "words": [
+          {
+            "text": "fases.",
+            "startMs": 75530,
+            "endMs": 76890
+          }
+        ]
+      },
+      {
+        "id": "caption-23",
+        "startMs": 78860,
+        "endMs": 86590,
+        "text": "Então, falta apenas essa aqui, é a validação e testar os cenários reais.",
+        "words": [
+          {
+            "text": "Então,",
+            "startMs": 78940,
+            "endMs": 79930
+          },
+          {
+            "text": "falta",
+            "startMs": 80250,
+            "endMs": 81070,
+            "leadingSpace": true
+          },
+          {
+            "text": "apenas",
+            "startMs": 81070,
+            "endMs": 82060,
+            "leadingSpace": true
+          },
+          {
+            "text": "essa",
+            "startMs": 82060,
+            "endMs": 82720,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui,",
+            "startMs": 82720,
+            "endMs": 83400,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 83560,
+            "endMs": 83720,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 83720,
+            "endMs": 83790,
+            "leadingSpace": true
+          },
+          {
+            "text": "validação",
+            "startMs": 83790,
+            "endMs": 84680,
+            "leadingSpace": true
+          },
+          {
+            "text": "e",
+            "startMs": 84680,
+            "endMs": 84760,
+            "leadingSpace": true
+          },
+          {
+            "text": "testar",
+            "startMs": 84760,
+            "endMs": 85240,
+            "leadingSpace": true
+          },
+          {
+            "text": "os",
+            "startMs": 85240,
+            "endMs": 85400,
+            "leadingSpace": true
+          },
+          {
+            "text": "cenários",
+            "startMs": 85400,
+            "endMs": 85830,
+            "leadingSpace": true
+          },
+          {
+            "text": "reais.",
+            "startMs": 86110,
+            "endMs": 86510,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-24",
+        "startMs": 86720,
+        "endMs": 91620,
+        "text": "Eu deixei isso aqui para trás porque eu queria que o Cloud Code fizesse.",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 86800,
+            "endMs": 86960
+          },
+          {
+            "text": "deixei",
+            "startMs": 86960,
+            "endMs": 87440,
+            "leadingSpace": true
+          },
+          {
+            "text": "isso",
+            "startMs": 87440,
+            "endMs": 87760,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 88040,
+            "endMs": 88080,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 88080,
+            "endMs": 88400,
+            "leadingSpace": true
+          },
+          {
+            "text": "trás",
+            "startMs": 88400,
+            "endMs": 88790,
+            "leadingSpace": true
+          },
+          {
+            "text": "porque",
+            "startMs": 88790,
+            "endMs": 89270,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 89310,
+            "endMs": 89450,
+            "leadingSpace": true
+          },
+          {
+            "text": "queria",
+            "startMs": 89450,
+            "endMs": 89940,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 89940,
+            "endMs": 90170,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 90180,
+            "endMs": 90260,
+            "leadingSpace": true
+          },
+          {
+            "text": "Cloud",
+            "startMs": 90260,
+            "endMs": 90660,
+            "leadingSpace": true
+          },
+          {
+            "text": "Code",
+            "startMs": 90660,
+            "endMs": 90980,
+            "leadingSpace": true
+          },
+          {
+            "text": "fizesse.",
+            "startMs": 90980,
+            "endMs": 91540,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-25",
+        "startMs": 91800,
+        "endMs": 103240,
+        "text": "Então, lá no meu quadro, eu tenho aqui edição, eu já tenho aqui a minha criação de skill, uma atividade aqui.",
+        "words": [
+          {
+            "text": "Então,",
+            "startMs": 91880,
+            "endMs": 92600
+          },
+          {
+            "text": "lá",
+            "startMs": 93120,
+            "endMs": 93200,
+            "leadingSpace": true
+          },
+          {
+            "text": "no",
+            "startMs": 93200,
+            "endMs": 93440,
+            "leadingSpace": true
+          },
+          {
+            "text": "meu",
+            "startMs": 93440,
+            "endMs": 93740,
+            "leadingSpace": true
+          },
+          {
+            "text": "quadro,",
+            "startMs": 93800,
+            "endMs": 94520,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 94810,
+            "endMs": 95000,
+            "leadingSpace": true
+          },
+          {
+            "text": "tenho",
+            "startMs": 95000,
+            "endMs": 95590,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 95590,
+            "endMs": 96080,
+            "leadingSpace": true
+          },
+          {
+            "text": "edição,",
+            "startMs": 96080,
+            "endMs": 96700,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 97300,
+            "endMs": 97440,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 97570,
+            "endMs": 97780,
+            "leadingSpace": true
+          },
+          {
+            "text": "tenho",
+            "startMs": 97780,
+            "endMs": 98210,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 98280,
+            "endMs": 98650,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 98650,
+            "endMs": 98730,
+            "leadingSpace": true
+          },
+          {
+            "text": "minha",
+            "startMs": 98730,
+            "endMs": 99190,
+            "leadingSpace": true
+          },
+          {
+            "text": "criação",
+            "startMs": 99190,
+            "endMs": 100130,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 100130,
+            "endMs": 100460,
+            "leadingSpace": true
+          },
+          {
+            "text": "skill,",
+            "startMs": 100930,
+            "endMs": 101750,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 102220,
+            "endMs": 102400,
+            "leadingSpace": true
+          },
+          {
+            "text": "atividade",
+            "startMs": 102400,
+            "endMs": 102880,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui.",
+            "startMs": 102880,
+            "endMs": 103160,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-26",
+        "startMs": 104048,
+        "endMs": 108180,
+        "text": "Vou mostrar outra coisa que eu faço para me ajudar a manter o controle das coisas."
+      },
+      {
+        "id": "caption-27",
+        "startMs": 108969,
+        "endMs": 114100,
+        "text": "Ela estava aqui na minha coluna de todo, quando eu passo para a coluna de todo de progresso,"
+      },
+      {
+        "id": "caption-28",
+        "startMs": 114100,
+        "endMs": 117680,
+        "text": "você vê que ele ganhou uma tag em progresso."
+      },
+      {
+        "id": "caption-29",
+        "startMs": 117680,
+        "endMs": 124860,
+        "text": "Eu posso colocar qualquer tag aqui na coluna, eu posso colocar a tag que ele ganha quando ele entra",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 117760,
+            "endMs": 117990
+          },
+          {
+            "text": "posso",
+            "startMs": 117990,
+            "endMs": 118580,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocar",
+            "startMs": 119000,
+            "endMs": 119410,
+            "leadingSpace": true
+          },
+          {
+            "text": "qualquer",
+            "startMs": 119410,
+            "endMs": 120360,
+            "leadingSpace": true
+          },
+          {
+            "text": "tag",
+            "startMs": 120360,
+            "endMs": 120710,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 120710,
+            "endMs": 121180,
+            "leadingSpace": true
+          },
+          {
+            "text": "na",
+            "startMs": 121180,
+            "endMs": 121390,
+            "leadingSpace": true
+          },
+          {
+            "text": "coluna,",
+            "startMs": 121420,
+            "endMs": 122110,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 122390,
+            "endMs": 122520,
+            "leadingSpace": true
+          },
+          {
+            "text": "posso",
+            "startMs": 122520,
+            "endMs": 122800,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocar",
+            "startMs": 122800,
+            "endMs": 123260,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 123260,
+            "endMs": 123320,
+            "leadingSpace": true
+          },
+          {
+            "text": "tag",
+            "startMs": 123450,
+            "endMs": 123500,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 123500,
+            "endMs": 123680,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 123680,
+            "endMs": 123860,
+            "leadingSpace": true
+          },
+          {
+            "text": "ganha",
+            "startMs": 123860,
+            "endMs": 124220,
+            "leadingSpace": true
+          },
+          {
+            "text": "quando",
+            "startMs": 124220,
+            "endMs": 124420,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 124420,
+            "endMs": 124560,
+            "leadingSpace": true
+          },
+          {
+            "text": "entra",
+            "startMs": 124590,
+            "endMs": 124860,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-30",
+        "startMs": 124820,
+        "endMs": 127040,
+        "text": "e tag que ele perde quando ele sai.",
+        "words": [
+          {
+            "text": "e",
+            "startMs": 124900,
+            "endMs": 124970
+          },
+          {
+            "text": "tag",
+            "startMs": 124970,
+            "endMs": 125200,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 125200,
+            "endMs": 125430,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 125430,
+            "endMs": 125660,
+            "leadingSpace": true
+          },
+          {
+            "text": "perde",
+            "startMs": 125660,
+            "endMs": 126040,
+            "leadingSpace": true
+          },
+          {
+            "text": "quando",
+            "startMs": 126140,
+            "endMs": 126500,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 126500,
+            "endMs": 126730,
+            "leadingSpace": true
+          },
+          {
+            "text": "sai.",
+            "startMs": 126730,
+            "endMs": 126960,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-31",
+        "startMs": 127160,
+        "endMs": 131810,
+        "text": "Posso ter um limite também de atividades em uma única coluna.",
+        "words": [
+          {
+            "text": "Posso",
+            "startMs": 127240,
+            "endMs": 127670
+          },
+          {
+            "text": "ter",
+            "startMs": 127670,
+            "endMs": 127930,
+            "leadingSpace": true
+          },
+          {
+            "text": "um",
+            "startMs": 127930,
+            "endMs": 128100,
+            "leadingSpace": true
+          },
+          {
+            "text": "limite",
+            "startMs": 128480,
+            "endMs": 128620,
+            "leadingSpace": true
+          },
+          {
+            "text": "também",
+            "startMs": 128620,
+            "endMs": 129230,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 129230,
+            "endMs": 129400,
+            "leadingSpace": true
+          },
+          {
+            "text": "atividades",
+            "startMs": 129400,
+            "endMs": 130260,
+            "leadingSpace": true
+          },
+          {
+            "text": "em",
+            "startMs": 130260,
+            "endMs": 130430,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 130430,
+            "endMs": 130690,
+            "leadingSpace": true
+          },
+          {
+            "text": "única",
+            "startMs": 130690,
+            "endMs": 131210,
+            "leadingSpace": true
+          },
+          {
+            "text": "coluna.",
+            "startMs": 131210,
+            "endMs": 131730,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-32",
+        "startMs": 131980,
+        "endMs": 136940,
+        "text": "Mas a ideia para isso é que, por exemplo, quando eu passar aqui para a coluna de feito,",
+        "words": [
+          {
+            "text": "Mas",
+            "startMs": 132060,
+            "endMs": 132260
+          },
+          {
+            "text": "a",
+            "startMs": 132260,
+            "endMs": 132320,
+            "leadingSpace": true
+          },
+          {
+            "text": "ideia",
+            "startMs": 132320,
+            "endMs": 132660,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 132660,
+            "endMs": 132930,
+            "leadingSpace": true
+          },
+          {
+            "text": "isso",
+            "startMs": 132930,
+            "endMs": 133200,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 133300,
+            "endMs": 133330,
+            "leadingSpace": true
+          },
+          {
+            "text": "que,",
+            "startMs": 133330,
+            "endMs": 133530,
+            "leadingSpace": true
+          },
+          {
+            "text": "por",
+            "startMs": 133660,
+            "endMs": 133860,
+            "leadingSpace": true
+          },
+          {
+            "text": "exemplo,",
+            "startMs": 133860,
+            "endMs": 134330,
+            "leadingSpace": true
+          },
+          {
+            "text": "quando",
+            "startMs": 134470,
+            "endMs": 134860,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 134990,
+            "endMs": 135010,
+            "leadingSpace": true
+          },
+          {
+            "text": "passar",
+            "startMs": 135010,
+            "endMs": 135410,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 135420,
+            "endMs": 135680,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 135690,
+            "endMs": 135960,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 135960,
+            "endMs": 136020,
+            "leadingSpace": true
+          },
+          {
+            "text": "coluna",
+            "startMs": 136020,
+            "endMs": 136420,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 136420,
+            "endMs": 136550,
+            "leadingSpace": true
+          },
+          {
+            "text": "feito,",
+            "startMs": 136550,
+            "endMs": 136860,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-33",
+        "startMs": 137340,
+        "endMs": 145320,
+        "text": "ele vai perder o em progresso, porque ele já está, eu não configurei aqui a automação, vamos lá, coluna,"
+      },
+      {
+        "id": "caption-34",
+        "startMs": 145320,
+        "endMs": 150010,
+        "text": "quando eu entrar nessa coluna aqui, eu vou remover o em progresso.",
+        "words": [
+          {
+            "text": "quando",
+            "startMs": 145400,
+            "endMs": 145900
+          },
+          {
+            "text": "eu",
+            "startMs": 145900,
+            "endMs": 146060,
+            "leadingSpace": true
+          },
+          {
+            "text": "entrar",
+            "startMs": 146070,
+            "endMs": 146550,
+            "leadingSpace": true
+          },
+          {
+            "text": "nessa",
+            "startMs": 146640,
+            "endMs": 146980,
+            "leadingSpace": true
+          },
+          {
+            "text": "coluna",
+            "startMs": 146980,
+            "endMs": 147480,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui,",
+            "startMs": 147480,
+            "endMs": 147810,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 147970,
+            "endMs": 148130,
+            "leadingSpace": true
+          },
+          {
+            "text": "vou",
+            "startMs": 148130,
+            "endMs": 148380,
+            "leadingSpace": true
+          },
+          {
+            "text": "remover",
+            "startMs": 148380,
+            "endMs": 148960,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 148960,
+            "endMs": 149030,
+            "leadingSpace": true
+          },
+          {
+            "text": "em",
+            "startMs": 149040,
+            "endMs": 149200,
+            "leadingSpace": true
+          },
+          {
+            "text": "progresso.",
+            "startMs": 149200,
+            "endMs": 149930,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-35",
+        "startMs": 152966,
+        "endMs": 159040,
+        "text": "Essa daqui é um exemplo um pouco sem utilidade, porque eu já tenho a própria coluna que chama em progresso,"
+      },
+      {
+        "id": "caption-36",
+        "startMs": 159040,
+        "endMs": 166000,
+        "text": "mas eu uso esse tipo aqui para várias outras coisas, com bug, precisa de alguém, alguma coisa,",
+        "words": [
+          {
+            "text": "mas",
+            "startMs": 159120,
+            "endMs": 159370
+          },
+          {
+            "text": "eu",
+            "startMs": 159370,
+            "endMs": 159540,
+            "leadingSpace": true
+          },
+          {
+            "text": "uso",
+            "startMs": 159540,
+            "endMs": 159790,
+            "leadingSpace": true
+          },
+          {
+            "text": "esse",
+            "startMs": 159790,
+            "endMs": 160130,
+            "leadingSpace": true
+          },
+          {
+            "text": "tipo",
+            "startMs": 160360,
+            "endMs": 160470,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 160470,
+            "endMs": 160810,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 160810,
+            "endMs": 161150,
+            "leadingSpace": true
+          },
+          {
+            "text": "várias",
+            "startMs": 161150,
+            "endMs": 161740,
+            "leadingSpace": true
+          },
+          {
+            "text": "outras",
+            "startMs": 161740,
+            "endMs": 162250,
+            "leadingSpace": true
+          },
+          {
+            "text": "coisas,",
+            "startMs": 162250,
+            "endMs": 162750,
+            "leadingSpace": true
+          },
+          {
+            "text": "com",
+            "startMs": 162930,
+            "endMs": 163180,
+            "leadingSpace": true
+          },
+          {
+            "text": "bug,",
+            "startMs": 163180,
+            "endMs": 163430,
+            "leadingSpace": true
+          },
+          {
+            "text": "precisa",
+            "startMs": 163600,
+            "endMs": 163940,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 164130,
+            "endMs": 164360,
+            "leadingSpace": true
+          },
+          {
+            "text": "alguém,",
+            "startMs": 164810,
+            "endMs": 164950,
+            "leadingSpace": true
+          },
+          {
+            "text": "alguma",
+            "startMs": 165190,
+            "endMs": 165630,
+            "leadingSpace": true
+          },
+          {
+            "text": "coisa,",
+            "startMs": 165630,
+            "endMs": 165920,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-37",
+        "startMs": 166960,
+        "endMs": 169860,
+        "text": "E para me ajudar a ter também...",
+        "words": [
+          {
+            "text": "E",
+            "startMs": 167040,
+            "endMs": 167150
+          },
+          {
+            "text": "para",
+            "startMs": 167150,
+            "endMs": 167610,
+            "leadingSpace": true
+          },
+          {
+            "text": "me",
+            "startMs": 167610,
+            "endMs": 167840,
+            "leadingSpace": true
+          },
+          {
+            "text": "ajudar",
+            "startMs": 168280,
+            "endMs": 168560,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 168560,
+            "endMs": 168670,
+            "leadingSpace": true
+          },
+          {
+            "text": "ter",
+            "startMs": 168670,
+            "endMs": 168980,
+            "leadingSpace": true
+          },
+          {
+            "text": "também...",
+            "startMs": 169000,
+            "endMs": 169780,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-38",
+        "startMs": 170740,
+        "endMs": 171600,
+        "text": "Eu tenho uma cor aqui.",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 170820,
+            "endMs": 170900
+          },
+          {
+            "text": "tenho",
+            "startMs": 170900,
+            "endMs": 171110,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 171110,
+            "endMs": 171230,
+            "leadingSpace": true
+          },
+          {
+            "text": "cor",
+            "startMs": 171230,
+            "endMs": 171350,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui.",
+            "startMs": 171350,
+            "endMs": 171520,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-39",
+        "startMs": 171600,
+        "endMs": 173300,
+        "text": "Você pode colocar uma cor para a tag.",
+        "words": [
+          {
+            "text": "Você",
+            "startMs": 171680,
+            "endMs": 171940
+          },
+          {
+            "text": "pode",
+            "startMs": 171940,
+            "endMs": 172150,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocar",
+            "startMs": 172150,
+            "endMs": 172510,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 172510,
+            "endMs": 172660,
+            "leadingSpace": true
+          },
+          {
+            "text": "cor",
+            "startMs": 172660,
+            "endMs": 172810,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 172920,
+            "endMs": 173020,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 173020,
+            "endMs": 173070,
+            "leadingSpace": true
+          },
+          {
+            "text": "tag.",
+            "startMs": 173070,
+            "endMs": 173220,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-40",
+        "startMs": 173340,
+        "endMs": 176780,
+        "text": "Então, eu vou colocar a tag aqui em progresso.",
+        "words": [
+          {
+            "text": "Então,",
+            "startMs": 173420,
+            "endMs": 173930
+          },
+          {
+            "text": "eu",
+            "startMs": 174100,
+            "endMs": 174270,
+            "leadingSpace": true
+          },
+          {
+            "text": "vou",
+            "startMs": 174270,
+            "endMs": 174520,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocar",
+            "startMs": 174660,
+            "endMs": 175110,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 175110,
+            "endMs": 175160,
+            "leadingSpace": true
+          },
+          {
+            "text": "tag",
+            "startMs": 175190,
+            "endMs": 175440,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 175440,
+            "endMs": 175780,
+            "leadingSpace": true
+          },
+          {
+            "text": "em",
+            "startMs": 175780,
+            "endMs": 175940,
+            "leadingSpace": true
+          },
+          {
+            "text": "progresso.",
+            "startMs": 175950,
+            "endMs": 176700,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-41",
+        "startMs": 176920,
+        "endMs": 179650,
+        "text": "Essa aqui é o gerenciador de tags.",
+        "words": [
+          {
+            "text": "Essa",
+            "startMs": 177000,
+            "endMs": 177370
+          },
+          {
+            "text": "aqui",
+            "startMs": 177370,
+            "endMs": 177740,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 177740,
+            "endMs": 177920,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 177920,
+            "endMs": 178010,
+            "leadingSpace": true
+          },
+          {
+            "text": "gerenciador",
+            "startMs": 178010,
+            "endMs": 179020,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 179020,
+            "endMs": 179200,
+            "leadingSpace": true
+          },
+          {
+            "text": "tags.",
+            "startMs": 179200,
+            "endMs": 179570,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-42",
+        "startMs": 179800,
+        "endMs": 181980,
+        "text": "Ele lista todas as tags do sistema.",
+        "words": [
+          {
+            "text": "Ele",
+            "startMs": 179880,
+            "endMs": 180100
+          },
+          {
+            "text": "lista",
+            "startMs": 180100,
+            "endMs": 180460,
+            "leadingSpace": true
+          },
+          {
+            "text": "todas",
+            "startMs": 180460,
+            "endMs": 180820,
+            "leadingSpace": true
+          },
+          {
+            "text": "as",
+            "startMs": 180820,
+            "endMs": 180960,
+            "leadingSpace": true
+          },
+          {
+            "text": "tags",
+            "startMs": 181120,
+            "endMs": 181250,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 181250,
+            "endMs": 181390,
+            "leadingSpace": true
+          },
+          {
+            "text": "sistema.",
+            "startMs": 181390,
+            "endMs": 181900,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-43",
+        "startMs": 182080,
+        "endMs": 185040,
+        "text": "Então, aqui a tag em progresso.",
+        "words": [
+          {
+            "text": "Então,",
+            "startMs": 182160,
+            "endMs": 182800
+          },
+          {
+            "text": "aqui",
+            "startMs": 183350,
+            "endMs": 183440,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 183440,
+            "endMs": 183540,
+            "leadingSpace": true
+          },
+          {
+            "text": "tag",
+            "startMs": 183540,
+            "endMs": 183860,
+            "leadingSpace": true
+          },
+          {
+            "text": "em",
+            "startMs": 183860,
+            "endMs": 184030,
+            "leadingSpace": true
+          },
+          {
+            "text": "progresso.",
+            "startMs": 184080,
+            "endMs": 184960,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-44",
+        "startMs": 185320,
+        "endMs": 186120,
+        "text": "Eu posso...",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 185400,
+            "endMs": 185580
+          },
+          {
+            "text": "posso...",
+            "startMs": 185580,
+            "endMs": 186040,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-45",
+        "startMs": 186820,
+        "endMs": 187940,
+        "text": "Eu dei a cor verde para ela.",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 186900,
+            "endMs": 186990
+          },
+          {
+            "text": "dei",
+            "startMs": 186990,
+            "endMs": 187130,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 187130,
+            "endMs": 187170,
+            "leadingSpace": true
+          },
+          {
+            "text": "cor",
+            "startMs": 187170,
+            "endMs": 187310,
+            "leadingSpace": true
+          },
+          {
+            "text": "verde",
+            "startMs": 187310,
+            "endMs": 187540,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 187540,
+            "endMs": 187720,
+            "leadingSpace": true
+          },
+          {
+            "text": "ela.",
+            "startMs": 187720,
+            "endMs": 187860,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-46",
+        "startMs": 187960,
+        "endMs": 188820,
+        "text": "Posso dar uma outra cor.",
+        "words": [
+          {
+            "text": "Posso",
+            "startMs": 188040,
+            "endMs": 188220
+          },
+          {
+            "text": "dar",
+            "startMs": 188220,
+            "endMs": 188330,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 188330,
+            "endMs": 188440,
+            "leadingSpace": true
+          },
+          {
+            "text": "outra",
+            "startMs": 188440,
+            "endMs": 188630,
+            "leadingSpace": true
+          },
+          {
+            "text": "cor.",
+            "startMs": 188630,
+            "endMs": 188740,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-47",
+        "startMs": 188820,
+        "endMs": 190180,
+        "text": "Posso também renomear ela."
+      },
+      {
+        "id": "caption-48",
+        "startMs": 190180,
+        "endMs": 196840,
+        "text": "Então, o Word tem uma quantidade de automações e funcionalidades",
+        "words": [
+          {
+            "text": "Então,",
+            "startMs": 190260,
+            "endMs": 190770
+          },
+          {
+            "text": "o",
+            "startMs": 190940,
+            "endMs": 191020,
+            "leadingSpace": true
+          },
+          {
+            "text": "Word",
+            "startMs": 191020,
+            "endMs": 191360,
+            "leadingSpace": true
+          },
+          {
+            "text": "tem",
+            "startMs": 191500,
+            "endMs": 191610,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 191610,
+            "endMs": 191860,
+            "leadingSpace": true
+          },
+          {
+            "text": "quantidade",
+            "startMs": 191860,
+            "endMs": 192730,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 192770,
+            "endMs": 193590,
+            "leadingSpace": true
+          },
+          {
+            "text": "automações",
+            "startMs": 193600,
+            "endMs": 195060,
+            "leadingSpace": true
+          },
+          {
+            "text": "e",
+            "startMs": 195330,
+            "endMs": 195600,
+            "leadingSpace": true
+          },
+          {
+            "text": "funcionalidades",
+            "startMs": 195600,
+            "endMs": 196840,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-49",
+        "startMs": 196760,
+        "endMs": 199220,
+        "text": "Para facilitar o dia a dia",
+        "words": [
+          {
+            "text": "Para",
+            "startMs": 196840,
+            "endMs": 197380
+          },
+          {
+            "text": "facilitar",
+            "startMs": 198030,
+            "endMs": 198580,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 198600,
+            "endMs": 198670,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia",
+            "startMs": 198670,
+            "endMs": 198900,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 198900,
+            "endMs": 198970,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia",
+            "startMs": 198970,
+            "endMs": 199220,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-50",
+        "startMs": 199140,
+        "endMs": 201300,
+        "text": "Aí quando eu estou pronto para fazer isso daqui"
+      },
+      {
+        "id": "caption-51",
+        "startMs": 201300,
+        "endMs": 202640,
+        "text": "Eu simplesmente clico aqui nesse botão"
+      },
+      {
+        "id": "caption-52",
+        "startMs": 202640,
+        "endMs": 204399,
+        "text": "Copiar referência do card"
+      },
+      {
+        "id": "caption-53",
+        "startMs": 205500,
+        "endMs": 206810,
+        "text": "lá no",
+        "words": [
+          {
+            "text": "lá",
+            "startMs": 205580,
+            "endMs": 206200
+          },
+          {
+            "text": "no",
+            "startMs": 206200,
+            "endMs": 206810,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-54",
+        "startMs": 206760,
+        "endMs": 207310,
+        "text": "No",
+        "words": [
+          {
+            "text": "No",
+            "startMs": 206840,
+            "endMs": 207230
+          }
+        ]
+      },
+      {
+        "id": "caption-55",
+        "startMs": 207950,
+        "endMs": 208300,
+        "text": "cloud",
+        "words": [
+          {
+            "text": "cloud",
+            "startMs": 208030,
+            "endMs": 208220
+          }
+        ]
+      },
+      {
+        "id": "caption-56",
+        "startMs": 209380,
+        "endMs": 211180,
+        "text": "falo para ele",
+        "words": [
+          {
+            "text": "falo",
+            "startMs": 209460,
+            "endMs": 210690
+          },
+          {
+            "text": "para",
+            "startMs": 210730,
+            "endMs": 210980,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 210980,
+            "endMs": 211180,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-57",
+        "startMs": 211100,
+        "endMs": 213440,
+        "text": "Implemente",
+        "words": [
+          {
+            "text": "Implemente",
+            "startMs": 211180,
+            "endMs": 213440
+          }
+        ]
+      },
+      {
+        "id": "caption-58",
+        "startMs": 213360,
+        "endMs": 215160,
+        "text": "Esse card",
+        "words": [
+          {
+            "text": "Esse",
+            "startMs": 213440,
+            "endMs": 214300
+          },
+          {
+            "text": "card",
+            "startMs": 214680,
+            "endMs": 215160,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-59",
+        "startMs": 215080,
+        "endMs": 216500,
+        "text": "E aperto enter",
+        "words": [
+          {
+            "text": "E",
+            "startMs": 215160,
+            "endMs": 215260
+          },
+          {
+            "text": "aperto",
+            "startMs": 215260,
+            "endMs": 215880,
+            "leadingSpace": true
+          },
+          {
+            "text": "enter",
+            "startMs": 216350,
+            "endMs": 216420,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-60",
+        "startMs": 217027,
+        "endMs": 218460,
+        "text": "A especificação já está lá dentro"
+      },
+      {
+        "id": "caption-61",
+        "startMs": 218460,
+        "endMs": 220100,
+        "text": "O que eu quero seja feito",
+        "words": [
+          {
+            "text": "O",
+            "startMs": 218540,
+            "endMs": 218610
+          },
+          {
+            "text": "que",
+            "startMs": 218610,
+            "endMs": 218840,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 218840,
+            "endMs": 218990,
+            "leadingSpace": true
+          },
+          {
+            "text": "quero",
+            "startMs": 218990,
+            "endMs": 219370,
+            "leadingSpace": true
+          },
+          {
+            "text": "seja",
+            "startMs": 219370,
+            "endMs": 219680,
+            "leadingSpace": true
+          },
+          {
+            "text": "feito",
+            "startMs": 219780,
+            "endMs": 220100,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-62",
+        "startMs": 220020,
+        "endMs": 222360,
+        "text": "Aqui é uma coisa simples, somente criar skill",
+        "words": [
+          {
+            "text": "Aqui",
+            "startMs": 220100,
+            "endMs": 220340
+          },
+          {
+            "text": "é",
+            "startMs": 220340,
+            "endMs": 220460,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 220460,
+            "endMs": 220640,
+            "leadingSpace": true
+          },
+          {
+            "text": "coisa",
+            "startMs": 220640,
+            "endMs": 220930,
+            "leadingSpace": true
+          },
+          {
+            "text": "simples,",
+            "startMs": 221290,
+            "endMs": 221360,
+            "leadingSpace": true
+          },
+          {
+            "text": "somente",
+            "startMs": 221460,
+            "endMs": 221820,
+            "leadingSpace": true
+          },
+          {
+            "text": "criar",
+            "startMs": 221820,
+            "endMs": 222080,
+            "leadingSpace": true
+          },
+          {
+            "text": "skill",
+            "startMs": 222080,
+            "endMs": 222360,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-63",
+        "startMs": 222280,
+        "endMs": 223080,
+        "text": "Com",
+        "words": [
+          {
+            "text": "Com",
+            "startMs": 222360,
+            "endMs": 223000
+          }
+        ]
+      },
+      {
+        "id": "caption-64",
+        "startMs": 223770,
+        "endMs": 224920,
+        "text": "daqui",
+        "words": [
+          {
+            "text": "daqui",
+            "startMs": 223850,
+            "endMs": 224920
+          }
+        ]
+      },
+      {
+        "id": "caption-65",
+        "startMs": 224840,
+        "endMs": 227860,
+        "text": "e o MCP do bombom de marketing configurado.",
+        "words": [
+          {
+            "text": "e",
+            "startMs": 224920,
+            "endMs": 225170
+          },
+          {
+            "text": "o",
+            "startMs": 225170,
+            "endMs": 225420,
+            "leadingSpace": true
+          },
+          {
+            "text": "MCP",
+            "startMs": 225420,
+            "endMs": 226200,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 226200,
+            "endMs": 226360,
+            "leadingSpace": true
+          },
+          {
+            "text": "bombom",
+            "startMs": 226360,
+            "endMs": 226820,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 226840,
+            "endMs": 226980,
+            "leadingSpace": true
+          },
+          {
+            "text": "marketing",
+            "startMs": 226980,
+            "endMs": 227160,
+            "leadingSpace": true
+          },
+          {
+            "text": "configurado.",
+            "startMs": 227160,
+            "endMs": 227860,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-66",
+        "startMs": 227780,
+        "endMs": 233380,
+        "text": "O Cloud já consegue fazer, ele já encontra, ele já sabe.",
+        "words": [
+          {
+            "text": "O",
+            "startMs": 227860,
+            "endMs": 227970
+          },
+          {
+            "text": "Cloud",
+            "startMs": 227970,
+            "endMs": 228530,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 228530,
+            "endMs": 228860,
+            "leadingSpace": true
+          },
+          {
+            "text": "consegue",
+            "startMs": 229100,
+            "endMs": 229760,
+            "leadingSpace": true
+          },
+          {
+            "text": "fazer,",
+            "startMs": 229780,
+            "endMs": 230980,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 231460,
+            "endMs": 231710,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 231710,
+            "endMs": 231960,
+            "leadingSpace": true
+          },
+          {
+            "text": "encontra,",
+            "startMs": 231960,
+            "endMs": 232610,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 232740,
+            "endMs": 232950,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 232950,
+            "endMs": 233100,
+            "leadingSpace": true
+          },
+          {
+            "text": "sabe.",
+            "startMs": 233100,
+            "endMs": 233300,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-67",
+        "startMs": 233380,
+        "endMs": 235591,
+        "text": "Você não precisa explicar o que é isso daqui para ele."
+      },
+      {
+        "id": "caption-68",
+        "startMs": 236034,
+        "endMs": 236920,
+        "text": "Ele já sabe o que é."
+      },
+      {
+        "id": "caption-69",
+        "startMs": 236920,
+        "endMs": 241480,
+        "text": "Se ele tem o MCP instalado, ele já sabe o que é esse número estranho que vem aqui,",
+        "words": [
+          {
+            "text": "Se",
+            "startMs": 237000,
+            "endMs": 237190
+          },
+          {
+            "text": "ele",
+            "startMs": 237190,
+            "endMs": 237470,
+            "leadingSpace": true
+          },
+          {
+            "text": "tem",
+            "startMs": 237470,
+            "endMs": 237750,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 237750,
+            "endMs": 237840,
+            "leadingSpace": true
+          },
+          {
+            "text": "MCP",
+            "startMs": 237840,
+            "endMs": 238120,
+            "leadingSpace": true
+          },
+          {
+            "text": "instalado,",
+            "startMs": 238240,
+            "endMs": 238940,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 239180,
+            "endMs": 239370,
+            "leadingSpace": true
+          },
+          {
+            "text": "já",
+            "startMs": 239370,
+            "endMs": 239560,
+            "leadingSpace": true
+          },
+          {
+            "text": "sabe",
+            "startMs": 239560,
+            "endMs": 239800,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 239810,
+            "endMs": 239850,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 239930,
+            "endMs": 239980,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 239980,
+            "endMs": 240070,
+            "leadingSpace": true
+          },
+          {
+            "text": "esse",
+            "startMs": 240080,
+            "endMs": 240260,
+            "leadingSpace": true
+          },
+          {
+            "text": "número",
+            "startMs": 240260,
+            "endMs": 240570,
+            "leadingSpace": true
+          },
+          {
+            "text": "estranho",
+            "startMs": 240570,
+            "endMs": 240910,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 240940,
+            "endMs": 241100,
+            "leadingSpace": true
+          },
+          {
+            "text": "vem",
+            "startMs": 241100,
+            "endMs": 241250,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui,",
+            "startMs": 241260,
+            "endMs": 241480,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-70",
+        "startMs": 241420,
+        "endMs": 244530,
+        "text": "que é a referência do documento, a coluna e o card.",
+        "words": [
+          {
+            "text": "que",
+            "startMs": 241500,
+            "endMs": 241710
+          },
+          {
+            "text": "é",
+            "startMs": 241710,
+            "endMs": 241850,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 241850,
+            "endMs": 241920,
+            "leadingSpace": true
+          },
+          {
+            "text": "referência",
+            "startMs": 241920,
+            "endMs": 242530,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 242740,
+            "endMs": 242810,
+            "leadingSpace": true
+          },
+          {
+            "text": "documento,",
+            "startMs": 242810,
+            "endMs": 243410,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 243550,
+            "endMs": 243620,
+            "leadingSpace": true
+          },
+          {
+            "text": "coluna",
+            "startMs": 243620,
+            "endMs": 244020,
+            "leadingSpace": true
+          },
+          {
+            "text": "e",
+            "startMs": 244030,
+            "endMs": 244100,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 244100,
+            "endMs": 244170,
+            "leadingSpace": true
+          },
+          {
+            "text": "card.",
+            "startMs": 244170,
+            "endMs": 244450,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-71",
+        "startMs": 245305,
+        "endMs": 247780,
+        "text": "Ele já sabe o que é, ele já vai lá, pega, já executa."
+      },
+      {
+        "id": "caption-72",
+        "startMs": 247780,
+        "endMs": 251930,
+        "text": "Eu gosto também de pedir para ele colocar os comits.",
+        "words": [
+          {
+            "text": "Eu",
+            "startMs": 247860,
+            "endMs": 248040
+          },
+          {
+            "text": "gosto",
+            "startMs": 248040,
+            "endMs": 248510,
+            "leadingSpace": true
+          },
+          {
+            "text": "também",
+            "startMs": 249050,
+            "endMs": 249160,
+            "leadingSpace": true
+          },
+          {
+            "text": "de",
+            "startMs": 249160,
+            "endMs": 249340,
+            "leadingSpace": true
+          },
+          {
+            "text": "pedir",
+            "startMs": 249340,
+            "endMs": 249800,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 249800,
+            "endMs": 250180,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 250180,
+            "endMs": 250460,
+            "leadingSpace": true
+          },
+          {
+            "text": "colocar",
+            "startMs": 250460,
+            "endMs": 251110,
+            "leadingSpace": true
+          },
+          {
+            "text": "os",
+            "startMs": 251110,
+            "endMs": 251290,
+            "leadingSpace": true
+          },
+          {
+            "text": "comits.",
+            "startMs": 251290,
+            "endMs": 251850,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-73",
+        "startMs": 252120,
+        "endMs": 255180,
+        "text": "agora pedi para ele comentar",
+        "words": [
+          {
+            "text": "agora",
+            "startMs": 252200,
+            "endMs": 253250
+          },
+          {
+            "text": "pedi",
+            "startMs": 253440,
+            "endMs": 254070,
+            "leadingSpace": true
+          },
+          {
+            "text": "para",
+            "startMs": 254100,
+            "endMs": 254220,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 254220,
+            "endMs": 254320,
+            "leadingSpace": true
+          },
+          {
+            "text": "comentar",
+            "startMs": 254320,
+            "endMs": 255180,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-74",
+        "startMs": 255100,
+        "endMs": 257160,
+        "text": "colocar o commit onde foi feito",
+        "words": [
+          {
+            "text": "colocar",
+            "startMs": 255180,
+            "endMs": 255790
+          },
+          {
+            "text": "o",
+            "startMs": 255790,
+            "endMs": 255870,
+            "leadingSpace": true
+          },
+          {
+            "text": "commit",
+            "startMs": 256370,
+            "endMs": 256410,
+            "leadingSpace": true
+          },
+          {
+            "text": "onde",
+            "startMs": 256420,
+            "endMs": 256620,
+            "leadingSpace": true
+          },
+          {
+            "text": "foi",
+            "startMs": 256620,
+            "endMs": 256780,
+            "leadingSpace": true
+          },
+          {
+            "text": "feito",
+            "startMs": 256780,
+            "endMs": 257160,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-75",
+        "startMs": 257080,
+        "endMs": 259960,
+        "text": "para que eu possa ter o histórico disso",
+        "words": [
+          {
+            "text": "para",
+            "startMs": 257160,
+            "endMs": 257300
+          },
+          {
+            "text": "que",
+            "startMs": 257300,
+            "endMs": 257410,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 257410,
+            "endMs": 257480,
+            "leadingSpace": true
+          },
+          {
+            "text": "possa",
+            "startMs": 257480,
+            "endMs": 257680,
+            "leadingSpace": true
+          },
+          {
+            "text": "ter",
+            "startMs": 258350,
+            "endMs": 258380,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 258400,
+            "endMs": 259150,
+            "leadingSpace": true
+          },
+          {
+            "text": "histórico",
+            "startMs": 259150,
+            "endMs": 259630,
+            "leadingSpace": true
+          },
+          {
+            "text": "disso",
+            "startMs": 259640,
+            "endMs": 259960,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-76",
+        "startMs": 259940,
+        "endMs": 260490,
+        "text": "e",
+        "words": [
+          {
+            "text": "e",
+            "startMs": 260020,
+            "endMs": 260410
+          }
+        ]
+      },
+      {
+        "id": "caption-77",
+        "startMs": 261180,
+        "endMs": 264210,
+        "text": "saber tudo o que aconteceu",
+        "words": [
+          {
+            "text": "saber",
+            "startMs": 261260,
+            "endMs": 262400
+          },
+          {
+            "text": "tudo",
+            "startMs": 262400,
+            "endMs": 262820,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 262950,
+            "endMs": 262960,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 262960,
+            "endMs": 263220,
+            "leadingSpace": true
+          },
+          {
+            "text": "aconteceu",
+            "startMs": 263220,
+            "endMs": 264210,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-78",
+        "startMs": 264140,
+        "endMs": 266560,
+        "text": "se eu quiser ver também quem alterou o que",
+        "words": [
+          {
+            "text": "se",
+            "startMs": 264220,
+            "endMs": 264370
+          },
+          {
+            "text": "eu",
+            "startMs": 264370,
+            "endMs": 264520,
+            "leadingSpace": true
+          },
+          {
+            "text": "quiser",
+            "startMs": 264520,
+            "endMs": 264970,
+            "leadingSpace": true
+          },
+          {
+            "text": "ver",
+            "startMs": 264970,
+            "endMs": 265190,
+            "leadingSpace": true
+          },
+          {
+            "text": "também",
+            "startMs": 265460,
+            "endMs": 265740,
+            "leadingSpace": true
+          },
+          {
+            "text": "quem",
+            "startMs": 265740,
+            "endMs": 265940,
+            "leadingSpace": true
+          },
+          {
+            "text": "alterou",
+            "startMs": 265950,
+            "endMs": 266320,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 266320,
+            "endMs": 266370,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 266370,
+            "endMs": 266560,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-79",
+        "startMs": 266480,
+        "endMs": 270720,
+        "text": "eu tenho aqui também o log do cart",
+        "words": [
+          {
+            "text": "eu",
+            "startMs": 266560,
+            "endMs": 266760
+          },
+          {
+            "text": "tenho",
+            "startMs": 266760,
+            "endMs": 267280,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 267280,
+            "endMs": 267690,
+            "leadingSpace": true
+          },
+          {
+            "text": "também",
+            "startMs": 267800,
+            "endMs": 268420,
+            "leadingSpace": true
+          },
+          {
+            "text": "o",
+            "startMs": 268420,
+            "endMs": 268510,
+            "leadingSpace": true
+          },
+          {
+            "text": "log",
+            "startMs": 268520,
+            "endMs": 268860,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 268860,
+            "endMs": 269360,
+            "leadingSpace": true
+          },
+          {
+            "text": "cart",
+            "startMs": 269490,
+            "endMs": 270720,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-80",
+        "startMs": 270640,
+        "endMs": 273520,
+        "text": "então é assim que eu uso ele no meu dia a dia",
+        "words": [
+          {
+            "text": "então",
+            "startMs": 270720,
+            "endMs": 271190
+          },
+          {
+            "text": "é",
+            "startMs": 271190,
+            "endMs": 271350,
+            "leadingSpace": true
+          },
+          {
+            "text": "assim",
+            "startMs": 271350,
+            "endMs": 271740,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 271960,
+            "endMs": 271970,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 271970,
+            "endMs": 272130,
+            "leadingSpace": true
+          },
+          {
+            "text": "uso",
+            "startMs": 272130,
+            "endMs": 272360,
+            "leadingSpace": true
+          },
+          {
+            "text": "ele",
+            "startMs": 272360,
+            "endMs": 272580,
+            "leadingSpace": true
+          },
+          {
+            "text": "no",
+            "startMs": 272580,
+            "endMs": 272750,
+            "leadingSpace": true
+          },
+          {
+            "text": "meu",
+            "startMs": 272750,
+            "endMs": 272980,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia",
+            "startMs": 272980,
+            "endMs": 273190,
+            "leadingSpace": true
+          },
+          {
+            "text": "a",
+            "startMs": 273230,
+            "endMs": 273290,
+            "leadingSpace": true
+          },
+          {
+            "text": "dia",
+            "startMs": 273290,
+            "endMs": 273520,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-81",
+        "startMs": 273520,
+        "endMs": 275600,
+        "text": "e eu uso para todos os meus projetos"
+      },
+      {
+        "id": "caption-82",
+        "startMs": 275600,
+        "endMs": 278660,
+        "text": "podem ver aqui que tem 5 boards abertos aqui no momento",
+        "words": [
+          {
+            "text": "podem",
+            "startMs": 275680,
+            "endMs": 275860
+          },
+          {
+            "text": "ver",
+            "startMs": 275860,
+            "endMs": 275970,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 275970,
+            "endMs": 276120,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 276120,
+            "endMs": 276230,
+            "leadingSpace": true
+          },
+          {
+            "text": "tem",
+            "startMs": 276230,
+            "endMs": 276360,
+            "leadingSpace": true
+          },
+          {
+            "text": "5",
+            "startMs": 276360,
+            "endMs": 276810,
+            "leadingSpace": true
+          },
+          {
+            "text": "boards",
+            "startMs": 276920,
+            "endMs": 277720,
+            "leadingSpace": true
+          },
+          {
+            "text": "abertos",
+            "startMs": 277720,
+            "endMs": 278080,
+            "leadingSpace": true
+          },
+          {
+            "text": "aqui",
+            "startMs": 278080,
+            "endMs": 278250,
+            "leadingSpace": true
+          },
+          {
+            "text": "no",
+            "startMs": 278250,
+            "endMs": 278330,
+            "leadingSpace": true
+          },
+          {
+            "text": "momento",
+            "startMs": 278330,
+            "endMs": 278660,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-83",
+        "startMs": 278580,
+        "endMs": 281220,
+        "text": "é a funcionalidade que eu mais uso",
+        "words": [
+          {
+            "text": "é",
+            "startMs": 278660,
+            "endMs": 278830
+          },
+          {
+            "text": "a",
+            "startMs": 278830,
+            "endMs": 278910,
+            "leadingSpace": true
+          },
+          {
+            "text": "funcionalidade",
+            "startMs": 278910,
+            "endMs": 280130,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 280130,
+            "endMs": 280380,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 280390,
+            "endMs": 280540,
+            "leadingSpace": true
+          },
+          {
+            "text": "mais",
+            "startMs": 280560,
+            "endMs": 280910,
+            "leadingSpace": true
+          },
+          {
+            "text": "uso",
+            "startMs": 280910,
+            "endMs": 281220,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-84",
+        "startMs": 281140,
+        "endMs": 283880,
+        "text": "Por isso que ela é uma das mais refinadas do Valdemar",
+        "words": [
+          {
+            "text": "Por",
+            "startMs": 281220,
+            "endMs": 281360
+          },
+          {
+            "text": "isso",
+            "startMs": 281360,
+            "endMs": 281540,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 281540,
+            "endMs": 281680,
+            "leadingSpace": true
+          },
+          {
+            "text": "ela",
+            "startMs": 281680,
+            "endMs": 281820,
+            "leadingSpace": true
+          },
+          {
+            "text": "é",
+            "startMs": 281820,
+            "endMs": 281910,
+            "leadingSpace": true
+          },
+          {
+            "text": "uma",
+            "startMs": 281910,
+            "endMs": 282050,
+            "leadingSpace": true
+          },
+          {
+            "text": "das",
+            "startMs": 282050,
+            "endMs": 282190,
+            "leadingSpace": true
+          },
+          {
+            "text": "mais",
+            "startMs": 282210,
+            "endMs": 282360,
+            "leadingSpace": true
+          },
+          {
+            "text": "refinadas",
+            "startMs": 282460,
+            "endMs": 282820,
+            "leadingSpace": true
+          },
+          {
+            "text": "do",
+            "startMs": 282820,
+            "endMs": 283000,
+            "leadingSpace": true
+          },
+          {
+            "text": "Valdemar",
+            "startMs": 283010,
+            "endMs": 283800,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-85",
+        "startMs": 285650,
+        "endMs": 289130,
+        "text": "também são bem poderosas",
+        "words": [
+          {
+            "text": "também",
+            "startMs": 285730,
+            "endMs": 286980
+          },
+          {
+            "text": "são",
+            "startMs": 286980,
+            "endMs": 287300,
+            "leadingSpace": true
+          },
+          {
+            "text": "bem",
+            "startMs": 287300,
+            "endMs": 287760,
+            "leadingSpace": true
+          },
+          {
+            "text": "poderosas",
+            "startMs": 287760,
+            "endMs": 289130,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-86",
+        "startMs": 289060,
+        "endMs": 290880,
+        "text": "Era isso que eu queria mostrar hoje",
+        "words": [
+          {
+            "text": "Era",
+            "startMs": 289140,
+            "endMs": 289320
+          },
+          {
+            "text": "isso",
+            "startMs": 289320,
+            "endMs": 289560,
+            "leadingSpace": true
+          },
+          {
+            "text": "que",
+            "startMs": 289560,
+            "endMs": 289740,
+            "leadingSpace": true
+          },
+          {
+            "text": "eu",
+            "startMs": 289740,
+            "endMs": 289860,
+            "leadingSpace": true
+          },
+          {
+            "text": "queria",
+            "startMs": 289860,
+            "endMs": 290220,
+            "leadingSpace": true
+          },
+          {
+            "text": "mostrar",
+            "startMs": 290380,
+            "endMs": 290640,
+            "leadingSpace": true
+          },
+          {
+            "text": "hoje",
+            "startMs": 290640,
+            "endMs": 290880,
+            "leadingSpace": true
+          }
+        ]
+      },
+      {
+        "id": "caption-87",
+        "startMs": 290820,
+        "endMs": 292020,
+        "text": "Valeu, obrigado!",
+        "words": [
+          {
+            "text": "Valeu,",
+            "startMs": 290900,
+            "endMs": 291230
+          },
+          {
+            "text": "obrigado!",
+            "startMs": 291360,
+            "endMs": 291940,
+            "leadingSpace": true
+          }
+        ]
+      }
+    ],
+    "autoCaptionSettings": {
+      "enabled": true,
+      "timelineQuickAdd": true,
+      "language": "pt",
+      "fontFamily": "\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif",
+      "fontSize": 30,
+      "bottomOffset": 3,
+      "maxWidth": 62,
+      "maxRows": 1,
+      "animationStyle": "fade",
+      "boxRadius": 17.5,
+      "textColor": "#FFFFFF",
+      "inactiveTextColor": "#A3A3A3",
+      "backgroundOpacity": 0.9
+    },
+    "keystrokeOverlay": {
+      "enabled": true,
+      "position": "bottom-center",
+      "fontSize": 34,
+      "lingerMs": 900,
+      "fadeMs": 150,
+      "groupingMs": 600,
+      "bottomOffset": 12
+    },
+    "aspectRatio": "16:9",
+    "sourceAudioTrackSettingsByClip": {},
+    "defaultSourceAudioTrackSettings": {
+      "mixed": {
+        "volume": 1,
+        "normalize": false
+      }
+    }
+  }
+}

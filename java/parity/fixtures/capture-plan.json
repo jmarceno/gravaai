@@ -1,0 +1,186 @@
+{
+  "width": 1280,
+  "mediaDirectory": "java/parity/fixtures/media",
+  "ffmpeg": "java/native/build/ffmpeg/bin/ffmpeg",
+  "projects": [
+    {
+      "name": "01-wallpaper-blur",
+      "project": "01-wallpaper-blur.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.35,
+        0.9,
+        1.65
+      ],
+      "features": [
+        "wallpaper",
+        "background blur",
+        "padding (linked)",
+        "shadow",
+        "border radius",
+        "cursor style macos",
+        "click effect spotlight",
+        "captions / fade"
+      ]
+    },
+    {
+      "name": "02-padding-crop-aspect",
+      "project": "02-padding-crop-aspect.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.5,
+        1.0,
+        1.6
+      ],
+      "features": [
+        "padding (per side)",
+        "crop region",
+        "aspect ratio 9:16",
+        "border radius",
+        "cursor style tahoe",
+        "click effect ripple",
+        "captions / rise"
+      ]
+    },
+    {
+      "name": "03-zoom-motion-blur",
+      "project": "03-zoom-motion-blur.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.25,
+        0.6,
+        1.05,
+        1.35,
+        1.8
+      ],
+      "features": [
+        "zoom regions",
+        "zoom depth/focus",
+        "zoom motion blur",
+        "cursor style tahoe-inverted",
+        "click effect echo",
+        "captions / pop"
+      ]
+    },
+    {
+      "name": "04-cursor-windows11",
+      "project": "04-cursor-windows11.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.5,
+        0.72,
+        1.25
+      ],
+      "features": [
+        "cursor style windows11",
+        "click effect spotlight",
+        "captions / none"
+      ]
+    },
+    {
+      "name": "05-cursor-dot-keystrokes",
+      "project": "05-cursor-dot-keystrokes.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.35,
+        0.75,
+        1.15,
+        1.55
+      ],
+      "features": [
+        "cursor style dot",
+        "click effect ripple",
+        "keystroke overlay",
+        "captions / fade"
+      ]
+    },
+    {
+      "name": "06-cursor-figma",
+      "project": "06-cursor-figma.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.5,
+        1.25
+      ],
+      "features": [
+        "cursor style figma",
+        "click effect none",
+        "wallpaper (dark)",
+        "captions / rise"
+      ]
+    },
+    {
+      "name": "07-webcam-bottom-right",
+      "project": "07-webcam-bottom-right.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.35,
+        0.9,
+        1.5
+      ],
+      "features": [
+        "webcam overlay (bottom-right preset)",
+        "webcam reacts to zoom",
+        "cursor style tahoe",
+        "click effect ripple",
+        "captions / pop"
+      ]
+    },
+    {
+      "name": "08-webcam-layouts-fade",
+      "project": "08-webcam-layouts-fade.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.35,
+        0.82,
+        1.05,
+        1.55,
+        1.8
+      ],
+      "features": [
+        "webcam overlay (top-left preset)",
+        "clip camera layout default",
+        "clip camera layout hide-camera",
+        "clip camera layout camera-only",
+        "clip transition fade-black"
+      ]
+    },
+    {
+      "name": "09-annotations",
+      "project": "09-annotations.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+      "timesSeconds": [
+        0.25,
+        0.6,
+        1.0,
+        1.5
+      ],
+      "features": [
+        "annotation text",
+        "annotation image",
+        "annotation figure (arrow)",
+        "annotation blur",
+        "cursor style macos",
+        "click effect spotlight",
+        "captions / fade"
+      ]
+    },
+    {
+      "name": "10-connected-zoom-classic-vp9",
+      "project": "10-connected-zoom-classic-vp9.gravaai",
+      "video": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/vp9-720p30.webm",
+      "timesSeconds": [
+        0.35,
+        0.6,
+        1.0,
+        1.25
+      ],
+      "features": [
+        "connected zooms",
+        "classic zoom mode",
+        "zoom motion blur",
+        "VP9 source decode"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "project": "java/parity/fixtures/projects/02-padding-crop-aspect.gravaai",
+  "timesSeconds": [
+    0.5,
+    1,
+    1.6
+  ],
+  "width": 1280,
+  "capturedAt": "2026-10-28T05:06:28.136Z",
+  "frames": [
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/02-padding-crop-aspect/500.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/02-padding-crop-aspect/1000.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/02-padding-crop-aspect/1600.png"
+  ],
+  "route": "electron MCP frames tool (one frame per call; VA-API decode/encode disabled; lossless PNG from capturePage)"
+}

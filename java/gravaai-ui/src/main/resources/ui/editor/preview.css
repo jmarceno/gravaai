@@ -1,0 +1,34 @@
+/*
+ * Editor preview styles (P2.5, task-17): the compositor-backed preview frame plus playback-bar
+ * state that differs from the shell defaults. Loaded after ui/editor/editor.css.
+ */
+
+.editor-preview__frame {
+	-fx-background-color: #0b0e12;
+	-fx-background-radius: 10px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.18, 0, 8);
+}
+
+.editor-preview__surface {
+	-fx-background-color: transparent;
+}
+
+.editor-playback__play--playing.button {
+	-fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.editor-playback__play--playing.button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.18);
+}
+
+.editor-playback__volume-percent {
+	-fx-font-size: 10px;
+	-fx-text-fill: -g-muted;
+}
+
+.editor-playback__volume-slider {
+	-fx-pref-width: 120px;
+}
+.editor-preview__skeleton {
+	-fx-background-radius: 10px;
+}

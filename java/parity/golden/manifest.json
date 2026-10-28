@@ -1,0 +1,166 @@
+{
+  "cases": [
+    {
+      "projectPath": "../fixtures/projects/01-wallpaper-blur.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.35,
+        0.9,
+        1.65
+      ],
+      "referenceImages": [
+        "01-wallpaper-blur/350.png",
+        "01-wallpaper-blur/900.png",
+        "01-wallpaper-blur/1650.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/02-padding-crop-aspect.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 2276,
+      "times": [
+        0.5,
+        1,
+        1.6
+      ],
+      "referenceImages": [
+        "02-padding-crop-aspect/500.png",
+        "02-padding-crop-aspect/1000.png",
+        "02-padding-crop-aspect/1600.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/03-zoom-motion-blur.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.25,
+        0.6,
+        1.05,
+        1.35,
+        1.8
+      ],
+      "referenceImages": [
+        "03-zoom-motion-blur/250.png",
+        "03-zoom-motion-blur/600.png",
+        "03-zoom-motion-blur/1050.png",
+        "03-zoom-motion-blur/1350.png",
+        "03-zoom-motion-blur/1800.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/04-cursor-windows11.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.5,
+        0.72,
+        1.25
+      ],
+      "referenceImages": [
+        "04-cursor-windows11/500.png",
+        "04-cursor-windows11/720.png",
+        "04-cursor-windows11/1250.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/05-cursor-dot-keystrokes.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.35,
+        0.75,
+        1.15,
+        1.55
+      ],
+      "referenceImages": [
+        "05-cursor-dot-keystrokes/350.png",
+        "05-cursor-dot-keystrokes/750.png",
+        "05-cursor-dot-keystrokes/1150.png",
+        "05-cursor-dot-keystrokes/1550.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/06-cursor-figma.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.5,
+        1.25
+      ],
+      "referenceImages": [
+        "06-cursor-figma/500.png",
+        "06-cursor-figma/1250.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/07-webcam-bottom-right.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.35,
+        0.9,
+        1.5
+      ],
+      "referenceImages": [
+        "07-webcam-bottom-right/350.png",
+        "07-webcam-bottom-right/900.png",
+        "07-webcam-bottom-right/1500.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/08-webcam-layouts-fade.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.35,
+        0.82,
+        1.05,
+        1.55,
+        1.8
+      ],
+      "referenceImages": [
+        "08-webcam-layouts-fade/350.png",
+        "08-webcam-layouts-fade/820.png",
+        "08-webcam-layouts-fade/1050.png",
+        "08-webcam-layouts-fade/1550.png",
+        "08-webcam-layouts-fade/1800.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/09-annotations.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.25,
+        0.6,
+        1,
+        1.5
+      ],
+      "referenceImages": [
+        "09-annotations/250.png",
+        "09-annotations/600.png",
+        "09-annotations/1000.png",
+        "09-annotations/1500.png"
+      ]
+    },
+    {
+      "projectPath": "../fixtures/projects/10-connected-zoom-classic-vp9.gravaai",
+      "outputWidth": 1280,
+      "outputHeight": 720,
+      "times": [
+        0.35,
+        0.6,
+        1,
+        1.25
+      ],
+      "referenceImages": [
+        "10-connected-zoom-classic-vp9/350.png",
+        "10-connected-zoom-classic-vp9/600.png",
+        "10-connected-zoom-classic-vp9/1000.png",
+        "10-connected-zoom-classic-vp9/1250.png"
+      ]
+    }
+  ]
+}

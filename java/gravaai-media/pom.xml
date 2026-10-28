@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>dev.gravaai</groupId>
+		<artifactId>gravaai-parent</artifactId>
+		<version>1.4.0</version>
+	</parent>
+
+	<artifactId>gravaai-media</artifactId>
+	<name>Gravaai Media</name>
+
+	<dependencies>
+		<dependency>
+			<groupId>dev.gravaai</groupId>
+			<artifactId>gravaai-platform</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<!-- JavaFX PixelBuffer hand-off for the preview (compile only). -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-graphics</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl</artifactId>
+			<classifier>natives-linux</classifier>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+			<classifier>natives-linux</classifier>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-egl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.github.humbleui</groupId>
+			<artifactId>skija-linux-x64</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.github.humbleui</groupId>
+			<artifactId>skija-shared</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

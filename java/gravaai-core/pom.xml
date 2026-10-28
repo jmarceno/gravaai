@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>dev.gravaai</groupId>
+		<artifactId>gravaai-parent</artifactId>
+		<version>1.4.0</version>
+	</parent>
+
+	<artifactId>gravaai-core</artifactId>
+	<name>Gravaai Core</name>
+
+	<dependencies>
+		<!-- Domain model, project format, settings stores, pure logic, i18n. No JavaFX, no native (plan §4.2). -->
+		<dependency>
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.jqwik</groupId>
+			<artifactId>jqwik</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

@@ -1,0 +1,18 @@
+{
+  "project": "java/parity/fixtures/projects/09-annotations.gravaai",
+  "timesSeconds": [
+    0.25,
+    0.6,
+    1,
+    1.5
+  ],
+  "width": 1280,
+  "capturedAt": "2026-10-28T05:10:07.357Z",
+  "frames": [
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden3/09-annotations/250.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden3/09-annotations/600.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden3/09-annotations/1000.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden3/09-annotations/1500.png"
+  ],
+  "route": "electron MCP frames tool (one frame per call; VA-API decode/encode disabled; lossless PNG from capturePage)"
+}

@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Window/GPU spike for the Java rewrite: transparent always-on-top HUD,
+  editor window and an OpenGL preview delivered through a JavaFX PixelBuffer.
+
+  `mvn package` builds the jar, a jlink runtime (JDK + JavaFX jmods) and a
+  jpackage app image whose launcher is a native binary:
+    ${spike.out}/dist/GravaaiSpike/bin/GravaaiSpike
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>dev.gravaai</groupId>
+	<artifactId>gravaai-spike</artifactId>
+	<version>0.1.0</version>
+	<packaging>jar</packaging>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.release>27</maven.compiler.release>
+		<javafx.version>27</javafx.version>
+		<lwjgl.version>3.4.3</lwjgl.version>
+		<main.class>dev.gravaai.spike.Main</main.class>
+		<!-- Build output stays off the repo disk. -->
+		<spike.out>/media/jmarceno/scratch/java-targets/gravaai-spike</spike.out>
+		<jfx.jmods>/media/jmarceno/scratch/java-toolchain/javafx-jmods-27</jfx.jmods>
+	</properties>
+
+	<dependencies>
+		<!-- JavaFX comes from the jlink runtime image, so it is compile-only here. -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-controls</artifactId>
+			<version>${javafx.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl</artifactId>
+			<version>${lwjgl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-linux</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+			<version>${lwjgl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-linux</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-egl</artifactId>
+			<version>${lwjgl.version}</version>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<directory>${spike.out}</directory>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.14.0</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.4.2</version>
+				<configuration>
+					<outputDirectory>${spike.out}/libs</outputDirectory>
+					<finalName>gravaai-spike</finalName>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.8.1</version>
+				<executions>
+					<execution>
+						<id>copy-libs</id>
+						<phase>package</phase>
+						<goals><goal>copy-dependencies</goal></goals>
+						<configuration>
+							<includeScope>runtime</includeScope>
+							<outputDirectory>${spike.out}/libs</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+				<executions>
+					<execution>
+						<id>clean-images</id>
+						<phase>package</phase>
+						<goals><goal>exec</goal></goals>
+						<configuration>
+							<executable>rm</executable>
+							<arguments>
+								<argument>-rf</argument>
+								<argument>${spike.out}/runtime</argument>
+								<argument>${spike.out}/dist</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>jlink</id>
+						<phase>package</phase>
+						<goals><goal>exec</goal></goals>
+						<configuration>
+							<executable>${java.home}/bin/jlink</executable>
+							<arguments>
+								<argument>--module-path</argument>
+								<argument>${jfx.jmods}</argument>
+								<argument>--add-modules</argument>
+								<argument>java.base,java.logging,jdk.unsupported,javafx.controls</argument>
+								<argument>--strip-debug</argument>
+								<argument>--no-header-files</argument>
+								<argument>--no-man-pages</argument>
+								<argument>--output</argument>
+								<argument>${spike.out}/runtime</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>jpackage</id>
+						<phase>package</phase>
+						<goals><goal>exec</goal></goals>
+						<configuration>
+							<executable>${java.home}/bin/jpackage</executable>
+							<arguments>
+								<argument>--type</argument>
+								<argument>app-image</argument>
+								<argument>--name</argument>
+								<argument>GravaaiSpike</argument>
+								<argument>--app-version</argument>
+								<argument>${project.version}</argument>
+								<argument>--input</argument>
+								<argument>${spike.out}/libs</argument>
+								<argument>--main-jar</argument>
+								<argument>gravaai-spike.jar</argument>
+								<argument>--main-class</argument>
+								<argument>${main.class}</argument>
+								<argument>--runtime-image</argument>
+								<argument>${spike.out}/runtime</argument>
+								<argument>--icon</argument>
+								<argument>${project.basedir}/../../icons/icons/png/256x256.png</argument>
+								<argument>--java-options</argument>
+								<argument>--enable-native-access=ALL-UNNAMED,javafx.graphics</argument>
+								<argument>--java-options</argument>
+								<argument>-XX:AOTCache=$APPDIR/spike.aot</argument>
+								<argument>--dest</argument>
+								<argument>${spike.out}/dist</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

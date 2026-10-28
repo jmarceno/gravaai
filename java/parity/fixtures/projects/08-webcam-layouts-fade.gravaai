@@ -1,0 +1,161 @@
+{
+  "version": 2,
+  "videoPath": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/h264-1080p60.mp4",
+  "editor": {
+    "wallpaper": "/wallpapers/sequoia-blue.jpg",
+    "shadowIntensity": 0.67,
+    "backgroundBlur": 0.0,
+    "zoomMotionBlur": 0.0,
+    "connectZooms": false,
+    "zoomInDurationMs": 200.0,
+    "zoomInOverlapMs": 200.0,
+    "zoomOutDurationMs": 200.0,
+    "connectedZoomGapMs": 1500.0,
+    "connectedZoomDurationMs": 1000.0,
+    "zoomInEasing": "gravaai",
+    "zoomOutEasing": "gravaai",
+    "connectedZoomEasing": "glide",
+    "showCursor": true,
+    "loopCursor": false,
+    "cursorStyle": "tahoe",
+    "cursorClickEffect": "none",
+    "cursorClickEffectColor": "#2563EB",
+    "cursorClickEffectScale": 1.0,
+    "cursorClickEffectOpacity": 1.0,
+    "cursorClickEffectDurationMs": 600.0,
+    "cursorSize": 2.5,
+    "cursorSmoothing": 0.67,
+    "cursorSpringStiffnessMultiplier": 1.35,
+    "cursorSpringDampingMultiplier": 0.79,
+    "cursorSpringMassMultiplier": 1.29,
+    "cameraSpringStiffnessMultiplier": 1.0,
+    "cameraSpringDampingMultiplier": 1.13,
+    "cameraSpringMassMultiplier": 1.12,
+    "zoomSmoothness": 0.5,
+    "zoomClassicMode": false,
+    "cursorMotionBlur": 0.6,
+    "cursorClickBounce": 2.0,
+    "cursorClickBounceDuration": 350.0,
+    "cursorSway": 0.4,
+    "borderRadius": 0.0,
+    "padding": {
+      "top": 20.0,
+      "bottom": 20.0,
+      "left": 20.0,
+      "right": 20.0,
+      "linked": true
+    },
+    "cropRegion": {
+      "x": 0.0,
+      "y": 0.0,
+      "width": 1.0,
+      "height": 1.0
+    },
+    "zoomRegions": [],
+    "trimRegions": [],
+    "clipRegions": [
+      {
+        "id": "clip-1",
+        "startMs": 0,
+        "endMs": 700,
+        "sourceStartMs": 0,
+        "speed": 1.0,
+        "muted": false,
+        "showSourceAudio": false,
+        "transitionOut": {
+          "kind": "fade-black",
+          "durationMs": 250
+        }
+      },
+      {
+        "id": "clip-2",
+        "startMs": 700,
+        "endMs": 1400,
+        "sourceStartMs": 700,
+        "speed": 1.0,
+        "muted": false,
+        "showSourceAudio": false,
+        "cameraLayout": "hide-camera",
+        "transitionOut": {
+          "kind": "fade-black",
+          "durationMs": 250
+        }
+      },
+      {
+        "id": "clip-3",
+        "startMs": 1400,
+        "endMs": 2000,
+        "sourceStartMs": 1400,
+        "speed": 1.0,
+        "muted": false,
+        "showSourceAudio": false,
+        "cameraLayout": "camera-only"
+      }
+    ],
+    "speedRegions": [],
+    "annotationRegions": [],
+    "audioRegions": [],
+    "autoCaptions": [],
+    "autoCaptionSettings": {
+      "enabled": false,
+      "timelineQuickAdd": true,
+      "language": "auto",
+      "fontFamily": "\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif",
+      "fontSize": 30.0,
+      "bottomOffset": 3.0,
+      "maxWidth": 62.0,
+      "maxRows": 1,
+      "animationStyle": "fade",
+      "boxRadius": 17.5,
+      "textColor": "#FFFFFF",
+      "inactiveTextColor": "#A3A3A3",
+      "backgroundOpacity": 0.9
+    },
+    "keystrokeOverlay": {
+      "enabled": false,
+      "position": "bottom-center",
+      "fontSize": 34.0,
+      "lingerMs": 900,
+      "fadeMs": 150,
+      "groupingMs": 600,
+      "bottomOffset": 12.0
+    },
+    "webcam": {
+      "visibleRanges": [
+        {
+          "startMs": 0,
+          "endMs": 2000
+        }
+      ],
+      "enabled": true,
+      "sourcePath": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/vp9-720p30.webm",
+      "mirror": false,
+      "cropRegion": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 1.0,
+        "height": 1.0
+      },
+      "positionPreset": "top-left",
+      "positionX": 1.0,
+      "positionY": 1.0,
+      "corner": "top-left",
+      "size": 28.0,
+      "width": 28.0,
+      "height": 28.0,
+      "reactToZoom": false,
+      "roundness": 80.0,
+      "shadow": 0.3,
+      "timeOffsetMs": 0,
+      "margin": 24.0
+    },
+    "aspectRatio": "16:9",
+    "sourceAudioTrackSettingsByClip": {},
+    "defaultSourceAudioTrackSettings": {
+      "mixed": {
+        "volume": 1,
+        "normalize": false
+      }
+    }
+  }
+}

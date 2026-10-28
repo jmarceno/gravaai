@@ -1,0 +1,18 @@
+{
+  "project": "java/parity/fixtures/projects/10-connected-zoom-classic-vp9.gravaai",
+  "timesSeconds": [
+    0.35,
+    0.6,
+    1,
+    1.25
+  ],
+  "width": 1280,
+  "capturedAt": "2026-10-28T05:07:15.733Z",
+  "frames": [
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/10-connected-zoom-classic-vp9/350.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/10-connected-zoom-classic-vp9/600.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/10-connected-zoom-classic-vp9/1000.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden/10-connected-zoom-classic-vp9/1250.png"
+  ],
+  "route": "electron MCP frames tool (one frame per call; VA-API decode/encode disabled; lossless PNG from capturePage)"
+}

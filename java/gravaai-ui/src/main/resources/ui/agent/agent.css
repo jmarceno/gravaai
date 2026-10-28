@@ -1,0 +1,115 @@
+/*
+ * AI control (P3.2, plan §5.16): settings page, header chip and timeline highlight overlay.
+ * Loaded after the kit theme.
+ */
+
+.agent-settings-page {
+	-fx-padding: 0 0 24 0;
+}
+
+.agent-settings__heading {
+	-fx-spacing: 6px;
+}
+
+.agent-settings__title {
+	-fx-font-size: 20px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.agent-settings__subtitle {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+}
+
+.agent-settings__section {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 12px;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 12px;
+	-fx-padding: 16px;
+	-fx-spacing: 10px;
+}
+
+.agent-settings__section-title {
+	-fx-font-size: 13px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.agent-settings__description {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+}
+
+.agent-settings__status-line {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-fg;
+}
+
+.agent-settings__pill {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 999px;
+	-fx-padding: 3px 10px;
+}
+
+.agent-settings__pill-label {
+	-fx-font-size: 10px;
+	-fx-text-fill: -g-muted;
+}
+
+.agent-settings__mono {
+	-fx-font-family: "DejaVu Sans Mono", "JetBrains Mono", monospace;
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-fg;
+}
+
+.agent-settings__code {
+	-fx-font-family: "DejaVu Sans Mono", "JetBrains Mono", monospace;
+	-fx-font-size: 11px;
+	-fx-text-fill: rgba(255, 255, 255, 0.92);
+	-fx-background-color: -g-field;
+	-fx-background-radius: 8px;
+	-fx-padding: 10px;
+}
+
+.agent-settings__activity {
+	-fx-spacing: 0;
+}
+
+.agent-settings__activity-row {
+	-fx-padding: 6px 0;
+	-fx-border-color: transparent transparent -g-border transparent;
+	-fx-border-width: 0 0 1 0;
+}
+
+.agent-settings__activity-time {
+	-fx-font-size: 10px;
+	-fx-text-fill: -g-muted;
+	-fx-min-width: 40px;
+}
+
+.agent-settings__activity-label {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-fg;
+}
+
+/* ── editor header chip ─────────────────────────────────────────────────── */
+.agent-status-chip {
+	-fx-background-color: rgba(139, 92, 246, 0.10);
+	-fx-border-color: rgba(139, 92, 246, 0.40);
+	-fx-border-radius: 999px;
+	-fx-background-radius: 999px;
+	-fx-padding: 0 4px 0 12px;
+}
+
+.agent-status-chip__label {
+	-fx-font-size: 12px;
+	-fx-font-weight: 500;
+	-fx-text-fill: rgba(255, 255, 255, 0.9);
+}
+
+/* ── timeline highlight overlay ─────────────────────────────────────────── */
+.agent-timeline-highlights {
+	-fx-background-color: transparent;
+}

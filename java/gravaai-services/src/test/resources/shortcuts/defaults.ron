@@ -1,0 +1,34 @@
+{
+    (modifiers: [Super, Alt], key: "Escape"): Terminate,
+    (modifiers: [Super, Shift], key: "Escape"): System(LogOut),
+    (modifiers: [Super, Ctrl], key: "Escape"): Debug,
+    (modifiers: [Super], key: "Escape"): System(LockScreen),
+    (modifiers: [Super], key: "q"): Close,
+    (modifiers: [Alt], key: "F4"): Close,
+
+    (modifiers: [Super], key: "Left"): Focus(Left),
+    (modifiers: [Super], key: "Right"): Focus(Right),
+    (modifiers: [Super], key: "Up"): Focus(Up),
+    (modifiers: [Super], key: "Down"): Focus(Down),
+    (modifiers: [Super], key: "h"): Focus(Left),
+    (modifiers: [Super], key: "j"): Focus(Down),
+    (modifiers: [Super], key: "k"): Focus(Up),
+    (modifiers: [Super], key: "l"): Focus(Right),
+    // Comments and keycode-only entries are allowed.
+    (modifiers: [Super, Ctrl], keycode: 36): Debug,
+    /* block comment */
+    (modifiers: [Super], key: "m"): Maximize,
+    (modifiers: [Super], key: "F11"): Fullscreen,
+    (modifiers: [Super], key: "r"): Resizing(Outwards),
+    (modifiers: [Super, Shift], key: "r"): Resizing(Inwards),
+
+    (modifiers: [Super], key: "a"): System(AppLibrary),
+    (modifiers: [Super], key: "w"): System(WorkspaceOverview),
+    (modifiers: [Super], key: "slash"): System(Launcher),
+    (modifiers: [Super]): System(Launcher),
+    (modifiers: [Alt], key: "Tab"): System(WindowSwitcher),
+    (modifiers: [Alt, Shift], key: "Tab"): System(WindowSwitcherPrevious),
+
+
+    (modifiers: [], key: "Print"): System(Screenshot),
+}

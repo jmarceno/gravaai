@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>dev.gravaai</groupId>
+		<artifactId>gravaai-parent</artifactId>
+		<version>1.4.0</version>
+	</parent>
+
+	<artifactId>gravaai-app</artifactId>
+	<name>Gravaai App</name>
+
+	<dependencies>
+		<dependency>
+			<groupId>dev.gravaai</groupId>
+			<artifactId>gravaai-ui</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-controls</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testfx</groupId>
+			<artifactId>testfx-junit5</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<finalName>gravaai-app</finalName>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>dev.gravaai.app.Main</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<!--
+		  Plan §5.19: jlink runtime (JDK + JavaFX jmods), jpackage app image, AOT cache and an
+		  AppImage. `./mvnw -T1 -Pdist package` is the release command.
+		-->
+		<profile>
+			<id>dist</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-dependency-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>copy-runtime-libraries</id>
+								<phase>package</phase>
+								<goals>
+									<goal>copy-dependencies</goal>
+								</goals>
+								<configuration>
+									<includeScope>runtime</includeScope>
+									<outputDirectory>${project.build.directory}/dist/libs</outputDirectory>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>exec-maven-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>package-app-image</id>
+								<phase>package</phase>
+								<goals>
+									<goal>exec</goal>
+								</goals>
+								<configuration>
+									<executable>bash</executable>
+									<environmentVariables>
+										<MAVEN_OPTS>-Xmx1g</MAVEN_OPTS>
+									</environmentVariables>
+									<arguments>
+										<argument>${maven.multiModuleProjectDirectory}/tools/package-dist.sh</argument>
+										<argument>--jdk</argument>
+										<argument>${gravaai.jdk}</argument>
+										<argument>--jmods</argument>
+										<argument>${gravaai.javafx.jmods}</argument>
+										<argument>--build-dir</argument>
+										<argument>${project.build.directory}</argument>
+										<argument>--main-jar</argument>
+										<argument>${project.build.directory}/gravaai-app.jar</argument>
+										<argument>--deps-dir</argument>
+										<argument>${project.build.directory}/dist/libs</argument>
+										<argument>--native-dir</argument>
+										<argument>${maven.multiModuleProjectDirectory}/native/build</argument>
+										<argument>--icon</argument>
+										<argument>${maven.multiModuleProjectDirectory}/../icons/icons/png/256x256.png</argument>
+										<argument>--app-version</argument>
+										<argument>${project.version}</argument>
+										<argument>--image-name</argument>
+										<argument>gravaai</argument>
+										<argument>--out-dir</argument>
+										<argument>${project.build.directory}/dist</argument>
+									</arguments>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>

@@ -1,0 +1,149 @@
+{
+ "comment": "Regression baseline against the lossless preview references (2026-10-28): measured floor x1.1 plus a small margin, never below the plan thresholds. Regenerate only with a recorded reason; see parity-deviation.md. Keys are <case>@<milliseconds>.",
+ "cases": {
+  "01-wallpaper-blur@350": {
+   "meanAbsDiff": 4.863,
+   "changedPixelRatio": 0.2195
+  },
+  "01-wallpaper-blur@900": {
+   "meanAbsDiff": 4.882,
+   "changedPixelRatio": 0.2284
+  },
+  "01-wallpaper-blur@1650": {
+   "meanAbsDiff": 4.851,
+   "changedPixelRatio": 0.2191
+  },
+  "02-padding-crop-aspect@500": {
+   "meanAbsDiff": 8.567,
+   "changedPixelRatio": 0.2485
+  },
+  "02-padding-crop-aspect@1000": {
+   "meanAbsDiff": 8.583,
+   "changedPixelRatio": 0.2513
+  },
+  "02-padding-crop-aspect@1600": {
+   "meanAbsDiff": 6.432,
+   "changedPixelRatio": 0.2533
+  },
+  "03-zoom-motion-blur@250": {
+   "meanAbsDiff": 2.442,
+   "changedPixelRatio": 0.0263
+  },
+  "03-zoom-motion-blur@600": {
+   "meanAbsDiff": 2.505,
+   "changedPixelRatio": 0.0285
+  },
+  "03-zoom-motion-blur@1050": {
+   "meanAbsDiff": 3.299,
+   "changedPixelRatio": 0.0709
+  },
+  "03-zoom-motion-blur@1350": {
+   "meanAbsDiff": 2.224,
+   "changedPixelRatio": 0.0825
+  },
+  "03-zoom-motion-blur@1800": {
+   "meanAbsDiff": 7.722,
+   "changedPixelRatio": 0.179
+  },
+  "04-cursor-windows11@500": {
+   "meanAbsDiff": 3.144,
+   "changedPixelRatio": 0.1789
+  },
+  "04-cursor-windows11@720": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.0138
+  },
+  "04-cursor-windows11@1250": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.0134
+  },
+  "05-cursor-dot-keystrokes@350": {
+   "meanAbsDiff": 3.235,
+   "changedPixelRatio": 0.1924
+  },
+  "05-cursor-dot-keystrokes@750": {
+   "meanAbsDiff": 3.972,
+   "changedPixelRatio": 0.1926
+  },
+  "05-cursor-dot-keystrokes@1150": {
+   "meanAbsDiff": 3.985,
+   "changedPixelRatio": 0.1933
+  },
+  "05-cursor-dot-keystrokes@1550": {
+   "meanAbsDiff": 3.986,
+   "changedPixelRatio": 0.1926
+  },
+  "06-cursor-figma@500": {
+   "meanAbsDiff": 2.555,
+   "changedPixelRatio": 0.1777
+  },
+  "06-cursor-figma@1250": {
+   "meanAbsDiff": 2.549,
+   "changedPixelRatio": 0.1776
+  },
+  "07-webcam-bottom-right@350": {
+   "meanAbsDiff": 2.92,
+   "changedPixelRatio": 0.1756
+  },
+  "07-webcam-bottom-right@900": {
+   "meanAbsDiff": 2.02,
+   "changedPixelRatio": 0.0284
+  },
+  "07-webcam-bottom-right@1500": {
+   "meanAbsDiff": 2.498,
+   "changedPixelRatio": 0.1412
+  },
+  "08-webcam-layouts-fade@350": {
+   "meanAbsDiff": 2.31,
+   "changedPixelRatio": 0.167
+  },
+  "08-webcam-layouts-fade@820": {
+   "meanAbsDiff": 2.242,
+   "changedPixelRatio": 0.1748
+  },
+  "08-webcam-layouts-fade@1050": {
+   "meanAbsDiff": 2.287,
+   "changedPixelRatio": 0.1754
+  },
+  "08-webcam-layouts-fade@1550": {
+   "meanAbsDiff": 2.749,
+   "changedPixelRatio": 0.0104
+  },
+  "08-webcam-layouts-fade@1800": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.005
+  },
+  "09-annotations@250": {
+   "meanAbsDiff": 3.649,
+   "changedPixelRatio": 0.1879
+  },
+  "09-annotations@600": {
+   "meanAbsDiff": 2.881,
+   "changedPixelRatio": 0.1833
+  },
+  "09-annotations@1000": {
+   "meanAbsDiff": 2.856,
+   "changedPixelRatio": 0.1885
+  },
+  "09-annotations@1500": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.0091
+  },
+  "10-connected-zoom-classic-vp9@350": {
+   "meanAbsDiff": 7.456,
+   "changedPixelRatio": 0.0427
+  },
+  "10-connected-zoom-classic-vp9@600": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.0057
+  },
+  "10-connected-zoom-classic-vp9@1000": {
+   "meanAbsDiff": 2.0,
+   "changedPixelRatio": 0.0057
+  },
+  "10-connected-zoom-classic-vp9@1250": {
+   "meanAbsDiff": 4.377,
+   "changedPixelRatio": 0.0272
+  }
+ }
+}

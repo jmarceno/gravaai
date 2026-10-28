@@ -1,0 +1,151 @@
+{
+  "version": 2,
+  "videoPath": "/home/jmarceno/Projects/gravaai/java/parity/fixtures/media/vp9-720p30.webm",
+  "editor": {
+    "wallpaper": "/wallpapers/cityscape.jpg",
+    "shadowIntensity": 0.67,
+    "backgroundBlur": 0.0,
+    "zoomMotionBlur": 0.5,
+    "connectZooms": true,
+    "zoomInDurationMs": 200.0,
+    "zoomInOverlapMs": 200.0,
+    "zoomOutDurationMs": 200.0,
+    "connectedZoomGapMs": 250.0,
+    "connectedZoomDurationMs": 500.0,
+    "zoomInEasing": "gravaai",
+    "zoomOutEasing": "gravaai",
+    "connectedZoomEasing": "glide",
+    "showCursor": true,
+    "loopCursor": false,
+    "cursorStyle": "tahoe",
+    "cursorClickEffect": "none",
+    "cursorClickEffectColor": "#2563EB",
+    "cursorClickEffectScale": 1.0,
+    "cursorClickEffectOpacity": 1.0,
+    "cursorClickEffectDurationMs": 600.0,
+    "cursorSize": 2.5,
+    "cursorSmoothing": 0.67,
+    "cursorSpringStiffnessMultiplier": 1.35,
+    "cursorSpringDampingMultiplier": 0.79,
+    "cursorSpringMassMultiplier": 1.29,
+    "cameraSpringStiffnessMultiplier": 1.0,
+    "cameraSpringDampingMultiplier": 1.13,
+    "cameraSpringMassMultiplier": 1.12,
+    "zoomSmoothness": 0.5,
+    "zoomClassicMode": true,
+    "cursorMotionBlur": 0.6,
+    "cursorClickBounce": 2.0,
+    "cursorClickBounceDuration": 350.0,
+    "cursorSway": 0.4,
+    "borderRadius": 0.0,
+    "padding": {
+      "top": 16.0,
+      "bottom": 16.0,
+      "left": 16.0,
+      "right": 16.0,
+      "linked": true
+    },
+    "cropRegion": {
+      "x": 0.0,
+      "y": 0.0,
+      "width": 1.0,
+      "height": 1.0
+    },
+    "zoomRegions": [
+      {
+        "id": "zoom-1",
+        "startMs": 300,
+        "endMs": 700,
+        "depth": 3,
+        "focus": {
+          "cx": 0.4,
+          "cy": 0.4
+        },
+        "mode": "manual"
+      },
+      {
+        "id": "zoom-2",
+        "startMs": 750,
+        "endMs": 1300,
+        "depth": 2,
+        "focus": {
+          "cx": 0.65,
+          "cy": 0.55
+        },
+        "mode": "manual"
+      }
+    ],
+    "trimRegions": [],
+    "clipRegions": [
+      {
+        "id": "clip-1",
+        "startMs": 0,
+        "endMs": 2000,
+        "sourceStartMs": 0,
+        "speed": 1.0,
+        "muted": false,
+        "showSourceAudio": false
+      }
+    ],
+    "speedRegions": [],
+    "annotationRegions": [],
+    "audioRegions": [],
+    "autoCaptions": [],
+    "autoCaptionSettings": {
+      "enabled": false,
+      "timelineQuickAdd": true,
+      "language": "auto",
+      "fontFamily": "\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif",
+      "fontSize": 30.0,
+      "bottomOffset": 3.0,
+      "maxWidth": 62.0,
+      "maxRows": 1,
+      "animationStyle": "fade",
+      "boxRadius": 17.5,
+      "textColor": "#FFFFFF",
+      "inactiveTextColor": "#A3A3A3",
+      "backgroundOpacity": 0.9
+    },
+    "keystrokeOverlay": {
+      "enabled": false,
+      "position": "bottom-center",
+      "fontSize": 34.0,
+      "lingerMs": 900,
+      "fadeMs": 150,
+      "groupingMs": 600,
+      "bottomOffset": 12.0
+    },
+    "webcam": {
+      "visibleRanges": [],
+      "enabled": false,
+      "sourcePath": null,
+      "mirror": true,
+      "cropRegion": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 1.0,
+        "height": 1.0
+      },
+      "positionPreset": "bottom-right",
+      "positionX": 1.0,
+      "positionY": 1.0,
+      "corner": "bottom-right",
+      "size": 40.0,
+      "width": 40.0,
+      "height": 40.0,
+      "reactToZoom": true,
+      "roundness": 100.0,
+      "shadow": 0.3,
+      "timeOffsetMs": 0,
+      "margin": 24.0
+    },
+    "aspectRatio": "16:9",
+    "sourceAudioTrackSettingsByClip": {},
+    "defaultSourceAudioTrackSettings": {
+      "mixed": {
+        "volume": 1,
+        "normalize": false
+      }
+    }
+  }
+}

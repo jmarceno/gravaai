@@ -1,0 +1,710 @@
+/*
+ * Editor shell styles (plan §5.12, P2.6).
+ *
+ * Colours come from the kit tokens (kit/gravaai.css, -g-*); geometry mirrors the React editor
+ * (src/components/video-editor/layout/*, src/components/video-editor/SettingsPanel.tsx) and the
+ * reference screenshots java/parity/ui/editor*.png.
+ */
+
+.editor-root {
+	-fx-background-color: -g-bg;
+	-fx-font-family: "DM Sans";
+}
+
+/* ---- Header (h-14 = 56, px-4 = 16, border-b) ------------------------------ */
+
+.editor-header {
+	-fx-min-height: 56px;
+	-fx-pref-height: 56px;
+	-fx-max-height: 56px;
+	-fx-padding: 0 16px;
+	-fx-spacing: 12px;
+	-fx-alignment: center-left;
+	-fx-background-color: -g-bg;
+	-fx-border-color: transparent transparent -g-border transparent;
+	-fx-border-width: 0 0 1 0;
+}
+
+.editor-header__breadcrumb {
+	-fx-spacing: 8px;
+	-fx-alignment: center-left;
+}
+
+.editor-header__slash {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 18px;
+	-fx-font-weight: 300;
+	-fx-padding: 0 4px;
+}
+
+.editor-header__project.button {
+	-fx-background-color: transparent;
+	-fx-padding: 0 6px;
+}
+.editor-header__project.button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+}
+.editor-header__project-name {
+	-fx-text-fill: rgba(255, 255, 255, 0.92);
+	-fx-font-size: 13px;
+	-fx-font-weight: 600;
+}
+/* The shell takes focus on open (React shows no ring until keyboard navigation). */
+.editor-header .button--ghost:focused {
+	-fx-background-color: transparent;
+}
+.editor-header__clips.button {
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: rgba(255, 255, 255, 0.92);
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+}
+.editor-header__clips.button:hover {
+	-fx-background-color: -g-surface-tertiary;
+}
+.editor-header__export.button {
+	-fx-background-color: linear-gradient(to right, #2fe3b6, #23cfa7);
+	-fx-text-fill: #062019;
+	-fx-font-weight: 600;
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-padding: 0 18px;
+}
+.editor-header__export.button:hover {
+	-fx-background-color: linear-gradient(to right, #43efc4, #2fdcb4);
+}
+/* Save sits left of Export with the Clips surface look, so Export stays the only accent CTA. */
+.editor-header__save.button {
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: rgba(255, 255, 255, 0.92);
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-padding: 0 14px;
+}
+.editor-header__save.button:hover {
+	-fx-background-color: -g-surface-tertiary;
+}
+/* Changes not on disk: the kit accent-soft tint, the same language as an active rail icon. */
+.editor-header__save.button.is-dirty {
+	-fx-background-color: -g-accent-soft;
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+.editor-header__save.button.is-dirty:hover {
+	-fx-background-color: -g-accent-soft-hover;
+}
+.editor-header__save.button.is-dirty .g-icon {
+	-g-icon-color: -g-accent-soft-foreground;
+}
+.editor-header__rename {
+	-fx-pref-width: 220px;
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+}
+
+/* ---- Body: rail + inspector + preview ------------------------------------ */
+
+.editor-body {
+	-fx-padding: 12px 12px 0 8px;
+	-fx-spacing: 0;
+}
+
+.editor-rail {
+	-fx-min-width: 56px;
+	-fx-pref-width: 56px;
+	-fx-max-width: 56px;
+	-fx-spacing: 6px;
+	-fx-padding: 4px 0 0 0;
+	-fx-alignment: top-center;
+}
+.editor-rail .button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 8px;
+	-fx-min-width: 36px;
+	-fx-pref-width: 36px;
+	-fx-max-width: 36px;
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-max-height: 36px;
+}
+.editor-rail .button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+}
+.editor-rail .button.is-active {
+	-fx-background-color: rgba(47, 179, 163, 0.16);
+}
+
+.editor-inspector {
+	-fx-min-width: 320px;
+	-fx-pref-width: 320px;
+	-fx-max-width: 320px;
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 12px;
+	-fx-border-radius: 12px;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-margin: 0 8px 12px 4px;
+}
+.editor-inspector__header {
+	-fx-min-height: 56px;
+	-fx-pref-height: 56px;
+	-fx-padding: 0 20px;
+	-fx-alignment: center-left;
+	-fx-spacing: 8px;
+}
+.editor-inspector__title {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+	-fx-font-weight: 600;
+}
+.editor-inspector__advanced-label {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+}
+.editor-inspector__scroll {
+	-fx-background-color: transparent;
+	-fx-padding: 0 20px 20px 20px;
+}
+.editor-inspector__scroll > .viewport {
+	-fx-background-color: transparent;
+}
+.editor-inspector__scroll .scroll-bar:vertical {
+	-fx-background-color: transparent;
+	-fx-pref-width: 8px;
+}
+.editor-inspector__scroll .scroll-bar:vertical .thumb {
+	-fx-background-color: -g-scrollbar-thumb;
+	-fx-background-radius: 4px;
+}
+.editor-section {
+	-fx-spacing: 16px;
+}
+.editor-section__heading {
+	-fx-alignment: center-left;
+}
+.editor-section__label {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 13px;
+	-fx-font-weight: 500;
+}
+.editor-section__reset.button {
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+	-fx-padding: 2px 4px;
+}
+.editor-section__reset.button:hover {
+	-fx-text-fill: -g-fg;
+}
+
+.editor-subsection {
+	-fx-spacing: 12px;
+}
+
+/* Wallpaper / gradient / colour grid (grid-cols-5, gap-2) */
+.editor-tiles {
+	-fx-hgap: 8px;
+	-fx-vgap: 8px;
+}
+.editor-tile.button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 6px;
+	-fx-padding: 0;
+	-fx-min-height: 38px;
+	-fx-pref-height: 38px;
+	-fx-max-height: 38px;
+	-fx-border-radius: 6px;
+}
+.editor-tile.button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.08);
+}
+.editor-tile__add {
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 6px;
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 6px;
+}
+.editor-tile__check {
+	-fx-background-color: rgba(0, 0, 0, 0.65);
+	-fx-background-radius: 6px;
+	-fx-padding: 1px;
+}
+
+/* ---- Preview ------------------------------------------------------------- */
+
+.editor-preview {
+	-fx-spacing: 0;
+}
+.editor-preview__toolbar {
+	-fx-min-height: 40px;
+	-fx-pref-height: 40px;
+	-fx-alignment: center;
+	-fx-spacing: 12px;
+	-fx-padding: 0 12px;
+}
+.editor-preview__toolbar .button {
+	-fx-background-color: transparent;
+	-fx-text-fill: rgba(255, 255, 255, 0.78);
+	-fx-font-size: 12px;
+	-fx-padding: 2px 6px;
+}
+.editor-preview__toolbar .button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-text-fill: -g-fg;
+}
+.editor-preview__divider {
+	-fx-min-width: 1px;
+	-fx-pref-width: 1px;
+	-fx-max-width: 1px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-background-color: rgba(255, 255, 255, 0.2);
+}
+.editor-preview__stage {
+	-fx-padding: 12px 16px;
+}
+.editor-preview__wallpaper {
+	-fx-background-radius: 8px;
+}
+.editor-preview__plate {
+	-fx-background-color: #2b3a49;
+	-fx-background-radius: 10px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 18, 0.25, 0, 6);
+}
+
+/* ---- Playback bar -------------------------------------------------------- */
+
+.editor-playback {
+	-fx-min-height: 56px;
+	-fx-pref-height: 56px;
+	-fx-max-height: 56px;
+	-fx-padding: 0 16px;
+	-fx-spacing: 12px;
+	-fx-alignment: center-left;
+}
+.editor-playback__tools {
+	-fx-spacing: 4px;
+	-fx-alignment: center-left;
+}
+.editor-playback__tools .button,
+.editor-playback__center .button,
+.editor-playback__volume .button {
+	-fx-background-color: transparent;
+	-fx-text-fill: rgba(255, 255, 255, 0.72);
+	-fx-min-width: 32px;
+	-fx-pref-width: 32px;
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+}
+.editor-playback__tools .button:hover,
+.editor-playback__center .button:hover,
+.editor-playback__volume .button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.08);
+	-fx-text-fill: -g-fg;
+}
+.editor-playback__time {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 10px;
+	-fx-font-weight: 500;
+}
+.editor-playback__duration {
+	-fx-text-fill: rgba(139, 146, 154, 0.7);
+	-fx-font-size: 10px;
+	-fx-font-weight: 500;
+}
+.editor-playback__play.button {
+	-fx-background-color: #f2f5f7;
+	-fx-background-radius: 999px;
+	-fx-min-width: 34px;
+	-fx-pref-width: 34px;
+	-fx-min-height: 34px;
+	-fx-pref-height: 34px;
+}
+.editor-playback__play.button:hover {
+	-fx-background-color: #ffffff;
+}
+
+/* ---- Timeline panel ------------------------------------------------------ */
+
+.editor-timeline {
+	-fx-padding: 8px 16px 16px 16px;
+}
+.editor-timeline__playhead {
+	-fx-fill: #ef4444;
+}
+.editor-timeline__track {
+	-fx-background-color: #131a24;
+	-fx-background-radius: 6px;
+	-fx-border-color: rgba(130, 160, 200, 0.45);
+	-fx-border-radius: 6px;
+	-fx-border-width: 1px;
+}
+.editor-timeline__handle {
+	-fx-background-color: rgba(255, 255, 255, 0.92);
+	-fx-background-radius: 2px;
+}
+
+/* ---- Export popover (EditorExportMenu.tsx + ExportSettingsMenu.tsx) ------- */
+
+.export-menu {
+	-fx-padding: 0;
+}
+
+.export-menu__header {
+	-fx-padding: 20px 20px 12px 20px;
+}
+
+.export-menu__heading {
+	-fx-font-size: 14px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.export-menu__state {
+	-fx-padding: 0 20px 20px 20px;
+}
+
+.export-menu__card {
+	-fx-spacing: 4px;
+}
+
+.export-menu__title {
+	-fx-font-size: 14px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.export-menu__subtitle {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+}
+
+.export-menu__note {
+	-fx-font-size: 11px;
+	-fx-text-fill: rgba(139, 146, 154, 0.7);
+}
+
+.export-menu__warning {
+	-fx-font-size: 11px;
+	-fx-text-fill: rgba(232, 179, 57, 0.8);
+}
+
+.export-menu__file-name {
+	-fx-font-size: 11px;
+	-fx-text-fill: rgba(139, 146, 154, 0.7);
+}
+
+.export-menu__error-text {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+}
+
+.export-menu__top {
+	-fx-spacing: 12px;
+	-fx-alignment: center-left;
+	-fx-padding: 0 0 12px 0;
+}
+
+.export-menu__actions {
+	-fx-spacing: 8px;
+	-fx-padding: 16px 0 0 0;
+}
+
+.export-menu__small-button.button {
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+	-fx-font-size: 12px;
+	-fx-padding: 0 12px;
+}
+
+/* ProgressBar (progress-bar.css): track h-2 bg-default r-sm, fill accent. */
+.export-progress-track {
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 4px;
+}
+
+.export-progress-fill {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 4px;
+}
+
+.export-progress-fill--indeterminate {
+	-fx-background-color: -g-accent;
+}
+
+/* ---- Export settings form ------------------------------------------------ */
+
+.export-settings__choices {
+	-fx-spacing: 8px;
+}
+
+.export-settings__hint {
+	-fx-font-size: 10px;
+	-fx-opacity: 0.7;
+	-fx-text-fill: -g-muted;
+}
+
+.export-settings__hint--indent {
+	-fx-padding: 0 0 0 52px;
+}
+
+/* HeroUI Tag size lg (tag.css): rounded-2xl, px-2.5 py-1.5, text-sm, min-h-10. */
+.export-tag.toggle-button {
+	-fx-background-radius: 16px;
+	-fx-padding: 6px 10px;
+	-fx-min-height: 40px;
+	-fx-pref-height: 40px;
+	-fx-font-size: 14px;
+	-fx-alignment: center;
+}
+
+.toggle-group--detached .export-tag.toggle-button,
+.toggle-group--detached .export-tag.toggle-button:first-child,
+.toggle-group--detached .export-tag.toggle-button:last-child {
+	-fx-background-radius: 16px;
+}
+
+.export-tag__description {
+	-fx-font-size: 10px;
+	-fx-opacity: 0.7;
+}
+
+/* ---- Clips panel (RecordingLibraryPanel.tsx) ----------------------------- */
+
+.clips-panel__header {
+	-fx-min-height: 56px;
+	-fx-pref-height: 56px;
+	-fx-padding: 12px 20px;
+	-fx-alignment: center-left;
+}
+
+.clips-panel__title {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+	-fx-font-weight: 600;
+}
+
+.clips-panel__search-row {
+	-fx-padding: 0 20px 12px 20px;
+}
+
+/* Dashboard search pattern: bg-default-soft, rounded-xl, icon gutter on the left. */
+.clips-panel__search {
+	-fx-background-color: -g-default-soft;
+	-fx-background-radius: 12;
+	-fx-border-width: 0;
+	-fx-padding: 0 12 0 40;
+	-fx-font-size: 14px;
+	-fx-pref-height: 40px;
+}
+
+.clips-panel__search:focused {
+	-fx-background-color: -g-default-soft;
+	-fx-border-width: 0;
+}
+
+.clips-panel__select-row {
+	-fx-min-height: 40px;
+	-fx-padding: 0 20px 8px 20px;
+	-fx-alignment: center-left;
+}
+
+.clips-panel__count {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+}
+
+.clips-panel__rows {
+	-fx-spacing: 4px;
+	-fx-padding: 0 12px 12px 12px;
+}
+
+.clips-panel__scroll {
+	-fx-background-color: transparent;
+}
+
+.clips-panel__scroll > .viewport {
+	-fx-background-color: transparent;
+}
+
+.clips-panel__scroll .scroll-bar:vertical {
+	-fx-background-color: transparent;
+	-fx-pref-width: 8px;
+}
+
+.clips-panel__scroll .scroll-bar:vertical .thumb {
+	-fx-background-color: -g-scrollbar-thumb;
+	-fx-background-radius: 4px;
+}
+
+.clips-row {
+	-fx-padding: 12px 8px;
+	-fx-spacing: 12px;
+	-fx-background-radius: 12px;
+	-fx-alignment: center-left;
+}
+
+.clips-row:hover,
+.clips-row--selected {
+	-fx-background-color: -g-default;
+}
+
+.clips-row__main {
+	-fx-background-color: transparent;
+	-fx-background-radius: 6px;
+	-fx-alignment: center-left;
+	-fx-padding: 0;
+	-fx-min-height: 36px;
+}
+
+.clips-row__content {
+	-fx-spacing: 12px;
+	-fx-alignment: center-left;
+}
+
+.clips-row__name {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 12px;
+	-fx-font-weight: 500;
+}
+
+.clips-row__meta {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 11px;
+}
+
+.clips-thumb {
+	-fx-min-width: 64px;
+	-fx-pref-width: 64px;
+	-fx-max-width: 64px;
+	-fx-min-height: 36px;
+	-fx-pref-height: 36px;
+	-fx-max-height: 36px;
+	-fx-background-color: -g-default-soft;
+	-fx-background-radius: 4px;
+	-fx-alignment: center;
+}
+
+.clips-thumb__pulse {
+	-fx-background-color: -g-default-soft;
+	-fx-background-radius: 4px;
+}
+
+/* HeroUI checkbox control: 16x16 rounded-md, field bg, accent when selected. */
+.clips-checkbox {
+	-fx-min-width: 16px;
+	-fx-pref-width: 16px;
+	-fx-max-width: 16px;
+	-fx-min-height: 16px;
+	-fx-pref-height: 16px;
+	-fx-max-height: 16px;
+	-fx-background-color: -g-field;
+	-fx-background-radius: 6px;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 6px;
+	-fx-border-width: 1px;
+	-fx-alignment: center;
+}
+
+.clips-checkbox--selected {
+	-fx-background-color: -g-accent;
+	-fx-border-color: -g-accent;
+}
+
+.clips-checkbox--disabled {
+	-fx-opacity: 0.5;
+}
+
+.clips-checkbox__mark {
+	-fx-min-width: 10px;
+	-fx-pref-width: 10px;
+	-fx-max-width: 10px;
+	-fx-min-height: 10px;
+	-fx-pref-height: 10px;
+	-fx-max-height: 10px;
+}
+
+.clips-checkbox__dash {
+	-fx-min-width: 10px;
+	-fx-pref-width: 10px;
+	-fx-max-width: 10px;
+	-fx-min-height: 2px;
+	-fx-pref-height: 2px;
+	-fx-max-height: 2px;
+	-fx-background-color: -g-accent-foreground;
+	-fx-background-radius: 1px;
+}
+
+.clips-panel__footer {
+	-fx-padding: 12px 20px;
+	-fx-alignment: center-left;
+}
+
+.clips-panel__footer-hint {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 11px;
+}
+
+.clips-panel__empty {
+	-fx-padding: 48px 20px;
+	-fx-alignment: center;
+}
+
+.clips-panel__empty-title {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+}
+
+.clips-panel__empty-subtitle {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+}
+
+.clips-panel__error {
+	-fx-padding: 8px;
+	-fx-spacing: 8px;
+	-fx-alignment: center-left;
+}
+
+.clips-panel__error-text {
+	-fx-text-fill: -g-danger;
+	-fx-font-size: 12px;
+}
+
+.clips-panel__loading {
+	-fx-padding: 16px 8px;
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+}
+
+/* ---- Clip import overlay (the EditorShell importing blocker) -------------- */
+
+.clip-import-overlay {
+	-fx-background-color: rgba(18, 20, 24, 0.8);
+}
+
+.clip-import-overlay__card {
+	-fx-background-color: -g-bg;
+	-fx-background-radius: 12px;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 12px;
+	-fx-border-width: 1px;
+	-fx-padding: 24px;
+	-fx-spacing: 8px;
+	-fx-alignment: center;
+}
+
+.clip-import-overlay__title {
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+}
+
+.clip-import-overlay__description {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 14px;
+	-fx-margin: 8px 0 0 0;
+}
+
+.clip-import-overlay__cancel {
+	-fx-margin: 16px 0 0 0;
+}

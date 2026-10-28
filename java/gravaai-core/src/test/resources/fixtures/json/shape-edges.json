@@ -1,0 +1,59 @@
+{
+  "emptyObject": {},
+  "emptyArray": [],
+  "nested": {
+    "arrays": [
+      [],
+      {},
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        "a",
+        "b"
+      ]
+    ],
+    "objects": [
+      {
+        "a": 1
+      },
+      {
+        "b": [
+          true,
+          false,
+          null
+        ]
+      }
+    ],
+    "deep": {
+      "deeper": {
+        "deepest": [
+          "x"
+        ]
+      }
+    }
+  },
+  "strings": {
+    "empty": "",
+    "unicode": "héllo wörld — 日本語 — 한국어 — 🎬",
+    "escapes": "line1\nline2\ttabbed \"quoted\" back\\slash",
+    "control": "\u0000\u0001\u001f",
+    "url": "https://example.com/a?b=c&d=e"
+  },
+  "numbers": {
+    "zero": 0,
+    "negative": -1,
+    "integer": 1720588800000,
+    "decimal": 0.67,
+    "negativeDecimal": -0.5,
+    "bigInteger": 9007199254740991,
+    "wholeFloat": 30
+  },
+  "booleans": [
+    true,
+    false
+  ],
+  "nullValue": null
+}

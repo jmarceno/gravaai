@@ -1,0 +1,19 @@
+{
+    (
+        modifiers: [
+            Super,
+        ],
+        key: "r",
+        description: Some("Lepramim: Speak highlighted selection"),
+    ): Spawn("busctl --user call org.lepramim.App /org/lepramim/App org.lepramim.App SpeakSelection"),
+    (
+        modifiers: [
+            Super,
+        ],
+        key: "Return",
+    ): System(Terminal),
+    (
+        modifiers: [],
+        key: "Print",
+    ): Spawn("cosmicshot region"),
+}

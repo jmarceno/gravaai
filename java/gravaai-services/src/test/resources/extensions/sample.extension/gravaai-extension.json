@@ -1,0 +1,10 @@
+{
+  "id": "com.example.sample",
+  "name": "Sample Extension",
+  "version": "1.0.0",
+  "description": "Draws a marker for the extension host tests.",
+  "author": "Gravaai tests",
+  "license": "MIT",
+  "main": "index.js",
+  "permissions": ["render", "ui"]
+}

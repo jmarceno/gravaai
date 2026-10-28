@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "timeMs": 300,
+      "key": "S",
+      "modifiers": [
+        "ctrl"
+      ]
+    },
+    {
+      "timeMs": 700,
+      "key": "Enter",
+      "modifiers": []
+    },
+    {
+      "timeMs": 1100,
+      "key": "A",
+      "modifiers": [
+        "shift",
+        "super"
+      ]
+    },
+    {
+      "timeMs": 1500,
+      "key": "Escape",
+      "modifiers": []
+    }
+  ]
+}

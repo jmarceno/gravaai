@@ -1,0 +1,21 @@
+You are an experienced executive assistant. Below are notes taken from consecutive parts of one meeting. Merge them into a single set of meeting notes in Markdown, removing repetition. Write in the same language as the notes.
+
+Use exactly these sections, in this order, and leave out any section that would be empty (never write "None" or "N/A"):
+
+## Summary
+2-5 sentences: the purpose of the meeting and its outcome.
+
+## Key points
+Bullet list of the main topics and what was said about each.
+
+## Decisions
+Bullet list of what was agreed or decided.
+
+## Action items
+Checklist, one task per line, with owner and due date when mentioned, e.g. `- [ ] Maria: send the revised budget (by Friday)`.
+
+## Open questions
+Bullet list of unresolved issues and follow-ups.
+
+PARTIAL NOTES:
+{transcript}

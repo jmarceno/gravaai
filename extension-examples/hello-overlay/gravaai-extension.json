@@ -1,0 +1,10 @@
+{
+  "id": "com.example.hello-overlay",
+  "name": "Hello Overlay",
+  "version": "1.0.0",
+  "description": "Draws a small hello banner from a final render hook.",
+  "author": "Gravaai examples",
+  "license": "MIT",
+  "main": "index.js",
+  "permissions": ["render"]
+}

@@ -1,0 +1,18 @@
+logs
+*.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.swp
+*.kiro/
+.tmp/
+.history/
+extension-sources/
+
+# Java build output
+target/
+*.class
+.jqwik-database

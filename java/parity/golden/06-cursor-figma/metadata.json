@@ -1,0 +1,14 @@
+{
+  "project": "java/parity/fixtures/projects/06-cursor-figma.gravaai",
+  "timesSeconds": [
+    0.5,
+    1.25
+  ],
+  "width": 1280,
+  "capturedAt": "2026-10-28T05:08:11.817Z",
+  "frames": [
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden2/06-cursor-figma/500.png",
+    "../../../../tmp/claude-1000/-home-jmarceno-Projects-gravaai/6852452f-81dc-4275-b35e-cbfe1f8e0119/scratchpad/golden2/06-cursor-figma/1250.png"
+  ],
+  "route": "electron MCP frames tool (one frame per call; VA-API decode/encode disabled; lossless PNG from capturePage)"
+}

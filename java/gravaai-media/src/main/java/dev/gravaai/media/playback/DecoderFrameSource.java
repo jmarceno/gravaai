@@ -1,0 +1,348 @@
+package dev.gravaai.media.playback;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.function.Supplier;
+
+import dev.gravaai.media.compose.RgbaFrame;
+
+/**
+ * A {@link FrameSource} with a decode-ahead ring (plan §5.9: 3-6 frames per source on a decode
+ * thread). The worker decodes sequentially; {@link #frameAt} consumes the newest frame whose pts is
+ * at or before the requested source time, and requests a seek when the request moves backwards or
+ * beyond the ring.
+ *
+ * <p>Only one consumer calls {@link #frameAt} (the playback render thread); the returned
+ * {@link RgbaFrame} stays valid until the next {@link #frameAt} call.
+ */
+public final class DecoderFrameSource implements FrameSource {
+
+	/** Default ring depth (plan §5.9: 3-6 frames per source). */
+	public static final int DEFAULT_RING_CAPACITY = 4;
+
+	private static final long SEEK_TOLERANCE_US = 250_000;
+	/** Seek slightly before the target so the ring also holds the frame at or before it. */
+	private static final long SEEK_BACKOFF_US = 50_000;
+	/** A request farther than this from the ring head seeks forward instead of decoding through. */
+	private static final long MAX_SEQUENTIAL_GAP_US = 500_000;
+	private static final long WAIT_SLICE_MS = 200;
+	/** Bounded, generous for a loaded build machine: the first 1080p decode can take seconds. */
+	private static final long MAX_WAIT_MS = 20_000;
+
+	/** The decoder is opened inside the worker so FFM arenas belong to the decode thread. */
+	private final Supplier<VideoFrameDecoder> decoderSupplier;
+	private final Double durationOverrideSeconds;
+	private VideoFrameDecoder decoder;
+	private final int ringCapacity;
+	private final Object lock = new Object();
+	private final Deque<VideoFrame> ring = new ArrayDeque<>();
+	private final Thread worker;
+	private boolean closed;
+	private boolean eof;
+	private RuntimeException failure;
+	private Double seekRequest;
+	/** True while the worker is inside decoder.seek()+next(): consumers must not queue another. */
+	private boolean seekInProgress;
+	private long lastReturnedPtsUs = -1;
+	// Decode profiling: number of seeks/decoded frames, logged once when the first frame lands.
+	private long seekCount;
+	private long framesDecoded;
+	private long firstSeekStartedNanos = -1;
+	private boolean profiledFirstFrame;
+	private VideoFrame lastReturned;
+
+	private DecoderFrameSource(
+			Supplier<VideoFrameDecoder> decoderSupplier,
+			Double durationOverrideSeconds,
+			int ringCapacity,
+			VideoFrameDecoder preOpenedDecoder) {
+		this.decoderSupplier = decoderSupplier;
+		this.decoder = preOpenedDecoder;
+		this.durationOverrideSeconds = durationOverrideSeconds != null
+				&& Double.isFinite(durationOverrideSeconds)
+				&& durationOverrideSeconds > 0
+						? durationOverrideSeconds
+						: null;
+		this.ringCapacity = Math.max(1, ringCapacity);
+		this.worker = Thread.ofPlatform().daemon().name("gravaai-playback-decode").start(this::decodeLoop);
+	}
+
+	public static DecoderFrameSource open(VideoFrameDecoder decoder) {
+		return open(decoder, DEFAULT_RING_CAPACITY);
+	}
+
+	public static DecoderFrameSource open(VideoFrameDecoder decoder, int ringCapacity) {
+		if (decoder == null) {
+			throw new IllegalArgumentException("decoder must not be null");
+		}
+		return new DecoderFrameSource(() -> decoder, null, ringCapacity, decoder);
+	}
+
+	/** Opens the decoder inside the decode worker (FFM confined arenas are thread-owned). */
+	public static DecoderFrameSource open(Supplier<VideoFrameDecoder> decoderSupplier) {
+		return open(decoderSupplier, null, DEFAULT_RING_CAPACITY);
+	}
+
+	public static DecoderFrameSource open(Supplier<VideoFrameDecoder> decoderSupplier, int ringCapacity) {
+		return open(decoderSupplier, null, ringCapacity);
+	}
+
+	/**
+	 * Opens the decoder inside the decode worker; {@code durationOverrideSeconds} keeps the media
+	 * duration available to callers before the worker has opened the decoder.
+	 */
+	public static DecoderFrameSource open(
+			Supplier<VideoFrameDecoder> decoderSupplier, Double durationOverrideSeconds, int ringCapacity) {
+		if (decoderSupplier == null) {
+			throw new IllegalArgumentException("decoderSupplier must not be null");
+		}
+		return new DecoderFrameSource(decoderSupplier, durationOverrideSeconds, ringCapacity, null);
+	}
+
+	private void decodeLoop() {
+		VideoFrameDecoder opened = null;
+		try {
+			// Open on this thread: the FFmpeg decoder's FFM arena rejects access from any other.
+			opened = decoder == null ? decoderSupplier.get() : decoder;
+			decoder = opened;
+			while (true) {
+				double seek;
+				synchronized (lock) {
+					while (!closed && seekRequest == null && ring.size() >= ringCapacity) {
+						lock.wait();
+					}
+					if (closed) {
+						return;
+					}
+					if (seekRequest == null) {
+						seek = Double.NaN;
+					} else {
+						seek = seekRequest;
+						seekRequest = null;
+						seekInProgress = true;
+						releaseRingLocked();
+						eof = false;
+						releaseFrameLocked(lastReturned);
+						lastReturned = null;
+						lastReturnedPtsUs = -1;
+					}
+				}
+				if (!Double.isNaN(seek)) {
+					if (firstSeekStartedNanos < 0) {
+						firstSeekStartedNanos = System.nanoTime();
+					}
+					decoder.seek(seek);
+				}
+				VideoFrame frame = decoder.next();
+				synchronized (lock) {
+					if (closed) {
+						if (frame != null) {
+							frame.release();
+						}
+						return;
+					}
+					if (!Double.isNaN(seek)) {
+						seekCount++;
+					}
+					if (frame == null) {
+						eof = true;
+					} else {
+						framesDecoded++;
+						ring.addLast(frame);
+					}
+					seekInProgress = false;
+					if (!profiledFirstFrame && frame != null) {
+						profiledFirstFrame = true;
+						long elapsedMs = firstSeekStartedNanos < 0
+								? 0
+								: (System.nanoTime() - firstSeekStartedNanos) / 1_000_000;
+						System.getLogger(DecoderFrameSource.class.getName()).log(
+								System.Logger.Level.INFO,
+								"first decoded preview frame after " + elapsedMs + " ms (seeks="
+										+ seekCount + ", frames=" + framesDecoded + ", size="
+										+ frame.width() + "x" + frame.height() + ")");
+					}
+					lock.notifyAll();
+				}
+			}
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+		} catch (RuntimeException error) {
+			synchronized (lock) {
+				failure = error;
+				lock.notifyAll();
+			}
+		} finally {
+			// The decoder and its converters are FFM-arena owners: close them on this thread, never
+			// on the FX thread that calls PlaybackEngine/FrameSource.close().
+			synchronized (lock) {
+				decoder = null;
+			}
+			if (opened != null) {
+				try {
+					opened.close();
+				} catch (RuntimeException error) {
+					System.getLogger(DecoderFrameSource.class.getName()).log(
+							System.Logger.Level.WARNING, "could not close the video decoder: " + error);
+				}
+			}
+		}
+	}
+
+	@Override
+	public RgbaFrame frameAt(double sourceSeconds) {
+		return frameAt(sourceSeconds, MAX_WAIT_MS);
+	}
+
+	/** Frame with an explicit wait budget (first frame/seek paths can fail fast). */
+	@Override
+	public RgbaFrame frameAt(double sourceSeconds, long timeoutMs) {
+		long targetUs = Math.max(0, Math.round((Double.isFinite(sourceSeconds) ? sourceSeconds : 0) * 1_000_000));
+		long budgetMs = timeoutMs > 0 ? timeoutMs : MAX_WAIT_MS;
+		long deadlineNanos = System.nanoTime() + budgetMs * 1_000_000;
+		synchronized (lock) {
+			while (true) {
+				if (closed) {
+					return null;
+				}
+				if (failure != null) {
+					throw new IllegalStateException("decode-ahead worker failed", failure);
+				}
+				if (ring.isEmpty()) {
+					if (eof) {
+						return null;
+					}
+					requestSeekLocked(sourceSeconds);
+					waitLocked(deadlineNanos);
+					continue;
+				}
+				VideoFrame first = ring.peekFirst();
+				boolean backward = lastReturnedPtsUs >= 0 && targetUs < lastReturnedPtsUs;
+				boolean tooFarAhead = first.ptsUs() - targetUs > SEEK_TOLERANCE_US;
+				// Don't decode hundreds of frames forward on a jump: seek the worker instead.
+				boolean farBehind = targetUs - first.ptsUs() > MAX_SEQUENTIAL_GAP_US;
+				if (backward || tooFarAhead || farBehind) {
+					releaseRingLocked();
+					requestSeekLocked(sourceSeconds);
+					waitLocked(deadlineNanos);
+					continue;
+				}
+				VideoFrame chosen = null;
+				while (!ring.isEmpty() && ring.peekFirst().ptsUs() <= targetUs) {
+					VideoFrame next = ring.pollFirst();
+					if (chosen != null) {
+						chosen.release();
+					}
+					chosen = next;
+				}
+				if (chosen != null) {
+					if (lastReturned != null) {
+						lastReturned.release();
+					}
+					lastReturned = chosen;
+					lastReturnedPtsUs = chosen.ptsUs();
+					lock.notifyAll();
+					return new RgbaFrame(chosen.width(), chosen.height(), chosen.rgbaTopFirst());
+				}
+				if (lastReturned != null) {
+					// The requested time sits between two frames: hold the frame at or before it.
+					lock.notifyAll();
+					return new RgbaFrame(
+							lastReturned.width(), lastReturned.height(), lastReturned.rgbaTopFirst());
+				}
+				if (eof) {
+					chosen = ring.pollFirst();
+					if (chosen == null) {
+						return null;
+					}
+					if (lastReturned != null) {
+						lastReturned.release();
+					}
+					lastReturned = chosen;
+					lastReturnedPtsUs = chosen.ptsUs();
+					lock.notifyAll();
+					return new RgbaFrame(chosen.width(), chosen.height(), chosen.rgbaTopFirst());
+				}
+				requestSeekLocked(sourceSeconds);
+				waitLocked(deadlineNanos);
+			}
+		}
+	}
+
+	/** Releases every buffered ring frame (the decoder's pooled buffers become reusable). */
+	private void releaseRingLocked() {
+		VideoFrame frame;
+		while ((frame = ring.pollFirst()) != null) {
+			frame.release();
+		}
+	}
+
+	private static void releaseFrameLocked(VideoFrame frame) {
+		if (frame != null) {
+			frame.release();
+		}
+	}
+
+	private void requestSeekLocked(double seconds) {
+		// Do not queue another seek while the worker is already seeking: the old code let the
+		// consumer replace the request mid-seek, which discarded every decoded frame and made
+		// the ring livelock (thousands of seeks/frames, 8 MB direct buffers churning).
+		if (seekRequest == null && !seekInProgress) {
+			double safeSeconds = Double.isFinite(seconds) ? Math.max(0, seconds) : 0;
+			// Back off slightly so the ring starts at or before the requested frame, never only after it.
+			seekRequest = Math.max(0, (Math.round(safeSeconds * 1_000_000) - SEEK_BACKOFF_US) / 1_000_000.0);
+		}
+		lock.notifyAll();
+	}
+
+	/**
+	 * Bounded wait: the ring can never hang a caller (or the build) forever. The consumer waits in
+	 * slices and fails with a clear error after the budget instead of blocking on the monitor.
+	 */
+	private void waitLocked(long deadlineNanos) {
+		long remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000;
+		if (remainingMs <= 0) {
+			throw new IllegalStateException(
+					"timed out waiting for the decode-ahead ring (" + MAX_WAIT_MS + " ms): ring="
+							+ ring.size() + " eof=" + eof + " seek=" + seekRequest + " decoder="
+							+ (decoder != null) + " worker=" + worker.getState() + " lastPtsUs="
+							+ lastReturnedPtsUs);
+		}
+		try {
+			lock.wait(Math.min(WAIT_SLICE_MS, remainingMs));
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("interrupted while waiting for a decoded frame", interrupted);
+		}
+	}
+
+	@Override
+	public double durationSeconds() {
+		if (durationOverrideSeconds != null && Double.isFinite(durationOverrideSeconds)
+				&& durationOverrideSeconds > 0) {
+			return durationOverrideSeconds;
+		}
+		VideoFrameDecoder current = decoder;
+		return current == null ? 0 : current.durationSeconds();
+	}
+
+	@Override
+	public void close() {
+		synchronized (lock) {
+			if (closed) {
+				return;
+			}
+			closed = true;
+			releaseRingLocked();
+			releaseFrameLocked(lastReturned);
+			lastReturned = null;
+			lock.notifyAll();
+		}
+		try {
+			// The worker closes the decoder in its finally block (FFM arena ownership).
+			worker.join(2_000);
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+		}
+	}
+}

@@ -1,0 +1,315 @@
+/*
+ * HUD overlay + HUD menu styles (plan §5.4, §5.12, §7.1 P1.7).
+ *
+ * Ported from src/components/launch/LaunchWindow.module.css, launchTheme.css and the Tailwind
+ * classes in LaunchWindow.tsx / HudMenuWindow.tsx. Uses the kit's -g- tokens (see
+ * dev/gravaai/ui/kit/README.md for the Tailwind -> px table).
+ */
+
+/* The HUD stage is transparent; the bar is the only visible surface. */
+.hud-root,
+.kit-root.hud-kit-root {
+	-fx-background-color: transparent;
+}
+
+/* LaunchWindow.module.css .bar: gap 10, px-3 (12), py-2 (8), radius-xl (12), bg surface,
+   1px border. */
+.hud-bar {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 12px;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 12px;
+	-fx-padding: 8px 12px 8px 12px;
+	-fx-spacing: 10px;
+	-fx-alignment: center-left;
+	-fx-max-width: 1200px;
+}
+
+/* .barState: gap 8, centred row, no wrapping. */
+.hud-bar-state {
+	-fx-spacing: 8px;
+	-fx-alignment: center-left;
+}
+
+/* .sep: 1px divider 26 high, margin 0 6. */
+.hud-sep {
+	-fx-background-color: -g-separator;
+	-fx-background-radius: 1px;
+	-fx-min-width: 1px;
+	-fx-pref-width: 1px;
+	-fx-max-width: 1px;
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
+	-fx-max-height: 26px;
+	-fx-translate-x: 6px;
+}
+
+/* The drag handle (DotsThreeVertical, #6b6b78, cursor grab). */
+.hud-drag-handle {
+	-fx-padding: 0 2px 0 2px;
+	-fx-cursor: open-hand;
+	-g-icon-color: #6b6b78;
+}
+
+.hud-drag-handle:pressed {
+	-fx-cursor: closed-hand;
+}
+
+/* .recDot: 14px white circle inside the danger record button, blink while recording. */
+.hud-rec-dot {
+	-fx-background-color: #ffffff;
+	-fx-background-radius: 50%;
+	-fx-min-width: 14px;
+	-fx-pref-width: 14px;
+	-fx-max-width: 14px;
+	-fx-min-height: 14px;
+	-fx-pref-height: 14px;
+	-fx-max-height: 14px;
+}
+
+/* .stopSquare: 15px white square radius 3 (recording state). */
+.hud-stop-square {
+	-fx-background-color: #ffffff;
+	-fx-background-radius: 3px;
+	-fx-min-width: 15px;
+	-fx-pref-width: 15px;
+	-fx-max-width: 15px;
+	-fx-min-height: 15px;
+	-fx-pref-height: 15px;
+	-fx-max-height: 15px;
+}
+
+/* Timer text: text-sm font-medium tabular-nums, min width 14 (3.5rem = 56). */
+.hud-timer {
+	-fx-font-size: 14px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+	-fx-min-width: 56px;
+}
+
+.hud-paused-label {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+}
+
+/* .finalizingState: inline row gap 11, min-width 238. */
+.hud-finalizing {
+	-fx-spacing: 11px;
+	-fx-alignment: center-left;
+	-fx-min-width: 238px;
+}
+
+.hud-finalizing-spin {
+	-g-icon-color: -g-accent;
+}
+
+.hud-finalizing-copy {
+	-fx-spacing: 2px;
+}
+
+.hud-finalizing-title {
+	-fx-font-size: 12px;
+	-fx-font-weight: 700;
+	-fx-text-fill: -g-fg;
+}
+
+.hud-finalizing-subtitle {
+	-fx-font-size: 10px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-muted;
+}
+
+/* Source picker label (MarqueeText inside the ghost button). */
+.hud-source-button {
+	-fx-padding: 0 12px 0 12px;
+	-fx-alignment: center-left;
+	-fx-graphic-text-gap: 8px;
+	-fx-min-width: 0;
+	-fx-max-width: 180px;
+}
+
+.hud-audio-only-note {
+	-fx-font-size: 14px;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 0 12px 0 12px;
+	-fx-spacing: 8px;
+}
+
+/* Recording webcam preview (LaunchWindow.module.css .recordingWebcamPreview): radius 24,
+   bg launch-surface, 1px border, draggable/resizable. */
+.hud-webcam-preview {
+	-fx-background-color: -g-overlay;
+	-fx-background-radius: 24px;
+	-fx-border-color: -g-separator;
+	-fx-border-width: 1px;
+	-fx-border-radius: 24px;
+	-fx-cursor: open-hand;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 18, 0.12, 0, 6);
+}
+
+.hud-webcam-preview:pressed {
+	-fx-cursor: closed-hand;
+}
+
+.hud-webcam-image {
+	-fx-opacity: 1;
+}
+
+.hud-webcam-resize-handle {
+	-fx-background-color: transparent;
+	-fx-cursor: se-resize;
+}
+
+/* ── HUD menu (HudMenuWindow.tsx) ─────────────────────────────────────── */
+
+/* Backdrop: bg-black/45 over the whole display. */
+.hud-menu-backdrop {
+	-fx-background-color: rgba(0, 0, 0, 0.45);
+}
+
+/* Panel: w-[520px], rounded-2xl (16), border launch-border, bg launch-panel, p-3 (12),
+   max 82vh / 720. */
+.hud-menu-panel {
+	-fx-background-color: -g-surface;
+	-fx-background-radius: 16px;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 16px;
+	-fx-padding: 12px;
+	-fx-spacing: 2px;
+	-fx-max-width: 520px;
+	-fx-pref-width: 520px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 40, 0.12, 0, 12);
+}
+
+.hud-menu-header {
+	-fx-padding: 4px 4px 8px 4px;
+	-fx-alignment: center-left;
+	-fx-spacing: 12px;
+}
+
+/* ddLabel: 9px, 600, muted, uppercase look with letter-spacing 0.08em, padding 6 10 4. */
+.hud-menu-title {
+	-fx-font-size: 10px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 0;
+}
+
+/* DropdownItem: full-width ghost button, gap 12, left aligned, 36 high. */
+.hud-menu-item {
+	-fx-background-color: transparent;
+	-fx-background-radius: 12px;
+	-fx-padding: 8px 12px 8px 12px;
+	-fx-spacing: 12px;
+	-fx-min-height: 40px;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 14px;
+}
+
+.hud-menu-item:hover {
+	-fx-background-color: -g-default;
+}
+
+.hud-menu-item:selected {
+	-fx-text-fill: -g-accent;
+	-g-icon-color: -g-accent;
+}
+
+.hud-menu-item:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+.hud-menu-item-empty {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 8px 12px 8px 12px;
+}
+
+.hud-menu-empty-note {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 16px;
+	-fx-alignment: center;
+}
+
+/* Webcam menu live preview: aspect 4/3, max 420 wide, radius 16, ring 1px. */
+.hud-menu-webcam-frame {
+	-fx-background-color: -g-default;
+	-fx-background-radius: 16px;
+	-fx-border-color: -g-separator;
+	-fx-border-width: 1px;
+	-fx-border-radius: 16px;
+	-fx-padding: 12px;
+}
+
+.hud-menu-webcam-image {
+	-fx-opacity: 1;
+}
+
+/* The device row meter is 64 wide (w-16). */
+.hud-menu-meter {
+	-fx-min-width: 64px;
+	-fx-pref-width: 64px;
+	-fx-max-width: 64px;
+}
+
+.hud-menu-scroll {
+	-fx-background-color: transparent;
+	-fx-background: transparent;
+	-fx-padding: 0;
+}
+
+/* ── HUD bar extras ─────────────────────────────────────────────────── */
+.hud-bar-state-viewport {
+	-fx-min-height: 46px;
+	-fx-pref-height: 46px;
+}
+
+/* Active toggle (meeting mode, mic/webcam enabled, countdown set): accent like text-accent. */
+.hud-accent {
+	-g-icon-color: -g-accent;
+}
+
+.hud-status-dot {
+	-fx-background-color: -g-danger;
+	-fx-background-radius: 50%;
+	-fx-min-width: 8px;
+	-fx-pref-width: 8px;
+	-fx-max-width: 8px;
+	-fx-min-height: 8px;
+	-fx-pref-height: 8px;
+	-fx-max-height: 8px;
+}
+
+.hud-status-dot--paused {
+	-fx-background-color: -g-warning;
+}
+
+.hud-menu-close {
+	-fx-background-color: transparent;
+	-fx-cursor: hand;
+}
+
+/* ── HUD hint bubble (instruction/feedback above the bar; toast.info parity) ── */
+.hud-hint {
+	-fx-background-color: -g-overlay;
+	-fx-background-radius: 12px;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 12px;
+	-fx-padding: 8px 12px 8px 12px;
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 12px;
+}
+
+.hud-hint--error {
+	-fx-background-color: -g-surface;
+	-fx-border-color: -g-danger;
+	-fx-text-fill: -g-danger;
+}

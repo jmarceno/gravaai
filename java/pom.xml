@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Gravaai - Java rewrite.
+  Parent POM: pinned dependency versions (plan §4.3), build output on the scratch disk
+  (plan §1.1.3) and the surefire/failsafe caps (plan §1.1.2).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>dev.gravaai</groupId>
+	<artifactId>gravaai-parent</artifactId>
+	<version>1.4.0</version>
+	<packaging>pom</packaging>
+	<name>Gravaai</name>
+
+	<modules>
+		<module>gravaai-core</module>
+		<module>gravaai-platform</module>
+		<module>gravaai-media</module>
+		<module>gravaai-services</module>
+		<module>gravaai-ui</module>
+		<module>gravaai-app</module>
+	</modules>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<maven.compiler.release>27</maven.compiler.release>
+
+		<!-- Pinned library versions: plan §4.3. Bump only with reviewer approval. -->
+		<javafx.version>27</javafx.version>
+		<lwjgl.version>3.4.3</lwjgl.version>
+		<skija.version>0.143.18</skija.version>
+		<jackson.version>3.2.4</jackson.version>
+		<mcp.version>2.1.0</mcp.version>
+		<dbus.version>5.2.2</dbus.version>
+		<commonmark.version>0.31.0</commonmark.version>
+		<graalvm.version>25.4.4.1.1</graalvm.version>
+		<junit.version>6.1.3</junit.version>
+		<!-- Pinned to the last 1.9.x release: jqwik 1.10.x ships an upstream prompt-injection-style
+		     notice to AI coding agents (the "jqwik Anti-AI Affair"); 1.9.3 is the last clean line.
+		     Do not bump past 1.9.3 without an explicit decision. -->
+		<jqwik.version>1.9.3</jqwik.version>
+		<testfx.version>4.0.18</testfx.version>
+
+		<!-- Toolchain: plan §3. Override with -Dgravaai.jdk=... on another machine. -->
+		<gravaai.jdk>/media/jmarceno/scratch/java-toolchain/jdk-27.0.1.0.2+1</gravaai.jdk>
+		<gravaai.javafx.jmods>/media/jmarceno/scratch/java-toolchain/javafx-jmods-27</gravaai.javafx.jmods>
+		<!-- Build output never lands in the repo: plan §1.1.3. -->
+		<gravaai.build.root>/media/jmarceno/scratch/java-targets</gravaai.build.root>
+		<!-- Display used by the JavaFX/TestFX tests and the dashboard screenshot test. -->
+		<!-- UI tests run on an isolated virtual display so they never pop windows on the user's
+		     desktop. Start one with: Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
+		     Override with -Dgravaai.test.display=:0 when you explicitly want the live display. -->
+		<gravaai.test.display>:99</gravaai.test.display>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- UI: JavaFX is compile-only; the jlink runtime image provides it. -->
+			<dependency>
+				<groupId>org.openjfx</groupId>
+				<artifactId>javafx-controls</artifactId>
+				<version>${javafx.version}</version>
+				<scope>provided</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.openjfx</groupId>
+				<artifactId>javafx-graphics</artifactId>
+				<version>${javafx.version}</version>
+				<scope>provided</scope>
+			</dependency>
+
+			<!-- GL + EGL (plan §4.3). -->
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl</artifactId>
+				<version>${lwjgl.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl</artifactId>
+				<version>${lwjgl.version}</version>
+				<classifier>natives-linux</classifier>
+			</dependency>
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl-opengl</artifactId>
+				<version>${lwjgl.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl-opengl</artifactId>
+				<version>${lwjgl.version}</version>
+				<classifier>natives-linux</classifier>
+			</dependency>
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl-egl</artifactId>
+				<version>${lwjgl.version}</version>
+			</dependency>
+
+			<!-- 2D on GPU (plan §4.3). -->
+			<dependency>
+				<groupId>io.github.humbleui</groupId>
+				<artifactId>skija-linux-x64</artifactId>
+				<version>${skija.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.github.humbleui</groupId>
+				<artifactId>skija-shared</artifactId>
+				<version>${skija.version}</version>
+			</dependency>
+
+			<!-- JSON: Jackson 3. Our own code only; the MCP SDK may bring Jackson 2. -->
+			<dependency>
+				<groupId>tools.jackson.core</groupId>
+				<artifactId>jackson-databind</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+
+			<!-- MCP server over stdio (plan §5.16). -->
+			<dependency>
+				<groupId>io.modelcontextprotocol.sdk</groupId>
+				<artifactId>mcp</artifactId>
+				<version>${mcp.version}</version>
+			</dependency>
+
+			<!-- D-Bus: tray, notifications, portals (plan §5.5). -->
+			<dependency>
+				<groupId>com.github.hypfvieh</groupId>
+				<artifactId>dbus-java-core</artifactId>
+				<version>${dbus.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.github.hypfvieh</groupId>
+				<artifactId>dbus-java-transport-native-unixsocket</artifactId>
+				<version>${dbus.version}</version>
+			</dependency>
+
+			<!-- Markdown for meeting notes (plan §5.12). -->
+			<dependency>
+				<groupId>org.commonmark</groupId>
+				<artifactId>commonmark</artifactId>
+				<version>${commonmark.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.commonmark</groupId>
+				<artifactId>commonmark-ext-gfm-tables</artifactId>
+				<version>${commonmark.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.commonmark</groupId>
+				<artifactId>commonmark-ext-gfm-strikethrough</artifactId>
+				<version>${commonmark.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.commonmark</groupId>
+				<artifactId>commonmark-ext-task-list-items</artifactId>
+				<version>${commonmark.version}</version>
+			</dependency>
+
+			<!-- Extensions JS engine (Phase 3, plan §5.18). -->
+			<dependency>
+				<groupId>org.graalvm.polyglot</groupId>
+				<artifactId>polyglot</artifactId>
+				<version>${graalvm.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.graalvm.polyglot</groupId>
+				<artifactId>js-community</artifactId>
+				<version>${graalvm.version}</version>
+				<type>pom</type>
+			</dependency>
+			<dependency>
+				<groupId>org.graalvm.truffle</groupId>
+				<artifactId>truffle-runtime</artifactId>
+				<version>${graalvm.version}</version>
+			</dependency>
+
+			<!-- Tests (plan §4.3). -->
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter</artifactId>
+				<version>${junit.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>net.jqwik</groupId>
+				<artifactId>jqwik</artifactId>
+				<version>${jqwik.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testfx</groupId>
+				<artifactId>testfx-junit5</artifactId>
+				<version>${testfx.version}</version>
+				<scope>test</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<directory>${gravaai.build.root}/${project.artifactId}</directory>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.14.0</version>
+					<configuration>
+						<compilerArgs>
+							<arg>-parameters</arg>
+						</compilerArgs>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>3.6.1</version>
+					<configuration>
+						<!-- Plan §1.1.2: one test JVM at a time, capped heap. -->
+						<forkCount>1</forkCount>
+						<reuseForks>true</reuseForks>
+						<argLine>-Xmx1g</argLine>
+						<systemPropertyVariables>
+							<!-- Keep jqwik's database out of the repository (plan §1.1.3). -->
+							<jqwik.database>${project.build.directory}/jqwik-database</jqwik.database>
+						</systemPropertyVariables>
+						<!-- JavaFX/TestFX tests need the session display; Maven inherits no DISPLAY from the
+						     desktop session when started from an agent shell. This machine is a COSMIC desktop. -->
+						<environmentVariables>
+							<DISPLAY>${gravaai.test.display}</DISPLAY>
+							<XDG_RUNTIME_DIR>/run/user/1000</XDG_RUNTIME_DIR>
+							<WAYLAND_DISPLAY>wayland-1</WAYLAND_DISPLAY>
+						</environmentVariables>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-failsafe-plugin</artifactId>
+					<version>3.6.1</version>
+					<configuration>
+						<forkCount>1</forkCount>
+						<reuseForks>true</reuseForks>
+						<argLine>-Xmx1g</argLine>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-jar-plugin</artifactId>
+					<version>3.4.2</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>3.3.1</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-dependency-plugin</artifactId>
+					<version>3.11.0</version>
+				</plugin>
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>exec-maven-plugin</artifactId>
+					<version>3.6.4</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-wrapper-plugin</artifactId>
+					<version>3.3.4</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+</project>

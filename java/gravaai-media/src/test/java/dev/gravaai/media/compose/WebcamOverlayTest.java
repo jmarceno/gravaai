@@ -96,8 +96,9 @@ class WebcamOverlayTest {
 		assertTrue(WebcamOverlay.shadowLayers(100, 0).isEmpty());
 		List<WebcamOverlay.ShadowLayer> layers = WebcamOverlay.shadowLayers(100, 0.5);
 		assertEquals(2, layers.size());
-		assertEquals(6.0, layers.get(0).offsetY(), 1e-9);
-		assertEquals(22.0, layers.get(0).blur(), 1e-9);
-		assertEquals(0.9, layers.get(0).alpha(), 1e-9);
+		// A tight shadow: the reach is a few percent of the overlay, the strength only fades it.
+		assertEquals(2.5, layers.get(0).offsetY(), 1e-9);
+		assertEquals(3.5, layers.get(0).blur(), 1e-9);
+		assertEquals(0.45, layers.get(0).alpha(), 1e-9);
 	}
 }

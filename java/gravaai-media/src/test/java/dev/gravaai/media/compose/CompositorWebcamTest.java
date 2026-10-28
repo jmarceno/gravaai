@@ -149,11 +149,15 @@ class CompositorWebcamTest {
 		ByteBuffer plain = render(input(0.0, solid(40, 40, 255, 0, 0), noShadow, ZoomSpec.NONE));
 		ByteBuffer shadowed = render(
 				input(0.0, solid(40, 40, 255, 0, 0), withShadow, ZoomSpec.NONE));
-		int[] plainPixel = pixel(plain, 200, 135);
-		int[] shadowPixel = pixel(shadowed, 200, 135);
+		// The 56 px overlay ends at y=128: the shadow hugs its edge...
+		int[] plainPixel = pixel(plain, 200, 130);
+		int[] shadowPixel = pixel(shadowed, 200, 130);
 		assertTrue(shadowPixel[0] < plainPixel[0],
 				"shadow did not darken below the webcam: " + shadowPixel[0] + " vs "
 						+ plainPixel[0]);
+		// ...and does not spread a halo across the scene (it reached ~40% of the overlay size).
+		assertEquals(pixel(plain, 200, 150)[0], pixel(shadowed, 200, 150)[0],
+				"the webcam shadow must stay close to the overlay");
 	}
 
 	@Test

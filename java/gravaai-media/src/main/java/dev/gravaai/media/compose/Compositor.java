@@ -4,12 +4,16 @@ import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ColorAlphaType;
 import io.github.humbleui.skija.ColorSpace;
 import io.github.humbleui.skija.ColorType;
+import io.github.humbleui.skija.FilterMipmap;
+import io.github.humbleui.skija.FilterMode;
 import io.github.humbleui.skija.FilterTileMode;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageFilter;
 import io.github.humbleui.skija.MaskFilter;
 import io.github.humbleui.skija.FilterBlurMode;
 import io.github.humbleui.skija.ImageInfo;
+import io.github.humbleui.skija.Matrix33;
+import io.github.humbleui.skija.MipmapMode;
 import io.github.humbleui.skija.Paint;
 import io.github.humbleui.skija.Path;
 import io.github.humbleui.skija.SamplingMode;
@@ -54,6 +58,12 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * flushes as well so the PBO readback sees the frame and raster images can be released.</p>
  */
 public final class Compositor implements AutoCloseable {
+	/**
+	 * The webcam is drawn several times smaller than its source, so it samples the mipmapped
+	 * texture trilinearly; plain bilinear skips texels and shimmers.
+	 */
+	private static final SamplingMode WEBCAM_SAMPLING = new FilterMipmap(FilterMode.LINEAR,
+			MipmapMode.LINEAR);
 
 	private static final System.Logger LOG = System.getLogger(Compositor.class.getName());
 
@@ -457,18 +467,8 @@ public final class Compositor implements AutoCloseable {
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
 				drawWebcamShadowLayers(canvas, box, radius, spec.shadow() * (1 - fill),
 						Math.min(box.getWidth(), box.getHeight()));
-				canvas.save();
-				if (radius > 0.5) {
-					try (Path path = SquircleGeometry.toPath(squircleRect(box, radius))) {
-						if (path != null) {
-							canvas.clipPath(path);
-						}
-					}
-				} else {
-					canvas.clipRect(box);
-				}
-				drawWebcamCover(canvas, image, source, box, spec.mirror());
-				canvas.restore();
+				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
+						radius, WEBCAM_SAMPLING);
 			}
 		} finally {
 			if (layered) {
@@ -519,27 +519,53 @@ public final class Compositor implements AutoCloseable {
 		}
 	}
 
-	/** Cover-fit the (cropped) webcam frame into the box, optionally mirrored horizontally. */
-	private void drawWebcamCover(Canvas canvas, Image image, Rect source, Rect box,
-			boolean mirror) {
+	/**
+	 * Image-to-canvas matrix that cover-fits the (cropped) webcam frame into the box, optionally
+	 * mirrored around the box centre like the sprite {@code scale.x = -1} path.
+	 */
+	private static Matrix33 webcamCoverMatrix(Rect source, Rect box, boolean mirror) {
 		double scale = Math.max(box.getWidth() / source.getWidth(),
 				box.getHeight() / source.getHeight());
-		double drawWidth = source.getWidth() * scale;
-		double drawHeight = source.getHeight() * scale;
-		double dx = box._left + (box.getWidth() - drawWidth) / 2.0;
-		double dy = box._top + (box.getHeight() - drawHeight) / 2.0;
-		Rect destination = Rect.makeXYWH((float) dx, (float) dy, (float) drawWidth,
-				(float) drawHeight);
+		double dx = box._left + (box.getWidth() - source.getWidth() * scale) / 2.0
+				- source._left * scale;
+		double dy = box._top + (box.getHeight() - source.getHeight() * scale) / 2.0
+				- source._top * scale;
 		if (mirror) {
-			canvas.save();
-			// Reflect around the box centre, exactly like the sprite scale.x = -1 path.
-			canvas.translate((float) (2 * box._left + box.getWidth()), 0);
-			canvas.scale(-1, 1);
-			canvas.drawImageRect(image, source, destination, SamplingMode.LINEAR, null, true);
-			canvas.restore();
-			return;
+			return new Matrix33((float) -scale, 0, (float) (2 * box._left + box.getWidth() - dx),
+					0, (float) scale, (float) dy, 0, 0, 1);
 		}
-		canvas.drawImageRect(image, source, destination, SamplingMode.LINEAR, null, true);
+		return new Matrix33((float) scale, 0, (float) dx, 0, (float) scale, (float) dy, 0, 0, 1);
+	}
+
+	/** Image-to-canvas matrix that stretches {@code source} onto {@code destination}. */
+	private static Matrix33 rectToRectMatrix(Rect source, Rect destination) {
+		double scaleX = destination.getWidth() / source.getWidth();
+		double scaleY = destination.getHeight() / source.getHeight();
+		return new Matrix33((float) scaleX, 0, (float) (destination._left - source._left * scaleX),
+				0, (float) scaleY, (float) (destination._top - source._top * scaleY), 0, 0, 1);
+	}
+
+	/**
+	 * Fills the squircle (or plain rectangle) outline of {@code box} with the image through an
+	 * anti-aliased shader paint. Coverage comes from the path rasterizer, so the edge is smooth
+	 * on every target; a clip is not, as GL targets without MSAA rasterize it hard.
+	 */
+	private static void fillImage(Canvas canvas, Image image, Matrix33 imageToCanvas, Rect box,
+			double radius, SamplingMode sampling) {
+		try (Shader shader = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
+				sampling, imageToCanvas); Paint paint = new Paint()) {
+			paint.setAntiAlias(true);
+			paint.setShader(shader);
+			if (radius <= 0.5) {
+				canvas.drawRect(box, paint);
+				return;
+			}
+			try (Path path = SquircleGeometry.toPath(squircleRect(box, radius))) {
+				if (path != null) {
+					canvas.drawPath(path, paint);
+				}
+			}
+		}
 	}
 
 	// ---- stage 2 + 4 (partial): video layer ----------------------------------------------
@@ -666,19 +692,8 @@ public final class Compositor implements AutoCloseable {
 		canvas.translate((float) transform.x(), (float) transform.y());
 		canvas.scale((float) transform.scale(), (float) transform.scale());
 		drawVideoShadowLayers(canvas, baseMask, maskRadius, style);
-		canvas.save();
-		if (maskRadius > 0.5) {
-			try (Path path = SquircleGeometry.toPath(squircleRect(baseMask, maskRadius))) {
-				if (path != null) {
-					canvas.clipPath(path);
-				}
-				canvas.drawImageRect(image, source, baseMask, SamplingMode.LINEAR, null, true);
-			}
-		} else {
-			canvas.clipRect(baseMask);
-			canvas.drawImageRect(image, source, baseMask, SamplingMode.LINEAR, null, true);
-		}
-		canvas.restore();
+		fillImage(canvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
+				SamplingMode.LINEAR);
 		canvas.restore();
 	}
 

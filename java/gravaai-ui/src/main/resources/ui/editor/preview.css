@@ -13,14 +13,6 @@
 	-fx-background-color: transparent;
 }
 
-.editor-playback__play--playing.button {
-	-fx-background-color: rgba(255, 255, 255, 0.10);
-}
-
-.editor-playback__play--playing.button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.18);
-}
-
 .editor-playback__volume-percent {
 	-fx-font-size: 10px;
 	-fx-text-fill: -g-muted;

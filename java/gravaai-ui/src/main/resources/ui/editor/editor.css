@@ -322,6 +322,12 @@
 .editor-playback__play.button:hover {
 	-fx-background-color: #ffffff;
 }
+.editor-playback__play.editor-playback__play--playing.button {
+	-fx-background-color: #2a313b;
+}
+.editor-playback__play.editor-playback__play--playing.button:hover {
+	-fx-background-color: #38414d;
+}
 
 /* ---- Timeline panel ------------------------------------------------------ */
 

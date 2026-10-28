@@ -70,72 +70,253 @@ public final class WebcamRecordingService {
 		}
 	}
 
-	/** The running webcam recording handle. */
+	/**
+	 * The running webcam recording. The camera is opened and warmed up before the screen
+	 * recording starts; {@link #begin} then anchors a constant 30 fps track to the screen video's
+	 * first frame, {@link #pause}/{@link #resume} follow the screen recorder, and
+	 * {@link #finish} cuts or pads it to exactly the screen video's duration. The webcam track
+	 * therefore always starts at offset 0 and lasts as long as the video.
+	 */
 	public final class WebcamRecording implements AutoCloseable {
 
 		private final Path path;
-		private final Supplier<Long> timeOffsetMs;
 		private final WebcamFormat format;
 		private final WebcamCapture capture;
 		private final WebcamVideoEncoder encoder;
-		private final Thread thread;
-		private final AtomicBoolean running;
+		private final AtomicBoolean running = new AtomicBoolean(true);
+		private final Object state = new Object();
+		private final ByteBuffer buffer;
+		private Thread thread;
+		/** Wall clock of the screen video's first frame; -1 until {@link #begin}. */
+		private long anchorMs = -1;
+		private long pausedAtMs = -1;
+		private long pausedTotalMs;
+		/** Wall clock of the screen recording's end; frames after it are not stored. */
+		private long endMs = -1;
+		private long framesWritten;
+		private boolean haveFrame;
+		private final java.util.concurrent.CountDownLatch firstFrame =
+				new java.util.concurrent.CountDownLatch(1);
 
-		WebcamRecording(
-				Path path,
-				Supplier<Long> timeOffsetMs,
-				WebcamFormat format,
-				WebcamCapture capture,
-				WebcamVideoEncoder encoder,
-				Thread thread,
-				AtomicBoolean running) {
+		WebcamRecording(Path path, WebcamFormat format, WebcamCapture capture,
+				WebcamVideoEncoder encoder) {
 			this.path = path;
-			this.timeOffsetMs = timeOffsetMs;
 			this.format = format;
 			this.capture = capture;
 			this.encoder = encoder;
-			this.thread = thread;
-			this.running = running;
+			this.buffer = ByteBuffer.allocateDirect(format.width() * format.height() * 4);
 		}
 
 		public Path path() {
 			return path;
 		}
 
-		/** Wall-clock offset of the first stored frame from the recording start. */
+		/** Always 0: the track is anchored to the screen video's first frame. */
 		public long timeOffsetMs() {
-			return timeOffsetMs.get();
+			return 0;
 		}
 
 		public WebcamFormat format() {
 			return format;
 		}
 
-		/** Stops capture and finalises the MKV; returns an error message or null. */
+		/**
+		 * Waits until the camera delivers its first frame (it can take hundreds of milliseconds
+		 * after open), so the screen recording starts with the webcam already live.
+		 */
+		public boolean awaitFirstFrame(long timeoutMs) {
+			try {
+				return firstFrame.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+			} catch (InterruptedException error) {
+				Thread.currentThread().interrupt();
+				return false;
+			}
+		}
+
+		/** Anchors the track to the screen video's first frame (wall clock). */
+		public void begin(long screenStartedAtMs) {
+			synchronized (state) {
+				if (anchorMs < 0) {
+					anchorMs = screenStartedAtMs;
+				}
+			}
+		}
+
+		/** The screen recording paused: no webcam frames are stored until {@link #resume}. */
+		public void pause(long atMs) {
+			synchronized (state) {
+				if (pausedAtMs < 0) {
+					pausedAtMs = atMs;
+				}
+			}
+		}
+
+		/** The screen recording resumed: the paused span is cut from the webcam track too. */
+		public void resume(long atMs) {
+			synchronized (state) {
+				if (pausedAtMs >= 0) {
+					pausedTotalMs += Math.max(0, atMs - pausedAtMs);
+					pausedAtMs = -1;
+				}
+			}
+		}
+
+		/** The screen recording stopped at {@code atMs}; later camera frames are not stored. */
+		public void endAt(long atMs) {
+			synchronized (state) {
+				if (endMs < 0) {
+					endMs = atMs;
+				}
+			}
+		}
+
+		void start(FrameListener preview) {
+			thread = Thread.ofPlatform().daemon().name("gravaai-webcam").start(() -> captureLoop(preview));
+		}
+
+		private void captureLoop(FrameListener preview) {
+			try {
+				while (running.get()) {
+					buffer.clear();
+					if (!capture.readFrame(buffer)) {
+						break;
+					}
+					long wallClockMs = System.currentTimeMillis();
+					if (preview != null) {
+						try {
+							preview.onFrame(buffer.asReadOnlyBuffer(), format, wallClockMs);
+						} catch (RuntimeException error) {
+							LOG.log(System.Logger.Level.WARNING, "Webcam preview frame failed: " + error);
+						}
+					}
+					firstFrame.countDown();
+					synchronized (state) {
+						haveFrame = true;
+						long due = dueFramesLocked(wallClockMs);
+						// The encoder reads a constant 30 fps stream, but cameras slow down in low
+						// light (15 fps is common): every slot on the screen's clock gets the newest
+						// frame, repeating it when the camera is late and skipping when it is early.
+						while (framesWritten < due) {
+							writeLocked();
+						}
+					}
+				}
+			} catch (IOException | RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING, "Webcam recording ended: " + error);
+			} finally {
+				running.set(false);
+				capture.close();
+			}
+		}
+
+		/** Track frames that are due at {@code wallClockMs} on the screen recording's clock. */
+		private long dueFramesLocked(long wallClockMs) {
+			if (anchorMs < 0 || pausedAtMs >= 0) {
+				return framesWritten;
+			}
+			long clock = endMs >= 0 ? Math.min(wallClockMs, endMs) : wallClockMs;
+			long elapsed = clock - anchorMs - pausedTotalMs;
+			if (elapsed < 0) {
+				return framesWritten;
+			}
+			return elapsed * WEBCAM_FRAME_RATE / 1000 + 1;
+		}
+
+		private void writeLocked() throws IOException {
+			// readFrame writes with absolute puts and leaves the position at 0: flip() here made
+			// every frame zero bytes long.
+			buffer.rewind();
+			encoder.writeFrame(buffer);
+			framesWritten++;
+		}
+
+		/** Stops capture and finalises the MKV as recorded; returns an error message or null. */
 		public String stop() {
+			return finish(-1);
+		}
+
+		/**
+		 * Stops capture and finalises the MKV with exactly the frames of a screen video of
+		 * {@code screenDurationMs} (the last camera frame repeats into a short tail; extra frames are
+		 * cut); a negative duration keeps what was recorded. Returns an error message or null.
+		 */
+		public String finish(long screenDurationMs) {
 			// The capture thread owns the device: it sees the flag after the current frame (one
 			// frame period), closes the capture and exits. Closing it here instead freed the
 			// FFmpeg contexts under a running av_read_frame.
 			running.set(false);
-			try {
-				thread.join(2000);
-			} catch (InterruptedException error) {
-				Thread.currentThread().interrupt();
+			if (thread != null) {
+				try {
+					thread.join(2000);
+				} catch (InterruptedException error) {
+					Thread.currentThread().interrupt();
+				}
+				if (thread.isAlive()) {
+					LOG.log(System.Logger.Level.WARNING, "Webcam capture thread did not stop within 2 s");
+				}
 			}
-			if (thread.isAlive()) {
-				LOG.log(System.Logger.Level.WARNING, "Webcam capture thread did not stop within 2 s");
-			}
+			long target = screenDurationMs < 0
+					? -1
+					: Math.max(1, Math.round(screenDurationMs * WEBCAM_FRAME_RATE / 1000.0));
+			long written;
 			try {
+				synchronized (state) {
+					if (target > 0 && haveFrame && (thread == null || !thread.isAlive())) {
+						while (framesWritten < target) {
+							writeLocked();
+						}
+					}
+					written = framesWritten;
+				}
 				encoder.finish();
-				return null;
 			} catch (IOException error) {
 				return String.valueOf(error);
 			}
+			if (target > 0 && written > target) {
+				String trimError = trimToFrames(path, target);
+				if (trimError != null) {
+					return trimError;
+				}
+			}
+			LOG.log(System.Logger.Level.INFO, "webcam track: " + Math.max(written, target)
+					+ " frames written, " + target + " for the screen video ("
+					+ screenDurationMs + " ms)");
+			return null;
 		}
 
 		@Override
 		public void close() {
 			stop();
+		}
+	}
+
+	/**
+	 * Cuts the webcam MKV to its first {@code frames} frames (a stream copy, no re-encode): the
+	 * camera stores a few frames past the screen video's last one while the screen recorder
+	 * shuts down. Returns an error message or null.
+	 */
+	private String trimToFrames(Path file, long frames) {
+		if (processes == null || environment == null) {
+			return null;
+		}
+		Path trimmed = file.resolveSibling(file.getFileName() + ".trim.mkv");
+		List<String> command = List.of(environment.ffmpeg().toString(), "-hide_banner",
+				"-loglevel", "error", "-y", "-i", file.toString(), "-map", "0:v:0", "-c", "copy",
+				"-frames:v", String.valueOf(frames), trimmed.toString());
+		try {
+			SpawnedProcess process = processes.spawn(command, new SpawnOptions(false, false, false));
+			int code = process.waitFor();
+			if (code != 0 || !Files.isRegularFile(trimmed)) {
+				Files.deleteIfExists(trimmed);
+				return "could not trim the webcam track (ffmpeg exit " + code + ")";
+			}
+			Files.move(trimmed, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			return null;
+		} catch (IOException error) {
+			return "could not trim the webcam track: " + error;
+		} catch (InterruptedException error) {
+			Thread.currentThread().interrupt();
+			return "interrupted while trimming the webcam track";
 		}
 	}
 
@@ -222,6 +403,19 @@ public final class WebcamRecordingService {
 			long recordingStartedAtMs,
 			String devicePath,
 			FrameListener preview) {
+		StartResult result = prepare(timestamp, devicePath, preview);
+		if (result.success()) {
+			result.recording().begin(recordingStartedAtMs);
+		}
+		return result;
+	}
+
+	/**
+	 * Opens and starts the camera without storing frames yet, so it is warmed up (first frames
+	 * can take hundreds of milliseconds) before the screen recording starts. Call
+	 * {@link WebcamRecording#begin} with the screen video's start once it is known.
+	 */
+	public StartResult prepare(long timestamp, String devicePath, FrameListener preview) {
 		List<WebcamDevice> available = devices.get();
 		WebcamDevice device = null;
 		if (devicePath != null && !devicePath.isBlank()) {
@@ -256,73 +450,17 @@ public final class WebcamRecordingService {
 			return StartResult.failed(String.valueOf(error));
 		}
 
-		long[] timeOffsetMs = {0};
-		boolean[] wroteFrame = {false};
-		long[] firstFrameMs = {0};
-		long[] framesWritten = {0};
-		AtomicBoolean running = new AtomicBoolean(true);
-		Thread thread = Thread.ofPlatform().daemon().name("gravaai-webcam").start(() -> {
-			ByteBuffer buffer = ByteBuffer.allocateDirect(format.width() * format.height() * 4);
-			try {
-				while (running.get()) {
-					buffer.clear();
-					boolean read = capture.readFrame(buffer);
-					if (!read) {
-						break;
-					}
-					long wallClockMs = System.currentTimeMillis();
-					if (preview != null) {
-						try {
-							preview.onFrame(buffer.asReadOnlyBuffer(), format, wallClockMs);
-						} catch (RuntimeException error) {
-							LOG.log(System.Logger.Level.WARNING, "Webcam preview frame failed: " + error);
-						}
-					}
-					// The track starts on the recording timeline: frames before the
-					// screen recording started are dropped, later ones set the offset.
-					if (wallClockMs < recordingStartedAtMs && !wroteFrame[0]) {
-						continue;
-					}
-					if (!wroteFrame[0]) {
-						wroteFrame[0] = true;
-						timeOffsetMs[0] = Math.max(0, wallClockMs - recordingStartedAtMs);
-						firstFrameMs[0] = wallClockMs;
-					}
-					// The encoder reads a constant 30 fps stream, but cameras slow down in low
-					// light (15 fps is common): place frames on the wall-clock grid, repeating
-					// the latest frame when the camera is late and dropping it when early, so
-					// the track lasts as long as the recording and stays in sync.
-					long due = (wallClockMs - firstFrameMs[0]) * WEBCAM_FRAME_RATE / 1000 + 1;
-					while (framesWritten[0] < due) {
-						// readFrame writes with absolute puts and leaves the position at 0:
-						// flip() here made every frame zero bytes long.
-						buffer.rewind();
-						encoder.writeFrame(buffer);
-						framesWritten[0]++;
-					}
-				}
-			} catch (IOException | RuntimeException error) {
-				LOG.log(System.Logger.Level.WARNING, "Webcam recording ended: " + error);
-			} finally {
-				running.set(false);
-				capture.close();
-			}
-		});
-		WebcamRecording recording = new WebcamRecording(
-				path, () -> timeOffsetMs[0], format, capture, encoder, thread, running);
-		// The offset is known once the first frame is stored; the app reads it after stop,
-		// so keep the measured value on the service for the session manifest.
-		this.lastTimeOffsetMs = () -> timeOffsetMs[0];
+		WebcamRecording recording = new WebcamRecording(path, format, capture, encoder);
+		recording.start(preview);
 		this.lastRecording = recording;
 		return new StartResult(true, null, recording);
 	}
 
-	private Supplier<Long> lastTimeOffsetMs = () -> 0L;
 	private WebcamRecording lastRecording;
 
-	/** The time offset measured for the most recent recording (after the first frame). */
+	/** Always 0: webcam tracks are anchored to the screen video's first frame. */
 	public long timeOffsetMs() {
-		return lastTimeOffsetMs.get();
+		return 0;
 	}
 
 	/** Pairs a finished recording with its webcam link; called after {@code stop}. */

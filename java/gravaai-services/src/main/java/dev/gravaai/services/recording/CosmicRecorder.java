@@ -182,6 +182,14 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		return active == null ? null : active.timestamp;
 	}
 
+	/**
+	 * Wall clock of the screen video's first frame for the recording in progress (the webcam
+	 * track anchors to it), or null when nothing is recording.
+	 */
+	public synchronized Long getActiveCosmicStartedAtMs() {
+		return active == null ? null : active.startedAtMs;
+	}
+
 	public synchronized boolean isCosmicRecordingActive() {
 		return active != null;
 	}

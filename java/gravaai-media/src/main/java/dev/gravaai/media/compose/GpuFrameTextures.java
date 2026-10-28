@@ -16,6 +16,7 @@ import static org.lwjgl.opengl.GL33C.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL33C.glBindBuffer;
 import static org.lwjgl.opengl.GL33C.glBindTexture;
 import static org.lwjgl.opengl.GL33C.glDeleteTextures;
+import static org.lwjgl.opengl.GL33C.glGenerateMipmap;
 import static org.lwjgl.opengl.GL33C.glGenTextures;
 import static org.lwjgl.opengl.GL33C.glPixelStorei;
 import static org.lwjgl.opengl.GL33C.glTexImage2D;
@@ -82,10 +83,16 @@ final class GpuFrameTextures implements AutoCloseable {
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.width(), frame.height(), GL_RGBA,
 				GL_UNSIGNED_BYTE, memAddress(pixels, 0));
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		boolean mipmapped = slot == Slot.WEBCAM;
+		if (mipmapped) {
+			// The webcam is drawn far smaller than its source; Skia samples these levels
+			// trilinearly instead of copying the texture into a mipmapped one every frame.
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
 		glBindTexture(GL_TEXTURE_2D, 0);
 		// Raw GL changed bindings Skia tracks.
 		target.resetGlState();
-		BackendTexture backend = BackendTexture.makeGL(frame.width(), frame.height(), false,
+		BackendTexture backend = BackendTexture.makeGL(frame.width(), frame.height(), mipmapped,
 				new GLTextureInfo(GL_TEXTURE_2D, texture.id(), GL_RGBA8));
 		Image image = Image.borrowTextureFrom(target.directContext(), backend,
 				SurfaceOrigin.TOP_LEFT, ColorType.RGBA_8888, ColorAlphaType.OPAQUE, colorSpace, null);

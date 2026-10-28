@@ -54,6 +54,8 @@ import tools.jackson.databind.JsonNode;
 public final class HudRecordingPortAdapter implements HudRecordingPort, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.recording");
+	/** Longest wait for the camera's first frame before the screen recording starts anyway. */
+	private static final long WEBCAM_WARMUP_TIMEOUT_MS = 3_000;
 
 	/** App navigation the HUD buttons trigger; implemented by {@code AppContext}. */
 	public interface Navigation {
@@ -238,6 +240,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 					microphoneLabel(current.microphoneDeviceId()),
 					meetingMode);
 			StartResult result;
+			WebcamRecordingService.WebcamRecording webcam = null;
 			if (audioOnly) {
 				result = wiring.recording().startAudioRecording(options);
 			} else {
@@ -247,19 +250,27 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 					publish();
 					return;
 				}
+				// The camera opens and warms up before the screen starts, so the webcam track can
+				// cover the screen video from its first frame (opening it afterwards lost ~0.4 s).
+				if (current.webcamEnabled()) {
+					webcam = prepareWebcamRecording(current.webcamDeviceId());
+				}
 				result = wiring.recording().startNativeScreenRecording(source, options);
 			}
 			if (!result.success()) {
 				LOG.log(System.Logger.Level.WARNING, "recording start failed: " + result.message());
+				discardWebcam(webcam);
 				publish();
 				return;
+			}
+			if (webcam != null) {
+				Long screenStartedAtMs = wiring.recording().activeScreenStartedAtMs();
+				webcam.begin(screenStartedAtMs != null ? screenStartedAtMs : System.currentTimeMillis());
+				webcamRecording = webcam;
 			}
 			paused = false;
 			finalizing = false;
 			wiring.recording().setRecordingState(true);
-			if (!audioOnly && current.webcamEnabled()) {
-				startWebcamRecording(current.webcamDeviceId());
-			}
 			LOG.log(System.Logger.Level.INFO, "recording started (" + (audioOnly ? "audio only" : "screen")
 					+ ", countdown " + countdownDelay + "s)");
 			publish();
@@ -289,19 +300,49 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		return service;
 	}
 
-	private void startWebcamRecording(String devicePath) {
+	/** Opens the camera and waits for its first frame; null when the webcam is unavailable. */
+	private WebcamRecordingService.WebcamRecording prepareWebcamRecording(String devicePath) {
 		try {
-			long now = System.currentTimeMillis();
 			WebcamRecordingService.StartResult result =
-					webcamService().start(now, now, devicePath, null);
+					webcamService().prepare(System.currentTimeMillis(), devicePath, null);
 			if (!result.success()) {
 				LOG.log(System.Logger.Level.WARNING, "webcam recording unavailable: " + result.message());
-				return;
+				return null;
 			}
-			webcamRecording = result.recording();
-			LOG.log(System.Logger.Level.INFO, "webcam recording started: " + result.recording().path());
+			if (!result.recording().awaitFirstFrame(WEBCAM_WARMUP_TIMEOUT_MS)) {
+				LOG.log(System.Logger.Level.WARNING, "webcam delivered no frame within "
+						+ WEBCAM_WARMUP_TIMEOUT_MS + " ms; recording it anyway");
+			}
+			LOG.log(System.Logger.Level.INFO, "webcam recording ready: " + result.recording().path());
+			return result.recording();
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "webcam recording failed: " + error);
+			return null;
+		}
+	}
+
+	/** Stops a webcam take that will not be used and deletes its file. */
+	private static void discardWebcam(WebcamRecordingService.WebcamRecording webcam) {
+		if (webcam == null) {
+			return;
+		}
+		webcam.stop();
+		try {
+			Files.deleteIfExists(webcam.path());
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.WARNING, "could not delete the unused webcam file: " + error);
+		}
+	}
+
+	/** Container duration of the finished screen video in ms, or -1 when it cannot be read. */
+	private static long screenDurationMs(String videoPath) {
+		try {
+			double seconds = dev.gravaai.media.ffmpeg.MediaProbe.probe(java.nio.file.Path.of(videoPath))
+					.durationSeconds();
+			return seconds > 0 ? Math.round(seconds * 1000) : -1;
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "could not read the screen video duration: " + error);
+			return -1;
 		}
 	}
 
@@ -339,14 +380,22 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		String webcamPath = null;
 		long webcamOffsetMs = 0;
 		if (webcam != null) {
-			String webcamError = webcam.stop();
+			// The screen stops now: no webcam frame after this moment belongs to the take. The
+			// webcam used to be finalised before the screen stopped, so it always ended early.
+			webcam.endAt(System.currentTimeMillis());
+		}
+		StopResult result = wiring.recording().stopNativeScreenRecording();
+		if (webcam != null) {
+			long durationMs = result.success() && result.path() != null
+					? screenDurationMs(result.path())
+					: -1;
+			String webcamError = webcam.finish(durationMs);
 			webcamOffsetMs = webcam.timeOffsetMs();
 			webcamPath = webcam.path().toString();
 			if (webcamError != null) {
 				LOG.log(System.Logger.Level.WARNING, "webcam finalise failed: " + webcamError);
 			}
 		}
-		StopResult result = wiring.recording().stopNativeScreenRecording();
 		wiring.recording().setRecordingState(false);
 		finalizing = false;
 		if (result.success() && result.path() != null) {
@@ -384,6 +433,11 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		wiring.recording().pauseCursorCapture(now);
 		StartResult result = wiring.recording().pauseNativeScreenRecording();
 		if (result.success()) {
+			// The screen video drops the paused span, so the webcam track must drop it too.
+			WebcamRecordingService.WebcamRecording webcam = webcamRecording;
+			if (webcam != null) {
+				webcam.pause(now);
+			}
 			paused = true;
 			publish();
 		}
@@ -394,9 +448,14 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		if (!wiring.recording().isRecordingActive() || !paused) {
 			return;
 		}
-		wiring.recording().resumeCursorCapture(System.currentTimeMillis());
+		long now = System.currentTimeMillis();
+		wiring.recording().resumeCursorCapture(now);
 		StartResult result = wiring.recording().resumeNativeScreenRecording();
 		if (result.success()) {
+			WebcamRecordingService.WebcamRecording webcam = webcamRecording;
+			if (webcam != null) {
+				webcam.resume(now);
+			}
 			paused = false;
 			publish();
 		}

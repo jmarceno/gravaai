@@ -2,6 +2,7 @@ package dev.gravaai.media.playback;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.List;
 import java.util.function.Supplier;
 
 import dev.gravaai.media.compose.RgbaFrame;
@@ -28,11 +29,14 @@ public final class DecoderFrameSource implements FrameSource {
 	private static final long WAIT_SLICE_MS = 200;
 	/** Bounded, generous for a loaded build machine: the first 1080p decode can take seconds. */
 	private static final long MAX_WAIT_MS = 20_000;
+	/** First step back when a seek lands at or past the last frame; doubles until a frame decodes. */
+	private static final double END_SEEK_BACKOFF_SECONDS = 0.25;
 
 	/** The decoder is opened inside the worker so FFM arenas belong to the decode thread. */
 	private final Supplier<VideoFrameDecoder> decoderSupplier;
 	private final Double durationOverrideSeconds;
-	private VideoFrameDecoder decoder;
+	/** Written by the worker, read by {@link #durationSeconds} on consumer threads. */
+	private volatile VideoFrameDecoder decoder;
 	private final int ringCapacity;
 	private final Object lock = new Object();
 	private final Deque<VideoFrame> ring = new ArrayDeque<>();
@@ -44,6 +48,10 @@ public final class DecoderFrameSource implements FrameSource {
 	/** True while the worker is inside decoder.seek()+next(): consumers must not queue another. */
 	private boolean seekInProgress;
 	private long lastReturnedPtsUs = -1;
+	/** Pts of the stream's last frame once the worker has decoded up to EOF; -1 while unknown. */
+	private long endPtsUs = -1;
+	/** Newest pts the worker decoded since the last seek; becomes {@link #endPtsUs} at EOF. */
+	private long lastDecodedPtsUs = -1;
 	// Decode profiling: number of seeks/decoded frames, logged once when the first frame lands.
 	private long seekCount;
 	private long framesDecoded;
@@ -100,15 +108,14 @@ public final class DecoderFrameSource implements FrameSource {
 	}
 
 	private void decodeLoop() {
-		VideoFrameDecoder opened = null;
 		try {
-			// Open on this thread: the FFmpeg decoder's FFM arena rejects access from any other.
-			opened = decoder == null ? decoderSupplier.get() : decoder;
-			decoder = opened;
 			while (true) {
 				double seek;
 				synchronized (lock) {
-					while (!closed && seekRequest == null && ring.size() >= ringCapacity) {
+					// Idle at EOF or after a failure until a consumer asks for a new position; the
+					// old loop kept calling next() at EOF and spun a core.
+					while (!closed && seekRequest == null
+							&& (ring.size() >= ringCapacity || eof || failure != null)) {
 						lock.wait();
 					}
 					if (closed) {
@@ -120,37 +127,43 @@ public final class DecoderFrameSource implements FrameSource {
 						seek = seekRequest;
 						seekRequest = null;
 						seekInProgress = true;
+						failure = null;
 						releaseRingLocked();
 						eof = false;
+						lastDecodedPtsUs = -1;
 						releaseFrameLocked(lastReturned);
 						lastReturned = null;
 						lastReturnedPtsUs = -1;
 					}
 				}
-				if (!Double.isNaN(seek)) {
-					if (firstSeekStartedNanos < 0) {
-						firstSeekStartedNanos = System.nanoTime();
-					}
-					decoder.seek(seek);
+				Step step;
+				try {
+					step = decodeStep(seek);
+				} catch (RuntimeException error) {
+					recoverFromFailure(error);
+					continue;
 				}
-				VideoFrame frame = decoder.next();
 				synchronized (lock) {
 					if (closed) {
-						if (frame != null) {
-							frame.release();
-						}
+						step.frames().forEach(VideoFrame::release);
 						return;
 					}
 					if (!Double.isNaN(seek)) {
 						seekCount++;
 					}
-					if (frame == null) {
-						eof = true;
-					} else {
+					for (VideoFrame decoded : step.frames()) {
 						framesDecoded++;
-						ring.addLast(frame);
+						lastDecodedPtsUs = decoded.ptsUs();
+						ring.addLast(decoded);
+					}
+					if (step.eof()) {
+						eof = true;
+						if (lastDecodedPtsUs >= 0) {
+							endPtsUs = lastDecodedPtsUs;
+						}
 					}
 					seekInProgress = false;
+					VideoFrame frame = step.frames().isEmpty() ? null : step.frames().get(0);
 					if (!profiledFirstFrame && frame != null) {
 						profiledFirstFrame = true;
 						long elapsedMs = firstSeekStartedNanos < 0
@@ -167,24 +180,93 @@ public final class DecoderFrameSource implements FrameSource {
 			}
 		} catch (InterruptedException interrupted) {
 			Thread.currentThread().interrupt();
-		} catch (RuntimeException error) {
-			synchronized (lock) {
-				failure = error;
-				lock.notifyAll();
-			}
 		} finally {
-			// The decoder and its converters are FFM-arena owners: close them on this thread, never
-			// on the FX thread that calls PlaybackEngine/FrameSource.close().
-			synchronized (lock) {
-				decoder = null;
+			closeDecoder();
+		}
+	}
+
+	/**
+	 * Seeks (when {@code seek} is a number) and decodes the next frame. A seek that lands at or
+	 * past the last frame decodes nothing, so it steps back until a frame comes out: the source then
+	 * holds the stream's final frame instead of reporting an empty end.
+	 */
+	private Step decodeStep(double seek) {
+		if (decoder == null) {
+			// Open on this thread: the FFmpeg decoder's FFM arena rejects access from any other.
+			decoder = decoderSupplier.get();
+		}
+		if (Double.isNaN(seek)) {
+			VideoFrame frame = decoder.next();
+			return frame == null ? Step.END : new Step(List.of(frame), false);
+		}
+		if (firstSeekStartedNanos < 0) {
+			firstSeekStartedNanos = System.nanoTime();
+		}
+		decoder.seek(seek);
+		VideoFrame frame = decoder.next();
+		if (frame != null) {
+			return new Step(List.of(frame), false);
+		}
+		double backoff = END_SEEK_BACKOFF_SECONDS;
+		double position = seek;
+		while (frame == null && position > 0) {
+			position = Math.max(0, seek - backoff);
+			backoff *= 2;
+			decoder.seek(position);
+			frame = decoder.next();
+		}
+		if (frame == null) {
+			return Step.END;
+		}
+		// The step back may land well before the end; decode through to EOF once, keeping only
+		// the newest frames, so the end becomes known and the consumer stops re-seeking past it.
+		Deque<VideoFrame> tail = new ArrayDeque<>();
+		while (frame != null) {
+			tail.addLast(frame);
+			if (tail.size() > ringCapacity) {
+				tail.pollFirst().release();
 			}
-			if (opened != null) {
-				try {
-					opened.close();
-				} catch (RuntimeException error) {
-					System.getLogger(DecoderFrameSource.class.getName()).log(
-							System.Logger.Level.WARNING, "could not close the video decoder: " + error);
-				}
+			frame = decoder.next();
+		}
+		return new Step(List.copyOf(tail), true);
+	}
+
+	/** Frames one worker step produced, oldest first, and whether the stream ended after them. */
+	private record Step(List<VideoFrame> frames, boolean eof) {
+		static final Step END = new Step(List.of(), true);
+	}
+
+	/**
+	 * A decode error no longer kills the source for good (the preview stayed empty until the
+	 * editor was reopened): the decoder is closed and reopened by the next seek, which any
+	 * consumer request triggers.
+	 */
+	private void recoverFromFailure(RuntimeException error) {
+		System.getLogger(DecoderFrameSource.class.getName()).log(System.Logger.Level.WARNING,
+				"video decode failed, reopening the decoder on the next request: " + error);
+		closeDecoder();
+		synchronized (lock) {
+			failure = error;
+			seekInProgress = false;
+			releaseRingLocked();
+			eof = false;
+			lock.notifyAll();
+		}
+	}
+
+	/** Closes the decoder on the worker thread (its FFM arenas belong to this thread). */
+	private void closeDecoder() {
+		VideoFrameDecoder current;
+		synchronized (lock) {
+			current = decoder;
+			decoder = null;
+		}
+		if (current != null) {
+			try {
+				current.close();
+			} catch (RuntimeException error) {
+				System.getLogger(DecoderFrameSource.class.getName()).log(
+						System.Logger.Level.WARNING, "could not close the video decoder: " + error);
 			}
 		}
 	}
@@ -197,22 +279,52 @@ public final class DecoderFrameSource implements FrameSource {
 	/** Frame with an explicit wait budget (first frame/seek paths can fail fast). */
 	@Override
 	public RgbaFrame frameAt(double sourceSeconds, long timeoutMs) {
-		long targetUs = Math.max(0, Math.round((Double.isFinite(sourceSeconds) ? sourceSeconds : 0) * 1_000_000));
+		long requestedUs = Math.max(0, Math.round((Double.isFinite(sourceSeconds) ? sourceSeconds : 0) * 1_000_000));
+		double knownDuration = durationSeconds();
+		if (knownDuration > 0) {
+			// The probed duration bounds the request before EOF has been seen once.
+			requestedUs = Math.min(requestedUs, Math.round(knownDuration * 1_000_000));
+		}
 		long budgetMs = timeoutMs > 0 ? timeoutMs : MAX_WAIT_MS;
 		long deadlineNanos = System.nanoTime() + budgetMs * 1_000_000;
 		synchronized (lock) {
+			boolean recoveryRequested = false;
 			while (true) {
 				if (closed) {
 					return null;
 				}
+				// Past the stream's last frame (a timeline longer than this file, a webcam that
+				// stops before the screen recording): hold the final frame instead of going blank.
+				long targetUs = endPtsUs >= 0 ? Math.min(requestedUs, endPtsUs) : requestedUs;
+				double targetSeconds = targetUs / 1_000_000.0;
 				if (failure != null) {
-					throw new IllegalStateException("decode-ahead worker failed", failure);
+					if (recoveryRequested) {
+						RuntimeException cause = failure;
+						throw new IllegalStateException("video decode failed", cause);
+					}
+					// The worker reopens the decoder on this seek; one failed request becomes a gap
+					// frame at most, never a permanently empty preview.
+					recoveryRequested = true;
+					requestSeekLocked(targetSeconds);
+					waitLocked(deadlineNanos);
+					continue;
 				}
 				if (ring.isEmpty()) {
 					if (eof) {
-						return null;
+						if (lastReturned != null && targetUs >= lastReturnedPtsUs) {
+							// At the end: keep showing the last frame.
+							return new RgbaFrame(lastReturned.width(), lastReturned.height(),
+									lastReturned.rgbaTopFirst());
+						}
+						if (lastReturned == null && lastDecodedPtsUs < 0 && !seekInProgress
+								&& seekRequest == null && endPtsUs < 0) {
+							// A seek decoded nothing even at the start: the stream has no frames.
+							return null;
+						}
 					}
-					requestSeekLocked(sourceSeconds);
+					// Moving back from the end (or nothing decoded yet): the seek resets EOF. The
+					// old code returned null here forever once EOF was reached.
+					requestSeekLocked(targetSeconds);
 					waitLocked(deadlineNanos);
 					continue;
 				}
@@ -223,7 +335,7 @@ public final class DecoderFrameSource implements FrameSource {
 				boolean farBehind = targetUs - first.ptsUs() > MAX_SEQUENTIAL_GAP_US;
 				if (backward || tooFarAhead || farBehind) {
 					releaseRingLocked();
-					requestSeekLocked(sourceSeconds);
+					requestSeekLocked(targetSeconds);
 					waitLocked(deadlineNanos);
 					continue;
 				}
@@ -263,7 +375,7 @@ public final class DecoderFrameSource implements FrameSource {
 					lock.notifyAll();
 					return new RgbaFrame(chosen.width(), chosen.height(), chosen.rgbaTopFirst());
 				}
-				requestSeekLocked(sourceSeconds);
+				requestSeekLocked(targetSeconds);
 				waitLocked(deadlineNanos);
 			}
 		}

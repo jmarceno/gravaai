@@ -110,6 +110,11 @@ public final class RecordingService {
 		return result;
 	}
 
+	/** Wall clock of the active screen video's first frame, or null when nothing records. */
+	public Long activeScreenStartedAtMs() {
+		return cosmic.getActiveCosmicStartedAtMs();
+	}
+
 	/** {@code start-native-*}: audio-only meeting recording (used by the meeting service). */
 	public StartResult startAudioRecording(RecordingOptions options) {
 		return cosmic.startCosmicAudioRecording(options);

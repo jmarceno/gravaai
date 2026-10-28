@@ -74,13 +74,15 @@ class WebcamRecordingLoopTest {
 				() -> dir, null, null, (path, format) -> encoder,
 				() -> List.of(new WebcamDevice("/dev/video-test", "Test camera")),
 				(devicePath, width, height, fps) -> capture);
+		long anchorMs = System.currentTimeMillis();
 		WebcamRecordingService.StartResult started =
-				service.start(1, System.currentTimeMillis(), "/dev/video-test", null);
+				service.start(1, anchorMs, "/dev/video-test", null);
 		assertTrue(started.success(), () -> "start failed: " + started.message());
 		Thread.sleep(1200);
 		assertNull(started.recording().stop());
 
-		long spanMs = capture.lastReadMs.get() - capture.firstReadMs.get();
+		// The track runs on the screen's clock from the anchor, not from the first camera frame.
+		long spanMs = capture.lastReadMs.get() - anchorMs;
 		long expected = spanMs * 30 / 1000 + 1;
 		long written = encoder.frames.get();
 		assertTrue(Math.abs(written - expected) <= 1,
@@ -88,6 +90,45 @@ class WebcamRecordingLoopTest {
 		assertTrue(written > capture.reads.get() * 3 / 2,
 				() -> "late frames must be repeated: " + written + " written, " + capture.reads.get() + " read");
 		assertEquals(written * FRAME_BYTES, encoder.bytes.get());
+	}
+
+	@Test
+	@DisplayName("the webcam track matches the screen video: offset 0, pauses cut, exact length")
+	void trackMatchesTheScreenVideo(@TempDir Path dir) throws Exception {
+		FakeCapture capture = new FakeCapture(33);
+		CountingEncoder encoder = new CountingEncoder();
+		WebcamRecordingService service = new WebcamRecordingService(
+				() -> dir, null, null, (path, format) -> encoder,
+				() -> List.of(new WebcamDevice("/dev/video-test", "Test camera")),
+				(devicePath, width, height, fps) -> capture);
+		WebcamRecordingService.StartResult prepared =
+				service.prepare(1, "/dev/video-test", null);
+		assertTrue(prepared.success(), () -> "prepare failed: " + prepared.message());
+		WebcamRecordingService.WebcamRecording recording = prepared.recording();
+		assertTrue(recording.awaitFirstFrame(5_000), "the camera never warmed up");
+		Thread.sleep(200);
+		assertEquals(0, encoder.frames.get(), "nothing is stored before the screen starts");
+
+		long anchor = System.currentTimeMillis();
+		recording.begin(anchor);
+		Thread.sleep(300);
+		recording.pause(System.currentTimeMillis());
+		Thread.sleep(400);
+		long writtenWhilePaused = encoder.frames.get();
+		Thread.sleep(200);
+		assertEquals(writtenWhilePaused, encoder.frames.get(), "a paused take stores no frames");
+		recording.resume(System.currentTimeMillis());
+		Thread.sleep(300);
+		recording.endAt(System.currentTimeMillis());
+		Thread.sleep(200);
+
+		// A screen video of 0.7 s needs exactly 21 webcam frames at 30 fps.
+		assertNull(recording.finish(700));
+		assertEquals(0, recording.timeOffsetMs());
+		assertTrue(encoder.frames.get() >= 21, "the track must cover the screen video: "
+				+ encoder.frames.get());
+		assertTrue(encoder.frames.get() <= 21 + 2, "the paused span must be cut: "
+				+ encoder.frames.get());
 	}
 
 	/** Writes frames the way {@code V4l2WebcamCapture} does: absolute puts, position untouched. */

@@ -19,7 +19,7 @@ class DecoderFrameSourceTest {
 
 	private static final long FRAME_US = 33_333;
 
-	private static final class FakeDecoder implements VideoFrameDecoder {
+	private static class FakeDecoder implements VideoFrameDecoder {
 
 		private final List<VideoFrame> frames = new ArrayList<>();
 		final List<Double> seeks = new ArrayList<>();
@@ -88,11 +88,61 @@ class DecoderFrameSourceTest {
 	}
 
 	@Test
-	@DisplayName("returns null at the end of the media")
-	void returnsNullAtEof() {
+	@DisplayName("a request past the last frame returns the last frame")
+	void pastEndReturnsLastFrame() {
 		FakeDecoder decoder = new FakeDecoder(3);
 		try (DecoderFrameSource source = DecoderFrameSource.open(decoder)) {
-			assertNull(source.frameAt(5.0));
+			assertNotNull(source.frameAt(5.0));
+		}
+	}
+
+	@Test
+	@DisplayName("an empty stream returns null instead of waiting")
+	void emptyStreamReturnsNull() {
+		FakeDecoder decoder = new FakeDecoder(0);
+		try (DecoderFrameSource source = DecoderFrameSource.open(decoder)) {
+			assertNull(source.frameAt(1.0, 2_000));
+		}
+	}
+
+	@Test
+	@DisplayName("seeking back after reaching the end decodes again (the preview went blank for good)")
+	void seeksBackAfterEof() throws InterruptedException {
+		FakeDecoder decoder = new FakeDecoder(60);
+		try (DecoderFrameSource source = DecoderFrameSource.open(decoder)) {
+			assertNotNull(source.frameAt(1.9));
+			// Let the worker decode ahead into EOF.
+			Thread.sleep(100);
+			assertNotNull(source.frameAt(1.99));
+			assertNotNull(source.frameAt(1.99));
+			var back = source.frameAt(0.5);
+			assertNotNull(back, "a seek back from the end must decode again");
+			assertNotNull(source.frameAt(0.0));
+		}
+	}
+
+	@Test
+	@DisplayName("a decode failure is recovered by the next request")
+	void recoversFromDecodeFailure() {
+		FakeDecoder decoder = new FakeDecoder(60) {
+			private boolean failed;
+
+			@Override
+			public VideoFrame next() {
+				if (!failed && index > 30) {
+					failed = true;
+					throw new IllegalStateException("simulated decode error");
+				}
+				return super.next();
+			}
+		};
+		try (DecoderFrameSource source = DecoderFrameSource.open(() -> decoder)) {
+			try {
+				source.frameAt(1.5);
+			} catch (IllegalStateException expected) {
+				// One request may become a gap frame.
+			}
+			assertNotNull(source.frameAt(0.2), "the source must recover after a decode error");
 		}
 	}
 

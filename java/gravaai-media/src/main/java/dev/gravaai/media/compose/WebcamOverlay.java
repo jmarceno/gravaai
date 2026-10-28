@@ -33,9 +33,14 @@ public final class WebcamOverlay {
 	public record ShadowLayer(double offsetY, double blur, double alpha) {
 	}
 
+	/**
+	 * {offsetY, alpha, blur sigma} as fractions of the overlay's short side: a soft key shadow
+	 * and a tight contact shadow. The blur stays a few percent of the overlay, so the shadow
+	 * hugs the camera instead of spreading a dark halo across light scenes.
+	 */
 	private static final double[][] SHADOW_PROFILES = {
-			{0.06, 0.9, 0.22},
-			{0.025, 0.8, 0.07}};
+			{0.025, 0.45, 0.035},
+			{0.006, 0.35, 0.008}};
 
 	private WebcamOverlay() {
 	}
@@ -208,8 +213,8 @@ public final class WebcamOverlay {
 		double size = Math.max(0, shadowSize);
 		List<ShadowLayer> layers = new ArrayList<>(SHADOW_PROFILES.length);
 		for (double[] profile : SHADOW_PROFILES) {
-			layers.add(new ShadowLayer(size * profile[0] * strength,
-					Math.max(0, size * profile[2] * strength),
+			// Strength fades the shadow in; its reach stays fixed so it never balloons.
+			layers.add(new ShadowLayer(size * profile[0], size * profile[2],
 					Math.min(1, profile[1] * strength)));
 		}
 		return List.copyOf(layers);

@@ -768,7 +768,13 @@ public final class PlaybackEngine implements PlaybackController {
 		}
 		RgbaFrame webcamFrame = null;
 		if (plan.webcam() != null && plan.webcamVisible()) {
-			webcamFrame = plan.webcam().frameAt(plan.webcamSeconds());
+			try {
+				webcamFrame = plan.webcam().frameAt(plan.webcamSeconds());
+			} catch (RuntimeException error) {
+				// A webcam decode error must not blank the screen video of the same frame.
+				LOG.log(System.Logger.Level.WARNING, "webcam frame could not be decoded at "
+						+ plan.webcamSeconds() + " s: " + error);
+			}
 		}
 		PlaybackFrame frame = new PlaybackFrame(
 				plan.frameIndex(),

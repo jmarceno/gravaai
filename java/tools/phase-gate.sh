@@ -40,15 +40,15 @@ echo "== dist package =="
 grep -E 'package-dist.sh: (app image|AppImage)' /tmp/gravaai-gate-dist.log || true
 
 echo "== startup budget =="
-./tools/startup-check.sh --runs "$RUNS" /media/jmarceno/scratch/java-targets/gravaai-app/dist/Gravaai-linux-x64.AppImage | tail -8
+./tools/startup-check.sh --runs "$RUNS" $(pwd)/dist/Gravaai-linux-x64.AppImage | tail -8
 
 echo "== java UI screenshots + gallery =="
-./tools/parity/capture-java-ui.sh --binary /media/jmarceno/scratch/java-targets/gravaai-app/dist/gravaai/bin/gravaai || true
+./tools/parity/capture-java-ui.sh --binary $(pwd)/dist/gravaai/bin/gravaai || true
 node tools/parity/gallery.mjs 1
 
 echo
 echo "phase-gate: done in $(( $(date +%s) - START ))s"
-echo "  app image : /media/jmarceno/scratch/java-targets/gravaai-app/dist/gravaai"
-echo "  AppImage  : /media/jmarceno/scratch/java-targets/gravaai-app/dist/Gravaai-linux-x64.AppImage"
+echo "  app image : $(pwd)/dist/gravaai"
+echo "  AppImage  : $(pwd)/dist/Gravaai-linux-x64.AppImage"
 echo "  gallery   : docs/java-rewrite/phase-1-ui.html"
 echo "  report    : docs/java-rewrite/phase-1-report.md"

@@ -20,8 +20,8 @@ overrides). Maven itself is pinned to 3.9.16 by the wrapper. All Maven builds mu
 
 ```bash
 # packaged app image / AppImage
-/media/jmarceno/scratch/java-targets/gravaai-app/dist/gravaai/bin/gravaai
-/media/jmarceno/scratch/java-targets/gravaai-app/dist/Gravaai-linux-x64.AppImage
+java/dist/gravaai/bin/gravaai
+java/dist/Gravaai-linux-x64.AppImage
 
 # development flags
 gravaai --ui-kit      # UI kit showcase (P1.3 visual gate)

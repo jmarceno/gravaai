@@ -114,7 +114,7 @@
 										<argument>--image-name</argument>
 										<argument>gravaai</argument>
 										<argument>--out-dir</argument>
-										<argument>${project.build.directory}/dist</argument>
+										<argument>${gravaai.dist.dir}</argument>
 									</arguments>
 								</configuration>
 							</execution>

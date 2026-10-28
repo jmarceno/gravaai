@@ -50,6 +50,8 @@
 		<gravaai.javafx.jmods>/media/jmarceno/scratch/java-toolchain/javafx-jmods-27</gravaai.javafx.jmods>
 		<!-- Build output never lands in the repo: plan §1.1.3. -->
 		<gravaai.build.root>/media/jmarceno/scratch/java-targets</gravaai.build.root>
+		<!-- Final artifacts (app image + AppImage) land inside the project, never on another drive. -->
+		<gravaai.dist.dir>${maven.multiModuleProjectDirectory}/dist</gravaai.dist.dir>
 		<!-- Display used by the JavaFX/TestFX tests and the dashboard screenshot test. -->
 		<!-- UI tests run on an isolated virtual display so they never pop windows on the user's
 		     desktop. Start one with: Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &

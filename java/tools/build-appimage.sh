@@ -2,7 +2,7 @@
 #
 # Wrap the jpackage app image into an AppImage (plan §5.19.5): AppDir with an AppRun entry point
 # (which also stamps GRAVAAI_LAUNCHED_AT before the JVM boots), .desktop file and icons.
-# appimagetool is downloaded once into the scratch toolchain and pinned by SHA-256.
+# appimagetool is downloaded once into java/build/tools (gitignored) and pinned by SHA-256.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +30,7 @@ for required in IMAGE NAME VERSION ICON OUTPUT; do
 	fi
 done
 
-TOOL="${GRAVAAI_APPIMAGE_TOOL:-/media/jmarceno/scratch/java-toolchain/bin/appimagetool-x86_64.AppImage}"
+TOOL="${GRAVAAI_APPIMAGE_TOOL:-$SCRIPT_DIR/../build/tools/appimagetool-x86_64.AppImage}"
 URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
 PIN_FILE="$SCRIPT_DIR/appimagetool.sha256"
 
@@ -52,7 +52,7 @@ if [ -f "$PIN_FILE" ]; then
 	fi
 fi
 
-WORK="$(dirname "$OUTPUT")/appimage-work"
+WORK="$(dirname "$OUTPUT")/.appimage-work"
 APPDIR="$WORK/$NAME.AppDir"
 rm -rf "$APPDIR" "$OUTPUT"
 mkdir -p "$APPDIR"
@@ -105,6 +105,42 @@ if [ -z "\${GRAVAAI_LAUNCHED_AT:-}" ]; then
 	GRAVAAI_LAUNCHED_AT="\$(date +%s%3N 2>/dev/null || echo 0)"
 	export GRAVAAI_LAUNCHED_AT
 fi
+APPRUN
+# Freedesktop integration: on first launch (and whenever the AppImage moves) register a launcher
+# and icon in the user's XDG data dir so any desktop menu finds the app. Quoted heredoc: this
+# block is copied verbatim. Opt out with GRAVAAI_NO_DESKTOP_INTEGRATION=1.
+cat >> "$APPDIR/AppRun" <<'INTEGRATE'
+if [ -n "${APPIMAGE:-}" ] && [ -z "${GRAVAAI_NO_DESKTOP_INTEGRATION:-}" ]; then
+	case "$APPIMAGE" in
+		*[\"\`\$\\]*) ;;
+		*)
+			_data="${XDG_DATA_HOME:-$HOME/.local/share}"
+			_desktop="$_data/applications/gravaai.desktop"
+			if ! grep -qxF "Exec=\"$APPIMAGE\" %U" "$_desktop" 2>/dev/null; then
+				mkdir -p "$_data/applications" "$_data/icons/hicolor/256x256/apps" 2>/dev/null
+				cp "$APPDIR/Gravaai.png" "$_data/icons/hicolor/256x256/apps/gravaai.png" 2>/dev/null
+				cat > "$_desktop.tmp" 2>/dev/null <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Gravaai
+GenericName=Screen Recorder
+Comment=Screen recording, video editing and meeting notes
+Exec="$APPIMAGE" %U
+TryExec=$APPIMAGE
+Icon=gravaai
+Terminal=false
+Categories=AudioVideo;Recorder;
+StartupWMClass=GravaaiApp
+DESKTOP
+				mv "$_desktop.tmp" "$_desktop" 2>/dev/null
+				command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$_data/applications" >/dev/null 2>&1
+				command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$_data/icons/hicolor" >/dev/null 2>&1
+			fi
+			;;
+	esac
+fi
+INTEGRATE
+cat >> "$APPDIR/AppRun" <<APPRUN
 exec "\$APPDIR/usr/lib/runtime/bin/java" \\
 	-Djpackage.app-version=$APP_VERSION \\
 	-Djpackage.app-path="\$APPDIR/usr/bin/gravaai" \\

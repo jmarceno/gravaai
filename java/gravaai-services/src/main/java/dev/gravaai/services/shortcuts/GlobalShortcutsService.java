@@ -47,6 +47,7 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final String appPath;
 	private final Map<String, String> env;
 	private final Consumer<GlobalShortcutAction> actionSink;
+	private final Runnable showSink;
 	private final Object lock = new Object();
 
 	private ControlSocket.Server controlSocket;
@@ -66,11 +67,23 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			String appPath,
 			Map<String, String> env,
 			Consumer<GlobalShortcutAction> actionSink) {
+		this(settings, bundledCtl, appPath, env, actionSink, null);
+	}
+
+	/** @param showSink brings the app to the front when a second launch sends {@code show} */
+	public GlobalShortcutsService(
+			GlobalShortcutSettings settings,
+			Supplier<Path> bundledCtl,
+			String appPath,
+			Map<String, String> env,
+			Consumer<GlobalShortcutAction> actionSink,
+			Runnable showSink) {
 		this.settings = settings;
 		this.bundledCtl = bundledCtl;
 		this.appPath = appPath;
 		this.env = env == null ? Map.of() : Map.copyOf(env);
 		this.actionSink = actionSink;
+		this.showSink = showSink;
 	}
 
 	/** Port of {@code isCosmicDesktop}. */
@@ -129,7 +142,7 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	public void init() {
 		synchronized (lock) {
 			try {
-				controlSocket = ControlSocket.start(actionSink, ControlSocket.getControlSocketPath(env));
+				controlSocket = ControlSocket.start(actionSink, showSink, ControlSocket.getControlSocketPath(env));
 			} catch (IOException error) {
 				LOG.log(System.Logger.Level.WARNING, "Could not start the control socket: " + error);
 			}

@@ -41,6 +41,9 @@ public final class ControlSocket {
 	/** Port of the socket's 2 s timeout (C sets SO_RCVTIMEO/SO_SNDTIMEO to 2 s). */
 	private static final Duration TIMEOUT = Duration.ofSeconds(2);
 
+	/** Sent by a second plain launch: the running app brings its window to the front. */
+	public static final String SHOW_LINE = "show";
+
 	private static final ScheduledExecutorService TIMEOUTS =
 			Executors.newSingleThreadScheduledExecutor(task -> {
 				Thread thread = new Thread(task, "gravaai-control-timeouts");
@@ -72,7 +75,20 @@ public final class ControlSocket {
 	 * without the trailing newline handling that the socket does.
 	 */
 	public static String handleControlLine(String line, Consumer<GlobalShortcutAction> onAction) {
+		return handleControlLine(line, onAction, null);
+	}
+
+	/**
+	 * Like {@link #handleControlLine(String, Consumer)}, and also accepts {@link #SHOW_LINE} when
+	 * {@code onShow} is set (a second plain launch asks the running app to come to the front).
+	 */
+	public static String handleControlLine(
+			String line, Consumer<GlobalShortcutAction> onAction, Runnable onShow) {
 		String action = line == null ? "" : line.trim();
+		if (onShow != null && SHOW_LINE.equals(action)) {
+			onShow.run();
+			return "ok\n";
+		}
 		GlobalShortcutAction parsed = GlobalShortcutAction.fromWire(action);
 		if (parsed == null) {
 			return "error\n";
@@ -88,6 +104,12 @@ public final class ControlSocket {
 
 	/** Port of {@code startControlSocket}. */
 	public static Server start(Consumer<GlobalShortcutAction> onAction, Path socketPath) throws IOException {
+		return start(onAction, null, socketPath);
+	}
+
+	/** Starts a server that also answers {@link #SHOW_LINE} through {@code onShow}. */
+	public static Server start(Consumer<GlobalShortcutAction> onAction, Runnable onShow, Path socketPath)
+			throws IOException {
 		Path directory = socketPath.getParent();
 		Files.createDirectories(directory);
 		setPermissions(directory, "rwx------");
@@ -102,7 +124,7 @@ public final class ControlSocket {
 		}
 		setPermissions(socketPath, "rw-------");
 
-		Server server = new Server(socketPath, channel, onAction);
+		Server server = new Server(socketPath, channel, onAction, onShow);
 		server.startAccepting();
 		return server;
 	}
@@ -168,13 +190,16 @@ public final class ControlSocket {
 		private final Path socketPath;
 		private final ServerSocketChannel channel;
 		private final Consumer<GlobalShortcutAction> onAction;
+		private final Runnable onShow;
 		private volatile boolean running = true;
 		private Thread acceptThread;
 
-		private Server(Path socketPath, ServerSocketChannel channel, Consumer<GlobalShortcutAction> onAction) {
+		private Server(Path socketPath, ServerSocketChannel channel, Consumer<GlobalShortcutAction> onAction,
+				Runnable onShow) {
 			this.socketPath = socketPath;
 			this.channel = channel;
 			this.onAction = onAction;
+			this.onShow = onShow;
 		}
 
 		public Path socketPath() {
@@ -225,7 +250,7 @@ public final class ControlSocket {
 					}
 					String line = newline == -1 ? "" : new String(bytes, 0, newline, StandardCharsets.UTF_8);
 					answered = true;
-					String reply = line.length() > MAX_LINE_BYTES ? "error\n" : handleControlLine(line, onAction);
+					String reply = line.length() > MAX_LINE_BYTES ? "error\n" : handleControlLine(line, onAction, onShow);
 					writeFully(client, reply.getBytes(StandardCharsets.UTF_8));
 				}
 			} catch (IOException error) {

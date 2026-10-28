@@ -4,7 +4,6 @@ import dev.gravaai.core.storage.UserData;
 import dev.gravaai.services.shortcuts.ControlSocket;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
 import dev.gravaai.services.shortcuts.GlobalShortcuts;
-import java.nio.file.Path;
 import javafx.application.Application;
 
 /**
@@ -13,8 +12,9 @@ import javafx.application.Application;
  * <ol>
  *   <li>Record the launch time.</li>
  *   <li>Parse args.</li>
- *   <li>Single-instance check: forward the action over the control socket and exit 0 when the
- *       running app accepted it; otherwise this process becomes the app.</li>
+ *   <li>Single-instance check: when another process holds the user-data instance lock, forward the
+ *       launch action (or {@code show}) over the control socket and exit; otherwise this process
+ *       becomes the app.</li>
  *   <li>Start the {@code gl-preview} thread (P1.5, §5.7) - before {@link Application#launch}.</li>
  *   <li>{@link Application#launch(GravaaiApp.class)}.</li>
  * </ol>
@@ -46,13 +46,20 @@ public final class Main {
 		}
 
 		launchAction = GlobalShortcuts.parseCliAction(args);
-		if (launchAction != null) {
-			Path socketPath = ControlSocket.getControlSocketPath();
-			ControlSocket.SendResult result = ControlSocket.send(launchAction, socketPath);
-			if (result == ControlSocket.SendResult.OK) {
-				Startup.log("forwarded " + launchAction.wire() + " to the running instance");
-				return;
+		if (!SingleInstance.acquire(userData.dir().resolve("instance.lock"))) {
+			// Another Gravaai is running: never open a second one. Hand it the launch action, or
+			// ask it to come to the front, and exit.
+			String line = launchAction != null ? launchAction.wire() : ControlSocket.SHOW_LINE;
+			if (SingleInstance.forward(line)) {
+				Startup.log("forwarded " + line + " to the running instance");
+			} else {
+				Startup.log("Gravaai is already running but did not answer " + line + "; exiting");
 			}
+			System.exit(0);
+			return;
+		}
+		if (launchAction != null) {
+			// No other instance holds the lock; a stale socket from a crashed run is harmless.
 			Startup.log("no running instance for " + launchAction.wire() + "; starting the app");
 		}
 

@@ -88,6 +88,23 @@ class ControlSocketTest {
 	}
 
 	@Test
+	@DisplayName("the control socket answers show only when a show handler is installed")
+	void showLine() throws IOException {
+		Path runtime = Files.createDirectory(tempDir.resolve("runtime"));
+		Path socketPath = ControlSocket.getControlSocketPath(Map.of("XDG_RUNTIME_DIR", runtime.toString()));
+		List<GlobalShortcutAction> seen = new ArrayList<>();
+		int[] shown = {0};
+		try (ControlSocket.Server server = ControlSocket.start(seen::add, () -> shown[0]++, socketPath)) {
+			assertEquals(ControlSocket.SendResult.OK, ControlSocket.send(ControlSocket.SHOW_LINE, server.socketPath()));
+			assertEquals(1, shown[0]);
+			assertTrue(seen.isEmpty());
+		}
+		try (ControlSocket.Server server = ControlSocket.start(seen::add, socketPath)) {
+			assertEquals(ControlSocket.SendResult.ERROR, ControlSocket.send(ControlSocket.SHOW_LINE, server.socketPath()));
+		}
+	}
+
+	@Test
 	@DisplayName("the control socket rejects an over-long line")
 	void rejectsOverlongLine() throws IOException {
 		Path runtime = Files.createDirectory(tempDir.resolve("runtime"));

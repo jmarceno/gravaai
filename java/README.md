@@ -30,6 +30,9 @@ gravaai --mcp         # MCP bridge over stdio (Phase 3, P3.2)
 gravaai --toggle-recording   # any gravaai-ctl action; forwarded to a running instance
 ```
 
+Only one Gravaai runs per user-data directory (`instance.lock`). A second launch forwards its
+action, or `show` to bring the running window to the front, over the control socket and exits.
+
 Use a scratch profile for tests/screenshots: `GRAVAAI_USER_DATA=/tmp/... gravaai --ui-kit`.
 
 UI tests run on an isolated virtual display by default (`gravaai.test.display=:99`) so a test run

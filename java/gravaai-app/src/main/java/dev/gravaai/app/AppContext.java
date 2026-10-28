@@ -814,6 +814,21 @@ public final class AppContext {
 		bringHudToFront();
 	}
 
+	/**
+	 * A second launch of the app was refused (single instance): raise the main window when it is
+	 * open, otherwise show the HUD like a fresh launch would.
+	 */
+	private void bringToFrontForSecondLaunch() {
+		LOG.log(System.Logger.Level.INFO, "second launch: bringing Gravaai to the front");
+		if (primaryStage != null && primaryStage.isShowing()) {
+			primaryStage.setIconified(false);
+			primaryStage.toFront();
+			primaryStage.requestFocus();
+			return;
+		}
+		showHud();
+	}
+
 	/** Focus/toFront the HUD; kept off the measured window-shown path. */
 	private void bringHudToFront() {
 		HudOverlayWindow hud = hudWindow;
@@ -1359,7 +1374,8 @@ public final class AppContext {
 					() -> NativeHelpers.path("gravaai-ctl"),
 					appPath(),
 					System.getenv(),
-					dispatcher::dispatch);
+					dispatcher::dispatch,
+					() -> Platform.runLater(this::bringToFrontForSecondLaunch));
 			LOG.log(System.Logger.Level.INFO, "global shortcut service created");
 		} catch (Exception error) {
 			LOG.log(System.Logger.Level.WARNING, "global shortcuts unavailable: " + error);

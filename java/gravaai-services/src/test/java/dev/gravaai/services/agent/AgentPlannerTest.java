@@ -68,15 +68,8 @@ class AgentPlannerTest {
 		return new ClipRegion(id, startMs, endMs, null, null, null, 1, null, null, null, null);
 	}
 
-	private static ProjectEditorState baseState(Map<String, Object> overrides) {
-		Map<String, Object> values = new LinkedHashMap<>();
-		values.put("clipRegions", List.of(clip("clip-1", 0, SOURCE_MS)));
-		values.putAll(overrides);
-		return AgentStatePatch.withAll(defaults(), values);
-	}
-
 	private static ProjectEditorState baseState() {
-		return baseState(Map.of());
+		return defaults().toBuilder().clipRegions(List.of(clip("clip-1", 0, SOURCE_MS))).build();
 	}
 
 	private static ZoomRegion zoom(String id, long startMs, long endMs) {
@@ -143,8 +136,7 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("cuts a timeline range and ripples anchored regions")
 	void cutsTimelineRange() {
-		ProjectEditorState state = baseState(Map.of("zoomRegions",
-				List.of(zoom("zoom-a", 25_000, 27_000), zoom("zoom-b", 12_000, 14_000))));
+		ProjectEditorState state = baseState().toBuilder().zoomRegions(List.of(zoom("zoom-a", 25_000, 27_000), zoom("zoom-b", 12_000, 14_000))).build();
 		Ok result = ok(apply(state, "[{\"op\":\"cut\",\"from\":10,\"to\":20}]"));
 		assertClips(result, new long[][] {{0, 10_000}, {10_000, 50_000}});
 		assertEquals(List.of("zoom-a"),
@@ -184,8 +176,7 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("splits without losing regions on either side")
 	void splitClip() {
-		ProjectEditorState state = baseState(Map.of("zoomRegions",
-				List.of(zoom("zoom-left", 1_000, 2_000), zoom("zoom-right", 8_000, 9_000))));
+		ProjectEditorState state = baseState().toBuilder().zoomRegions(List.of(zoom("zoom-left", 1_000, 2_000), zoom("zoom-right", 8_000, 9_000))).build();
 		Ok result = ok(apply(state, "[{\"op\":\"split\",\"at\":5}]"));
 		assertEquals(List.of("clip-1", "clip-new-2"),
 				result.state().clipRegions().stream().map(ClipRegion::id).toList());
@@ -202,8 +193,7 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("changes clip speed and rescales zooms")
 	void clipSpeed() {
-		ProjectEditorState state = baseState(Map.of("zoomRegions",
-				List.of(zoom("zoom-1", 2_000, 4_000))));
+		ProjectEditorState state = baseState().toBuilder().zoomRegions(List.of(zoom("zoom-1", 2_000, 4_000))).build();
 		Ok result = ok(apply(state, "[{\"op\":\"clip\",\"id\":\"c1\",\"speed\":2}]"));
 		assertEquals(2, result.state().clipRegions().get(0).speed());
 		assertEquals(30_000, result.state().clipRegions().get(0).endMs());
@@ -230,10 +220,10 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("trims a clip and re-packs the sequence")
 	void trimClip() {
-		ProjectEditorState state = AgentStatePatch.with(baseState(), "clipRegions", List.of(
+		ProjectEditorState state = baseState().toBuilder().clipRegions(List.of(
 				clip("clip-1", 0, 10_000),
 				new ClipRegion("clip-2", 10_000, 20_000, 10_000L, null, null, 1, null, null,
-						null, null)));
+						null, null))).build();
 		Ok result = ok(apply(state, "[{\"op\":\"trim_clip\",\"id\":\"c2\",\"start\":12}]"));
 		assertEquals(List.of(10_000L, 18_000L),
 				List.of(result.state().clipRegions().get(1).startMs(),
@@ -244,10 +234,10 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("deletes and reorders clips")
 	void deleteReorderClips() {
-		ProjectEditorState state = AgentStatePatch.with(baseState(), "clipRegions", List.of(
+		ProjectEditorState state = baseState().toBuilder().clipRegions(List.of(
 				clip("clip-1", 0, 10_000),
 				new ClipRegion("clip-2", 10_000, 20_000, 10_000L, null, null, 1, null, null,
-						null, null)));
+						null, null))).build();
 		Ok moved = ok(apply(state, "[{\"op\":\"move_clip\",\"id\":\"c2\",\"toIndex\":0}]"));
 		assertEquals(List.of("clip-2", "clip-1"),
 				moved.state().clipRegions().stream().map(ClipRegion::id).toList());
@@ -263,7 +253,7 @@ class AgentPlannerTest {
 	}
 
 	private static ProjectEditorState stateWithTranscript() {
-		return baseState(Map.of("autoCaptions", transcriptCues()));
+		return baseState().toBuilder().autoCaptions(transcriptCues()).build();
 	}
 
 	@Test
@@ -345,8 +335,7 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("rejects overlapping zooms")
 	void overlappingZooms() {
-		ProjectEditorState state = baseState(Map.of("zoomRegions",
-				List.of(zoom("zoom-1", 2_000, 6_000))));
+		ProjectEditorState state = baseState().toBuilder().zoomRegions(List.of(zoom("zoom-1", 2_000, 6_000))).build();
 		failed(apply(state, "[{\"op\":\"zoom\",\"from\":5,\"to\":7}]"), "overlaps z1");
 	}
 
@@ -447,7 +436,7 @@ class AgentPlannerTest {
 	@Test
 	@DisplayName("adds, updates, splits, merges and deletes caption cues")
 	void captionCrud() {
-		Ok added = ok(apply(baseState(Map.of("autoCaptions", List.of())),
+		Ok added = ok(apply(baseState().toBuilder().autoCaptions(List.of()).build(),
 				"[{\"op\":\"caption\",\"from\":60,\"to\":62,\"text\":\"one two\"}]"));
 		assertEquals(1, added.state().autoCaptions().size());
 		assertEquals(true, added.state().autoCaptionSettings().enabled());
@@ -531,8 +520,8 @@ class AgentPlannerTest {
 	}
 
 	private static ProjectEditorState twoZooms() {
-		return baseState(Map.of("zoomRegions", List.of(zoom("zoom-a", 1_000, 2_000),
-				zoom("zoom-b", 3_000, 4_000), zoom("zoom-c", 5_000, 6_000))));
+		return baseState().toBuilder().zoomRegions(List.of(zoom("zoom-a", 1_000, 2_000),
+				zoom("zoom-b", 3_000, 4_000), zoom("zoom-c", 5_000, 6_000))).build();
 	}
 
 	@Test

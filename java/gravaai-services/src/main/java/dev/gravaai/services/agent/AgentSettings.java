@@ -1,6 +1,5 @@
 package dev.gravaai.services.agent;
 
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,12 +32,12 @@ public final class AgentSettings {
 
 	/** Applies a {@code set} patch; throws {@link AgentOpReader.OpError} for invalid input. */
 	public static ProjectEditorState applySettingPatch(ProjectEditorState state,
-			Map<String, Object> values) {
+			Map<String, JsonNode> values) {
 		if (values == null || values.isEmpty()) {
 			throw new AgentOpReader.OpError("set needs at least one key");
 		}
 		Set<String> roots = new LinkedHashSet<>();
-		for (Map.Entry<String, Object> entry : values.entrySet()) {
+		for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
 			String path = entry.getKey();
 			List<String> segments = splitPath(path);
 			String root = segments.get(0);
@@ -51,13 +50,13 @@ public final class AgentSettings {
 				throw new AgentOpReader.OpError("\"" + path
 						+ "\" is edited with its own op (clips, zooms, captions), not with set");
 			}
-			if (entry.getValue() == null) {
+			if (entry.getValue() == null || entry.getValue().isNull()) {
 				throw new AgentOpReader.OpError("\"" + path + "\" needs a value");
 			}
 			if ("wallpaper".equals(root)) {
 				assertWallpaper(entry.getValue());
 			}
-			String blocked = findBlockedChange(Json.MAPPER.valueToTree(entry.getValue()),
+			String blocked = findBlockedChange(entry.getValue(),
 					readStoredPath(AgentStatePatch.toJson(state), segments));
 			if (blocked != null) {
 				throw new AgentOpReader.OpError("\"" + path + "." + blocked
@@ -67,17 +66,17 @@ public final class AgentSettings {
 		}
 
 		JsonNode patched = AgentStatePatch.toJson(state);
-		for (Map.Entry<String, Object> entry : values.entrySet()) {
+		for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
 			List<String> segments = splitPath(entry.getKey());
-			writePath(patched, segments, Json.MAPPER.valueToTree(entry.getValue()));
+			writePath(patched, segments, entry.getValue());
 		}
 		ProjectEditorState normalized = AgentStatePatch.normalize(patched);
 
 		JsonNode normalizedJson = AgentStatePatch.toJson(normalized);
-		for (Map.Entry<String, Object> entry : values.entrySet()) {
+		for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
 			List<String> segments = splitPath(entry.getKey());
 			JsonNode actual = readStoredPath(normalizedJson, segments);
-			JsonNode expected = Json.MAPPER.valueToTree(entry.getValue());
+			JsonNode expected = entry.getValue();
 			if (!deepEqual(actual, expected)) {
 				throw new AgentOpReader.OpError("invalid value for \"" + entry.getKey() + "\": "
 						+ compact(expected) + " becomes " + compact(actual)
@@ -85,18 +84,18 @@ public final class AgentSettings {
 			}
 		}
 
-		ProjectEditorState next = state;
+		ProjectEditorState.Builder next = state.toBuilder();
 		for (String root : roots) {
-			next = AgentStatePatch.with(next, root, componentValue(normalized, root));
+			next.copy(root, normalized);
 		}
-		return next;
+		return next.build();
 	}
 
 	/** {@code applyCaptionStylePatch}. */
 	public static ProjectEditorState applyCaptionStylePatch(ProjectEditorState state,
-			Map<String, Object> values) {
-		Map<String, Object> renamed = new LinkedHashMap<>();
-		for (Map.Entry<String, Object> entry : values.entrySet()) {
+			Map<String, JsonNode> values) {
+		Map<String, JsonNode> renamed = new LinkedHashMap<>();
+		for (Map.Entry<String, JsonNode> entry : values.entrySet()) {
 			String key = entry.getKey();
 			if (key.equals("op") || key.equals("values") || key.equals("settings")) {
 				continue;
@@ -113,23 +112,11 @@ public final class AgentSettings {
 		return new LinkedHashSet<>(AgentStatePatch.componentNames());
 	}
 
-	private static Object componentValue(ProjectEditorState state, String component) {
-		for (RecordComponent candidate : ProjectEditorState.class.getRecordComponents()) {
-			if (candidate.getName().equals(component)) {
-				try {
-					return candidate.getAccessor().invoke(state);
-				} catch (ReflectiveOperationException error) {
-					throw new IllegalStateException("could not read " + component, error);
-				}
-			}
-		}
-		throw new IllegalStateException("unknown editor component " + component);
-	}
-
-	private static void assertWallpaper(Object value) {
-		if (!(value instanceof String text)) {
+	private static void assertWallpaper(JsonNode value) {
+		if (!value.isString()) {
 			throw new AgentOpReader.OpError("\"wallpaper\" must be a string");
 		}
+		String text = value.asString();
 		if (text.contains("wallpapers/") || HEX_COLOUR.matcher(text).matches()
 				|| text.startsWith("linear-gradient(") || text.startsWith("radial-gradient(")) {
 			return;

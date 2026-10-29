@@ -304,22 +304,22 @@ final class AgentOpReader {
 		return List.copyOf(ranges);
 	}
 
-	static Map<String, Object> readValues(JsonNode raw) {
+	static Map<String, JsonNode> readValues(JsonNode raw) {
 		JsonNode nested = optionalObject(raw, "values");
 		if (nested == null) {
 			nested = optionalObject(raw, "settings");
 		}
-		Map<String, Object> values = new LinkedHashMap<>();
+		Map<String, JsonNode> values = new LinkedHashMap<>();
 		if (nested != null) {
 			for (Map.Entry<String, JsonNode> entry : nested.properties()) {
-				values.put(entry.getKey(), toJava(entry.getValue()));
+				values.put(entry.getKey(), entry.getValue());
 			}
 		} else {
 			for (Map.Entry<String, JsonNode> entry : raw.properties()) {
 				if (entry.getKey().equals("op") || entry.getKey().equals("values")) {
 					continue;
 				}
-				values.put(entry.getKey(), toJava(entry.getValue()));
+				values.put(entry.getKey(), entry.getValue());
 			}
 		}
 		if (values.isEmpty()) {
@@ -352,45 +352,6 @@ final class AgentOpReader {
 			throw new OpError("\"n\" must be a positive integer");
 		}
 		return (int) (double) n;
-	}
-
-	/** Converts a JSON value to the plain Java value used by the settings patch. */
-	static Object toJava(JsonNode node) {
-		if (node == null || node.isNull() || node.isMissingNode()) {
-			return null;
-		}
-		if (node.isString()) {
-			return node.asString();
-		}
-		if (node.isBoolean()) {
-			return node.asBoolean();
-		}
-		if (node.isIntegralNumber()) {
-			return node.asLong();
-		}
-		if (node.isNumber()) {
-			return node.asDouble();
-		}
-		if (node.isArray()) {
-			List<Object> list = new ArrayList<>();
-			for (JsonNode entry : node) {
-				list.add(toJava(entry));
-			}
-			return list;
-		}
-		Map<String, Object> map = new LinkedHashMap<>();
-		for (Map.Entry<String, JsonNode> entry : node.properties()) {
-			map.put(entry.getKey(), toJava(entry.getValue()));
-		}
-		return map;
-	}
-
-	static ObjectNode valuesToJson(Map<String, Object> values) {
-		ObjectNode node = dev.gravaai.core.json.Json.nodeFactory().objectNode();
-		for (Map.Entry<String, Object> entry : values.entrySet()) {
-			node.set(entry.getKey(), dev.gravaai.core.json.Json.MAPPER.valueToTree(entry.getValue()));
-		}
-		return node;
 	}
 
 	private static boolean isInteger(double value) {

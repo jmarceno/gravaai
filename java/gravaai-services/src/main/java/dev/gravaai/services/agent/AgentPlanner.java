@@ -444,9 +444,13 @@ public final class AgentPlanner {
 		List<AnnotationRegion> annotations = remapAnnotations(draft.state.annotationRegions(),
 				before, after);
 		List<AudioRegion> audio = remapAnchors(draft.state.audioRegions(), before, after);
-		draft.state = AgentStatePatch.withAll(draft.state, Map.of("clipRegions", after,
-				"zoomRegions", zooms, "speedRegions", speeds, "annotationRegions", annotations,
-				"audioRegions", audio));
+		draft.state = draft.state.toBuilder()
+				.clipRegions(after)
+				.zoomRegions(zooms)
+				.speedRegions(speeds)
+				.annotationRegions(annotations)
+				.audioRegions(audio)
+				.build();
 		markNewJoins(draft, before, after);
 	}
 
@@ -1135,7 +1139,7 @@ public final class AgentPlanner {
 				focus == null ? new ZoomFocus(0.5, 0.5) : focus, ZoomMode.MANUAL);
 		List<ZoomRegion> zooms = new ArrayList<>(draft.state.zoomRegions());
 		zooms.add(zoom);
-		draft.state = AgentStatePatch.with(draft.state, "zoomRegions", zooms);
+		draft.state = draft.state.toBuilder().zoomRegions(zooms).build();
 		draft.summary.add("zoom " + shortRef("z", id) + " "
 				+ AgentIds.formatSeconds(span.startMs()) + "–"
 				+ AgentIds.formatSeconds(span.endMs()) + "s depth " + zoom.depth().wire());
@@ -1166,9 +1170,8 @@ public final class AgentPlanner {
 		assertSpanFree(draft.state.zoomRegions(),
 				new Span(next.startMs(), next.endMs()), draft.ids.zoomShortById(), "zoom",
 				id);
-		draft.state = AgentStatePatch.with(draft.state, "zoomRegions",
-				draft.state.zoomRegions().stream()
-						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList());
+		draft.state = draft.state.toBuilder().zoomRegions(draft.state.zoomRegions().stream()
+						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);
 		push(draft, Highlight.Kind.CHANGED, next.startMs(), next.endMs(), "zoom");
 	}
@@ -1181,7 +1184,7 @@ public final class AgentPlanner {
 		}
 		if (Boolean.TRUE.equals(all)) {
 			int count = draft.state.zoomRegions().size();
-			draft.state = AgentStatePatch.with(draft.state, "zoomRegions", List.of());
+			draft.state = draft.state.toBuilder().zoomRegions(List.of()).build();
 			draft.summary.add("deleted " + count + " zooms");
 			return;
 		}
@@ -1189,9 +1192,8 @@ public final class AgentPlanner {
 		if (id == null) {
 			fail(shortId + " not found");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "zoomRegions",
-				draft.state.zoomRegions().stream()
-						.filter(candidate -> !candidate.id().equals(id)).toList());
+		draft.state = draft.state.toBuilder().zoomRegions(draft.state.zoomRegions().stream()
+						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
 		draft.summary.add("deleted " + shortId);
 	}
 
@@ -1254,7 +1256,7 @@ public final class AgentPlanner {
 				: new ArrayList<>(draft.state.zoomRegions()) {{
 					addAll(zooms);
 				}};
-		draft.state = AgentStatePatch.with(draft.state, "zoomRegions", next);
+		draft.state = draft.state.toBuilder().zoomRegions(next).build();
 		draft.summary.add("added " + zooms.size() + " click zooms");
 		for (ZoomRegion zoom : zooms) {
 			push(draft, Highlight.Kind.ADDED, zoom.startMs(), zoom.endMs(), "auto zoom");
@@ -1271,7 +1273,7 @@ public final class AgentPlanner {
 		SpeedRegion region = new SpeedRegion(id, span.startMs(), span.endMs(), rate);
 		List<SpeedRegion> speeds = new ArrayList<>(draft.state.speedRegions());
 		speeds.add(region);
-		draft.state = AgentStatePatch.with(draft.state, "speedRegions", speeds);
+		draft.state = draft.state.toBuilder().speedRegions(speeds).build();
 		draft.summary.add("speed " + shortRef("s", id) + " " + rate + "x at "
 				+ AgentIds.formatSeconds(span.startMs()) + "–"
 				+ AgentIds.formatSeconds(span.endMs()) + "s");
@@ -1285,7 +1287,7 @@ public final class AgentPlanner {
 			fail("delete_speed needs \"id\" or \"all\": true");
 		}
 		if (Boolean.TRUE.equals(all)) {
-			draft.state = AgentStatePatch.with(draft.state, "speedRegions", List.of());
+			draft.state = draft.state.toBuilder().speedRegions(List.of()).build();
 			draft.summary.add("deleted all speed regions");
 			return;
 		}
@@ -1293,9 +1295,8 @@ public final class AgentPlanner {
 		if (id == null) {
 			fail(shortId + " not found");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "speedRegions",
-				draft.state.speedRegions().stream()
-						.filter(candidate -> !candidate.id().equals(id)).toList());
+		draft.state = draft.state.toBuilder().speedRegions(draft.state.speedRegions().stream()
+						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
 		draft.summary.add("deleted " + shortId);
 	}
 
@@ -1344,7 +1345,7 @@ public final class AgentPlanner {
 		}
 		List<AnnotationRegion> annotations = new ArrayList<>(draft.state.annotationRegions());
 		annotations.add(annotation);
-		draft.state = AgentStatePatch.with(draft.state, "annotationRegions", annotations);
+		draft.state = draft.state.toBuilder().annotationRegions(annotations).build();
 		draft.summary.add("added " + op + " " + shortRef("a", id) + " at "
 				+ AgentIds.formatSeconds(span.startMs()) + "–"
 				+ AgentIds.formatSeconds(span.endMs()) + "s");
@@ -1402,9 +1403,8 @@ public final class AgentPlanner {
 				annotationPosition(geometry), annotationSize(geometry), style,
 				annotation.zIndex(), annotation.trackIndex(), figure,
 				annotation.blurIntensity(), annotation.blurColor());
-		draft.state = AgentStatePatch.with(draft.state, "annotationRegions",
-				draft.state.annotationRegions().stream()
-						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList());
+		draft.state = draft.state.toBuilder().annotationRegions(draft.state.annotationRegions().stream()
+						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);
 		push(draft, Highlight.Kind.CHANGED, startMs, endMs, "annotation");
 	}
@@ -1416,7 +1416,7 @@ public final class AgentPlanner {
 			fail("delete_annotation needs \"id\" or \"all\": true");
 		}
 		if (Boolean.TRUE.equals(all)) {
-			draft.state = AgentStatePatch.with(draft.state, "annotationRegions", List.of());
+			draft.state = draft.state.toBuilder().annotationRegions(List.of()).build();
 			draft.summary.add("deleted all annotations");
 			return;
 		}
@@ -1424,9 +1424,8 @@ public final class AgentPlanner {
 		if (id == null) {
 			fail(shortId + " not found");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "annotationRegions",
-				draft.state.annotationRegions().stream()
-						.filter(candidate -> !candidate.id().equals(id)).toList());
+		draft.state = draft.state.toBuilder().annotationRegions(draft.state.annotationRegions().stream()
+						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
 		draft.summary.add("deleted " + shortId);
 	}
 
@@ -1446,7 +1445,7 @@ public final class AgentPlanner {
 				volume == null ? 1 : volume, null, null);
 		List<AudioRegion> regions = new ArrayList<>(draft.state.audioRegions());
 		regions.add(region);
-		draft.state = AgentStatePatch.with(draft.state, "audioRegions", regions);
+		draft.state = draft.state.toBuilder().audioRegions(regions).build();
 		draft.summary.add("added audio " + shortRef("m", id) + " at "
 				+ AgentIds.formatSeconds(toMs(at)) + "–" + AgentIds.formatSeconds(toMs(to)) + "s");
 		push(draft, Highlight.Kind.ADDED, toMs(at), toMs(to), "audio");
@@ -1475,9 +1474,8 @@ public final class AgentPlanner {
 		AudioRegion next = new AudioRegion(region.id(), startMs, endMs, region.audioPath(),
 				volume == null ? region.volume() : volume, region.normalize(),
 				region.trackIndex());
-		draft.state = AgentStatePatch.with(draft.state, "audioRegions",
-				draft.state.audioRegions().stream()
-						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList());
+		draft.state = draft.state.toBuilder().audioRegions(draft.state.audioRegions().stream()
+						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);
 		push(draft, Highlight.Kind.CHANGED, startMs, endMs, "audio");
 	}
@@ -1489,7 +1487,7 @@ public final class AgentPlanner {
 			fail("delete_audio needs \"id\" or \"all\": true");
 		}
 		if (Boolean.TRUE.equals(all)) {
-			draft.state = AgentStatePatch.with(draft.state, "audioRegions", List.of());
+			draft.state = draft.state.toBuilder().audioRegions(List.of()).build();
 			draft.summary.add("deleted all audio regions");
 			return;
 		}
@@ -1497,9 +1495,8 @@ public final class AgentPlanner {
 		if (id == null) {
 			fail(shortId + " not found");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "audioRegions",
-				draft.state.audioRegions().stream()
-						.filter(candidate -> !candidate.id().equals(id)).toList());
+		draft.state = draft.state.toBuilder().audioRegions(draft.state.audioRegions().stream()
+						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
 		draft.summary.add("deleted " + shortId);
 	}
 
@@ -1526,8 +1523,7 @@ public final class AgentPlanner {
 			fail(clipShort + " not found");
 		}
 		if (muted != null) {
-			draft.state = AgentStatePatch.with(draft.state, "clipRegions",
-					draft.state.clipRegions().stream()
+			draft.state = draft.state.toBuilder().clipRegions(draft.state.clipRegions().stream()
 							.map(clip -> clipIds.contains(clip.id())
 									? new ClipRegion(clip.id(), clip.startMs(), clip.endMs(),
 											clip.sourceStartMs(), clip.sourceMinMs(),
@@ -1535,7 +1531,7 @@ public final class AgentPlanner {
 											clip.showSourceAudio(), clip.cameraLayout(),
 											clip.transitionOut())
 									: clip)
-							.toList());
+							.toList()).build();
 		}
 		if (volume != null) {
 			ObjectNode byClip = draft.state.sourceAudioTrackSettingsByClip() == null
@@ -1554,8 +1550,7 @@ public final class AgentPlanner {
 				trackSettings.set("mixed", mixed);
 				byClip.set(clipId, trackSettings);
 			}
-			draft.state = AgentStatePatch.with(draft.state, "sourceAudioTrackSettingsByClip",
-					byClip);
+			draft.state = draft.state.toBuilder().sourceAudioTrackSettingsByClip(byClip).build();
 		}
 		List<String> parts = new ArrayList<>();
 		parts.add("source audio");
@@ -1574,11 +1569,9 @@ public final class AgentPlanner {
 		long startMs = toMs(range[0]);
 		long endMs = toMs(range[1]);
 		CaptionCue cue = CaptionOps.createCaptionCue(startMs, endMs, text);
-		draft.state = AgentStatePatch.with(draft.state, "autoCaptions",
-				CaptionOps.addCue(draft.state.autoCaptions(), cue));
+		draft.state = draft.state.toBuilder().autoCaptions(CaptionOps.addCue(draft.state.autoCaptions(), cue)).build();
 		if (!draft.state.autoCaptionSettings().enabled()) {
-			draft.state = AgentStatePatch.with(draft.state, "autoCaptionSettings",
-					enabledCaptionSettings(draft.state.autoCaptionSettings()));
+			draft.state = draft.state.toBuilder().autoCaptionSettings(enabledCaptionSettings(draft.state.autoCaptionSettings())).build();
 		}
 		draft.summary.add("caption " + shortRef("q", cue.id()) + " "
 				+ AgentIds.formatSeconds(startMs) + "–" + AgentIds.formatSeconds(endMs) + "s");
@@ -1619,7 +1612,7 @@ public final class AgentPlanner {
 					? new CaptionCue(cue.id(), cue.startMs(), cue.endMs(), nextText, null)
 					: cue).toList();
 		}
-		draft.state = AgentStatePatch.with(draft.state, "autoCaptions", cues);
+		draft.state = draft.state.toBuilder().autoCaptions(cues).build();
 		draft.summary.add("updated " + shortId);
 		CaptionCue updated = cues.stream().filter(cue -> cue.id().equals(id)).findFirst()
 				.orElse(existing);
@@ -1641,7 +1634,7 @@ public final class AgentPlanner {
 		if (cues.size() == before) {
 			fail(shortId + " has too few words to split");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "autoCaptions", cues);
+		draft.state = draft.state.toBuilder().autoCaptions(cues).build();
 		draft.summary.add("split " + shortId);
 	}
 
@@ -1658,7 +1651,7 @@ public final class AgentPlanner {
 		if (cues.size() == before) {
 			fail("merge_captions needs two adjacent cues");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "autoCaptions", cues);
+		draft.state = draft.state.toBuilder().autoCaptions(cues).build();
 		draft.summary.add("merged " + aShort + " into " + bShort);
 	}
 
@@ -1669,7 +1662,7 @@ public final class AgentPlanner {
 			fail("delete_caption needs \"id\" or \"all\": true");
 		}
 		if (Boolean.TRUE.equals(all)) {
-			draft.state = AgentStatePatch.with(draft.state, "autoCaptions", List.of());
+			draft.state = draft.state.toBuilder().autoCaptions(List.of()).build();
 			draft.summary.add("deleted all captions");
 			return;
 		}
@@ -1677,13 +1670,12 @@ public final class AgentPlanner {
 		if (id == null) {
 			fail(shortId + " not found");
 		}
-		draft.state = AgentStatePatch.with(draft.state, "autoCaptions",
-				CaptionOps.deleteCue(draft.state.autoCaptions(), id));
+		draft.state = draft.state.toBuilder().autoCaptions(CaptionOps.deleteCue(draft.state.autoCaptions(), id)).build();
 		draft.summary.add("deleted " + shortId);
 	}
 
 	private static void captionsStyle(Draft draft, ObjectNode raw) {
-		Map<String, Object> values = AgentOpReader.readValues(raw);
+		Map<String, JsonNode> values = AgentOpReader.readValues(raw);
 		draft.state = AgentSettings.applyCaptionStylePatch(draft.state, values);
 		String keys = values.keySet().stream().filter(key -> !key.equals("op")
 				&& !key.equals("values") && !key.equals("settings"))
@@ -1692,7 +1684,7 @@ public final class AgentPlanner {
 	}
 
 	private static void setSettings(Draft draft, ObjectNode raw) {
-		Map<String, Object> values = AgentOpReader.readValues(raw);
+		Map<String, JsonNode> values = AgentOpReader.readValues(raw);
 		draft.state = AgentSettings.applySettingPatch(draft.state, values);
 		draft.summary.add("set " + String.join(", ", values.keySet()));
 	}

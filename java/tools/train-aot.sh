@@ -34,9 +34,11 @@ if [ -z "$classpath" ] || [ -z "$mainclass" ]; then
 	echo "train-aot.sh: cannot read classpath/main class from $CFG" >&2
 	exit 1
 fi
-classpath="${classpath//\$APPDIR/$IMAGE}"
-
-# The launcher expands $APPDIR; so do we. Skip the AOTCache read option: this run writes it.
+# The launcher expands $APPDIR to the app directory ($IMAGE/lib/app in a jpackage app image);
+# jpackage writes every app.classpath entry relative to it. Skip the AOTCache read option: this
+# run writes the cache.
+app_dir="$IMAGE/lib/app"
+classpath="${classpath//\$APPDIR/$app_dir}"
 options=()
 while IFS= read -r line; do
 	case "$line" in

@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -34,7 +36,7 @@ public record SourceAudioTrackSettings(Map<String, Track> tracks) {
 	}
 
 	/** The setting for {@code trackId}, or {@code null} when the clip has no entry for it. */
-	public Track track(String trackId) {
+	public @Nullable Track track(String trackId) {
 		return trackId == null ? null : tracks.get(trackId);
 	}
 

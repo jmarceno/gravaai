@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -57,7 +59,7 @@ public final class CursorMotionPresets {
 	}
 
 	/** {@code getMatchingCursorMotionPresetId}: null when no preset matches exactly. */
-	public static String getMatchingCursorMotionPresetId(SelectionInput values) {
+	public static @Nullable String getMatchingCursorMotionPresetId(SelectionInput values) {
 		for (Map.Entry<String, CursorMotionPreset> entry : PRESETS.entrySet()) {
 			CursorMotionPreset preset = entry.getValue();
 			if (preset.zoomInDurationMs() == values.zoomInDurationMs()
@@ -81,7 +83,7 @@ public final class CursorMotionPresets {
 		return id != null ? id : "focused";
 	}
 
-	public static CursorMotionPreset preset(String id) {
+	public static @Nullable CursorMotionPreset preset(String id) {
 		return PRESETS.get(id);
 	}
 }

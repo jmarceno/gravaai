@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -38,6 +40,8 @@ import dev.gravaai.services.sources.WindowBounds;
  * which are only ever written next to the recording. Samples are taken every 33 ms with drift
  * compensation so CPU load cannot create large gaps.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CursorCaptureSession implements CursorTelemetrySource, KeystrokeSource {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -67,18 +71,18 @@ public final class CursorCaptureSession implements CursorTelemetrySource, Keystr
 
 	private volatile boolean captureActive;
 	private volatile long captureStartTimeMs;
-	private volatile CursorVisualType currentCursorVisualType;
-	private volatile SpawnedProcess helper;
+	private volatile @Nullable CursorVisualType currentCursorVisualType;
+	private volatile @Nullable SpawnedProcess helper;
 	private volatile boolean helperActive;
-	private volatile Long waylandCaptureDisplayId;
+	private volatile @Nullable Long waylandCaptureDisplayId;
 	private long linuxCursorX;
 	private long linuxCursorY;
 	private long linuxCursorUpdatedAt;
 	private boolean hasLinuxCursorPoint;
-	private ScheduledFuture<?> sampleTimer;
+	private @Nullable ScheduledFuture<?> sampleTimer;
 	private long nextExpectedMs;
-	private KeystrokeCapture.KeystrokeRecorder keystrokeRecorder;
-	private LastLeftClick lastLeftClick;
+	private KeystrokeCapture.@Nullable KeystrokeRecorder keystrokeRecorder;
+	private @Nullable LastLeftClick lastLeftClick;
 
 	private record LastLeftClick(long timeMs, double cx, double cy) {
 	}
@@ -99,7 +103,7 @@ public final class CursorCaptureSession implements CursorTelemetrySource, Keystr
 	}
 
 	/** Port of {@code normalizeHookMouseButton}. */
-	public static int normalizeHookMouseButton(Object rawButton) {
+	public static int normalizeHookMouseButton(@Nullable Object rawButton) {
 		if (!(rawButton instanceof Number number) || !Double.isFinite(number.doubleValue())) {
 			return 1;
 		}

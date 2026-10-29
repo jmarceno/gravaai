@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,7 +19,7 @@ public final class CaptionEditing {
 			String cueId, int cueWordIndex, long startMs, long endMs, String text, boolean leadingSpace) {}
 
 	/** The words currently shown on screen (one caption page) for the inline editor. */
-	public record EditTarget(String id, long startMs, long endMs, String text, List<WordRef> words) {}
+	public record EditTarget(String id, long startMs, long endMs, @Nullable String text, List<WordRef> words) {}
 
 	private CaptionEditing() {}
 

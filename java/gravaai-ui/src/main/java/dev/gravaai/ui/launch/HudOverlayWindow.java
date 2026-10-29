@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
 import dev.gravaai.services.shortcuts.GlobalShortcutHud;
 import dev.gravaai.ui.AppFonts;
@@ -51,6 +53,8 @@ import javafx.util.Duration;
  * // shutdown: hud.dispose()
  * }</pre>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudOverlayWindow implements GlobalShortcutHud {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud");
@@ -77,14 +81,14 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private final Label hintLabel = new Label();
 	private final long createdAtNanos = System.nanoTime();
 
-	private HudBar bar;
-	private HudWebcamPreview webcamPreview;
-	private HudMenuWindow menuWindow;
-	private AutoCloseable subscription;
-	private PauseTransition hintTimer;
+	private @Nullable HudBar bar;
+	private @Nullable HudWebcamPreview webcamPreview;
+	private @Nullable HudMenuWindow menuWindow;
+	private @Nullable AutoCloseable subscription;
+	private @Nullable PauseTransition hintTimer;
 	/** A content change arrived while the stage was hidden; re-fit it when shown. */
 	private boolean resizePending;
-	private HudRecordingPort.State lastState;
+	private HudRecordingPort.@Nullable State lastState;
 	private volatile boolean ready;
 	private volatile boolean alive;
 	private volatile boolean shown;
@@ -94,7 +98,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private double dragOffsetY;
 	/** The user dragged the HUD away from its bottom-centre spot; kept until it is shown again. */
 	private boolean userMoved;
-	private String previewDevice;
+	private @Nullable String previewDevice;
 
 	public HudOverlayWindow(HudRecordingPort port) {
 		this.port = Objects.requireNonNull(port, "port");
@@ -330,7 +334,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	 * record.")} the port never surfaced): shown while the capture pick is pending and after a
 	 * pick that ended without a source, so "Pick screen" is never a silent no-op.
 	 */
-	private void updateHint(HudRecordingPort.State previous, HudRecordingPort.State state) {
+	private void updateHint(HudRecordingPort.@Nullable State previous, HudRecordingPort.State state) {
 		boolean wasPicking = previous != null && previous.picking();
 		if (state.picking() && !wasPicking) {
 			showHint("Click anywhere on the screen you want to record.", false);
@@ -466,7 +470,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		return webcamPreview;
 	}
 
-	private String cameraPath(HudRecordingPort.State state) {
+	private @Nullable String cameraPath(HudRecordingPort.State state) {
 		List<HudRecordingPort.CameraDevice> cameras = port.cameraDevices();
 		if (cameras.isEmpty()) {
 			return null;
@@ -522,7 +526,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	 * {@code -Dgravaai.hud.screen=widest} is the development/screenshot variant for this machine,
 	 * whose primary display is portrait.
 	 */
-	static Screen hudScreen() {
+	static @Nullable Screen hudScreen() {
 		String setting = System.getProperty("gravaai.hud.screen", "");
 		if (setting.equals("widest")) {
 			return dev.gravaai.ui.kit.ShowcaseStage.showcaseScreen();
@@ -541,7 +545,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	}
 
 	/** The bar view; null until the first deferred build pass. */
-	public HudBar bar() {
+	public @Nullable HudBar bar() {
 		return bar;
 	}
 

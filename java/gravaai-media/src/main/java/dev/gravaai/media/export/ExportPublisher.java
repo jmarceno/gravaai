@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
@@ -27,10 +29,10 @@ public final class ExportPublisher {
 	/** The published file. */
 	public record PublishResult(Path path, long bytes) {}
 
-	private final Consumer<Path> revealAction;
+	private final @Nullable Consumer<Path> revealAction;
 
 	/** @param revealAction platform reveal callback (for example {@code FileManager::reveal}); may be null */
-	public ExportPublisher(Consumer<Path> revealAction) {
+	public ExportPublisher(@Nullable Consumer<Path> revealAction) {
 		this.revealAction = revealAction;
 	}
 

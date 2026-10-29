@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import tools.jackson.databind.node.ObjectNode;
@@ -13,8 +15,10 @@ import tools.jackson.databind.node.ObjectNode;
  * raw JSON objects because the TS normaliser passes them through untouched (they are per-source
  * maps whose inner shape belongs to the audio layer).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record ProjectEditorState(
-		String wallpaper,
+		@Nullable String wallpaper,
 		double shadowIntensity,
 		double backgroundBlur,
 		double zoomMotionBlur,
@@ -49,15 +53,15 @@ public record ProjectEditorState(
 		double cursorMotionBlur,
 		double cursorClickBounce,
 		double cursorClickBounceDuration,
-		double cursorSway,
-		double borderRadius,
-		Padding padding,
-		CropRegion cropRegion,
+		@Nullable double cursorSway,
+		@Nullable double borderRadius,
+		@Nullable Padding padding,
+		@Nullable CropRegion cropRegion,
 		List<ZoomRegion> zoomRegions,
 		List<TrimRegion> trimRegions,
 		List<ClipRegion> clipRegions,
-		String autoFullTrackClipId,
-		Long autoFullTrackClipEndMs,
+		@Nullable String autoFullTrackClipId,
+		@Nullable Long autoFullTrackClipEndMs,
 		List<SpeedRegion> speedRegions,
 		List<AnnotationRegion> annotationRegions,
 		List<AudioRegion> audioRegions,
@@ -65,8 +69,8 @@ public record ProjectEditorState(
 		AutoCaptionSettings autoCaptionSettings,
 		KeystrokeOverlaySettings keystrokeOverlay,
 		WebcamOverlaySettings webcam,
-		String aspectRatio,
-		ObjectNode sourceAudioTrackSettingsByClip,
+		@Nullable String aspectRatio,
+		@Nullable ObjectNode sourceAudioTrackSettingsByClip,
 		ObjectNode defaultSourceAudioTrackSettings) {
 
 	/**
@@ -93,7 +97,7 @@ public record ProjectEditorState(
 	}
 
 	/** Copy with a new raw source-audio settings map (unknown keys preserved). */
-	public ProjectEditorState withSourceAudioTrackSettingsByClip(tools.jackson.databind.node.ObjectNode nextSourceAudioTrackSettings) {		return new ProjectEditorState(wallpaper, shadowIntensity, backgroundBlur, zoomMotionBlur,
+	public ProjectEditorState withSourceAudioTrackSettingsByClip(tools.jackson.databind.node.@Nullable ObjectNode nextSourceAudioTrackSettings) {		return new ProjectEditorState(wallpaper, shadowIntensity, backgroundBlur, zoomMotionBlur,
 				zoomMotionBlurTuning, connectZooms, zoomInDurationMs, zoomInOverlapMs,
 				zoomOutDurationMs, connectedZoomGapMs, connectedZoomDurationMs, zoomInEasing,
 				zoomOutEasing, connectedZoomEasing, showCursor, loopCursor, cursorStyle,
@@ -128,7 +132,7 @@ public record ProjectEditorState(
 	/** Typed field-by-field edits of a {@link ProjectEditorState}. */
 	public static final class Builder {
 
-		private String wallpaper;
+		private @Nullable String wallpaper;
 		private double shadowIntensity;
 		private double backgroundBlur;
 		private double zoomMotionBlur;
@@ -163,15 +167,15 @@ public record ProjectEditorState(
 		private double cursorMotionBlur;
 		private double cursorClickBounce;
 		private double cursorClickBounceDuration;
-		private double cursorSway;
-		private double borderRadius;
-		private Padding padding;
-		private CropRegion cropRegion;
+		private @Nullable double cursorSway;
+		private @Nullable double borderRadius;
+		private @Nullable Padding padding;
+		private @Nullable CropRegion cropRegion;
 		private List<ZoomRegion> zoomRegions;
 		private List<TrimRegion> trimRegions;
 		private List<ClipRegion> clipRegions;
-		private String autoFullTrackClipId;
-		private Long autoFullTrackClipEndMs;
+		private @Nullable String autoFullTrackClipId;
+		private @Nullable Long autoFullTrackClipEndMs;
 		private List<SpeedRegion> speedRegions;
 		private List<AnnotationRegion> annotationRegions;
 		private List<AudioRegion> audioRegions;
@@ -179,8 +183,8 @@ public record ProjectEditorState(
 		private AutoCaptionSettings autoCaptionSettings;
 		private KeystrokeOverlaySettings keystrokeOverlay;
 		private WebcamOverlaySettings webcam;
-		private String aspectRatio;
-		private ObjectNode sourceAudioTrackSettingsByClip;
+		private @Nullable String aspectRatio;
+		private @Nullable ObjectNode sourceAudioTrackSettingsByClip;
 		private ObjectNode defaultSourceAudioTrackSettings;
 
 		private Builder(ProjectEditorState state) {

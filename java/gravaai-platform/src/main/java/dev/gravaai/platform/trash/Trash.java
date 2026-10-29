@@ -1,5 +1,7 @@
 package dev.gravaai.platform.trash;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +34,8 @@ import java.util.List;
  *
  * <p>All operations are blocking file IO and are meant to run on a service executor.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Trash {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.trash");
@@ -243,7 +247,7 @@ public final class Trash {
 		}
 	}
 
-	private static boolean isDirectoryQuietly(Path path) {
+	private static @Nullable boolean isDirectoryQuietly(Path path) {
 		try {
 			return Files.isDirectory(path);
 		} catch (SecurityException error) {
@@ -251,7 +255,7 @@ public final class Trash {
 		}
 	}
 
-	static Long deviceId(Path path, LinkOption... options) {
+	static @Nullable Long deviceId(Path path, LinkOption... options) {
 		try {
 			Path existing = nearestExisting(path);
 			Object value = Files.getAttribute(existing, "unix:dev", options);
@@ -261,7 +265,7 @@ public final class Trash {
 		}
 	}
 
-	private static Path nearestExisting(Path path) {
+	private static @Nullable Path nearestExisting(Path path) {
 		Path current = path;
 		while (current != null && !Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
 			current = current.getParent();
@@ -269,7 +273,7 @@ public final class Trash {
 		return current;
 	}
 
-	static Path topDirectoryOf(Path path) {
+	static @Nullable Path topDirectoryOf(Path path) {
 		Long device = deviceId(path);
 		Path top = path.toAbsolutePath().normalize();
 		while (top.getParent() != null) {
@@ -282,7 +286,7 @@ public final class Trash {
 		return top;
 	}
 
-	private static String unixUid() {
+	private static @Nullable String unixUid() {
 		try {
 			Object value = Files.getAttribute(Path.of(System.getProperty("user.home", ".")), "unix:uid");
 			return value instanceof Number number ? String.valueOf(number.longValue()) : null;
@@ -344,7 +348,7 @@ public final class Trash {
 	}
 
 	/** URL-encodes an absolute path the way the Trash specification (and gio) writes it. */
-	static String encodePath(Path path) {
+	static @Nullable String encodePath(Path path) {
 		byte[] bytes = path.toString().getBytes(StandardCharsets.UTF_8);
 		StringBuilder encoded = new StringBuilder(bytes.length + 16);
 		for (byte value : bytes) {
@@ -360,14 +364,14 @@ public final class Trash {
 		return encoded.toString();
 	}
 
-	private static boolean isUnreserved(int character) {
+	private static @Nullable boolean isUnreserved(int character) {
 		return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z')
 				|| (character >= '0' && character <= '9') || character == '-' || character == '.'
 				|| character == '_' || character == '~' || character == '/';
 	}
 
 	/** Decodes a {@code Path=} value from a trash info file. */
-	static Path decodePath(String encoded) {
+	static @Nullable Path decodePath(String encoded) {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream(encoded.length());
 		for (int index = 0; index < encoded.length(); index++) {
 			char character = encoded.charAt(index);
@@ -386,7 +390,7 @@ public final class Trash {
 		return Path.of(bytes.toString(StandardCharsets.UTF_8));
 	}
 
-	private TrashedItem parse(Path infoFile) {
+	private @Nullable TrashedItem parse(Path infoFile) {
 		try {
 			List<String> lines = Files.readAllLines(infoFile, StandardCharsets.UTF_8);
 			if (lines.isEmpty() || !INFO_HEADER.equals(lines.getFirst().trim())) {
@@ -429,7 +433,7 @@ public final class Trash {
 		}
 	}
 
-	private static LocalDateTime parseDeletionDate(String value) {
+	private static @Nullable LocalDateTime parseDeletionDate(String value) {
 		try {
 			return LocalDateTime.parse(value, DATE_FORMATTER);
 		} catch (DateTimeParseException error) {

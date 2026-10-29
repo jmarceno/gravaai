@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.humbleui.skija.Canvas;
 
 /**
@@ -61,12 +63,12 @@ public interface FrameOverlayHooks {
 		}
 
 		/** False only for the reserved {@code background} phase. */
-		public boolean dispatched() {
+		public @Nullable boolean dispatched() {
 			return dispatched;
 		}
 
 		/** Resolves a {@link #wire()} name, or null when it is not a phase. */
-		public static Phase fromWire(String value) {
+		public static @Nullable Phase fromWire(String value) {
 			if (value == null) {
 				return null;
 			}

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -24,8 +26,8 @@ public record ZoomSpec(
 		double zoomSmoothness,
 		boolean connectZooms,
 		boolean zoomClassicMode,
-		Double zoomInDurationMs,
-		Double zoomOutDurationMs,
+		@Nullable Double zoomInDurationMs,
+		@Nullable Double zoomOutDurationMs,
 		double cameraSpringStiffnessMultiplier,
 		double cameraSpringDampingMultiplier,
 		double cameraSpringMassMultiplier,

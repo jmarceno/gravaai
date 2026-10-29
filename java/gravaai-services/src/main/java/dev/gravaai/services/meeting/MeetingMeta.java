@@ -1,17 +1,21 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Map;
 
 /**
  * Typed view of {@code <recording>.meeting.json}. The file is a loose JSON object owned by the
  * Electron app; unknown keys survive because {@link MeetingMetaStore} edits the raw map.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record MeetingMeta(
 		String kind,
 		String createdAt,
-		Boolean hasVideo,
+		@Nullable Boolean hasVideo,
 		String language,
-		Long durationMs,
+		@Nullable Long durationMs,
 		String title,
 		String titleSource,
 		String transcribedAt,
@@ -40,22 +44,22 @@ public record MeetingMeta(
 				lastJob(raw.get("lastJob")));
 	}
 
-	private static String text(Map<?, ?> raw, String key) {
+	private static @Nullable String text(Map<?, ?> raw, String key) {
 		Object value = raw.get(key);
 		return value instanceof String string ? string : null;
 	}
 
-	private static Boolean bool(Map<?, ?> raw, String key) {
+	private static @Nullable Boolean bool(Map<?, ?> raw, String key) {
 		Object value = raw.get(key);
 		return value instanceof Boolean flag ? flag : null;
 	}
 
-	private static Long number(Map<?, ?> raw, String key) {
+	private static @Nullable Long number(Map<?, ?> raw, String key) {
 		Object value = raw.get(key);
 		return value instanceof Number parsed ? parsed.longValue() : null;
 	}
 
-	private static LastJob lastJob(Object value) {
+	private static @Nullable LastJob lastJob(@Nullable Object value) {
 		if (!(value instanceof Map<?, ?> map)) {
 			return null;
 		}

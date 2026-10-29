@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,8 @@ import javafx.util.Duration;
  * release, so the banner is hidden by default; the app can push a selected list via
  * {@link #show(List)}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorAnnouncementBanner extends HBox {
 
 	private final Consumer<String> onDismiss;
@@ -35,7 +39,7 @@ public final class EditorAnnouncementBanner extends HBox {
 	private final Button actionButton;
 	private final Button closeButton;
 	private List<Announcements.Announcement> queue = List.of();
-	private PauseTransition autoAdvance;
+	private @Nullable PauseTransition autoAdvance;
 
 	public EditorAnnouncementBanner() {
 		this(Announcements.bundledFeed(), Announcements.Feed.EMPTY, Set.of(), Map.of(), "0.0.0",
@@ -100,7 +104,7 @@ public final class EditorAnnouncementBanner extends HBox {
 	}
 
 	/** The announcement currently shown, or null. */
-	public Announcements.Announcement current() {
+	public Announcements.@Nullable Announcement current() {
 		return queue.isEmpty() ? null : queue.get(0);
 	}
 

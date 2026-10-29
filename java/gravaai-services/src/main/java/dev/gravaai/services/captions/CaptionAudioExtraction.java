@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +29,7 @@ public final class CaptionAudioExtraction {
 
 	/** One attempt, for diagnostics. */
 	public record Attempt(CaptionAudioCandidate candidate, boolean readable,
-			boolean extractedAudio, String error) {
+			boolean extractedAudio, @Nullable String error) {
 	}
 
 	private final ProcessRunnerPort processes;

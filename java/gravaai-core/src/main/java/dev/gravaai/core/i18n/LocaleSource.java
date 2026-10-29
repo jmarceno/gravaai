@@ -1,5 +1,7 @@
 package dev.gravaai.core.i18n;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -20,14 +22,14 @@ public interface LocaleSource {
 	/**
 	 * @return the UTF-8 JSON text of one namespace file, or {@code null} when it does not exist
 	 */
-	String read(String locale, String namespace) throws IOException;
+	@Nullable String read(String locale, String namespace) throws IOException;
 
 	/** Reads from the context class loader (the app's classpath, i.e. gravaai-ui resources). */
-	static LocaleSource classpath() {
+	static @Nullable LocaleSource classpath() {
 		return classpath(Thread.currentThread().getContextClassLoader());
 	}
 
-	static LocaleSource classpath(ClassLoader loader) {
+	static @Nullable LocaleSource classpath(ClassLoader loader) {
 		return (locale, namespace) -> {
 			try (InputStream input = loader.getResourceAsStream(
 					"i18n/" + locale + "/" + namespace + ".json")) {
@@ -37,7 +39,7 @@ public interface LocaleSource {
 	}
 
 	/** Reads {@code <root>/<locale>/<namespace>.json} (the copied resources during tests). */
-	static LocaleSource directory(Path localesRoot) {
+	static @Nullable LocaleSource directory(Path localesRoot) {
 		return (locale, namespace) -> {
 			Path file = localesRoot.resolve(locale).resolve(namespace + ".json");
 			return Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : null;

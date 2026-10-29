@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayDeque;
 import java.util.function.LongSupplier;
 
@@ -45,7 +47,7 @@ public final class ExportSpeedMeter {
 	 * Records that {@code frameIndex} was written and returns the snapshot to publish, or
 	 * {@code null} when it is too soon for another one.
 	 */
-	public Reading frameWritten(long frameIndex) {
+	public @Nullable Reading frameWritten(long frameIndex) {
 		long now = nanoTime.getAsLong();
 		long done = frameIndex + 1;
 		boolean due = done >= totalFrames || frameIndex % notifyEvery == 0

@@ -1,28 +1,32 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
  * Captions for one compositor frame (plan §5.8 stage 9), media-local like {@link FrameInput}:
  * the resolved auto-caption settings plus the cues that can be visible at the frame time.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record CaptionSpec(
 		boolean enabled,
 		String fontFamily,
-		double fontSize,
-		double bottomOffset,
-		double maxWidth,
-		int maxRows,
+		@Nullable double fontSize,
+		@Nullable double bottomOffset,
+		@Nullable double maxWidth,
+		@Nullable int maxRows,
 		String animationStyle,
-		double boxRadius,
-		String textColor,
+		@Nullable double boxRadius,
+		@Nullable String textColor,
 		String inactiveTextColor,
 		double backgroundOpacity,
 		List<Cue> cues) {
 
 	/** One caption cue ({@code startMs..endMs} inclusive at the end like the renderer). */
 	public record Cue(String id, long startMs, long endMs, String text,
-			List<dev.gravaai.core.project.CaptionCueWord> words) {
+			@Nullable List<dev.gravaai.core.project.CaptionCueWord> words) {
 
 		public Cue {
 			words = words == null ? List.of() : List.copyOf(words);

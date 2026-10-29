@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import io.github.humbleui.types.Rect;
@@ -100,7 +102,7 @@ public final class MotionBlur {
 		return a.x() * b.y() - a.y() * b.x();
 	}
 
-	private static Point intersectInfiniteLines(Point aStart, Point aEnd, Point bStart,
+	private static @Nullable Point intersectInfiniteLines(Point aStart, Point aEnd, Point bStart,
 			Point bEnd) {
 		Point aDelta = new Point(aEnd.x() - aStart.x(), aEnd.y() - aStart.y());
 		Point bDelta = new Point(bEnd.x() - bStart.x(), bEnd.y() - bStart.y());

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +22,8 @@ import dev.gravaai.ui.editor.EditorWallpapers;
  * <p>Colours and gradients go through the media layer's {@code Background.fromWallpaper} (the same
  * parser as the export renderer); plain files are read as encoded image bytes.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PreviewBackgrounds {
 
 	private static final String PREVIEW_ROOT = "/ui/editor/wallpapers/previews/";
@@ -27,16 +31,16 @@ public final class PreviewBackgrounds {
 	private static final Map<String, java.util.Optional<java.nio.file.Path>> VIDEO_PATHS =
 			new ConcurrentHashMap<>();
 
-	private PreviewBackgrounds() {
+	@Nullable private PreviewBackgrounds() {
 	}
 
 	/** The compositor background for a project wallpaper value; never null. */
-	public static Background of(String wallpaper) {
+	public static @Nullable Background of(String wallpaper) {
 		String key = wallpaper == null ? "" : wallpaper.trim();
 		return CACHE.computeIfAbsent(key, PreviewBackgrounds::resolve);
 	}
 
-	private static Background resolve(String value) {
+	private static @Nullable Background resolve(String value) {
 		if (value.isEmpty()) {
 			return Background.black();
 		}
@@ -58,7 +62,7 @@ public final class PreviewBackgrounds {
 		}
 	}
 
-	private static byte[] loadPreviewImage(String wallpaper) {
+	private static @Nullable byte[] loadPreviewImage(String wallpaper) {
 		String name = wallpaper.substring(wallpaper.lastIndexOf('/') + 1);
 		if (EditorWallpapers.isVideoWallpaper(name)) {
 			name = name.replaceFirst("\\.[^.]+$", ".jpg");
@@ -74,7 +78,7 @@ public final class PreviewBackgrounds {
 	 * The file to decode for a video wallpaper, or null for other wallpapers. Bundled videos live
 	 * inside the application image, so they are extracted once to a temp file FFmpeg can open.
 	 */
-	public static java.nio.file.Path videoPath(String wallpaper) {
+	public static java.nio.file.@Nullable Path videoPath(String wallpaper) {
 		if (!EditorWallpapers.isVideoWallpaper(wallpaper)) {
 			return null;
 		}
@@ -82,7 +86,7 @@ public final class PreviewBackgrounds {
 				.orElse(null);
 	}
 
-	private static java.util.Optional<java.nio.file.Path> resolveVideo(String value) {
+	private static java.util.@Nullable Optional<java.nio.file.Path> resolveVideo(String value) {
 		try {
 			if (EditorWallpapers.isBundledWallpaper(value)) {
 				String name = value.substring(value.lastIndexOf('/') + 1);
@@ -110,7 +114,7 @@ public final class PreviewBackgrounds {
 	}
 
 	/** User wallpapers: an absolute path or {@code file://} URL the compositor cannot resolve. */
-	private static byte[] loadFileImage(String value) {
+	private static @Nullable byte[] loadFileImage(String value) {
 		try {
 			java.nio.file.Path path = value.startsWith("file:")
 					? java.nio.file.Path.of(java.net.URI.create(value))

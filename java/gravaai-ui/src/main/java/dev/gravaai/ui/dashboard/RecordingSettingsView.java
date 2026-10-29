@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 
 import dev.gravaai.core.json.Json;
@@ -76,7 +78,7 @@ public final class RecordingSettingsView extends VBox {
 	}
 
 	/** The selected microphone noise-reduction level. */
-	public String micNoise() {
+	public @Nullable String micNoise() {
 		return micNoise.value();
 	}
 
@@ -92,7 +94,7 @@ public final class RecordingSettingsView extends VBox {
 		}
 	}
 
-	private String stringSetting(String key) {
+	private @Nullable String stringSetting(String key) {
 		try {
 			JsonNode value = settings.readSetting(key);
 			return value != null && value.isString() ? value.asString() : null;

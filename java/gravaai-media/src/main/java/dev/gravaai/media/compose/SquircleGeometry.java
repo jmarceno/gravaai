@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -103,7 +105,7 @@ public final class SquircleGeometry {
 	 *
 	 * @return the path the caller must close, or {@code null} for a degenerate rectangle
 	 */
-	public static io.github.humbleui.skija.Path toPath(SquircleRect rect) {
+	public static io.github.humbleui.skija.@Nullable Path toPath(SquircleRect rect) {
 		List<SquirclePoint> points = getSquirclePathPoints(rect);
 		if (points.isEmpty()) {
 			return null;

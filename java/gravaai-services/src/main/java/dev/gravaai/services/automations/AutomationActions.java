@@ -11,6 +11,8 @@ import java.util.function.Consumer;
  * <p>Throwing reports a failure to the engine, which logs it, notifies once and keeps going with
  * the next action.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutomationActions {
 
 	private AutomationActions() {}

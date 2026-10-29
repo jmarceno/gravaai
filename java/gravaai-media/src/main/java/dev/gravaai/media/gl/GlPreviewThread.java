@@ -1,5 +1,7 @@
 package dev.gravaai.media.gl;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -47,9 +49,9 @@ public final class GlPreviewThread implements AutoCloseable {
 	private final AtomicLong framesRendered = new AtomicLong();
 	private final ByteBuffer consumerBuffer;
 	private final Duration readyTimeout;
-	private volatile Throwable failure;
+	private volatile @Nullable Throwable failure;
 	private volatile String glDescription = "not started";
-	private Thread thread;
+	private @Nullable Thread thread;
 
 	/**
 	 * @param width the render target width
@@ -108,7 +110,7 @@ public final class GlPreviewThread implements AutoCloseable {
 	}
 
 	/** The failure that stopped the loop, or {@code null}. */
-	public Throwable failure() {
+	public @Nullable Throwable failure() {
 		return failure;
 	}
 

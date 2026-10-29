@@ -1,5 +1,7 @@
 package dev.gravaai.platform.tray;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,7 +58,7 @@ public final class Tray implements AutoCloseable {
 		void RegisterStatusNotifierItem(String service);
 	}
 
-	private record State(boolean recording, String sourceName) {
+	private record State(@Nullable boolean recording, @Nullable String sourceName) {
 		State {
 			sourceName = sourceName == null ? "" : sourceName;
 		}
@@ -87,7 +89,7 @@ public final class Tray implements AutoCloseable {
 	}
 
 	/** The watcher service name in use, or {@code null} when there is none. */
-	static String watcherService(SessionBus bus) {
+	static @Nullable String watcherService(SessionBus bus) {
 		if (bus.isServiceRunning(WATCHER_SERVICE)) {
 			return WATCHER_SERVICE;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -176,7 +178,7 @@ public final class AgentHelpText {
 	}
 
 	/** {@code getHelp}: the index for a blank topic, the prefixed topic text, or an unknown-topic line. */
-	public static String help(String topic) {
+	public static String help(@Nullable String topic) {
 		if (topic == null || topic.trim().isEmpty()) {
 			return INDEX;
 		}
@@ -188,7 +190,7 @@ public final class AgentHelpText {
 		return normalized + "\n" + body;
 	}
 
-	private static String topicText(String topic) {
+	private static @Nullable String topicText(String topic) {
 		return switch (topic) {
 			case "clips" -> CLIPS;
 			case "zoom" -> ZOOM;

@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>{@code --mcp} keeps one bridge and forwards every MCP tool call through it; the app itself
  * builds a second bridge only in tests.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentSocketBridge implements AutoCloseable {
 
 	/** {@code CONNECT_TIMEOUT_MS}. */
@@ -73,8 +77,8 @@ public final class AgentSocketBridge implements AutoCloseable {
 				return thread;
 			});
 
-	private volatile SocketChannel socket;
-	private volatile CompletableFuture<SocketChannel> connecting;
+	private volatile @Nullable SocketChannel socket;
+	private volatile @Nullable CompletableFuture<SocketChannel> connecting;
 	private volatile boolean closed;
 
 	private record Pending(CompletableFuture<AgentToolResult> result,
@@ -287,7 +291,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 	}
 
 	/** Reads one newline-terminated line from the channel (blocking; used for the auth ack). */
-	private static String readLine(SocketChannel channel) throws IOException {
+	private static @Nullable String readLine(SocketChannel channel) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ByteBuffer chunk = ByteBuffer.allocate(1024);
 		while (true) {

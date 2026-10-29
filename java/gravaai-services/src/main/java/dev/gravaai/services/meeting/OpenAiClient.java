@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -36,14 +38,14 @@ public interface OpenAiClient {
 		}
 	}
 
-	record OpenAiEndpoint(String baseUrl, String apiKey) {
+	record OpenAiEndpoint(String baseUrl, @Nullable String apiKey) {
 	}
 
 	record RequestOptions(CancelSignal signal, long timeoutMs) {
 	}
 
-	record ChatCompletionRequest(String model, List<ChatMessage> messages, Integer maxTokens,
-			Double temperature, Map<String, Object> extra) {
+	record ChatCompletionRequest(String model, List<ChatMessage> messages, @Nullable Integer maxTokens,
+			@Nullable Double temperature, Map<String, Object> extra) {
 	}
 
 	record ChatMessage(String role, List<ChatContentPart> content) {
@@ -63,14 +65,14 @@ public interface OpenAiClient {
 		}
 	}
 
-	record TranscriptionRequest(String model, Path filePath, String language, String prompt) {
+	record TranscriptionRequest(String model, Path filePath, String language, @Nullable String prompt) {
 	}
 
 	record TranscriptionSegmentResult(double start, String text) {
 	}
 
-	record TranscriptionResult(String text, List<TranscriptionSegmentResult> segments,
-			String language) {
+	record TranscriptionResult(String text, @Nullable List<TranscriptionSegmentResult> segments,
+			@Nullable String language) {
 	}
 
 	/** Turns a failed response into a message a user can act on. */

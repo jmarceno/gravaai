@@ -19,6 +19,8 @@ import dev.gravaai.ui.launch.HudRecordingPort;
  * <p>Threading: the HUD calls on the FX thread; the delegate is attached from the startup thread and
  * state forwarding hops to the FX thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.lazy");

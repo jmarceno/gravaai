@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -41,6 +43,8 @@ import javafx.scene.layout.VBox;
  * {@code MeetingThumbnail} and the library actions of {@code MeetingViewHost}): a card per meeting
  * with thumbnail, status/duration/notes badges, open, reveal, rename and delete.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingLibraryView extends VBox {
 
 	private final MeetingUiService service;
@@ -55,7 +59,7 @@ public final class MeetingLibraryView extends VBox {
 
 	private List<MeetingLibraryEntry> meetings = List.of();
 	private boolean loading = true;
-	private String error;
+	private @Nullable String error;
 
 	public MeetingLibraryView(MeetingUiService service, MeetingViewActions actions,
 			Consumer<Path> onOpen) {

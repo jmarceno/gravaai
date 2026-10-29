@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,7 +25,7 @@ public final class MeetingAssets {
 	 * @param archive null for plain files, "tar.gz" for archives that extract into {@code path}
 	 */
 	public record MeetingAsset(String id, String label, String url, String sha256, long sizeBytes,
-			Path path, String archive) {
+			Path path, @Nullable String archive) {
 
 		public boolean isArchive() {
 			return archive != null;

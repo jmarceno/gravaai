@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,6 +36,8 @@ import dev.gravaai.services.recording.ports.SpawnedProcess;
  * {@code ffmpeg} CLI (software libx264) behind {@link WebcamVideoEncoder}; swapping in the
  * in-process encoder means providing another {@link EncoderFactory} (reported to the Lead).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class WebcamRecordingService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -63,7 +67,7 @@ public final class WebcamRecordingService {
 		WebcamVideoEncoder create(Path outputPath, WebcamFormat format);
 	}
 
-	public record StartResult(boolean success, String message, WebcamRecording recording) {
+	public record StartResult(boolean success, @Nullable String message, @Nullable WebcamRecording recording) {
 
 		static StartResult failed(String message) {
 			return new StartResult(false, message, null);
@@ -86,7 +90,7 @@ public final class WebcamRecordingService {
 		private final AtomicBoolean running = new AtomicBoolean(true);
 		private final Object state = new Object();
 		private final ByteBuffer buffer;
-		private Thread thread;
+		private @Nullable Thread thread;
 		/** Wall clock of the screen video's first frame; -1 until {@link #begin}. */
 		private long anchorMs = -1;
 		private long pausedAtMs = -1;
@@ -231,7 +235,7 @@ public final class WebcamRecordingService {
 		}
 
 		/** Stops capture and finalises the MKV as recorded; returns an error message or null. */
-		public String stop() {
+		public @Nullable String stop() {
 			return finish(-1);
 		}
 
@@ -240,7 +244,7 @@ public final class WebcamRecordingService {
 		 * {@code screenDurationMs} (the last camera frame repeats into a short tail; extra frames are
 		 * cut); a negative duration keeps what was recorded. Returns an error message or null.
 		 */
-		public String finish(long screenDurationMs) {
+		public @Nullable String finish(long screenDurationMs) {
 			// The capture thread owns the device: it sees the flag after the current frame (one
 			// frame period), closes the capture and exits. Closing it here instead freed the
 			// FFmpeg contexts under a running av_read_frame.
@@ -295,7 +299,7 @@ public final class WebcamRecordingService {
 	 * camera stores a few frames past the screen video's last one while the screen recorder
 	 * shuts down. Returns an error message or null.
 	 */
-	private String trimToFrames(Path file, long frames) {
+	private @Nullable String trimToFrames(Path file, long frames) {
 		if (processes == null || environment == null) {
 			return null;
 		}
@@ -456,7 +460,7 @@ public final class WebcamRecordingService {
 		return new StartResult(true, null, recording);
 	}
 
-	private WebcamRecording lastRecording;
+	private @Nullable WebcamRecording lastRecording;
 
 	/** Always 0: webcam tracks are anchored to the screen video's first frame. */
 	public long timeOffsetMs() {

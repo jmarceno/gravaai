@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Consumer;
 
 import dev.gravaai.core.project.CropRegion;
@@ -28,6 +30,8 @@ import javafx.scene.shape.Rectangle;
  *
  * <p>Edits commit on gesture end (React {@code flushPendingCommit}), never per mouse-move.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class WebcamCropControl extends Region {
 
 	/** Visual size of a corner handle (React: h-3.5 w-3.5 = 14 px). */
@@ -43,11 +47,11 @@ public final class WebcamCropControl extends Region {
 	private final Handle[] handleKinds = {Handle.NW, Handle.NE, Handle.SE, Handle.SW};
 	private final Rectangle[] guides = new Rectangle[4];
 
-	private CropRegion crop = CropRegion.DEFAULT;
+	private @Nullable CropRegion crop = CropRegion.DEFAULT;
 	private boolean mirrored;
 	private Consumer<CropRegion> onCropChange = region -> { };
-	private Handle activeHandle;
-	private Drag drag;
+	private @Nullable Handle activeHandle;
+	private @Nullable Drag drag;
 
 	/** One in-progress pointer gesture; coordinates are scene coordinates. */
 	private static final class Drag {
@@ -56,7 +60,7 @@ public final class WebcamCropControl extends Region {
 		final double startSceneY;
 		final CropRegion initial;
 
-		Drag(Handle handle, double startSceneX, double startSceneY, CropRegion initial) {
+		Drag(Handle handle, double startSceneX, double startSceneY, @Nullable CropRegion initial) {
 			this.handle = handle;
 			this.startSceneX = startSceneX;
 			this.startSceneY = startSceneY;
@@ -123,7 +127,7 @@ public final class WebcamCropControl extends Region {
 	}
 
 	/** The crop region shown/edited (stored source space, not mirrored). */
-	public CropRegion cropRegion() {
+	public @Nullable CropRegion cropRegion() {
 		return crop;
 	}
 
@@ -149,7 +153,7 @@ public final class WebcamCropControl extends Region {
 	}
 
 	/** Visual crop: flipped when the webcam is mirrored. */
-	CropRegion visualCrop() {
+	@Nullable CropRegion visualCrop() {
 		return mirrored ? WebcamCropMath.flipHorizontally(crop) : crop;
 	}
 

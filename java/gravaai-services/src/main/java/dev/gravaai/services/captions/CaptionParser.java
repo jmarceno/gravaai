@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -8,6 +10,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Port of electron/ipc/captions/parser.ts: whisper JSON/SRT cue parsing. */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionParser {
 
 	private static final System.Logger LOG =
@@ -44,7 +48,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code parseWhisperJsonWords}: token stream to timed words. */
-	public static List<CaptionWord> parseWhisperJsonWords(JsonNode tokens) {
+	public static @Nullable List<CaptionWord> parseWhisperJsonWords(JsonNode tokens) {
 		if (tokens == null || !tokens.isArray()) {
 			return List.of();
 		}
@@ -97,7 +101,7 @@ public final class CaptionParser {
 		return List.copyOf(filtered);
 	}
 
-	private static Long finiteLong(JsonNode node) {
+	private static @Nullable Long finiteLong(JsonNode node) {
 		if (node == null || !node.isNumber()) {
 			return null;
 		}
@@ -109,7 +113,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code parseWhisperJsonCues}: whisper.cpp {@code -ojf} transcription to cues. */
-	public static List<CaptionCue> parseWhisperJsonCues(String content) {
+	public static @Nullable List<CaptionCue> parseWhisperJsonCues(String content) {
 		try {
 			JsonNode parsed = mapper().readTree(content);
 			JsonNode transcription = parsed == null ? null : parsed.path("transcription");
@@ -146,7 +150,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code parseSrtTimestamp}: {@code HH:MM:SS,mmm} to milliseconds, or null. */
-	public static Long parseSrtTimestamp(String value) {
+	public static @Nullable Long parseSrtTimestamp(String value) {
 		if (value == null) {
 			return null;
 		}
@@ -214,7 +218,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code shouldRetryWhisperWithoutJson}: older runtimes reject {@code -ojf}. */
-	public static boolean shouldRetryWhisperWithoutJson(String message) {
+	public static boolean shouldRetryWhisperWithoutJson(@Nullable String message) {
 		return message != null && RETRY_WITHOUT_JSON.matcher(message).find();
 	}
 }

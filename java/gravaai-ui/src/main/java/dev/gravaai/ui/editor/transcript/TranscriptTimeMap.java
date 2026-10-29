@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -17,14 +19,14 @@ public final class TranscriptTimeMap {
 
 	private final List<ClipRegion> clips;
 
-	public TranscriptTimeMap(List<ClipRegion> clips) {
+	@Nullable public TranscriptTimeMap(List<ClipRegion> clips) {
 		List<ClipRegion> sorted = clips == null ? List.of() : new ArrayList<>(clips);
 		sorted.sort(Comparator.comparingLong(ClipRegion::startMs));
 		this.clips = List.copyOf(sorted);
 	}
 
 	/** Source time for a timeline time, or {@code null} when the time falls in a gap. */
-	public Double timelineToSourceMs(double timelineMs) {
+	public @Nullable Double timelineToSourceMs(double timelineMs) {
 		if (!Double.isFinite(timelineMs)) {
 			return null;
 		}
@@ -39,7 +41,7 @@ public final class TranscriptTimeMap {
 	}
 
 	/** Timeline time for a source time, or {@code null} when that footage was cut away. */
-	public Double sourceToTimelineMs(double sourceMs) {
+	public @Nullable Double sourceToTimelineMs(double sourceMs) {
 		if (!Double.isFinite(sourceMs)) {
 			return null;
 		}
@@ -54,13 +56,13 @@ public final class TranscriptTimeMap {
 	}
 
 	/** Timeline seconds to seek for a source time (null when the footage is gone). */
-	public Double seekSecondsForSourceMs(double sourceMs) {
+	public @Nullable Double seekSecondsForSourceMs(double sourceMs) {
 		Double timeline = sourceToTimelineMs(sourceMs);
 		return timeline == null ? null : timeline / 1000.0;
 	}
 
 	/** The word spoken at a timeline time, or {@code null}. */
-	public TranscriptWords.Word activeWord(List<TranscriptWords.Word> words, double timelineMs) {
+	public TranscriptWords.@Nullable Word activeWord(List<TranscriptWords.Word> words, double timelineMs) {
 		Double source = timelineToSourceMs(timelineMs);
 		if (source == null) {
 			return null;

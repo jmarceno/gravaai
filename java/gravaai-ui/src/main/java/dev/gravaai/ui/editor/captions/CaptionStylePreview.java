@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.core.project.AutoCaptionSettings;
@@ -19,6 +21,8 @@ import javafx.scene.text.TextAlignment;
  * Captions section (editor shell) embeds this and calls {@link #setSettings(AutoCaptionSettings)}
  * whenever the user changes font size, width, colours, radius, offset or background opacity.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionStylePreview extends Pane {
 
 	private final Label caption = new Label();
@@ -62,7 +66,7 @@ public final class CaptionStylePreview extends Pane {
 		return activeText;
 	}
 
-	public AutoCaptionSettings settings() {
+	public @Nullable AutoCaptionSettings settings() {
 		return settings;
 	}
 
@@ -121,7 +125,7 @@ public final class CaptionStylePreview extends Pane {
 		requestLayout();
 	}
 
-	private static String fontFamily(String cssFamilyList) {
+	private static @Nullable String fontFamily(String cssFamilyList) {
 		if (cssFamilyList == null || cssFamilyList.isBlank()) {
 			return null;
 		}
@@ -129,7 +133,7 @@ public final class CaptionStylePreview extends Pane {
 		return first.isBlank() ? null : first;
 	}
 
-	private static Color parseColor(String value, Color fallback) {
+	private static Color parseColor(@Nullable String value, Color fallback) {
 		try {
 			return value == null || value.isBlank() ? fallback : Color.web(value);
 		} catch (IllegalArgumentException error) {

@@ -16,6 +16,8 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
  * registrations/queries land in the next increments (settings panels, cursor effects, assets,
  * events, drawIcon).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExtensionApi {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.extensions");

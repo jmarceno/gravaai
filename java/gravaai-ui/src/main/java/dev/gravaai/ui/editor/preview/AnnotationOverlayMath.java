@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.AnnotationPosition;
 import dev.gravaai.core.project.AnnotationSize;
 import dev.gravaai.media.compose.CameraGeometry;
@@ -48,7 +50,7 @@ public final class AnnotationOverlayMath {
 	 * computation). Drawn on top of the compositor frame, so the annotation is not re-rendered
 	 * here: this is the selection/hit area.
 	 */
-	public static Rect overlayRect(AnnotationPosition position, AnnotationSize size,
+	public static Rect overlayRect(@Nullable AnnotationPosition position, @Nullable AnnotationSize size,
 			CameraGeometry geometry, double panelWidth, double panelHeight) {
 		CameraGeometry g = safeGeometry(geometry, panelWidth, panelHeight);
 		double posX = position == null ? AnnotationPosition.DEFAULT.x() : position.x();

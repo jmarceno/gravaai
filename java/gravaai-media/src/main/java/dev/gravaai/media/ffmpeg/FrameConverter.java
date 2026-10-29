@@ -1,5 +1,7 @@
 package dev.gravaai.media.ffmpeg;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -48,7 +50,7 @@ public final class FrameConverter implements AutoCloseable {
 	private final int targetHeight;
 	private final int targetStrideBytes;
 	private final ScaleMode mode;
-	private final ColourInfo sourceColour;
+	private final @Nullable ColourInfo sourceColour;
 	private final Arena arena;
 	private final MemorySegment targetBuffer;
 	private final MemorySegment targetDataArray;
@@ -56,7 +58,7 @@ public final class FrameConverter implements AutoCloseable {
 	private final MemorySegment sourceDataArray;
 	private final MemorySegment sourceStrideArray;
 	private final ByteBuffer rgba;
-	private MemorySegment swsContext;
+	private @Nullable MemorySegment swsContext;
 	private int sourceWidth;
 	private int sourceHeight;
 	private int sourcePixelFormat;
@@ -71,7 +73,7 @@ public final class FrameConverter implements AutoCloseable {
 	 * @param sourceColour the source stream's colour metadata, or {@code null} for the
 	 *        limited-range BT.709 fallback
 	 */
-	public FrameConverter(int targetWidth, int targetHeight, ScaleMode mode, ColourInfo sourceColour) {
+	public FrameConverter(int targetWidth, int targetHeight, ScaleMode mode, @Nullable ColourInfo sourceColour) {
 		if (targetWidth <= 0 || targetHeight <= 0) {
 			throw new IllegalArgumentException(
 					"invalid target size: " + targetWidth + "x" + targetHeight);

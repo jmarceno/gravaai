@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -129,7 +131,7 @@ public final class EvdevKeys {
 	}
 
 	/** Display label for an evdev keycode, or null when the key is ignored. */
-	public static String evdevKeyLabel(int code) {
+	public static @Nullable String evdevKeyLabel(int code) {
 		KeyModifier modifier = MODIFIER_CODES.get(code);
 		if (modifier != null) {
 			return capitalizeModifier(modifier);

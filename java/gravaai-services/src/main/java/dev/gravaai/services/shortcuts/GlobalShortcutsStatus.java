@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,7 +13,7 @@ public record GlobalShortcutsStatus(
 		Backend backend,
 		Map<GlobalShortcutAction, GlobalShortcutBinding> registered,
 		Map<GlobalShortcutAction, String> conflicts,
-		String error,
+		@Nullable String error,
 		Map<GlobalShortcutAction, String> commands) {
 
 	/** Where the shortcuts live: COSMIC's settings files, or plain CLI flags anywhere else. */

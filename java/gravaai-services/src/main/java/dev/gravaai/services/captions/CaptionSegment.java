@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -34,14 +36,14 @@ public final class CaptionSegment {
 
 	/** Options for {@link #segmentCuesIntoPhrases}; null components use the defaults. */
 	public record SegmentOptions(
-			Long pauseMs,
-			Long splitSilenceMs,
-			Long edgePadMs,
-			Long maxPhraseMs,
-			Long minCaptionMs,
-			Long mergeGapMs,
-			Long maxMergedMs,
-			Integer maxMergedChars) {
+			@Nullable Long pauseMs,
+			@Nullable Long splitSilenceMs,
+			@Nullable Long edgePadMs,
+			@Nullable Long maxPhraseMs,
+			@Nullable Long minCaptionMs,
+			@Nullable Long mergeGapMs,
+			@Nullable Long maxMergedMs,
+			@Nullable Integer maxMergedChars) {
 
 		public static SegmentOptions defaults() {
 			return new SegmentOptions(null, null, null, null, null, null, null, null);
@@ -331,7 +333,7 @@ public final class CaptionSegment {
 
 	/** {@code segmentCuesIntoPhrases}. */
 	public static List<CaptionCue> segmentCuesIntoPhrases(List<CaptionCue> cues,
-			List<CaptionSilence.SilenceInterval> silences, SegmentOptions options) {
+			List<CaptionSilence.SilenceInterval> silences, @Nullable SegmentOptions options) {
 		SegmentOptions effective = options == null ? SegmentOptions.defaults() : options;
 		long pauseMs = effective.pauseMs() == null ? DEFAULT_PHRASE_PAUSE_MS : effective.pauseMs();
 		long splitSilenceMs = effective.splitSilenceMs() == null

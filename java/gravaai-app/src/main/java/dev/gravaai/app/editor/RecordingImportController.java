@@ -1,5 +1,7 @@
 package dev.gravaai.app.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -39,6 +41,8 @@ import javafx.application.Platform;
  * {@code applyImportBatch} command — the packed sequence makes the persistence normalizer treat
  * the sequence as unchanged, so it does not ripple a second time.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingImportController {
 
 	/** The recording service seams ({@code window.electronAPI} import calls). */
@@ -83,7 +87,7 @@ public final class RecordingImportController {
 	private final AtomicBoolean running = new AtomicBoolean();
 	private final AtomicBoolean cancelled = new AtomicBoolean();
 
-	public RecordingImportController(Library library, Session session, BooleanSupplier autoZoomsEnabled) {
+	@Nullable public RecordingImportController(Library library, Session session, BooleanSupplier autoZoomsEnabled) {
 		this.library = library;
 		this.session = session;
 		this.autoZoomsEnabled = autoZoomsEnabled;
@@ -120,7 +124,7 @@ public final class RecordingImportController {
 		});
 	}
 
-	private EditorViewActions.ClipImportResult run(List<String> paths, Integer index) {
+	private EditorViewActions.@Nullable ClipImportResult run(List<String> paths, Integer index) {
 		String source = session.videoPath();
 		if (source == null || source.isBlank()) {
 			return null;
@@ -299,7 +303,7 @@ public final class RecordingImportController {
 				base.margin());
 	}
 
-	private static List<RecordingImportService.VisibleRange> serviceRanges(
+	private static @Nullable List<RecordingImportService.VisibleRange> serviceRanges(
 			WebcamOverlaySettings webcam) {
 		if (webcam.visibleRanges() == null) {
 			return null;

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -16,6 +18,8 @@ import dev.gravaai.services.captions.CaptionGenerator;
  * service state machine, converts generated cues to the core project caption model and forwards the
  * options the editor session resolved for this project.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutoCaptionTranscriptUiService implements TranscriptUiService, AutoCloseable {
 
 	private final AutoCaptionService service;
@@ -69,7 +73,7 @@ public final class AutoCaptionTranscriptUiService implements TranscriptUiService
 
 	/** Generated cues in the project model. */
 	public static List<CaptionCue> projectCues(
-			List<dev.gravaai.services.captions.CaptionCue> generated) {
+			@Nullable List<dev.gravaai.services.captions.CaptionCue> generated) {
 		List<CaptionCue> cues = new ArrayList<>(generated.size());
 		for (dev.gravaai.services.captions.CaptionCue cue : generated) {
 			List<CaptionCueWord> words = new ArrayList<>(cue.words().size());

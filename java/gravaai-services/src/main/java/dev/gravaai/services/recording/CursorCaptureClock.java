@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
@@ -12,7 +14,7 @@ public final class CursorCaptureClock {
 
 	private long captureStartTimeMs;
 	private long accumulatedPausedMs;
-	private Long pauseStartedAtMs;
+	private @Nullable Long pauseStartedAtMs;
 
 	/** The wall-clock time the recording started; 0 means "not started". */
 	public void setStartTimeMs(long startTimeMs) {

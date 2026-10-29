@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * System-wide recording shortcuts, portable of {@code GLOBAL_SHORTCUT_ACTIONS} in
  * {@code src/lib/globalShortcuts.ts}. The wire values are part of the protocol with
@@ -18,12 +20,12 @@ public enum GlobalShortcutAction {
 	}
 
 	/** The string used in files, CLI flags and the control socket. */
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
 	/** Port of {@code isGlobalShortcutAction}: null for anything that is not an action. */
-	public static GlobalShortcutAction fromWire(String value) {
+	public static @Nullable GlobalShortcutAction fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

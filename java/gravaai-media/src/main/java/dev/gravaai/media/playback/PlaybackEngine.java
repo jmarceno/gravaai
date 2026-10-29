@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -30,6 +32,8 @@ import dev.gravaai.media.compose.RgbaFrame;
  * pumps the audio track, which keeps every step deterministic. Paused scrubs decode on the
  * {@link Dependencies#worker()} (latest wins), never on the caller's thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PlaybackEngine implements PlaybackController {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.media.playback");
@@ -92,10 +96,10 @@ public final class PlaybackEngine implements PlaybackController {
 	private final List<Consumer<PlaybackStatus>> statusListeners = new CopyOnWriteArrayList<>();
 	private final List<Consumer<PlaybackTime>> timeListeners = new CopyOnWriteArrayList<>();
 
-	private PlaybackMedia media;
-	private volatile PlaybackAudioTrack audioTrack;
-	private FrameSource videoSource;
-	private FrameSource webcamSource;
+	private @Nullable PlaybackMedia media;
+	private volatile @Nullable PlaybackAudioTrack audioTrack;
+	private @Nullable FrameSource videoSource;
+	private @Nullable FrameSource webcamSource;
 	private double durationSeconds;
 	private double anchorTimelineSeconds;
 	private double anchorClockSeconds;
@@ -113,7 +117,7 @@ public final class PlaybackEngine implements PlaybackController {
 	 */
 	private boolean audioFeeds;
 	/** The running audio pump thread's stop flag (audio-thread mode). */
-	private AtomicBoolean audioRunning;
+	private @Nullable AtomicBoolean audioRunning;
 
 	public PlaybackEngine(Dependencies dependencies) {
 		this.frameSources = dependencies.frameSources();
@@ -703,7 +707,7 @@ public final class PlaybackEngine implements PlaybackController {
 		anchorClockSeconds = clock.positionSeconds();
 	}
 
-	private double clampTimelineLocked(double seconds) {
+	private @Nullable double clampTimelineLocked(double seconds) {
 		if (!Double.isFinite(seconds)) {
 			return 0;
 		}
@@ -711,7 +715,7 @@ public final class PlaybackEngine implements PlaybackController {
 	}
 
 	/** The playhead may hold the final clip at exactly the timeline end (not a black gap). */
-	private ClipRegion findPreviewClipLocked(double timeMs) {
+	private @Nullable ClipRegion findPreviewClipLocked(double timeMs) {
 		if (media == null) {
 			return null;
 		}
@@ -868,7 +872,7 @@ public final class PlaybackEngine implements PlaybackController {
 			double sourceSeconds,
 			FrameSource video,
 			FrameSource webcam,
-			Double webcamSeconds,
+			@Nullable Double webcamSeconds,
 			boolean webcamVisible) {
 	}
 

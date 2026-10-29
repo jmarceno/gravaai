@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -11,6 +13,8 @@ import java.util.function.Consumer;
  * P3.2): a deterministic demo state for the Settings page, the header chip and the timeline
  * highlights, plus the same behaviour the real adapter must provide.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PlaceholderAgentUiService implements AgentUiService {
 
 	private static final AtomicLong TOKEN_SERIAL = new AtomicLong(1);
@@ -24,7 +28,7 @@ public final class PlaceholderAgentUiService implements AgentUiService {
 	private boolean listening = true;
 	private boolean editorReady = true;
 	private String token;
-	private String lastSummary = "Trimmed 4 silences and added 2 zooms";
+	private @Nullable String lastSummary = "Trimmed 4 silences and added 2 zooms";
 	private List<Client> clients = List.of(new Client("Claude Code", System.currentTimeMillis() - 45_000));
 	private String socketPath = "~/.local/share/Gravaai/agent.sock";
 	private String mcpCommand = "gravaai --mcp --ozone-platform=headless";

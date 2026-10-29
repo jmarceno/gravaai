@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -11,15 +13,15 @@ public record AnnotationSpec(
 		long startMs,
 		long endMs,
 		Type type,
-		String content,
-		String imageData,
+		@Nullable String content,
+		@Nullable String imageData,
 		Position position,
 		Size size,
 		TextStyle style,
-		int zIndex,
-		Figure figure,
-		Double blurIntensity,
-		String blurColor) {
+		@Nullable int zIndex,
+		@Nullable Figure figure,
+		@Nullable Double blurIntensity,
+		@Nullable String blurColor) {
 
 	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur"}). */
 	public enum Type {
@@ -39,19 +41,19 @@ public record AnnotationSpec(
 
 	/** Text style with ARGB colours ({@code backgroundColor} null/transparent for none). */
 	public record TextStyle(
-			int color,
-			Integer backgroundColor,
-			double fontSize,
-			String fontFamily,
+			@Nullable int color,
+			@Nullable Integer backgroundColor,
+			@Nullable double fontSize,
+			@Nullable String fontFamily,
 			boolean bold,
 			boolean italic,
 			boolean underline,
 			String textAlign,
-			double borderRadius) {
+			@Nullable double borderRadius) {
 	}
 
 	/** Figure payload: arrow direction, ARGB colour and stroke width in reference pixels. */
-	public record Figure(String direction, int color, double strokeWidth) {
+	public record Figure(@Nullable String direction, @Nullable int color, double strokeWidth) {
 	}
 
 	public AnnotationSpec {

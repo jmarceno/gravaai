@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -13,6 +15,8 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * Compositor-backed {@link FrameAtTime} for filmstrip/thumbnail rendering: one compositor on a
  * dedicated offscreen GL thread, synchronously rendering the requested timeline time.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CompositorFrameAtTime implements FrameAtTime {
 
 	private static final Duration WAIT = Duration.ofSeconds(15);
@@ -23,9 +27,9 @@ public final class CompositorFrameAtTime implements FrameAtTime {
 	private final Object lock = new Object();
 	private final Compositor compositor;
 	private final GlPreviewThread preview;
-	private FrameInput pendingInput;
-	private CountDownLatch pendingLatch;
-	private RgbaFrame pendingResult;
+	private @Nullable FrameInput pendingInput;
+	private @Nullable CountDownLatch pendingLatch;
+	private @Nullable RgbaFrame pendingResult;
 	private boolean renderedForRequest;
 	/** GL tick that rendered the pending request; readback arrives one tick later. */
 	private long renderedFrameIndex = -1;
@@ -48,7 +52,7 @@ public final class CompositorFrameAtTime implements FrameAtTime {
 	}
 
 	@Override
-	public RgbaFrame frameAtTime(double timelineSeconds) {
+	public @Nullable RgbaFrame frameAtTime(double timelineSeconds) {
 		if (!Double.isFinite(timelineSeconds)) {
 			throw new IllegalArgumentException("timelineSeconds must be finite");
 		}

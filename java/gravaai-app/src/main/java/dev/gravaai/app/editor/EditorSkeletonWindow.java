@@ -19,6 +19,8 @@ import javafx.stage.StageStyle;
  * <p>Deliberately tiny (one StackPane, one ImageView, one Label) so its construction stays a few
  * milliseconds; the full editor chrome arrives with the real window.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorSkeletonWindow {
 
 	private final Stage stage;

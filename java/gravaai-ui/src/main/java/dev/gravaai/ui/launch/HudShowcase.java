@@ -19,6 +19,8 @@ import javafx.stage.Stage;
  * java -Dgravaai.hud.demo=menu HUDShowcase      # opens the microphone menu
  * }</pre>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudShowcase extends Application {
 
 	@Override

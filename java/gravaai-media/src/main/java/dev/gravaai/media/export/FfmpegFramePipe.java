@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,6 +15,8 @@ import dev.gravaai.platform.process.RunningProcess;
  * Shared plumbing for the ffmpeg-CLI encoders (rawvideo frames through stdin, progress lines from
  * stdout, cooperative cancellation with temp-file cleanup; plan §5.10).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class FfmpegFramePipe {
 
 	/** Callback after a frame was handed to ffmpeg. */
@@ -65,7 +69,7 @@ final class FfmpegFramePipe {
 		for (int i = 0; i < IN_FLIGHT; i++) {
 			free.add(new byte[frameBytes]);
 		}
-		record Filled(long frameIndex, byte[] bytes) {}
+		record Filled(long frameIndex, @Nullable byte[] bytes) {}
 		Filled end = new Filled(-1, null);
 		java.util.concurrent.BlockingQueue<Filled> filled =
 				new java.util.concurrent.ArrayBlockingQueue<>(IN_FLIGHT + 1);

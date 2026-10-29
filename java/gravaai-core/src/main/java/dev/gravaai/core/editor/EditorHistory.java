@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -29,13 +31,13 @@ public final class EditorHistory {
 			List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions,
 			List<AnnotationRegion> annotationRegions,
-			List<AudioRegion> audioRegions,
+			@Nullable List<AudioRegion> audioRegions,
 			List<CaptionCue> autoCaptions,
-			String selectedZoomId,
-			String selectedClipId,
-			String selectedAnnotationId,
-			String selectedAudioId,
-			tools.jackson.databind.node.ObjectNode sourceAudioTrackSettingsByClip) {
+			@Nullable String selectedZoomId,
+			@Nullable String selectedClipId,
+			@Nullable String selectedAnnotationId,
+			@Nullable String selectedAudioId,
+			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip) {
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
@@ -54,7 +56,7 @@ public final class EditorHistory {
 	}
 
 	/** Options for {@link #record(Stack, Snapshot, RecordOptions)}; null fields take defaults. */
-	public record RecordOptions(Boolean applyingHistory, Integer maxEntries, String label) {
+	public record RecordOptions(@Nullable Boolean applyingHistory, @Nullable Integer maxEntries, @Nullable String label) {
 
 		public static final RecordOptions DEFAULT = new RecordOptions(null, null, null);
 
@@ -71,7 +73,7 @@ public final class EditorHistory {
 	public static final class Stack {
 		private List<Snapshot> past = new ArrayList<>();
 		private List<String> pastLabels = new ArrayList<>();
-		private Snapshot current;
+		private @Nullable Snapshot current;
 		private List<Snapshot> future = new ArrayList<>();
 
 		public List<Snapshot> past() {
@@ -82,7 +84,7 @@ public final class EditorHistory {
 			return pastLabels;
 		}
 
-		public Snapshot current() {
+		public @Nullable Snapshot current() {
 			return current;
 		}
 
@@ -126,11 +128,11 @@ public final class EditorHistory {
 		return Objects.equals(left, right);
 	}
 
-	public static RecordResult record(Stack stack, Snapshot snapshot) {
+	public static @Nullable RecordResult record(Stack stack, Snapshot snapshot) {
 		return record(stack, snapshot, RecordOptions.DEFAULT);
 	}
 
-	public static RecordResult record(Stack stack, Snapshot snapshot, RecordOptions options) {
+	public static @Nullable RecordResult record(Stack stack, Snapshot snapshot, RecordOptions options) {
 		RecordOptions effectiveOptions = options == null ? RecordOptions.DEFAULT : options;
 		Snapshot clonedSnapshot = cloneSnapshot(snapshot);
 
@@ -163,7 +165,7 @@ public final class EditorHistory {
 		return RecordResult.RECORDED;
 	}
 
-	public static Snapshot undo(Stack stack, Snapshot fallbackCurrent) {
+	public static @Nullable Snapshot undo(Stack stack, Snapshot fallbackCurrent) {
 		if (stack.past.isEmpty()) {
 			return null;
 		}
@@ -179,7 +181,7 @@ public final class EditorHistory {
 		return cloneSnapshot(previous);
 	}
 
-	public static Snapshot redo(Stack stack, Snapshot fallbackCurrent) {
+	public static @Nullable Snapshot redo(Stack stack, Snapshot fallbackCurrent) {
 		if (stack.future.isEmpty()) {
 			return null;
 		}
@@ -194,7 +196,7 @@ public final class EditorHistory {
 	}
 
 	/** {@code peekUndoLabel}: label of the change Ctrl+Z would undo, when there is one. */
-	public static String peekUndoLabel(Stack stack) {
+	public static @Nullable String peekUndoLabel(Stack stack) {
 		if (stack.pastLabels.isEmpty()) {
 			return null;
 		}

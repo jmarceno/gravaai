@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 /** Port of {@code AutomationTrigger} in {@code src/types/automations.ts}. */
 public enum AutomationTrigger {
 	RECORDING_SAVED("recording-saved"),
@@ -13,11 +15,11 @@ public enum AutomationTrigger {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
-	public static AutomationTrigger fromWire(String value) {
+	public static @Nullable AutomationTrigger fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

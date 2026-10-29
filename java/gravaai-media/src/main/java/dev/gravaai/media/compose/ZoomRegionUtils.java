@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -30,8 +32,8 @@ public final class ZoomRegionUtils {
 	 * Options for {@link #findDominantRegion} / {@link #computeRegionStrength}
 	 * (TS {@code DominantRegionOptions}).
 	 */
-	public record DominantRegionOptions(Boolean connectZooms, Double zoomInDurationMs,
-			Double zoomOutDurationMs) {
+	public record DominantRegionOptions(@Nullable Boolean connectZooms, @Nullable Double zoomInDurationMs,
+			@Nullable Double zoomOutDurationMs) {
 
 		/** No options: disconnected zooms, default durations. */
 		public static final DominantRegionOptions EMPTY =
@@ -53,8 +55,8 @@ public final class ZoomRegionUtils {
 	}
 
 	/** Result of {@link #findDominantRegion}. */
-	public record DominantRegionResult(ZoomRegionSpec region, double strength,
-			Double blendedScale, ConnectedPanTransition transition) {
+	public record DominantRegionResult(@Nullable ZoomRegionSpec region, double strength,
+			@Nullable Double blendedScale, @Nullable ConnectedPanTransition transition) {
 
 		static DominantRegionResult none() {
 			return new DominantRegionResult(null, 0, null, null);
@@ -133,10 +135,10 @@ public final class ZoomRegionUtils {
 		return pairs;
 	}
 
-	private static DominantRegionResult getActiveRegion(List<ZoomRegionSpec> regions,
+	private static @Nullable DominantRegionResult getActiveRegion(List<ZoomRegionSpec> regions,
 			double timeMs, List<ConnectedRegionPair> connectedPairs,
 			DominantRegionOptions options) {
-		record ActiveRegion(ZoomRegionSpec region, double strength) {
+		@Nullable record ActiveRegion(ZoomRegionSpec region, double strength) {
 		}
 		List<ActiveRegion> activeRegions = new ArrayList<>();
 		for (ZoomRegionSpec region : regions) {
@@ -192,7 +194,7 @@ public final class ZoomRegionUtils {
 				activeRegions.get(0).strength(), null, null);
 	}
 
-	private static DominantRegionResult getConnectedRegionHold(double timeMs,
+	private static @Nullable DominantRegionResult getConnectedRegionHold(double timeMs,
 			List<ConnectedRegionPair> connectedPairs) {
 		for (ConnectedRegionPair pair : connectedPairs) {
 			if (timeMs >= pair.transitionEnd() && timeMs < pair.nextRegion().startMs()) {

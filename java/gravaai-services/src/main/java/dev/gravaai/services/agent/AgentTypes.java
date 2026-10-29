@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -24,7 +26,7 @@ public final class AgentTypes {
 	}
 
 	/** Progress reported while a tool call (usually {@code job wait}) runs. */
-	public record AgentProgressUpdate(double progress, Double total, String message) {
+	public record AgentProgressUpdate(double progress, @Nullable Double total, @Nullable String message) {
 		public static AgentProgressUpdate of(double progress) {
 			return new AgentProgressUpdate(progress, null, null);
 		}

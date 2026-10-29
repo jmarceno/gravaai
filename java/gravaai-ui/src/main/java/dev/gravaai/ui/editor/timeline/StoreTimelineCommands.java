@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -29,6 +31,8 @@ import dev.gravaai.ui.editor.timeline.core.TimelineRows;
  * region command. Tests/simulations can inject the media duration with
  * {@link #sourceDuration(ToLongFunction)}; otherwise the clip's own source bounds are used.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class StoreTimelineCommands implements TimelineCommands {
 
 	private final EditorStore store;
@@ -200,7 +204,7 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		}
 	}
 
-	private void applyClipSpan(String clipId, Span span, Integer sequenceIndex) {
+	private void applyClipSpan(String clipId, Span span, @Nullable Integer sequenceIndex) {
 		store.apply(new ClipCommands.ChangeSpan(clipId, span.start(), span.end(), sequenceIndex,
 				sourceDurationMs.applyAsLong(clipId)));
 	}

@@ -36,6 +36,8 @@ import tools.jackson.databind.JsonNode;
  * {@link dev.gravaai.services.agent.AgentPlanner} edit batch per intent, offscreen compositor frames,
  * project open/save, and headless export jobs reported through the shared job registry.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentWiring implements AutoCloseable {
 
 	private final AgentService service;

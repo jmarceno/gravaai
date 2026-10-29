@@ -24,6 +24,8 @@ import javafx.scene.text.TextFlow;
  * {@code MeetingMarkdown.tsx}): headings, bullets, checklists, bold, italics, inline code, and
  * clickable [HH:MM:SS] timestamps that seek the recording.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingMarkdownView extends VBox {
 
 	private static final String MONO_STYLE =

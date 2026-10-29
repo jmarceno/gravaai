@@ -60,6 +60,8 @@ import javafx.util.Duration;
  * {@code java/parity/fixtures/media}); the recording's cursor sidecar is loaded through
  * {@link RecordingPaths} and fed to the compositor as a {@link PreviewFrameMapper.CursorTrack}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorPreviewSnapshot {
 
 	private static final String DEFAULT_FIXTURE = "03-zoom-motion-blur.gravaai";

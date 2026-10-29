@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -116,7 +118,7 @@ public final class Transcript {
 	}
 
 	/** What whisper's JSON output gives us: the detected language and the trimmed segments. */
-	public record ParsedTranscript(String language, List<TranscriptSegment> segments) {
+	public record ParsedTranscript(@Nullable String language, List<TranscriptSegment> segments) {
 	}
 
 	/** Parses whisper.cpp's {@code .json} output; empty text segments are dropped. */

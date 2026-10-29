@@ -1,5 +1,7 @@
 package dev.gravaai.platform.portal;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -68,7 +70,7 @@ public final class Portal implements AutoCloseable {
 
 	/** A file chooser request, mirroring the Electron {@code dialog.showOpenDialog/SaveDialog} options. */
 	public record FileDialogRequest(String title, boolean multiple, boolean directory, List<FileFilter> filters,
-			Path currentFolder, String currentName) {
+			@Nullable Path currentFolder, @Nullable String currentName) {
 
 		public FileDialogRequest {
 			Objects.requireNonNull(title, "title");
@@ -328,7 +330,7 @@ public final class Portal implements AutoCloseable {
 		}
 	}
 
-	private static void closeQuietly(AutoCloseable closeable) {
+	private static void closeQuietly(@Nullable AutoCloseable closeable) {
 		if (closeable == null) {
 			return;
 		}

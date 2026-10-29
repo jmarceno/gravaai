@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -40,6 +42,8 @@ import tools.jackson.databind.JsonNode;
  * {@code AppContext}) and {@link EditorPlaybackPort} (playback engine, plan §5.9). The dashboard
  * teammate's timeline is mounted with {@link #setTimelineContent}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorShellView extends VBox {
 
 	private static final String STYLESHEET = "/ui/editor/editor.css";
@@ -47,18 +51,18 @@ public final class EditorShellView extends VBox {
 	private final EditorStore store;
 	private final EditorViewActions actions;
 	private final EditorPlaybackPort playback;
-	private AgentStatusChip agentStatusChip;
-	private AgentHighlightsController agentHighlights;
+	private @Nullable AgentStatusChip agentStatusChip;
+	private @Nullable AgentHighlightsController agentHighlights;
 	private final EditorHeaderView header;
 	private final EditorSidebarRail rail;
-	private EditorInspectorPanel inspector;
-	private dev.gravaai.ui.editor.transcript.CaptionModelUiService captionModels;
+	private @Nullable EditorInspectorPanel inspector;
+	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
 	private Region inspectorPlaceholder;
 	private HBox body;
 	private final VBox dropHost;
-	private RecordingLibraryPanel clipsPanel;
+	private @Nullable RecordingLibraryPanel clipsPanel;
 	private boolean clipsOpen;
-	private ClipImportOverlay importOverlay;
+	private @Nullable ClipImportOverlay importOverlay;
 	private final EditorPreviewPanel preview;
 	private final PlaybackControls playbackControls;
 	private final EditorTimelinePanel timelinePanel;
@@ -245,7 +249,7 @@ public final class EditorShellView extends VBox {
 	}
 
 	/** The highlights controller for the timeline overlay (null until setAgentUiService). */
-	public AgentHighlightsController agentHighlights() {
+	public @Nullable AgentHighlightsController agentHighlights() {
 		return agentHighlights;
 	}
 
@@ -279,7 +283,7 @@ public final class EditorShellView extends VBox {
 	}
 
 	/** The inspector; built now when a caller needs it before the deferred startup build. */
-	public EditorInspectorPanel inspector() {
+	public @Nullable EditorInspectorPanel inspector() {
 		ensureInspector();
 		return inspector;
 	}
@@ -302,7 +306,7 @@ public final class EditorShellView extends VBox {
 		timelinePanel.setContent(timelineContent);
 	}
 
-	private Node timelineContent;
+	private @Nullable Node timelineContent;
 
 	/** Whether the Clips panel replaces the inspector content. */
 	public boolean clipsOpen() {
@@ -310,7 +314,7 @@ public final class EditorShellView extends VBox {
 	}
 
 	/** The Clips panel (built on first open). */
-	public RecordingLibraryPanel clipsPanel() {
+	public @Nullable RecordingLibraryPanel clipsPanel() {
 		return clipsPanel;
 	}
 
@@ -344,7 +348,7 @@ public final class EditorShellView extends VBox {
 		header.setClipsOpen(open);
 	}
 
-	private RecordingLibraryPanel.Host clipsHost() {
+	private RecordingLibraryPanel.@Nullable Host clipsHost() {
 		return new RecordingLibraryPanel.Host() {
 			@Override
 			public java.util.List<dev.gravaai.services.recording.RecordingLibrary.RecordingLibraryEntry>
@@ -353,7 +357,7 @@ public final class EditorShellView extends VBox {
 			}
 
 			@Override
-			public boolean setRecordingsRemoved(java.util.List<String> paths, boolean removed)
+			public @Nullable boolean setRecordingsRemoved(java.util.List<String> paths, boolean removed)
 					throws java.io.IOException {
 				return actions.setRecordingsRemoved(paths, removed);
 			}
@@ -370,7 +374,7 @@ public final class EditorShellView extends VBox {
 			}
 
 			@Override
-			public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String path) {
+			public java.util.concurrent.@Nullable CompletableFuture<String> recordingThumbnail(String path) {
 				return actions.recordingThumbnail(path);
 			}
 
@@ -420,7 +424,7 @@ public final class EditorShellView extends VBox {
 	}
 
 	/** {@code JSON.parse} of the drag payload; {@code null} when it is not a path list. */
-	private static java.util.List<String> recordingPaths(Object content) {
+	private static java.util.@Nullable List<String> recordingPaths(Object content) {
 		if (!(content instanceof String json)) {
 			return null;
 		}
@@ -449,7 +453,7 @@ public final class EditorShellView extends VBox {
 	 * The insert index for a timeline drop: the first clip whose midpoint is right of the drop X
 	 * (React compares {@code clientX} against clip midpoints), or {@code null} to append.
 	 */
-	private Integer timelineDropIndex(DragEvent event) {
+	private @Nullable Integer timelineDropIndex(DragEvent event) {
 		Node picked = event.getPickResult().getIntersectedNode();
 		boolean overTimeline = false;
 		for (Node node = picked; node != null; node = node.getParent()) {

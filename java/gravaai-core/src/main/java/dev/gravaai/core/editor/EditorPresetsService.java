@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -35,15 +37,15 @@ public final class EditorPresetsService {
 	}
 
 	/** Result of {@link #savePreset}: the status plus the persisted preset list and active id. */
-	public record SaveResult(SaveStatus status, List<EditorPreset> presets, String activePresetId) {}
+	public record SaveResult(SaveStatus status, List<EditorPreset> presets, @Nullable String activePresetId) {}
 
 	/** Result of {@link #deletePreset}. */
 	public record DeleteResult(DeleteStatus status, List<EditorPreset> presets,
-			String activePresetId) {}
+			@Nullable String activePresetId) {}
 
 	private final EditorPreferencesStore store;
 	private List<EditorPreset> presets;
-	private String activePresetId;
+	private @Nullable String activePresetId;
 
 	public EditorPresetsService(EditorPreferencesStore store) {
 		this.store = store;
@@ -54,7 +56,7 @@ public final class EditorPresetsService {
 		return presets;
 	}
 
-	public String activePresetId() {
+	public @Nullable String activePresetId() {
 		return activePresetId;
 	}
 
@@ -63,12 +65,12 @@ public final class EditorPresetsService {
 	}
 
 	/** {@code currentEditorPreset}: the preset with the active id, if any. */
-	public EditorPreset currentEditorPreset() {
+	public @Nullable EditorPreset currentEditorPreset() {
 		return find(activePresetId);
 	}
 
 	/** The preset with the given id, or null. */
-	public EditorPreset find(String id) {
+	public @Nullable EditorPreset find(@Nullable String id) {
 		if (id == null) {
 			return null;
 		}
@@ -84,7 +86,7 @@ public final class EditorPresetsService {
 	 * The preset whose serialised snapshot equals the current one ({@code currentSignature}), i.e.
 	 * what the hook's effect sets the active id to when the editor exactly matches a preset.
 	 */
-	public String matchingPresetId(EditorPresetSnapshot currentSnapshot) {
+	public @Nullable String matchingPresetId(EditorPresetSnapshot currentSnapshot) {
 		String signature = EditorPresets.serializeSnapshot(currentSnapshot);
 		for (EditorPreset preset : presets) {
 			if (EditorPresets.serializeSnapshot(preset.snapshot()).equals(signature)) {

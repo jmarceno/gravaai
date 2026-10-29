@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
@@ -36,6 +38,8 @@ import javafx.scene.layout.VBox;
  * with a Copy button instead. The service applies COSMIC's file splice; this page only renders and
  * captures.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class GlobalShortcutsSettingsView extends VBox {
 
 	/** {@code MODIFIER_CODES} in the React source. */
@@ -46,9 +50,9 @@ public final class GlobalShortcutsSettingsView extends VBox {
 	private final Label errorBanner = new Label();
 	private final javafx.event.EventHandler<KeyEvent> captureHandler = this::handleCaptureKey;
 
-	private GlobalShortcutsConfig config;
-	private GlobalShortcutsStatus status;
-	private GlobalShortcutAction capturing;
+	private @Nullable GlobalShortcutsConfig config;
+	private @Nullable GlobalShortcutsStatus status;
+	private @Nullable GlobalShortcutAction capturing;
 	private boolean busy;
 
 	public GlobalShortcutsSettingsView(GlobalShortcutsController controller) {

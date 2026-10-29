@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,6 +28,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Editor-preset normalisation and JSON encoding (port of the preset half of
  * {@code src/components/video-editor/editorPreferences.ts}).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorPresets {
 
 	private static final Pattern WHITESPACE_RUN =
@@ -33,10 +37,10 @@ public final class EditorPresets {
 	private static final DateTimeFormatter ISO_MILLIS =
 			DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 
-	private EditorPresets() {}
+	@Nullable private EditorPresets() {}
 
 	/** {@code normalizePresetName}: trim, collapse spaces, null when blank. */
-	public static String normalizePresetName(String value) {
+	public static @Nullable String normalizePresetName(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}
@@ -46,13 +50,13 @@ public final class EditorPresets {
 	}
 
 	/** {@code new Date(parsed).toISOString()}; lenient like {@code Date.parse}. */
-	public static String normalizePresetTimestamp(String value, String fallback) {
+	public static @Nullable String normalizePresetTimestamp(@Nullable String value, String fallback) {
 		Long millis = parseTimestamp(value);
 		return millis == null ? fallback
 				: ISO_MILLIS.format(Instant.ofEpochMilli(millis));
 	}
 
-	private static Long parseTimestamp(String value) {
+	private static @Nullable Long parseTimestamp(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}
@@ -115,7 +119,7 @@ public final class EditorPresets {
 				keystrokeOverlay);
 	}
 
-	private static JsonNode singleField(JsonNode raw, String field) {
+	private static @Nullable JsonNode singleField(JsonNode raw, String field) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		if (raw != null && raw.isObject() && raw.has(field)) {
 			node.set(field, raw.get(field));
@@ -124,7 +128,7 @@ public final class EditorPresets {
 	}
 
 	/** {@code normalizeEditorPreset}: null when the name is missing/blank. */
-	public static EditorPreset normalizePreset(JsonNode candidate) {
+	public static @Nullable EditorPreset normalizePreset(JsonNode candidate) {
 		if (candidate == null || !candidate.isObject()) {
 			return null;
 		}
@@ -172,12 +176,12 @@ public final class EditorPresets {
 	}
 
 	/** {@code serializeEditorPresetSnapshot}: compact JSON of the normalised snapshot. */
-	public static String serializeSnapshot(EditorPresetSnapshot snapshot) {
+	public static String serializeSnapshot(@Nullable EditorPresetSnapshot snapshot) {
 		EditorPresetSnapshot normalized = normalizeSnapshot(snapshotToJson(snapshot));
 		return Json.MAPPER.writeValueAsString(snapshotToJson(normalized));
 	}
 
-	public static ObjectNode snapshotToJson(EditorPresetSnapshot snapshot) {
+	public static ObjectNode snapshotToJson(@Nullable EditorPresetSnapshot snapshot) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("wallpaper", snapshot.wallpaper());
 		node.put("shadowIntensity", snapshot.shadowIntensity());
@@ -241,7 +245,7 @@ public final class EditorPresets {
 		return array;
 	}
 
-	private static ObjectNode paddingToJson(Padding padding) {
+	private static ObjectNode paddingToJson(@Nullable Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -251,7 +255,7 @@ public final class EditorPresets {
 		return node;
 	}
 
-	private static ObjectNode cropRegionToJson(CropRegion crop) {
+	private static ObjectNode cropRegionToJson(@Nullable CropRegion crop) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("x", crop.x());
 		node.put("y", crop.y());
@@ -260,7 +264,7 @@ public final class EditorPresets {
 		return node;
 	}
 
-	private static ObjectNode autoCaptionSettingsToJson(AutoCaptionSettings settings) {
+	private static ObjectNode autoCaptionSettingsToJson(@Nullable AutoCaptionSettings settings) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("enabled", settings.enabled());
 		node.put("timelineQuickAdd", settings.timelineQuickAdd());

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +31,8 @@ import javafx.scene.layout.VBox;
  * timecodes and split/merge/delete, all as {@link CaptionCommands} on the shared
  * {@link EditorStore}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionListPanel extends VBox {
 
 	private static final Pattern TIMECODE =
@@ -170,7 +174,7 @@ public final class CaptionListPanel extends VBox {
 	}
 
 	/** {@code formatTimecode}: {@code m:ss.mmm} with a 0 floor. */
-	public static String formatTimecode(long ms) {
+	public static @Nullable String formatTimecode(long ms) {
 		long safeMs = Math.max(0, Math.round(ms));
 		long minutes = safeMs / 60_000;
 		long seconds = (safeMs % 60_000) / 1_000;
@@ -180,7 +184,7 @@ public final class CaptionListPanel extends VBox {
 	}
 
 	/** {@code parseTimecode}: null for anything the React parser rejects. */
-	public static Long parseTimecode(String value) {
+	public static @Nullable Long parseTimecode(String value) {
 		if (value == null) {
 			return null;
 		}

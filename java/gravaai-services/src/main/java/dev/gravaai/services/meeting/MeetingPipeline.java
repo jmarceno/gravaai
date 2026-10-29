@@ -16,6 +16,8 @@ import dev.gravaai.services.meeting.OpenAiClient.OpenAiEndpoint;
  * recording, so a stage can be re-run alone and new ones (screen context) can slot in between.
  * Ported from electron/ipc/meeting/pipeline.ts.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingPipeline {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.meeting");

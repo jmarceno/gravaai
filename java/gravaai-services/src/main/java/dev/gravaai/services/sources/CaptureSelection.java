@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Map;
 
@@ -15,28 +17,30 @@ import dev.gravaai.services.recording.CosmicSources;
  * that the Java app does not have (plan §2.3). The rule that matters is preserved: identity and
  * geometry are revalidated, and a vanished source is never substituted with a broader one.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptureSelection {
 
 	/** Lists the outputs of the COSMIC screen-capture helper. */
 	public interface CosmicOutputs {
-		List<CosmicOutput> list() throws Exception;
+		@Nullable List<CosmicOutput> list() throws Exception;
 	}
 
 	private final CosmicOutputs cosmicOutputs;
 	private final Map<String, String> env;
 
-	public CaptureSelection(CosmicOutputs cosmicOutputs, Map<String, String> env) {
+	@Nullable public CaptureSelection(CosmicOutputs cosmicOutputs, Map<String, String> env) {
 		this.cosmicOutputs = cosmicOutputs;
 		this.env = env;
 	}
 
 	/** True on a Linux Wayland session, where direct COSMIC capture is used. */
-	public boolean isWaylandSession() {
+	public @Nullable boolean isWaylandSession() {
 		return SourceMapping.isLikelyLinuxWaylandSession(env);
 	}
 
 	/** Revalidate identity and geometry; never substitute a broader capture source. */
-	public SelectedSource validateCaptureSource(SelectedSource candidate) {
+	public @Nullable SelectedSource validateCaptureSource(SelectedSource candidate) {
 		if (candidate == null || candidate.id() == null || candidate.name() == null) {
 			return null;
 		}
@@ -67,7 +71,7 @@ public final class CaptureSelection {
 	}
 
 	/** Revalidate against a known display list, so the cosmic source carries its display id. */
-	public SelectedSource validateCaptureSource(
+	public @Nullable SelectedSource validateCaptureSource(
 			SelectedSource candidate,
 			List<DisplayOutputResolver.DisplayInfo> displays) {
 		if (candidate == null || candidate.id() == null || candidate.name() == null) {

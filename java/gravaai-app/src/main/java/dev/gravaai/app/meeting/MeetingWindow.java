@@ -1,5 +1,7 @@
 package dev.gravaai.app.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -94,7 +96,7 @@ public final class MeetingWindow {
 	}
 
 	/** Shows the window, loading the given meeting when it is not null. */
-	public void open(Path mediaPath) {
+	public void open(@Nullable Path mediaPath) {
 		Runnable show = () -> {
 			if (mediaPath != null) {
 				view.open(mediaPath);

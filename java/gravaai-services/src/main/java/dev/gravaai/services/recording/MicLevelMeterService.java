@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -47,7 +49,7 @@ public final class MicLevelMeterService implements AutoCloseable {
 		final java.util.concurrent.atomic.AtomicBoolean streamClosed =
 				new java.util.concurrent.atomic.AtomicBoolean();
 		volatile boolean stopping;
-		volatile Thread pump;
+		volatile @Nullable Thread pump;
 
 		Session(PulseRecordStream stream) {
 			this.stream = stream;
@@ -64,7 +66,7 @@ public final class MicLevelMeterService implements AutoCloseable {
 		}
 	}
 
-	private volatile Session session;
+	private volatile @Nullable Session session;
 
 	public MicLevelMeterService(Consumer<Double> onLevel) {
 		this(onLevel, 0.8);

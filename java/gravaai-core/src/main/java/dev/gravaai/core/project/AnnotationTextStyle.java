@@ -1,19 +1,21 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /** Text style of an annotation; the font weight/style/decoration/alignment unions become enums. */
 public record AnnotationTextStyle(
-		String color,
-		String backgroundColor,
-		double fontSize,
-		String fontFamily,
+		@Nullable String color,
+		@Nullable String backgroundColor,
+		@Nullable double fontSize,
+		@Nullable String fontFamily,
 		FontWeight fontWeight,
-		FontStyle fontStyle,
-		TextDecoration textDecoration,
+		@Nullable FontStyle fontStyle,
+		@Nullable TextDecoration textDecoration,
 		TextAlign textAlign,
-		double borderRadius) {
+		@Nullable double borderRadius) {
 
 	public enum FontWeight {
 		NORMAL("normal"), BOLD("bold");

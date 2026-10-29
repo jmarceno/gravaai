@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +33,8 @@ import tools.jackson.databind.JsonNode;
  * {@code gravaai-ctl} locator, the app path the shortcut command runs and the action sink (the
  * dispatcher). There are no static globals.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class GlobalShortcutsService implements AutoCloseable {
 
 	/** Port of {@code PARSE_ERROR_MESSAGE}. */
@@ -50,9 +54,9 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final Runnable showSink;
 	private final Object lock = new Object();
 
-	private ControlSocket.Server controlSocket;
-	private Path installedCtlPath;
-	private GlobalShortcutsStatus lastStatus;
+	private ControlSocket.@Nullable Server controlSocket;
+	private @Nullable Path installedCtlPath;
+	private @Nullable GlobalShortcutsStatus lastStatus;
 
 	/**
 	 * @param settings the {@code globalShortcuts} app setting
@@ -247,11 +251,11 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			GlobalShortcutsStatus base,
 			Map<GlobalShortcutAction, GlobalShortcutBinding> registered,
 			Map<GlobalShortcutAction, String> conflicts,
-			String error) {
+			@Nullable String error) {
 		return new GlobalShortcutsStatus(base.backend(), registered, conflicts, error, base.commands());
 	}
 
-	private static GlobalShortcutAction findRegisteredDuplicate(
+	private static @Nullable GlobalShortcutAction findRegisteredDuplicate(
 			Map<GlobalShortcutAction, GlobalShortcutBinding> registered, GlobalShortcutBinding binding) {
 		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
 			GlobalShortcutBinding existing = registered.get(action);
@@ -295,7 +299,7 @@ public final class GlobalShortcutsService implements AutoCloseable {
 		return target;
 	}
 
-	private static String sha256(Path file) {
+	private static @Nullable String sha256(Path file) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			return HexFormat.of().formatHex(digest.digest(Files.readAllBytes(file)));

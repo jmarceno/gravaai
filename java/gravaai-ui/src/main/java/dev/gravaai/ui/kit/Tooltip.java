@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Point2D;
@@ -28,7 +30,7 @@ public final class Tooltip {
 	private Anchors.Align align = Anchors.Align.CENTER;
 	private double offset = Anchors.DEFAULT_OFFSET;
 	private boolean showing;
-	private Pane layer;
+	private @Nullable Pane layer;
 
 	private Tooltip(Node target, Region content, Duration openDelay, Duration closeDelay) {
 		this.target = target;

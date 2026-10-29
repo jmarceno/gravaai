@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -58,9 +60,9 @@ public final class AgentControlServer implements AutoCloseable {
 	private final Map<SocketChannel, AgentConnectionInfo> clients = new ConcurrentHashMap<>();
 	private final AtomicBoolean running = new AtomicBoolean();
 
-	private volatile ServerSocketChannel server;
-	private volatile Thread acceptThread;
-	private volatile String currentToken;
+	private volatile @Nullable ServerSocketChannel server;
+	private volatile @Nullable Thread acceptThread;
+	private volatile @Nullable String currentToken;
 	private volatile boolean enabled;
 
 	public AgentControlServer(Path socketPath, Path tokenFile, AgentTypes.AgentToolHandler handler,

@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /** A modality an OpenAI-compatible chat model accepts (MeetingSettings.apiChatCapabilities). */
@@ -14,11 +16,11 @@ public enum SummarizerCapability {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
-	public static SummarizerCapability fromWire(Object value) {
+	public static @Nullable SummarizerCapability fromWire(Object value) {
 		if (!(value instanceof String text)) {
 			return null;
 		}

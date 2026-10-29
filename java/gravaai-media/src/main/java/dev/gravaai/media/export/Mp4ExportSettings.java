@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.core.editor.ExportPreferences.ExportQuality;
 
@@ -13,11 +15,11 @@ public record Mp4ExportSettings(ExportQuality quality, ExportEncodingMode encodi
 
 	/** Smoke-export overrides ({@code SmokeExportConfig} fields used by export settings). */
 	public record SmokeExportConfig(boolean enabled, ExportQuality quality,
-			ExportEncodingMode encodingMode, Integer fps) {}
+			ExportEncodingMode encodingMode, @Nullable Integer fps) {}
 
 	/** Export-dialog overrides (the used {@code ExportSettings} fields). */
-	public record ExportSettingsOverrides(ExportQuality quality, ExportEncodingMode encodingMode,
-			Integer mp4FrameRate) {}
+	public record ExportSettingsOverrides(@Nullable ExportQuality quality, @Nullable ExportEncodingMode encodingMode,
+			@Nullable Integer mp4FrameRate) {}
 
 	/** {@code resolveMp4ExportSettings}. */
 	public static Mp4ExportSettings resolve(SmokeExportConfig smokeExportConfig,

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.DoubleSupplier;
@@ -30,6 +32,8 @@ import javafx.scene.layout.VBox;
  * commands. The panel follows the store selection, so selecting a caption on the timeline or in
  * the caption list shows the same editor.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionListPanel extends VBox {
 
 	private final EditorStore store;
@@ -46,7 +50,7 @@ public final class CaptionListPanel extends VBox {
 
 	private boolean updating;
 	private boolean cancelNextCommit;
-	private String editedCueId;
+	private @Nullable String editedCueId;
 
 	public CaptionListPanel(EditorStore store, DoubleSupplier playheadMs) {
 		this.store = store;
@@ -169,7 +173,7 @@ public final class CaptionListPanel extends VBox {
 	}
 
 	/** Test/app seam: the Delete action button. */
-	public Button deleteAction() {
+	public @Nullable Button deleteAction() {
 		return deleteButton;
 	}
 
@@ -207,7 +211,7 @@ public final class CaptionListPanel extends VBox {
 	}
 
 	/** The cue currently edited, for tests/shells that need to mirror the selection. */
-	public CaptionCue selectedCue() {
+	public @Nullable CaptionCue selectedCue() {
 		String id = store.selectedCaptionId();
 		if (id == null) {
 			return null;

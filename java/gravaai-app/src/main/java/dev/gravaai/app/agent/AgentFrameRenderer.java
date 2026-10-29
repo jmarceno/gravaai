@@ -1,5 +1,7 @@
 package dev.gravaai.app.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
  * hooks are not installed here (the app owns the extension host); with no extensions enabled the
  * output is identical to the export frames.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentFrameRenderer {
 
 	/** One rendered frame ready for the MCP result. */
@@ -112,7 +116,7 @@ final class AgentFrameRenderer {
 		return Math.min(seconds, Math.max(0, durationSeconds));
 	}
 
-	private static Path videoPath(EditorSession session) {
+	private static @Nullable Path videoPath(EditorSession session) {
 		String path = session.videoPath();
 		if (path == null || path.isBlank()) {
 			throw new IllegalStateException("the project has no source video");
@@ -120,7 +124,7 @@ final class AgentFrameRenderer {
 		return Path.of(path);
 	}
 
-	private static String encodePng(ByteBuffer rgba, int width, int height) throws IOException {
+	private static @Nullable String encodePng(ByteBuffer rgba, int width, int height) throws IOException {
 		int[] pixels = new int[width * height];
 		ByteBuffer source = rgba.duplicate();
 		source.position(0);
@@ -142,7 +146,7 @@ final class AgentFrameRenderer {
 	 * Copies the project wallpaper resource into a temp {@code wallpapers/} root so the compositor
 	 * can read it from the filesystem (same staging as the exporter's {@code stageWallpapers}).
 	 */
-	private static Path stageWallpapers(String wallpaper) {
+	private static @Nullable Path stageWallpapers(@Nullable String wallpaper) {
 		if (wallpaper == null || !wallpaper.startsWith("/wallpapers/")) {
 			return null;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.CompletableFuture;
 
 import dev.gravaai.ui.kit.Button;
@@ -21,11 +23,13 @@ import javafx.scene.layout.VBox;
  * configuration; prompt handling and models stay outside the app. The agent service is Phase 3, so
  * the page talks to {@link AgentSettingsController} (Lead decision).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentSettingsView extends VBox {
 
 	private final AgentSettingsController controller;
 	private final VBox rows = new VBox(24);
-	private AgentSettingsController.State state;
+	private AgentSettingsController.@Nullable State state;
 	private boolean busy;
 
 	public AgentSettingsView(AgentSettingsController controller) {

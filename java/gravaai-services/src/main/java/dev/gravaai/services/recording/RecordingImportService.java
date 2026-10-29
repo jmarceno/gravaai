@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -38,13 +40,15 @@ import tools.jackson.databind.node.ObjectNode;
  * originals are never modified. Media metadata comes from {@link MediaProbe} and ffmpeg is the
  * bundled CLI (plan §5.7).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingImportService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
 	private static final int WEBCAM_FPS = 30;
 
 	/** One webcam source linked to a sequence video ({@code RecordingWebcamSource}). */
-	public record RecordingWebcamSource(String sourcePath, long timeOffsetMs, List<VisibleRange> visibleRanges) {
+	public record RecordingWebcamSource(String sourcePath, long timeOffsetMs, @Nullable List<VisibleRange> visibleRanges) {
 	}
 
 	/** A visible webcam span on the recording clock. */
@@ -69,7 +73,7 @@ public final class RecordingImportService {
 	}
 
 	/** Companion audio paths and their capture start delays. */
-	record NormalizeSources(String systemPath, String micPath, Map<String, Long> startDelayMsByPath) {
+	record NormalizeSources(@Nullable String systemPath, @Nullable String micPath, Map<String, Long> startDelayMsByPath) {
 	}
 
 	/** The ffmpeg arguments and filter graph that normalize one input. */
@@ -187,7 +191,7 @@ public final class RecordingImportService {
 
 	/** The filter and arguments for one webcam segment (a black span when the source is absent). */
 	static WebcamSegmentPlan planWebcamSegment(
-			String sourcePath,
+			@Nullable String sourcePath,
 			int width,
 			int height,
 			long delayMs,
@@ -378,7 +382,7 @@ public final class RecordingImportService {
 		runFfmpeg(args, cancelled);
 	}
 
-	private RecordingWebcamSource linked(String video) throws IOException {
+	private @Nullable RecordingWebcamSource linked(String video) throws IOException {
 		RecordingSessionManifest.RecordingSessionData session =
 				RecordingSessionManifest.resolveRecordingSession(video);
 		if (session == null || session.webcamPath() == null) {
@@ -410,7 +414,7 @@ public final class RecordingImportService {
 				webcamPath.toString(), session.timeOffsetMs(), visibleRanges);
 	}
 
-	private RecordingWebcamSource composeSequenceWebcam(
+	private @Nullable RecordingWebcamSource composeSequenceWebcam(
 			String current,
 			String added,
 			String output,

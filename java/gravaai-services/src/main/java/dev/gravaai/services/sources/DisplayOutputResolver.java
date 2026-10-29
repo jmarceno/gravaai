@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -30,7 +32,7 @@ public final class DisplayOutputResolver {
 	}
 
 	/** One display paired with the screen source the list should use for it. */
-	public record ScreenMatch(DisplayInfo display, ScreenSourceRef source) {
+	public record ScreenMatch(DisplayInfo display, @Nullable ScreenSourceRef source) {
 	}
 
 	/** Displays sorted by bounds x, bounds y, then id: the order the source list numbers them in. */
@@ -52,7 +54,7 @@ public final class DisplayOutputResolver {
 	 * The display an output sits on. The COSMIC output and the display share the top-left corner,
 	 * which is how the original ties a cosmic source to a display id.
 	 */
-	public static DisplayInfo findDisplayForOutput(CosmicOutput output, List<DisplayInfo> displays) {
+	public static @Nullable DisplayInfo findDisplayForOutput(CosmicOutput output, List<DisplayInfo> displays) {
 		for (DisplayInfo display : displays) {
 			if (display.bounds().x() == output.x() && display.bounds().y() == output.y()) {
 				return display;

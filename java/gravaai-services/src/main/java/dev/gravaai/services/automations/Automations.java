@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +25,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Everything here is pure: unknown triggers/actions/conditions are dropped, counts are clamped
  * and unknown fields never reach this model.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Automations {
 
 	public static final int MAX_AUTOMATION_RULES = 50;
@@ -87,14 +91,14 @@ public final class Automations {
 		return ALL_ACTION_TYPES.contains(action);
 	}
 
-	public static boolean triggerAllowsConditionsOfType(AutomationConditionType type, AutomationTrigger trigger) {
+	public static @Nullable boolean triggerAllowsConditionsOfType(AutomationConditionType type, AutomationTrigger trigger) {
 		if (type == AutomationConditionType.FORMAT_IS) {
 			return trigger == AutomationTrigger.EXPORT_FINISHED;
 		}
 		return true;
 	}
 
-	public static AutomationRule normalizeRule(JsonNode value, Supplier<String> createRuleId) {
+	public static @Nullable AutomationRule normalizeRule(JsonNode value, Supplier<String> createRuleId) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -159,7 +163,7 @@ public final class Automations {
 		return normalizeAutomationsFile(value, automationsRuleId());
 	}
 
-	public static AutomationsFile normalizeAutomationsFile(JsonNode value, Supplier<String> createRuleId) {
+	public static @Nullable AutomationsFile normalizeAutomationsFile(JsonNode value, Supplier<String> createRuleId) {
 		JsonNode record = value != null && value.isObject() ? value : null;
 		JsonNode rawRules = record == null ? null : record.get("rules");
 		List<AutomationRule> rules = new ArrayList<>();
@@ -184,12 +188,12 @@ public final class Automations {
 		return new AutomationsFile(1, rules);
 	}
 
-	public static AutomationsFile createEmptyAutomationsFile() {
+	public static @Nullable AutomationsFile createEmptyAutomationsFile() {
 		return new AutomationsFile(1, List.of());
 	}
 
 	/** Port of {@code automationRuleIssues}: problems the settings UI should surface. */
-	public static List<String> automationRuleIssues(AutomationRule rule) {
+	public static @Nullable List<String> automationRuleIssues(AutomationRule rule) {
 		List<String> issues = new ArrayList<>();
 		for (AutomationAction action : rule.actions()) {
 			if (!actionAllowedForTrigger(action.type(), rule.trigger())) {
@@ -213,7 +217,7 @@ public final class Automations {
 	 * Port of {@code findDisallowedAction} in {@code electron/ipc/register/automations.ts}: rules
 	 * the engine would silently ignore are rejected at save time.
 	 */
-	public static String findDisallowedAction(JsonNode value) {
+	public static @Nullable String findDisallowedAction(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -256,7 +260,7 @@ public final class Automations {
 	}
 
 	/** The stored JSON shape of a file (port of the object {@code JSON.stringify} receives). */
-	public static ObjectNode toJson(AutomationsFile file) {
+	public static @Nullable ObjectNode toJson(AutomationsFile file) {
 		JsonNodeFactory nodes = Json.nodeFactory();
 		ObjectNode root = nodes.objectNode();
 		root.put("version", file.version());
@@ -292,7 +296,7 @@ public final class Automations {
 		return root;
 	}
 
-	private static ObjectNode actionJson(AutomationAction action, JsonNodeFactory nodes) {
+	private static @Nullable ObjectNode actionJson(AutomationAction action, JsonNodeFactory nodes) {
 		ObjectNode node = nodes.objectNode();
 		node.put("type", action.type().wire());
 		if (action instanceof AutomationAction.Notify notify) {
@@ -328,7 +332,7 @@ public final class Automations {
 		}
 	}
 
-	private static AutomationCondition normalizeCondition(JsonNode value) {
+	private static @Nullable AutomationCondition normalizeCondition(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -349,7 +353,7 @@ public final class Automations {
 		return null;
 	}
 
-	private static AutomationAction normalizeAction(JsonNode value) {
+	private static @Nullable AutomationAction normalizeAction(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -398,7 +402,7 @@ public final class Automations {
 	}
 
 	/** Port of the TS {@code ...(fileName ? { fileName } : {})} spread. */
-	private static String optionalString(JsonNode value) {
+	private static @Nullable String optionalString(JsonNode value) {
 		String text = asString(value, MAX_NAME_LENGTH);
 		return text.isEmpty() ? null : text;
 	}

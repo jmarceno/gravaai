@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.core.project.AutoCaptionSettings;
@@ -12,11 +14,11 @@ import dev.gravaai.core.project.ZoomTransitionEasing;
 
 /** The editor controls captured by an editor preset (port of {@code EditorPresetSnapshot}). */
 public record EditorPresetSnapshot(
-		String wallpaper,
-		double shadowIntensity,
-		double backgroundBlur,
-		double zoomMotionBlur,
-		ZoomMotionBlurTuning zoomMotionBlurTuning,
+		@Nullable String wallpaper,
+		@Nullable double shadowIntensity,
+		@Nullable double backgroundBlur,
+		@Nullable double zoomMotionBlur,
+		@Nullable ZoomMotionBlurTuning zoomMotionBlurTuning,
 		boolean connectZooms,
 		double zoomInDurationMs,
 		double zoomInOverlapMs,
@@ -45,12 +47,12 @@ public record EditorPresetSnapshot(
 		double cursorClickEffectDurationMs,
 		double cursorClickBounce,
 		double cursorClickBounceDuration,
-		double cursorSway,
-		double borderRadius,
-		Padding padding,
-		String aspectRatio,
+		@Nullable double cursorSway,
+		@Nullable double borderRadius,
+		@Nullable Padding padding,
+		@Nullable String aspectRatio,
 		String borderRadiusUnit,
 		WebcamPresetSettings webcam,
-		CropRegion cropRegion,
-		AutoCaptionSettings autoCaptionSettings,
+		@Nullable CropRegion cropRegion,
+		@Nullable AutoCaptionSettings autoCaptionSettings,
 		KeystrokeOverlaySettings keystrokeOverlay) {}

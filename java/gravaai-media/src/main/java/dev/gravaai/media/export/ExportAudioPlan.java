@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 
@@ -7,7 +9,7 @@ import java.util.List;
  * Audio side of an export: the input files and one {@code -filter_complex} graph that must produce
  * the {@code [aout]} label (plan §5.10, "one libavfilter graph string").
  */
-public record ExportAudioPlan(List<Path> inputs, String filterComplex) {
+public record ExportAudioPlan(List<Path> inputs, @Nullable String filterComplex) {
 
 	public static final ExportAudioPlan NONE = new ExportAudioPlan(List.of(), null);
 

@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,7 +30,7 @@ public final class CaptionOps {
 	}
 
 	/** {@code createCaptionCue}: a new cue with a generated id and no word timings. */
-	public static CaptionCue createCaptionCue(double startMs, double endMs, String text) {
+	public static CaptionCue createCaptionCue(double startMs, double endMs, @Nullable String text) {
 		long normalizedStartMs = Math.round(startMs);
 		return new CaptionCue(createCaptionCueId(), normalizedStartMs,
 				Math.max(normalizedStartMs + 1, Math.round(endMs)), text == null ? "" : text, null);
@@ -68,7 +70,7 @@ public final class CaptionOps {
 	}
 
 	/** {@code retimeCue}. */
-	public static List<CaptionCue> retimeCue(List<CaptionCue> cues, String id, RetimeSpan span) {
+	public static List<CaptionCue> retimeCue(List<CaptionCue> cues, @Nullable String id, RetimeSpan span) {
 		List<CaptionCue> sorted = sortCaptionCues(cues);
 		int index = -1;
 		for (int candidate = 0; candidate < sorted.size(); candidate++) {
@@ -109,7 +111,7 @@ public final class CaptionOps {
 	}
 
 	/** {@code splitCue}: split at the nearest word boundary. */
-	public static List<CaptionCue> splitCue(List<CaptionCue> cues, String id, double atMs) {
+	public static List<CaptionCue> splitCue(List<CaptionCue> cues, @Nullable String id, double atMs) {
 		List<CaptionCue> sorted = sortCaptionCues(cues);
 		int index = -1;
 		for (int candidate = 0; candidate < sorted.size(); candidate++) {
@@ -163,7 +165,7 @@ public final class CaptionOps {
 	}
 
 	/** {@code mergeCues}: merge two adjacent cues. */
-	public static List<CaptionCue> mergeCues(List<CaptionCue> cues, String idA, String idB) {
+	public static List<CaptionCue> mergeCues(List<CaptionCue> cues, @Nullable String idA, @Nullable String idB) {
 		List<CaptionCue> sorted = sortCaptionCues(cues);
 		int indexA = -1;
 		int indexB = -1;
@@ -202,7 +204,7 @@ public final class CaptionOps {
 	}
 
 	/** {@code deleteCue}. */
-	public static List<CaptionCue> deleteCue(List<CaptionCue> cues, String id) {
+	public static List<CaptionCue> deleteCue(List<CaptionCue> cues, @Nullable String id) {
 		List<CaptionCue> next = new ArrayList<>();
 		for (CaptionCue cue : cues) {
 			if (!cue.id().equals(id)) {

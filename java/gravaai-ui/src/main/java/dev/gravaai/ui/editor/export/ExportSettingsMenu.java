@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.BooleanSupplier;
 
@@ -160,7 +162,7 @@ public final class ExportSettingsMenu extends VBox {
 		return export;
 	}
 
-	private Node choices(String label, String selected, List<Choice> options,
+	private Node choices(String label, @Nullable String selected, List<Choice> options,
 			java.util.function.Consumer<String> onChange) {
 		VBox box = new VBox(8);
 		box.getStyleClass().add("export-settings__choices");
@@ -186,11 +188,11 @@ public final class ExportSettingsMenu extends VBox {
 		return box;
 	}
 
-	private static Choice choice(String value, String label, String icon, String description) {
+	private static Choice choice(String value, String label, String icon, @Nullable String description) {
 		return new Choice(value, label, icon, description);
 	}
 
-	private record Choice(String value, String label, String icon, String description) {
+	private record Choice(String value, String label, @Nullable String icon, @Nullable String description) {
 		Node content() {
 			if (icon != null) {
 				HBox row = new HBox(8, Icon.of(icon, 16), new javafx.scene.control.Label(label));

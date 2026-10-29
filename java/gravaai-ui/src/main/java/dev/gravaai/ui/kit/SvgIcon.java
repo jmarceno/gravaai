@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -31,13 +33,15 @@ import org.xml.sax.SAXException;
  * {@code matrix}). Shapes: {@code path}, {@code circle}, {@code ellipse}, {@code rect},
  * {@code line}, {@code polygon}, {@code polyline}; groups are traversed with inherited paint.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SvgIcon {
 
 	/** How a shape's fill/stroke is resolved. */
 	public enum PaintKind { NONE, CURRENT_COLOR, COLOR }
 
 	/** Immutable paint description of one shape. */
-	public record SvgPaint(PaintKind fillKind, Color fillColor, PaintKind strokeKind, Color strokeColor,
+	public record SvgPaint(PaintKind fillKind, @Nullable Color fillColor, PaintKind strokeKind, @Nullable Color strokeColor,
 			double strokeWidth, StrokeLineCap lineCap, StrokeLineJoin lineJoin, boolean evenOdd,
 			double opacity) {}
 
@@ -57,7 +61,7 @@ public final class SvgIcon {
 	private SvgIcon() {}
 
 	/** Parses SVG from a class-path style stream; the caller closes it. */
-	public static Parsed parse(InputStream in) throws IOException {
+	public static @Nullable Parsed parse(InputStream in) throws IOException {
 		try {
 			return parse(parseDocument(new InputSource(in)));
 		} catch (SAXException error) {
@@ -66,7 +70,7 @@ public final class SvgIcon {
 	}
 
 	/** Parses SVG from a string. */
-	public static Parsed parse(String xml) throws IOException {
+	public static @Nullable Parsed parse(String xml) throws IOException {
 		try {
 			return parse(parseDocument(new InputSource(new StringReader(xml))));
 		} catch (SAXException error) {
@@ -75,10 +79,10 @@ public final class SvgIcon {
 	}
 
 	/** One hardened factory for every icon parse; a DocumentBuilder per thread. */
-	private static final DocumentBuilderFactory FACTORY = createFactory();
+	private static final @Nullable DocumentBuilderFactory FACTORY = createFactory();
 	private static final ThreadLocal<DocumentBuilder> BUILDERS = ThreadLocal.withInitial(SvgIcon::newBuilder);
 
-	private static DocumentBuilderFactory createFactory() {
+	private static @Nullable DocumentBuilderFactory createFactory() {
 		try {
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -91,7 +95,7 @@ public final class SvgIcon {
 		}
 	}
 
-	private static DocumentBuilder newBuilder() {
+	private static @Nullable DocumentBuilder newBuilder() {
 		try {
 			return FACTORY.newDocumentBuilder();
 		} catch (ParserConfigurationException error) {
@@ -99,13 +103,13 @@ public final class SvgIcon {
 		}
 	}
 
-	private static Document parseDocument(InputSource source) throws SAXException, IOException {
+	private static @Nullable Document parseDocument(InputSource source) throws SAXException, IOException {
 		DocumentBuilder builder = BUILDERS.get();
 		builder.reset();
 		return builder.parse(source);
 	}
 
-	private static Parsed parse(Document document) {
+	private static @Nullable Parsed parse(Document document) {
 		Element root = document.getDocumentElement();
 		if (root == null || !root.getTagName().equalsIgnoreCase("svg")) {
 			throw new IllegalArgumentException("Not an SVG document: " + (root == null ? "null" : root.getTagName()));
@@ -117,7 +121,7 @@ public final class SvgIcon {
 		return new Parsed(viewBox[0], viewBox[1], viewBox[2], viewBox[3], List.copyOf(shapes));
 	}
 
-	private static double[] parseViewBox(Element root) {
+	private static @Nullable double[] parseViewBox(Element root) {
 		String viewBox = attr(root, "viewBox");
 		if (viewBox != null) {
 			String[] parts = viewBox.trim().split("[\\s,]+");
@@ -156,7 +160,7 @@ public final class SvgIcon {
 	}
 
 	/** Converts an SVG shape element to SVG path data; returns null when the shape is unusable. */
-	public static String pathData(String element, Element shape) {
+	public static @Nullable String pathData(String element, Element shape) {
 		switch (element) {
 			case "path" -> {
 				String d = attr(shape, "d");
@@ -309,7 +313,7 @@ public final class SvgIcon {
 	}
 
 	/** A parsed paint value: kind plus explicit colour (null for currentColor/none). */
-	public record PaintValue(PaintKind kind, Color color) {}
+	public record PaintValue(PaintKind kind, @Nullable Color color) {}
 
 	/** SVG paint value: currentColor, none, #hex, rgb()/rgba(), or a var() with fallback. */
 	public static PaintValue paintValue(String raw) {
@@ -333,12 +337,12 @@ public final class SvgIcon {
 		return new PaintValue(PaintKind.COLOR, Color.BLACK);
 	}
 
-	private static Color withAlpha(Color color, double alpha) {
+	private static Color withAlpha(@Nullable Color color, double alpha) {
 		return new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, Math.min(1, alpha)));
 	}
 
 	/** All transform functions in a {@code transform="..."} attribute, in order. */
-	public static List<SvgTransform> parseTransforms(String raw) {
+	public static List<SvgTransform> parseTransforms(@Nullable String raw) {
 		if (raw == null || raw.isBlank()) {
 			return List.of();
 		}
@@ -410,7 +414,7 @@ public final class SvgIcon {
 		return text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
 	}
 
-	private static String attr(Element element, String name) {
+	private static @Nullable String attr(Element element, String name) {
 		return element.hasAttribute(name) ? element.getAttribute(name) : null;
 	}
 

@@ -1,5 +1,7 @@
 package dev.gravaai.app.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
@@ -47,7 +49,7 @@ public final class MeetingHosts {
 	}
 
 	private static void show(Region content, String title, double width, double height,
-			Runnable onShown) {
+			@Nullable Runnable onShown) {
 		Stage stage = new Stage();
 		stage.setTitle(title);
 		Scene scene = new Scene(new KitRoot(content), width, height);

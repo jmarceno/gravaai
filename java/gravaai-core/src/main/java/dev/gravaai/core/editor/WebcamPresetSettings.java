@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.WebcamCorner;
@@ -11,25 +13,27 @@ import tools.jackson.databind.node.ObjectNode;
  * The reusable part of the webcam settings stored in an editor preset: the imported media
  * attachment ({@code sourcePath}, {@code visibleRanges}) is deliberately left out.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record WebcamPresetSettings(
 		boolean enabled,
-		long timeOffsetMs,
-		boolean mirror,
-		CropRegion cropRegion,
-		WebcamCorner corner,
-		WebcamPositionPreset positionPreset,
-		double positionX,
-		double positionY,
+		@Nullable long timeOffsetMs,
+		@Nullable boolean mirror,
+		@Nullable CropRegion cropRegion,
+		@Nullable WebcamCorner corner,
+		@Nullable WebcamPositionPreset positionPreset,
+		@Nullable double positionX,
+		@Nullable double positionY,
 		double size,
-		double width,
-		double height,
-		boolean reactToZoom,
-		double roundness,
-		Double cornerRadius,
-		double shadow,
-		double margin) {
+		@Nullable double width,
+		@Nullable double height,
+		@Nullable boolean reactToZoom,
+		@Nullable double roundness,
+		@Nullable Double cornerRadius,
+		@Nullable double shadow,
+		@Nullable double margin) {
 
-	public static WebcamPresetSettings from(WebcamOverlaySettings webcam) {
+	public static WebcamPresetSettings from(@Nullable WebcamOverlaySettings webcam) {
 		return new WebcamPresetSettings(webcam.enabled(), webcam.timeOffsetMs(), webcam.mirror(),
 				webcam.cropRegion(), webcam.corner(), webcam.positionPreset(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),

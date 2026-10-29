@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -29,7 +31,7 @@ public enum KeystrokeOverlayPosition {
 		return BOTTOM_CENTER;
 	}
 
-	public static KeystrokeOverlayPosition fromWireOrNull(String value) {
+	public static @Nullable KeystrokeOverlayPosition fromWireOrNull(String value) {
 		for (KeystrokeOverlayPosition position : values()) {
 			if (position.wire.equals(value)) {
 				return position;

@@ -1,5 +1,7 @@
 package dev.gravaai.media.capture;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -17,6 +19,8 @@ import dev.gravaai.media.ffmpeg.gen.AVStream;
 import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
 
 /** libavdevice v4l2 implementation of {@link WebcamCapture} (plan §5.6.6). */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class V4l2WebcamCapture implements WebcamCapture {
 
 	private static final System.Logger LOG = System.getLogger(V4l2WebcamCapture.class.getName());
@@ -41,9 +45,9 @@ final class V4l2WebcamCapture implements WebcamCapture {
 	private final MemorySegment sourceStrideArray;
 	private final MemorySegment convertBuffer;
 	private final int videoStreamIndex;
-	private MemorySegment swsContext;
+	private @Nullable MemorySegment swsContext;
 	private MemorySegment convertDataArray;
-	private WebcamFormat format;
+	private @Nullable WebcamFormat format;
 	private long frameCount;
 	private boolean closed;
 
@@ -189,7 +193,7 @@ final class V4l2WebcamCapture implements WebcamCapture {
 	}
 
 	private static OpenResult attemptOpen(Arena arena, MemorySegment inputFormat, String devicePath,
-			int width, int height, int fps, String inputFormatName) {
+			int width, int height, int fps, @Nullable String inputFormatName) {
 		MemorySegment optionsPtr = arena.allocate(ValueLayout.ADDRESS);
 		optionsPtr.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL);
 		try {
@@ -234,7 +238,7 @@ final class V4l2WebcamCapture implements WebcamCapture {
 	}
 
 	@Override
-	public WebcamFormat format() {
+	public @Nullable WebcamFormat format() {
 		return format;
 	}
 

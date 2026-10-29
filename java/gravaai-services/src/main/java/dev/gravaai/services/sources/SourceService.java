@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -21,12 +23,14 @@ import dev.gravaai.services.recording.RecordingPaths;
  * (plan §2), so Electron's {@code desktopCapturer} enumeration and the macOS/Windows branches are
  * not ported (plan §2.3).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SourceService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.sources");
 
 	/** {@code SourceListPickResult} of {@code pick-capture-target}. */
-	public record PickResult(boolean success, boolean canceled, String message, SelectedSource source) {
+	public record PickResult(boolean success, boolean canceled, @Nullable String message, @Nullable SelectedSource source) {
 
 		public static PickResult picked(SelectedSource source) {
 			return new PickResult(true, false, null, source);
@@ -64,8 +68,8 @@ public final class SourceService {
 	private final SourceSelectorUi sourceSelectorUi;
 	private final List<Consumer<SelectedSource>> selectedSourceListeners = new CopyOnWriteArrayList<>();
 
-	private volatile SelectedSource selectedSource;
-	private CacheEntry sourceListCache;
+	private volatile @Nullable SelectedSource selectedSource;
+	private @Nullable CacheEntry sourceListCache;
 
 	public SourceService(
 			Map<String, String> env,

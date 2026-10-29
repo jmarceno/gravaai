@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Port of {@code src/components/video-editor/videoPlayback/motionSmoothing.ts}: the damped
  * harmonic oscillator used for zoom and cursor smoothing, plus the smoothing-factor → spring
@@ -9,6 +11,8 @@ package dev.gravaai.media.compose;
  * damped and overdamped regimes, the overshoot guard for ζ ≥ 1, the forward-difference
  * analytical velocity and both configuration curves.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SpringSmoothing {
 
 	private static final double CURSOR_SMOOTHING_MIN = 0;
@@ -47,8 +51,8 @@ public final class SpringSmoothing {
 	}
 
 	/** Optional cursor spring tuning multipliers (TS {@code CursorSpringTuning}). */
-	public record CursorSpringTuning(Double stiffnessMultiplier, Double dampingMultiplier,
-			Double massMultiplier) {
+	public record CursorSpringTuning(@Nullable Double stiffnessMultiplier, @Nullable Double dampingMultiplier,
+			@Nullable Double massMultiplier) {
 
 		/** No tuning. */
 		public static final CursorSpringTuning NONE = new CursorSpringTuning(null, null, null);
@@ -95,7 +99,7 @@ public final class SpringSmoothing {
 		return Math.min(80, Math.max(1, deltaMs));
 	}
 
-	private static double clampSpringMultiplier(Double value) {
+	private static double clampSpringMultiplier(@Nullable Double value) {
 		if (value == null || !Double.isFinite(value)) {
 			return 1;
 		}

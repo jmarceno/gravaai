@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.core.project.ClipRegion;
@@ -17,11 +19,11 @@ import dev.gravaai.core.project.ClipRegion;
  */
 public record PlaybackMedia(
 		String videoPath,
-		String webcamPath,
+		@Nullable String webcamPath,
 		long webcamTimeOffsetMs,
 		List<ClipRegion> clips,
 		long sourceDurationMs,
-		List<WebcamSync.WebcamRange> webcamVisibleRanges) {
+		@Nullable List<WebcamSync.WebcamRange> webcamVisibleRanges) {
 
 	public PlaybackMedia {
 		if (videoPath == null || videoPath.isBlank()) {

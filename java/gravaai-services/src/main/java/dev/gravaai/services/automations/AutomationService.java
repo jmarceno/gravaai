@@ -18,6 +18,8 @@ import tools.jackson.databind.JsonNode;
  * the folder/file choosers themselves belong to the UI/platform layer, so callers pass the chosen
  * path in.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutomationService implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");

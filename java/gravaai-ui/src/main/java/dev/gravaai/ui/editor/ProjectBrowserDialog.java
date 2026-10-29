@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.File;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -36,7 +38,7 @@ public final class ProjectBrowserDialog {
 
 	/** One saved project ({@code ProjectLibraryEntry} subset the browser needs). */
 	public record Entry(
-			Path path, String name, long updatedAt, Path thumbnailPath, boolean current) {}
+			Path path, String name, long updatedAt, @Nullable Path thumbnailPath, boolean current) {}
 
 	private final Popover popover;
 	private final Consumer<Path> onOpenProject;

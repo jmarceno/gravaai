@@ -21,6 +21,8 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * API transcription, ported from electron/ipc/meeting/apiTranscription.ts. Upload size limits
  * rule out long meetings in one request, so audio is cut into speech-quality mono MP3 chunks.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ApiTranscription {
 
 	/**

@@ -1,5 +1,7 @@
 package dev.gravaai.app.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +59,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>This class runs on the dispatcher's worker threads, never on the FX thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private static final int MAX_FRAMES = 9;
@@ -76,11 +80,11 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	/** Rev tracking: one seeded counter per editor session, bumped by every store change. */
 	private final Object revLock = new Object();
-	private EditorSession trackedSession;
+	private @Nullable EditorSession trackedSession;
 	private long revBase;
 	private long revCount;
-	private AutoCloseable revSubscription;
-	private EditorSession sourceSession;
+	private @Nullable AutoCloseable revSubscription;
+	private @Nullable EditorSession sourceSession;
 	private long sourceDurationMs = -1;
 
 	/** AI checkpoints for {@code revert_ai} (full project state, unlike Ctrl+Z's timeline arrays). */
@@ -107,7 +111,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	/** P3.2b seam: the export controller for the {@code job} export tool. */
-	ProjectExporter exporter() {
+	@Nullable ProjectExporter exporter() {
 		return exporter == null ? null : exporter.get();
 	}
 
@@ -422,7 +426,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	// ── project ─────────────────────────────────────────────────────────────────────────────
 
-	private String project(EditorSession session, JsonNode args) {
+	private String project(@Nullable EditorSession session, JsonNode args) {
 		String action = args != null && args.path("action").isString()
 				? args.path("action").asString() : "";
 		String path = args != null && args.path("path").isString() ? args.path("path").asString()
@@ -450,7 +454,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		return "Closed the project. The app is back on the dashboard.";
 	}
 
-	private String openOrCreate(EditorSession session, JsonNode args, String action, String path,
+	private @Nullable String openOrCreate(EditorSession session, JsonNode args, String action, @Nullable String path,
 			boolean force) {
 		if (path == null || path.isBlank()) {
 			throw new AgentDispatcher.AgentDispatchError(
@@ -491,7 +495,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	/** Waits (off the FX thread) until the app hosts the session for {@code target}. */
-	private EditorSession awaitSession(EditorSession previous, Path target) {
+	private @Nullable EditorSession awaitSession(EditorSession previous, Path target) {
 		long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20);
 		while (System.nanoTime() < deadline) {
 			EditorSession current = activeEditor.get();
@@ -755,13 +759,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		return ProjectDocument.writeEditor(state, Json.nodeFactory().objectNode());
 	}
 
-	private static ObjectNode text(String value) {
+	private static @Nullable ObjectNode text(String value) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("text", value);
 		return node;
 	}
 
-	private static Double number(JsonNode args, String key) {
+	private static @Nullable Double number(JsonNode args, String key) {
 		if (args == null) {
 			return null;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +25,8 @@ import javafx.scene.paint.Stop;
  * the thumbnails generated into {@code resources/ui/editor/wallpapers/} (a 160x120 {@code thumbs/}
  * and a 1280x720 {@code previews/} copy of each built-in image).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorWallpapers {
 
 	/** One wallpaper tile. */
@@ -94,7 +98,7 @@ public final class EditorWallpapers {
 	}
 
 	/** {@code isVideoWallpaperSource}. */
-	public static boolean isVideoWallpaper(String value) {
+	public static boolean isVideoWallpaper(@Nullable String value) {
 		return dev.gravaai.media.compose.Background.isVideoWallpaper(value);
 	}
 
@@ -104,17 +108,17 @@ public final class EditorWallpapers {
 	}
 
 	/** Hex colour values (the Color tab and the click-effect palette). */
-	public static boolean isHexColor(String value) {
+	public static boolean isHexColor(@Nullable String value) {
 		return value != null && HEX.matcher(value.trim()).matches();
 	}
 
 	/** The CSS gradient list contains this value. */
-	public static boolean isGradient(String value) {
+	public static boolean isGradient(@Nullable String value) {
 		return value != null && GRADIENTS.contains(value);
 	}
 
 	/** Background tab for a wallpaper value. */
-	public static String tabFor(String value) {
+	public static String tabFor(@Nullable String value) {
 		if (isGradient(value)) {
 			return "gradient";
 		}
@@ -128,7 +132,7 @@ public final class EditorWallpapers {
 	}
 
 	/** Thumbnail image for a wallpapers/ path; null for colours/gradients/custom files. */
-	public static Image thumbnail(String value) {
+	public static @Nullable Image thumbnail(String value) {
 		if (!isBundledWallpaper(value)) {
 			return null;
 		}
@@ -136,21 +140,21 @@ public final class EditorWallpapers {
 	}
 
 	/** Preview-resolution image (1280x720) for the preview stage. */
-	public static Image preview(String value) {
+	public static @Nullable Image preview(String value) {
 		if (!isBundledWallpaper(value)) {
 			return null;
 		}
 		return load("/ui/editor/wallpapers/previews/" + fileName(value));
 	}
 
-	private static String fileName(String value) {
+	private static @Nullable String fileName(String value) {
 		String[] parts = value.split("/");
 		String name = parts[parts.length - 1];
 		// Video wallpapers use a poster frame (WallpaperVideoPreview shows the first frame).
 		return isVideoWallpaper(name) ? name.replaceFirst("\\.[^.]+$", ".jpg") : name;
 	}
 
-	private static Image load(String resource) {
+	private static @Nullable Image load(String resource) {
 		try (InputStream in = EditorWallpapers.class.getResourceAsStream(resource)) {
 			return in == null ? null : new Image(in);
 		} catch (Exception error) {
@@ -159,7 +163,7 @@ public final class EditorWallpapers {
 	}
 
 	/** Parses a colour or CSS gradient; falls back to the given colour for images/custom files. */
-	public static Paint paintFor(String value, Color fallback) {
+	public static Paint paintFor(@Nullable String value, Color fallback) {
 		if (isHexColor(value)) {
 			return Color.web(value.trim());
 		}
@@ -259,7 +263,7 @@ public final class EditorWallpapers {
 		return parts;
 	}
 
-	private static Color parseColor(String value) {
+	private static @Nullable Color parseColor(String value) {
 		Matcher hex = HEX.matcher(value);
 		if (hex.find()) {
 			return Color.web(hex.group());

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -113,7 +115,7 @@ public interface EditorViewActions {
 
 	// ---- Announcements (bundled/remote feeds + dismissal/impression state) ----
 
-	default Announcements.Feed bundledAnnouncements() {
+	default Announcements.@Nullable Feed bundledAnnouncements() {
 		return Announcements.bundledFeed();
 	}
 
@@ -208,6 +210,6 @@ public interface EditorViewActions {
 	default void openRecordingsFolder() {}
 
 	/** The {@code addToTimeline} outcome the app reports back to the Clips panel. */
-	record ClipImportResult(boolean success, int completed, String error, boolean cancelled) {
+	record ClipImportResult(boolean success, int completed, @Nullable String error, boolean cancelled) {
 	}
 }

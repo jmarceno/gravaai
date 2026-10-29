@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -30,6 +32,8 @@ import io.github.humbleui.skija.svg.SVGDOM;
  * anchor, {@code tahoe-inverted} inverts the Tahoe set, and {@code dot}/{@code figma} build their
  * single style asset. Assets are decoded once per process and shared (raster images, read-only).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class CursorAssets {
 
 	/** One loaded cursor image: {@code LoadedCursorAsset}. */
@@ -85,7 +89,7 @@ final class CursorAssets {
 	}
 
 	/** Whether {@code style} draws per-cursor-type sprites ({@code isStatefulCursorStyle}). */
-	static boolean isStateful(CursorStyle style) {
+	static @Nullable boolean isStateful(CursorStyle style) {
 		return style == CursorStyle.MACOS || style == CursorStyle.TAHOE
 				|| style == CursorStyle.TAHOE_INVERTED || style == CursorStyle.WINDOWS11;
 	}
@@ -95,7 +99,7 @@ final class CursorAssets {
 	 * (the TS {@code spriteKey}), single styles use their style asset, and cursor-pack styles
 	 * without loaded packs fall back to the Tahoe set (the TS warning path).
 	 */
-	Asset resolve(CursorStyle style, String cursorType) {
+	@Nullable Asset resolve(CursorStyle style, String cursorType) {
 		if (style.isSingleCursorStyle()) {
 			return styleAssets.get(style);
 		}
@@ -168,7 +172,7 @@ final class CursorAssets {
 	// ---- createRasterizedCursorAsset ------------------------------------------------------
 
 	/** Unpremultiplied RGBA pixels of one rasterised cursor. */
-	private record Pixels(int width, int height, byte[] rgba) {
+	private record Pixels(int width, int height, @Nullable byte[] rgba) {
 	}
 
 	private static Asset rasterize(Source source) {
@@ -269,7 +273,7 @@ final class CursorAssets {
 		}
 	}
 
-	private static void drawEmbedded(Canvas canvas, Image image, float[] box, Paint paint) {
+	private static void drawEmbedded(Canvas canvas, @Nullable Image image, @Nullable float[] box, @Nullable Paint paint) {
 		canvas.drawImageRect(image, io.github.humbleui.types.Rect.makeWH(image.getWidth(),
 				image.getHeight()), io.github.humbleui.types.Rect.makeXYWH(box[0], box[1], box[2],
 				box[3]), new io.github.humbleui.skija.FilterMipmap(
@@ -311,7 +315,7 @@ final class CursorAssets {
 		return new double[] {300, 150};
 	}
 
-	private static Double cssLength(String value) {
+	private static @Nullable Double cssLength(String value) {
 		String trimmed = value.trim();
 		try {
 			if (trimmed.endsWith("pt")) {

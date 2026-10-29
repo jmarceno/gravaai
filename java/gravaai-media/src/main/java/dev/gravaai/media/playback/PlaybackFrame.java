@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.media.compose.RgbaFrame;
 
 /**
@@ -20,10 +22,10 @@ import dev.gravaai.media.compose.RgbaFrame;
 public record PlaybackFrame(
 		long frameIndex,
 		double timelineSeconds,
-		Double sourceSeconds,
-		String clipId,
-		RgbaFrame sourceFrame,
-		RgbaFrame webcamFrame,
+		@Nullable Double sourceSeconds,
+		@Nullable String clipId,
+		@Nullable RgbaFrame sourceFrame,
+		@Nullable RgbaFrame webcamFrame,
 		boolean webcamVisible) {
 
 	public PlaybackFrame {

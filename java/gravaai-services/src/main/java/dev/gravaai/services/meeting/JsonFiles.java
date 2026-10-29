@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +29,8 @@ import tools.jackson.databind.json.JsonMapper;
  * (transcript.md / notes.md / meeting.json next to a recording) is written by the meeting service
  * and asserted byte-for-byte in tests, so it owns this small helper.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class JsonFiles {
 
 	private static final ObjectMapper MAPPER = JsonMapper.shared();
@@ -44,12 +48,12 @@ public final class JsonFiles {
 	}
 
 	/** {@code JSON.stringify(value, null, 2)}: two-space indent, no space before the colon. */
-	public static String pretty(Object value) {
+	public static @Nullable String pretty(Object value) {
 		return PRETTY.writeValueAsString(value);
 	}
 
 	/** Parses a UTF-8 JSON file; tolerates a BOM; null when it is missing, empty or invalid. */
-	public static JsonNode readTreeOrNull(Path file) {
+	public static @Nullable JsonNode readTreeOrNull(Path file) {
 		try {
 			String text = Files.readString(file, StandardCharsets.UTF_8);
 			if (text.startsWith("\uFEFF")) {

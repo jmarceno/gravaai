@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -29,10 +31,12 @@ import io.github.humbleui.types.Rect;
  * Known differences from the Electron reference: system fonts instead of bundled SF Pro (glyph
  * metrics differ until DM Sans/custom fonts land), and rounded boxes are drawn square.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AnnotationRenderer {
 
 	/** Camera transform applied to annotation rects. */
-	record Transform(double scale, double x, double y) {
+	@Nullable record Transform(double scale, double x, double y) {
 		static final Transform IDENTITY = new Transform(1, 0, 0);
 	}
 
@@ -45,7 +49,7 @@ final class AnnotationRenderer {
 	private static final double[][] ARROW_DOWN_RIGHT = {{25, 25, 75, 75}, {75, 75, 70, 60}, {75, 75, 60, 70}};
 	private static final double[][] ARROW_DOWN_LEFT = {{75, 25, 25, 75}, {25, 75, 30, 60}, {25, 75, 40, 70}};
 
-	private AnnotationRenderer() {
+	@Nullable private AnnotationRenderer() {
 	}
 
 	static void draw(Canvas canvas, List<AnnotationSpec> annotations, long timeMs,
@@ -133,7 +137,7 @@ final class AnnotationRenderer {
 		}
 	}
 
-	private static Font resolveFont(AnnotationSpec.TextStyle style, float size) {
+	private static @Nullable Font resolveFont(AnnotationSpec.TextStyle style, float size) {
 		// Text style weight/style maps onto the bundled DM Sans faces (reference SF Pro substitute).
 		CompositorFonts.Face face = style.bold() && style.italic()
 				? CompositorFonts.Face.BOLD_ITALIC
@@ -143,7 +147,7 @@ final class AnnotationRenderer {
 		return CompositorFonts.font(face, size);
 	}
 
-	private static String firstFamily(String fontFamily) {
+	private static @Nullable String firstFamily(String fontFamily) {
 		if (fontFamily == null || fontFamily.isBlank()) {
 			return null;
 		}
@@ -154,7 +158,7 @@ final class AnnotationRenderer {
 		return first.isBlank() ? null : first;
 	}
 
-	private static List<String> wrapLines(Font font, String content, float availableWidth) {
+	private static @Nullable List<String> wrapLines(Font font, @Nullable String content, float availableWidth) {
 		List<String> lines = new ArrayList<>();
 		for (String rawLine : content.split("\n", -1)) {
 			if (rawLine.isEmpty()) {
@@ -295,7 +299,7 @@ final class AnnotationRenderer {
 		canvas.restore();
 	}
 
-	private static double[][] arrowSegments(String direction) {
+	private static double[][] arrowSegments(@Nullable String direction) {
 		if (direction == null) {
 			return null;
 		}
@@ -312,7 +316,7 @@ final class AnnotationRenderer {
 		};
 	}
 
-	private static byte[] decodeDataUri(String source) {
+	private static @Nullable byte[] decodeDataUri(@Nullable String source) {
 		if (source == null || source.isBlank()) {
 			return null;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,19 +13,21 @@ import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.FigureData;
 
 /** The {@code useAnnotationRegionCommands} operations, one class per command. */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AnnotationCommands {
 
 	/** Partial style update: only non-null components are merged into the region style. */
 	public record StylePatch(
 			String color,
 			String backgroundColor,
-			Double fontSize,
+			@Nullable Double fontSize,
 			String fontFamily,
 			AnnotationTextStyle.FontWeight fontWeight,
 			AnnotationTextStyle.FontStyle fontStyle,
 			AnnotationTextStyle.TextDecoration textDecoration,
 			AnnotationTextStyle.TextAlign textAlign,
-			Double borderRadius) {}
+			@Nullable Double borderRadius) {}
 
 	private AnnotationCommands() {}
 
@@ -32,9 +36,9 @@ public final class AnnotationCommands {
 	}
 
 	private static AnnotationRegion withRegion(AnnotationRegion region, long startMs, long endMs,
-			Integer trackIndex, String content, String textContent, String imageContent,
-			AnnotationPosition position, AnnotationSize size, AnnotationTextStyle style,
-			FigureData figureData, Double blurIntensity, String blurColor) {
+			@Nullable Integer trackIndex, @Nullable String content, @Nullable String textContent, @Nullable String imageContent,
+			@Nullable AnnotationPosition position, @Nullable AnnotationSize size, @Nullable AnnotationTextStyle style,
+			@Nullable FigureData figureData, @Nullable Double blurIntensity, @Nullable String blurColor) {
 		return new AnnotationRegion(region.id(), startMs, endMs, region.type(), content,
 				textContent, imageContent, position, size, style, region.zIndex(),
 				trackIndex != null ? trackIndex : region.trackIndex(), figureData,

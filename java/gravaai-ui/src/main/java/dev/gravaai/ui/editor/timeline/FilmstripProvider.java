@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.scene.image.Image;
 
 /**
@@ -16,6 +18,8 @@ import javafx.scene.image.Image;
  * times so a small number of thumbnails covers the strip. The view also caches by
  * {@code (clipId, quantized source time, thumbnail size)}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public interface FilmstripProvider {
 
 	/** A cached thumbnail for the timeline time, or {@code null} when it is not ready yet. */
@@ -31,12 +35,12 @@ public interface FilmstripProvider {
 	}
 
 	/** Sample-time quantum in milliseconds (default React-like 250 ms steps). */
-	default double quantumMs() {
+	default @Nullable double quantumMs() {
 		return 250;
 	}
 
 	/** Provider with no frames: the view keeps the placeholder filmstrip cells. */
-	static FilmstripProvider empty() {
+	static @Nullable FilmstripProvider empty() {
 		return (clipId, timelineTimeMs, thumbWidth, thumbHeight) -> null;
 	}
 }

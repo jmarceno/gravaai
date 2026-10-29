@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions.canvas;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +60,7 @@ public final class CanvasGradient {
 	}
 
 	/** The Skija shader for the current stops, or null when fewer than two are usable. */
-	Shader shader() {
+	@Nullable Shader shader() {
 		if (stops.size() < 2) {
 			return null;
 		}

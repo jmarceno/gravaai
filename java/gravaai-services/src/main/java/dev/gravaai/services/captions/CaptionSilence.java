@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,7 +34,7 @@ public final class CaptionSilence {
 	}
 
 	/** Options for {@link #resegmentCuesBySilence}; null components use the defaults. */
-	public record ResegmentOptions(Long splitSilenceMs, Long edgePadMs, Long minSpeechMs) {
+	public record ResegmentOptions(@Nullable Long splitSilenceMs, @Nullable Long edgePadMs, @Nullable Long minSpeechMs) {
 		public static ResegmentOptions defaults() {
 			return new ResegmentOptions(null, null, null);
 		}

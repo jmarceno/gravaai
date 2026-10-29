@@ -1,5 +1,7 @@
 package dev.gravaai.ui.overlays;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.application.Platform;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.Region;
@@ -25,7 +27,7 @@ public final class AreaRecordingBorder {
 	/** {@code const outset = 3} in windows.ts. */
 	private static final double OUTSET = 3;
 
-	private Stage stage;
+	private @Nullable Stage stage;
 
 	/** Shows (or moves) the border for an area; call on the JavaFX application thread. */
 	public void show(CaptureArea area) {

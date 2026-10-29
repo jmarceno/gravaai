@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -18,10 +20,10 @@ import java.util.List;
  */
 public record CosmicShortcutEntry(
 		List<String> modifiers,
-		String key,
-		String description,
+		@Nullable String key,
+		@Nullable String description,
 		String action,
-		String spawnCommand,
+		@Nullable String spawnCommand,
 		int start,
 		int end,
 		int valueEnd,

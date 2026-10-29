@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 
 import dev.gravaai.media.compose.Background;
@@ -19,12 +21,14 @@ import dev.gravaai.media.compose.RgbaFrame;
  * <p>Only one producer (the engine's render thread) and one consumer (the {@code gl-preview}
  * thread) are expected, matching {@code PlaybackController.onFrame}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PreviewFrameQueue {
 
 	private final Object lock = new Object();
 	private final Slot[] slots = {new Slot(), new Slot()};
-	private Slot rendering;
-	private Slot pending;
+	private @Nullable Slot rendering;
+	private @Nullable Slot pending;
 	private long submittedCount;
 	private long drawnCount;
 
@@ -42,7 +46,7 @@ public final class PreviewFrameQueue {
 	}
 
 	/** The latest submitted copy, or null when nothing new; call {@link #finishRendering()} after. */
-	public FrameInput pollLatest() {
+	public @Nullable FrameInput pollLatest() {
 		synchronized (lock) {
 			if (pending == null) {
 				return null;
@@ -89,8 +93,8 @@ public final class PreviewFrameQueue {
 		private ByteBuffer sourcePixels;
 		private ByteBuffer webcamPixels;
 		private ByteBuffer wallpaperPixels;
-		private RgbaFrame sourceFrame;
-		private RgbaFrame webcamFrame;
+		private @Nullable RgbaFrame sourceFrame;
+		private @Nullable RgbaFrame webcamFrame;
 		private FrameInput frame;
 
 		void copy(FrameInput input) {
@@ -114,7 +118,7 @@ public final class PreviewFrameQueue {
 					input.scene(), input.sourceTimeSeconds());
 		}
 
-		private RgbaFrame copy(RgbaFrame frame, boolean source) {
+		private @Nullable RgbaFrame copy(@Nullable RgbaFrame frame, boolean source) {
 			if (frame == null) {
 				return null;
 			}

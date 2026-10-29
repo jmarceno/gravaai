@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * What a caller reports to the engine (port of {@code AutomationEvent}).
  *
@@ -10,10 +12,10 @@ package dev.gravaai.services.automations;
 public record AutomationEvent(
 		AutomationTrigger trigger,
 		String path,
-		AutomationMediaKind kind,
-		AutomationExportFormat format,
-		String notesPath,
-		Double durationSec,
+		@Nullable AutomationMediaKind kind,
+		@Nullable AutomationExportFormat format,
+		@Nullable String notesPath,
+		@Nullable Double durationSec,
 		boolean durationSecProvided) {
 
 	public AutomationEvent {

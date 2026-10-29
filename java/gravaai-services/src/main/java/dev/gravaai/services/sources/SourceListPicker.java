@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -10,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 public final class SourceListPicker {
 
 	/** The TS result shape {@code { success, canceled?, source? }}. */
-	public record SourceListPickResult(boolean success, boolean canceled, SelectedSource source) {
+	public record SourceListPickResult(boolean success, boolean canceled, @Nullable SelectedSource source) {
 
 		public static SourceListPickResult picked(SelectedSource source) {
 			return new SourceListPickResult(true, false, source);
@@ -22,7 +24,7 @@ public final class SourceListPicker {
 	}
 
 	private final Runnable createWindow;
-	private CompletableFuture<SourceListPickResult> pending;
+	private @Nullable CompletableFuture<SourceListPickResult> pending;
 	private boolean open;
 
 	public SourceListPicker(Runnable createWindow) {

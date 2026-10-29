@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -41,7 +43,7 @@ public final class AutomationTriggers {
 	}
 
 	/** Port of {@code formatForExportPath}: only mp4 and gif exports fire the trigger. */
-	public static AutomationExportFormat formatForExportPath(String filePath) {
+	public static @Nullable AutomationExportFormat formatForExportPath(String filePath) {
 		String extension = filePath.substring(filePath.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
 		if (extension.equals("gif")) {
 			return AutomationExportFormat.GIF;

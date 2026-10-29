@@ -1,5 +1,7 @@
 package dev.gravaai.ui.windows;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.platform.x11.X11Bridge;
 import java.util.Optional;
 import javafx.application.Platform;
@@ -18,7 +20,7 @@ public final class X11Windows {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.x11");
 
-	private static X11Bridge bridge;
+	private static @Nullable X11Bridge bridge;
 	private static boolean bridgeTried;
 
 	private X11Windows() {

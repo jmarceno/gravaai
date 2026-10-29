@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -16,6 +18,8 @@ import dev.gravaai.media.compose.RgbaFrame;
  * <p>Only one consumer calls {@link #frameAt} (the playback render thread); the returned
  * {@link RgbaFrame} stays valid until the next {@link #frameAt} call.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class DecoderFrameSource implements FrameSource {
 
 	/** Default ring depth (plan §5.9: 3-6 frames per source). */
@@ -34,17 +38,17 @@ public final class DecoderFrameSource implements FrameSource {
 
 	/** The decoder is opened inside the worker so FFM arenas belong to the decode thread. */
 	private final Supplier<VideoFrameDecoder> decoderSupplier;
-	private final Double durationOverrideSeconds;
+	private final @Nullable Double durationOverrideSeconds;
 	/** Written by the worker, read by {@link #durationSeconds} on consumer threads. */
-	private volatile VideoFrameDecoder decoder;
+	private volatile @Nullable VideoFrameDecoder decoder;
 	private final int ringCapacity;
 	private final Object lock = new Object();
 	private final Deque<VideoFrame> ring = new ArrayDeque<>();
 	private final Thread worker;
 	private boolean closed;
 	private boolean eof;
-	private RuntimeException failure;
-	private Double seekRequest;
+	private @Nullable RuntimeException failure;
+	private @Nullable Double seekRequest;
 	/** True while the worker is inside decoder.seek()+next(): consumers must not queue another. */
 	private boolean seekInProgress;
 	private long lastReturnedPtsUs = -1;
@@ -57,13 +61,13 @@ public final class DecoderFrameSource implements FrameSource {
 	private long framesDecoded;
 	private long firstSeekStartedNanos = -1;
 	private boolean profiledFirstFrame;
-	private VideoFrame lastReturned;
+	private @Nullable VideoFrame lastReturned;
 
 	private DecoderFrameSource(
 			Supplier<VideoFrameDecoder> decoderSupplier,
-			Double durationOverrideSeconds,
+			@Nullable Double durationOverrideSeconds,
 			int ringCapacity,
-			VideoFrameDecoder preOpenedDecoder) {
+			@Nullable VideoFrameDecoder preOpenedDecoder) {
 		this.decoderSupplier = decoderSupplier;
 		this.decoder = preOpenedDecoder;
 		this.durationOverrideSeconds = durationOverrideSeconds != null
@@ -272,13 +276,13 @@ public final class DecoderFrameSource implements FrameSource {
 	}
 
 	@Override
-	public RgbaFrame frameAt(double sourceSeconds) {
+	public @Nullable RgbaFrame frameAt(double sourceSeconds) {
 		return frameAt(sourceSeconds, MAX_WAIT_MS);
 	}
 
 	/** Frame with an explicit wait budget (first frame/seek paths can fail fast). */
 	@Override
-	public RgbaFrame frameAt(double sourceSeconds, long timeoutMs) {
+	public @Nullable RgbaFrame frameAt(double sourceSeconds, long timeoutMs) {
 		long requestedUs = Math.max(0, Math.round((Double.isFinite(sourceSeconds) ? sourceSeconds : 0) * 1_000_000));
 		double knownDuration = durationSeconds();
 		if (knownDuration > 0) {
@@ -389,7 +393,7 @@ public final class DecoderFrameSource implements FrameSource {
 		}
 	}
 
-	private static void releaseFrameLocked(VideoFrame frame) {
+	private static void releaseFrameLocked(@Nullable VideoFrame frame) {
 		if (frame != null) {
 			frame.release();
 		}

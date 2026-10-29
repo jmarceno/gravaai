@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Raw input a capture-picker window reports, before validation. Mirrors the untyped
  * {@code unknown} input of {@code normalizeCapturePick} in {@code electron/ipc/sourceArea.ts}; nullable
@@ -7,11 +9,11 @@ package dev.gravaai.services.sources;
  */
 public record CapturePickRequest(
 		String kind,
-		Double x,
-		Double y,
-		Double width,
-		Double height,
-		String windowId,
-		Integer displayId,
+		@Nullable Double x,
+		@Nullable Double y,
+		@Nullable Double width,
+		@Nullable Double height,
+		@Nullable String windowId,
+		@Nullable Integer displayId,
 		boolean record) {
 }

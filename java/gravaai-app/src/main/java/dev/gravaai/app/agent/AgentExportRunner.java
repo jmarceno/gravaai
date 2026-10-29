@@ -1,5 +1,7 @@
 package dev.gravaai.app.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -33,6 +35,8 @@ import tools.jackson.databind.node.ObjectNode;
  * publishing. It runs on a background thread, so the MCP call returns at once and the dispatcher's
  * {@code job wait} polls progress.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentExportRunner {
 
 	/** What the job reports back to the agent registry on success. */
@@ -90,7 +94,7 @@ final class AgentExportRunner {
 	}
 
 	/** Exports the current editor state to {@code destination} on the calling thread. */
-	static ExportResult export(EditorSession session, ProjectExporter exporter,
+	static @Nullable ExportResult export(EditorSession session, ProjectExporter exporter,
 			JsonNode options) throws IOException {
 		Path destination = destination(options);
 		String format = format(options);
@@ -129,7 +133,7 @@ final class AgentExportRunner {
 		}
 	}
 
-	private static ExportPreferences preferences(ProjectExporter exporter, JsonNode options,
+	private static @Nullable ExportPreferences preferences(ProjectExporter exporter, JsonNode options,
 			String format) {
 		ObjectNode raw = exporter == null ? ExportPreferences.defaults().toJson()
 				: exporter.exportPreferences().toJson();
@@ -154,7 +158,7 @@ final class AgentExportRunner {
 	}
 
 	/** Same wallpaper staging as {@code ProjectExporter.stageWallpapers} (private there). */
-	private static Path stageWallpapers(String wallpaper) {
+	private static @Nullable Path stageWallpapers(@Nullable String wallpaper) {
 		if (wallpaper == null || !wallpaper.startsWith("/wallpapers/")) {
 			return null;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
@@ -31,6 +33,8 @@ import java.util.function.Consumer;
  * {@code $TMPDIR/gravaai-<uid>/control.sock} (must match gravaai-ctl). The same socket gives
  * single-instance forwarding (plan §5.1): a second launch sends its action and exits.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ControlSocket {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.shortcuts");
@@ -192,7 +196,7 @@ public final class ControlSocket {
 		private final Consumer<GlobalShortcutAction> onAction;
 		private final Runnable onShow;
 		private volatile boolean running = true;
-		private Thread acceptThread;
+		private @Nullable Thread acceptThread;
 
 		private Server(Path socketPath, ServerSocketChannel channel, Consumer<GlobalShortcutAction> onAction,
 				Runnable onShow) {
@@ -324,7 +328,7 @@ public final class ControlSocket {
 		return -1;
 	}
 
-	private static void setPermissions(Path path, String permissions) {
+	private static void setPermissions(@Nullable Path path, String permissions) {
 		try {
 			Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
 		} catch (IOException | UnsupportedOperationException error) {
@@ -340,7 +344,7 @@ public final class ControlSocket {
 		}
 	}
 
-	private static long currentUid() {
+	private static @Nullable long currentUid() {
 		try {
 			Object uid = Files.getAttribute(Path.of("/proc/self"), "unix:uid");
 			return uid instanceof Number number ? number.longValue() : 0L;
@@ -349,7 +353,7 @@ public final class ControlSocket {
 		}
 	}
 
-	private static String trimToNull(String value) {
+	private static @Nullable String trimToNull(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

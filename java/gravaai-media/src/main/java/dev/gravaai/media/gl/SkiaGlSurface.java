@@ -1,5 +1,7 @@
 package dev.gravaai.media.gl;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.humbleui.skija.BackendRenderTarget;
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ColorSpace;
@@ -93,7 +95,7 @@ public final class SkiaGlSurface implements AutoCloseable {
 	}
 
 	/** A GPU offscreen surface compatible with this one (stays on the GPU, unlike a raster one). */
-	public Surface makeOffscreen(int offscreenWidth, int offscreenHeight) {
+	public @Nullable Surface makeOffscreen(int offscreenWidth, int offscreenHeight) {
 		return surface.makeSurface(offscreenWidth, offscreenHeight);
 	}
 

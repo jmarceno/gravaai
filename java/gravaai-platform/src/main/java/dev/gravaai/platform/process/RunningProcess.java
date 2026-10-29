@@ -1,5 +1,7 @@
 package dev.gravaai.platform.process;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,6 +21,8 @@ import java.util.function.Consumer;
  * raw accessors then throw and the captured text is available in {@link ProcessResult}. In
  * {@link ProcessRunner#rawStdout() raw} mode the caller owns the stream and must consume it.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RunningProcess implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.process");
@@ -30,14 +34,14 @@ public final class RunningProcess implements AutoCloseable {
 	private final Duration timeout;
 	private final boolean rawStdout;
 	private final boolean rawStderr;
-	private final StreamCollector stdoutCollector;
-	private final StreamCollector stderrCollector;
+	private final @Nullable StreamCollector stdoutCollector;
+	private final @Nullable StreamCollector stderrCollector;
 	private final long startedAtNanos;
 	private final AtomicBoolean cancelRequested = new AtomicBoolean();
-	private ProcessResult result;
+	private @Nullable ProcessResult result;
 
-	RunningProcess(List<String> command, Process process, Duration timeout, Consumer<String> stdoutLine,
-			Consumer<String> stderrLine, boolean rawStdout, boolean rawStderr) {
+	RunningProcess(List<String> command, Process process, @Nullable Duration timeout, @Nullable Consumer<String> stdoutLine,
+			@Nullable Consumer<String> stderrLine, boolean rawStdout, boolean rawStderr) {
 		this.command = command;
 		this.process = process;
 		this.timeout = timeout;
@@ -143,7 +147,7 @@ public final class RunningProcess implements AutoCloseable {
 		return Character.toUpperCase(value.charAt(0)) + value.substring(1);
 	}
 
-	private static void join(StreamCollector collector) throws InterruptedException {
+	private static void join(@Nullable StreamCollector collector) throws InterruptedException {
 		if (collector != null) {
 			collector.join(JOIN_TIMEOUT_MILLIS);
 		}
@@ -194,7 +198,7 @@ public final class RunningProcess implements AutoCloseable {
 		private final Consumer<String> lineCallback;
 		private final StringBuilder captured = new StringBuilder();
 		private final StringBuilder currentLine = new StringBuilder();
-		private Thread thread;
+		private @Nullable Thread thread;
 
 		StreamCollector(String name, InputStream input, Consumer<String> lineCallback) {
 			this.name = name;

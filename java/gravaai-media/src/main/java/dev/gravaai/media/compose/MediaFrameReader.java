@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,21 +18,23 @@ import dev.gravaai.media.ffmpeg.VideoDecoder;
  * returned {@link RgbaFrame} uses one of two direct buffers in turn, so it stays valid until the
  * decode after next.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MediaFrameReader implements AutoCloseable {
 
 	private final Path path;
 	private final boolean video;
 	private double durationSeconds;
-	private VideoDecoder decoder;
-	private FrameConverter converter;
-	private ColourInfo colour;
+	private @Nullable VideoDecoder decoder;
+	private @Nullable FrameConverter converter;
+	private @Nullable ColourInfo colour;
 	// Two output buffers used in turn: the previous frame stays intact while the next one decodes,
 	// so the export can decode frame N+1 while the GPU still uploads frame N.
 	private final ByteBuffer[] reusableBuffers = new ByteBuffer[2];
 	private int reusableIndex;
 	private int converterWidth = -1;
 	private int converterHeight = -1;
-	private RgbaFrame lastFrame;
+	private @Nullable RgbaFrame lastFrame;
 	private long lastPtsUs;
 	private long lastEndUs;
 
@@ -40,7 +44,7 @@ public final class MediaFrameReader implements AutoCloseable {
 		this.durationSeconds = durationOverrideSeconds > 0 ? durationOverrideSeconds : 0;
 	}
 
-	public double durationSeconds() {
+	public @Nullable double durationSeconds() {
 		if (durationSeconds <= 0) {
 			try {
 				MediaInfo info = MediaProbe.probe(path);
@@ -55,7 +59,7 @@ public final class MediaFrameReader implements AutoCloseable {
 		return durationSeconds > 0 ? durationSeconds : 0;
 	}
 
-	public RgbaFrame decode(double seconds) {
+	public @Nullable RgbaFrame decode(double seconds) {
 		if (!Files.isReadable(path)) {
 			return null;
 		}
@@ -69,7 +73,7 @@ public final class MediaFrameReader implements AutoCloseable {
 	 * sequential callers (looping wallpapers, preview playback) pay one decode per source frame.
 	 * Going backwards or jumping more than a second ahead falls back to a precise seek.
 	 */
-	public RgbaFrame decodeForward(double seconds) {
+	public @Nullable RgbaFrame decodeForward(double seconds) {
 		long targetUs = Math.max(0, Math.round(seconds * 1_000_000));
 		if (lastFrame != null && targetUs >= lastPtsUs && targetUs < lastEndUs) {
 			return lastFrame;
@@ -89,7 +93,7 @@ public final class MediaFrameReader implements AutoCloseable {
 		}
 	}
 
-	private RgbaFrame convert(DecodedFrame frame) {
+	private @Nullable RgbaFrame convert(@Nullable DecodedFrame frame) {
 		if (frame == null) {
 			lastFrame = null;
 			return null;

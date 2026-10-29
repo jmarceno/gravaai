@@ -1,5 +1,7 @@
 package dev.gravaai.services.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,10 +52,12 @@ import tools.jackson.databind.JsonNode;
  * {@code width/height/frameRate} from {@link Prepared} and the production
  * {@code ProjectFrameInputFactory}, reuse it (reset() between GIF passes) and close it afterwards.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectExport {
 
 	/** Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video. */
-	public record Input(ProjectEditorState editor, Path videoPath, Path webcamPath,
+	public record Input(ProjectEditorState editor, Path videoPath, @Nullable Path webcamPath,
 			List<Path> companionAudioPaths, ExportPreferences preferences, Path destination,
 			boolean reveal, boolean overwrite, double sourceDurationSeconds) {
 		public Input {
@@ -75,7 +79,7 @@ public final class ProjectExport {
 
 	/** The assembled export, exposed for tests and for the frame-provider construction. */
 	public record Prepared(ExportCoordinator.Request request, ExportAudioPlan audioPlan,
-			CaptionSidecars.Payload captionPayload, ExportFormat format, int outputWidth,
+			CaptionSidecars.Payload captionPayload, @Nullable ExportFormat format, int outputWidth,
 			int outputHeight, int frameRate, int bitrate, double durationSeconds,
 			Path videoPath, Path webcamPath, List<Path> audioInputs) {}
 
@@ -178,7 +182,7 @@ public final class ProjectExport {
 		return clipsEnd > 0 ? clipsEnd : sourceDurationMs;
 	}
 
-	private static int validMp4FrameRate(int frameRate) {
+	private static int validMp4FrameRate(@Nullable int frameRate) {
 		for (int allowed : ExportPreferences.MP4_FRAME_RATES) {
 			if (allowed == frameRate) {
 				return frameRate;
@@ -273,7 +277,7 @@ public final class ProjectExport {
 		return ExportAudioSegments.buildEditedTrackSourceSegments(sourceDurationMs, trims, speeds);
 	}
 
-	private static Map<String, ExportAudioRouting.TrackSetting> parseTrackSettings(
+	private static @Nullable Map<String, ExportAudioRouting.TrackSetting> parseTrackSettings(
 			JsonNode settingsNode) {
 		Map<String, ExportAudioRouting.TrackSetting> settings = new LinkedHashMap<>();
 		if (settingsNode == null || !settingsNode.isObject()) {
@@ -292,7 +296,7 @@ public final class ProjectExport {
 		return settings;
 	}
 
-	private static CaptionSidecars.Payload buildCaptionPayload(ProjectEditorState editor,
+	private static CaptionSidecars.@Nullable Payload buildCaptionPayload(ProjectEditorState editor,
 			boolean include) {
 		if (!include || editor.autoCaptions() == null || editor.autoCaptions().isEmpty()) {
 			return null;

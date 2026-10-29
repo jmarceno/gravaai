@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -19,6 +21,8 @@ import tools.jackson.databind.node.ObjectNode;
  * developer motion-blur tuning are dropped exactly like {@code createProjectData} +
  * {@code stripPersistedDevMotionBlurSettings} do in the TS sources.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectDocument {
 
 	/** Every editor field this build knows; they are rewritten from the typed state on save. */
@@ -41,10 +45,10 @@ public final class ProjectDocument {
 
 	private final ObjectNode raw;
 	private final String videoPath;
-	private final String projectId;
+	private final @Nullable String projectId;
 	private final ProjectEditorState editor;
 
-	private ProjectDocument(ObjectNode raw, String videoPath, String projectId, ProjectEditorState editor) {
+	private ProjectDocument(ObjectNode raw, String videoPath, @Nullable String projectId, ProjectEditorState editor) {
 		this.raw = raw;
 		this.videoPath = videoPath;
 		this.projectId = projectId;
@@ -82,7 +86,7 @@ public final class ProjectDocument {
 		return videoPath;
 	}
 
-	public String projectId() {
+	public @Nullable String projectId() {
 		return projectId;
 	}
 
@@ -198,7 +202,7 @@ public final class ProjectDocument {
 		return editor;
 	}
 
-	private static ObjectNode writePadding(Padding padding) {
+	private static ObjectNode writePadding(@Nullable Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -208,7 +212,7 @@ public final class ProjectDocument {
 		return node;
 	}
 
-	private static ObjectNode writeCropRegion(CropRegion crop) {
+	private static ObjectNode writeCropRegion(@Nullable CropRegion crop) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("x", crop.x());
 		node.put("y", crop.y());

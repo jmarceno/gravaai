@@ -15,6 +15,8 @@ import dev.gravaai.platform.process.ProcessRunner;
  * locator, then the development {@code java/native/build/ffmpeg} directory from the repo or module
  * working directory. {@code -Dgravaai.ffmpeg.bin} overrides the binary for tests.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class FfmpegCli {
 
 	private FfmpegCli() {}

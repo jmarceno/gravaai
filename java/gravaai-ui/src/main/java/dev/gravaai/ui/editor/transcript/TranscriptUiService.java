@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -51,7 +53,7 @@ public interface TranscriptUiService {
 	void cancel();
 
 	/** Optional speaker attribution for a cue (services meeting transcripts), or {@code null}. */
-	default String speakerForCue(String cueId) {
+	default @Nullable String speakerForCue(String cueId) {
 		return null;
 	}
 }

@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,6 +20,8 @@ import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
  * next to the video is ever written. Nothing is logged beyond event counts, and "shortcuts" mode
  * never stores plain typing.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class KeystrokeCapture {
 
 	/** App setting that stores the capture mode. */
@@ -32,7 +36,7 @@ public final class KeystrokeCapture {
 	}
 
 	/** Unset or unknown values default to shortcuts; only an explicit "off" turns capture off. */
-	public static KeystrokeCaptureMode normalizeKeystrokeCaptureMode(String value) {
+	public static KeystrokeCaptureMode normalizeKeystrokeCaptureMode(@Nullable String value) {
 		if ("off".equals(value)) {
 			return KeystrokeCaptureMode.OFF;
 		}

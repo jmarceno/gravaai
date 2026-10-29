@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +24,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code src/components/video-editor/agent/ops.ts}). Error messages are byte-identical to the TS
  * ones because the agent reads them back through MCP.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentOpReader {
 
 	/** A validation failure; the planner attaches the op index. */
@@ -37,11 +41,11 @@ final class AgentOpReader {
 	record Geometry(double x, double y, double w, double h) {}
 
 	/** Annotation text style input. */
-	record StyleInput(Double fontSize, Boolean bold, Boolean italic, String color,
-			String backgroundColor, String align, String fontFamily) {}
+	record StyleInput(@Nullable Double fontSize, @Nullable Boolean bold, @Nullable Boolean italic, String color,
+			String backgroundColor, @Nullable String align, @Nullable String fontFamily) {}
 
 	/** A validated fade-black transition request; {@code ms == null} means remove. */
-	record TransitionInput(boolean present, Long ms) {}
+	record TransitionInput(boolean present, @Nullable Long ms) {}
 
 	private AgentOpReader() {}
 
@@ -72,7 +76,7 @@ final class AgentOpReader {
 		return value.asDouble();
 	}
 
-	static Double optionalNumber(JsonNode raw, String key) {
+	static @Nullable Double optionalNumber(JsonNode raw, String key) {
 		JsonNode value = raw.path(key);
 		if (value.isMissingNode() || value.isNull()) {
 			return null;
@@ -88,7 +92,7 @@ final class AgentOpReader {
 		return value.asString();
 	}
 
-	static String optionalString(JsonNode raw, String key) {
+	static @Nullable String optionalString(JsonNode raw, String key) {
 		JsonNode value = raw.path(key);
 		if (value.isMissingNode() || value.isNull()) {
 			return null;
@@ -96,7 +100,7 @@ final class AgentOpReader {
 		return string(raw, key);
 	}
 
-	static Boolean optionalBoolean(JsonNode raw, String key) {
+	static @Nullable Boolean optionalBoolean(JsonNode raw, String key) {
 		JsonNode value = raw.path(key);
 		if (value.isMissingNode() || value.isNull()) {
 			return null;
@@ -107,7 +111,7 @@ final class AgentOpReader {
 		return value.asBoolean();
 	}
 
-	static JsonNode optionalObject(JsonNode raw, String key) {
+	static @Nullable JsonNode optionalObject(JsonNode raw, String key) {
 		JsonNode value = raw.path(key);
 		if (value.isMissingNode() || value.isNull()) {
 			return null;
@@ -149,7 +153,7 @@ final class AgentOpReader {
 				h == null ? 0.2 : h);
 	}
 
-	static ZoomDepth readDepth(JsonNode raw, boolean required) {
+	static @Nullable ZoomDepth readDepth(JsonNode raw, boolean required) {
 		JsonNode depth = raw.path("depth");
 		if (!required && (depth.isMissingNode() || depth.isNull())) {
 			return null;
@@ -162,7 +166,7 @@ final class AgentOpReader {
 		return ZoomDepth.fromWire((int) value);
 	}
 
-	static ZoomFocus readFocus(JsonNode raw) {
+	static @Nullable ZoomFocus readFocus(JsonNode raw) {
 		JsonNode focus = optionalObject(raw, "focus");
 		if (focus == null) {
 			return null;
@@ -178,7 +182,7 @@ final class AgentOpReader {
 		return new ZoomFocus(x, y);
 	}
 
-	static StyleInput readStyle(JsonNode raw) {
+	static @Nullable StyleInput readStyle(JsonNode raw) {
 		JsonNode style = optionalObject(raw, "style");
 		if (style == null) {
 			return null;
@@ -206,7 +210,7 @@ final class AgentOpReader {
 				fontFamily.isString() ? fontFamily.asString() : null);
 	}
 
-	static ArrowDirection readArrow(JsonNode raw, boolean required) {
+	static @Nullable ArrowDirection readArrow(JsonNode raw, boolean required) {
 		JsonNode arrow = raw.path("arrow");
 		if (!required && (arrow.isMissingNode() || arrow.isNull())) {
 			return null;
@@ -221,7 +225,7 @@ final class AgentOpReader {
 				+ " down-right, down-left");
 	}
 
-	static ClipCameraLayout readCameraLayout(JsonNode raw) {
+	static @Nullable ClipCameraLayout readCameraLayout(JsonNode raw) {
 		String layout = optionalString(raw, "cameraLayout");
 		if (layout == null) {
 			return null;
@@ -343,7 +347,7 @@ final class AgentOpReader {
 		return List.copyOf(strings);
 	}
 
-	static Integer readCount(JsonNode raw) {
+	static @Nullable Integer readCount(JsonNode raw) {
 		Double n = optionalNumber(raw, "n");
 		if (n == null) {
 			return null;

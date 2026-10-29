@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
@@ -17,8 +19,8 @@ public final class ThreadRenderScheduler implements RenderScheduler {
 	private static final long STOP_JOIN_MS = 20;
 
 	private final long frameNanos;
-	private Thread thread;
-	private AtomicBoolean running;
+	private @Nullable Thread thread;
+	private @Nullable AtomicBoolean running;
 
 	public ThreadRenderScheduler(double framesPerSecond) {
 		if (!Double.isFinite(framesPerSecond) || framesPerSecond <= 0) {

@@ -1,27 +1,29 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /** Webcam overlay position, crop and timing. */
 public record WebcamOverlaySettings(
-		List<TimeRange> visibleRanges,
-		boolean enabled,
-		String sourcePath,
-		long timeOffsetMs,
-		boolean mirror,
-		CropRegion cropRegion,
-		WebcamCorner corner,
-		WebcamPositionPreset positionPreset,
-		double positionX,
-		double positionY,
+		@Nullable List<TimeRange> visibleRanges,
+		@Nullable boolean enabled,
+		@Nullable String sourcePath,
+		@Nullable long timeOffsetMs,
+		@Nullable boolean mirror,
+		@Nullable CropRegion cropRegion,
+		@Nullable WebcamCorner corner,
+		@Nullable WebcamPositionPreset positionPreset,
+		@Nullable double positionX,
+		@Nullable double positionY,
 		double size,
-		double width,
-		double height,
-		boolean reactToZoom,
-		double roundness,
-		Double cornerRadius,
-		double shadow,
-		double margin) {
+		@Nullable double width,
+		@Nullable double height,
+		@Nullable boolean reactToZoom,
+		@Nullable double roundness,
+		@Nullable Double cornerRadius,
+		@Nullable double shadow,
+		@Nullable double margin) {
 
 	public record TimeRange(long startMs, long endMs) {}
 

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -16,7 +18,7 @@ public final class CursorPosition {
 	 * @return the interpolated sample (its {@code timeSeconds} set to {@code timeMs / 1000}),
 	 *         or {@code null} when there are no samples
 	 */
-	public static CursorSample interpolateCursorPosition(List<CursorSample> samples,
+	public static @Nullable CursorSample interpolateCursorPosition(List<CursorSample> samples,
 			double timeMs) {
 		if (samples == null || samples.isEmpty()) {
 			return null;

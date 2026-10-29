@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -37,10 +39,10 @@ public final class ShortcutsConfigDialog {
 	private final Label status = new Label();
 	private final Map<Shortcuts.Action, Button> buttons = new LinkedHashMap<>();
 	private Map<Shortcuts.Action, Shortcuts.Binding> draft;
-	private Shortcuts.Action captureFor;
-	private Shortcuts.Action conflictFor;
-	private Shortcuts.Binding pendingBinding;
-	private Shortcuts.Conflict conflict;
+	private Shortcuts.@Nullable Action captureFor;
+	private Shortcuts.@Nullable Action conflictFor;
+	private Shortcuts.@Nullable Binding pendingBinding;
+	private Shortcuts.@Nullable Conflict conflict;
 
 	public ShortcutsConfigDialog(boolean isMac,
 			Map<Shortcuts.Action, Shortcuts.Binding> initial,

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.kit.Anchors.Align;
 import dev.gravaai.ui.kit.Anchors.Side;
 import java.util.function.Consumer;
@@ -34,8 +36,8 @@ public final class Popup {
 	private boolean modal;
 	private boolean flip = true;
 	private Consumer<Popup> onHide = popup -> {};
-	private Pane layer;
-	private Pane block;
+	private @Nullable Pane layer;
+	private @Nullable Pane block;
 	private boolean showing;
 	private final EventHandler<MouseEvent> outsideClick = this::handleOutsideClick;
 	private final EventHandler<KeyEvent> escape = event -> {

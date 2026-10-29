@@ -1,5 +1,7 @@
 package dev.gravaai.core.i18n;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,13 +38,15 @@ import tools.jackson.databind.JsonNode;
  * {@code gravaai.locale} plus {@code navigator.languages}) and the "wait for the first bundle"
  * gate.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class I18n {
 
 	private static final Pattern INTERPOLATION = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}");
 
 	private final LocaleSource source;
 	private final Map<String, Map<String, JsonNode>> bundles = new ConcurrentHashMap<>();
-	private volatile String locale;
+	private volatile @Nullable String locale;
 
 	public I18n(LocaleSource source) {
 		this(source, Locales.DEFAULT_LOCALE);
@@ -53,7 +57,7 @@ public final class I18n {
 		this.locale = normalizeLocale(locale);
 	}
 
-	public String locale() {
+	public @Nullable String locale() {
 		return locale;
 	}
 
@@ -62,21 +66,21 @@ public final class I18n {
 	}
 
 	/** {@code t(key)}: no variables, so {@code {{var}}} placeholders stay untouched. */
-	public String t(String key) {
+	public @Nullable String t(String key) {
 		return translateForLocale(locale, bundleOrNull(locale), key, null, null);
 	}
 
 	/** {@code t(key, fallback)}: no variables, so placeholders stay untouched. */
-	public String t(String key, String fallback) {
+	public @Nullable String t(String key, String fallback) {
 		return translateForLocale(locale, bundleOrNull(locale), key, fallback, null);
 	}
 
 	/** Plan §5.12 shorthand: {@code t("namespace:key.path", Map.of("count", 1))}. */
-	public String t(String key, Map<String, ?> vars) {
+	public @Nullable String t(String key, Map<String, ?> vars) {
 		return t(key, null, vars);
 	}
 
-	public String t(String key, String fallback, Map<String, ?> vars) {
+	public @Nullable String t(String key, String fallback, Map<String, ?> vars) {
 		return translateForLocale(locale, bundleOrNull(locale), key, fallback, vars);
 	}
 
@@ -84,13 +88,13 @@ public final class I18n {
 	 * One locale's namespace trees, loaded and cached. Missing or broken files yield an empty map;
 	 * the locale is retried on the next call.
 	 */
-	public Map<String, JsonNode> bundle(String locale) {
+	public @Nullable Map<String, JsonNode> bundle(String locale) {
 		Map<String, JsonNode> loaded = bundleOrNull(locale);
 		return loaded == null ? Map.of() : loaded;
 	}
 
 	/** Port of {@code normalizeLocale}: exact, case-insensitive, extended subtags, language-only. */
-	public static String normalizeLocale(String locale) {
+	public static @Nullable String normalizeLocale(String locale) {
 		if (locale == null || locale.isEmpty()) {
 			return Locales.DEFAULT_LOCALE;
 		}
@@ -122,7 +126,7 @@ public final class I18n {
 		return Locales.DEFAULT_LOCALE;
 	}
 
-	private Map<String, JsonNode> bundleOrNull(String locale) {
+	private @Nullable Map<String, JsonNode> bundleOrNull(@Nullable String locale) {
 		Map<String, JsonNode> cached = bundles.get(locale);
 		if (cached != null) {
 			return cached;
@@ -136,7 +140,7 @@ public final class I18n {
 		return existing != null ? existing : loaded;
 	}
 
-	private Map<String, JsonNode> loadBundle(String locale) {
+	private @Nullable Map<String, JsonNode> loadBundle(@Nullable String locale) {
 		Map<String, JsonNode> namespaces = new LinkedHashMap<>();
 		for (String namespace : Locales.I18N_NAMESPACES) {
 			String json;
@@ -162,12 +166,12 @@ public final class I18n {
 		return namespaces;
 	}
 
-	private String translateForLocale(
-			String locale,
-			Map<String, JsonNode> loadedBundle,
+	private @Nullable String translateForLocale(
+			@Nullable String locale,
+			@Nullable Map<String, JsonNode> loadedBundle,
 			String key,
-			String fallback,
-			Map<String, ?> vars) {
+			@Nullable String fallback,
+			@Nullable Map<String, ?> vars) {
 		ParsedKey parsed = parseKey(key);
 		Map<String, JsonNode> preferred =
 				locale.equals(Locales.DEFAULT_LOCALE) ? bundleOrNull(Locales.DEFAULT_LOCALE) : loadedBundle;
@@ -198,11 +202,11 @@ public final class I18n {
 	}
 
 	/** First hit in the active bundle, then English, exactly like translateForLocale in the TS. */
-	private static String firstMessage(
-			Map<String, JsonNode> preferred,
-			Map<String, JsonNode> english,
-			ParsedKey parsed,
-			String path) {
+	private static @Nullable String firstMessage(
+			@Nullable Map<String, JsonNode> preferred,
+			@Nullable Map<String, JsonNode> english,
+			@Nullable ParsedKey parsed,
+			@Nullable String path) {
 		String value = getMessageValue(preferred == null ? null : preferred.get(parsed.namespace()), path);
 		if (value == null) {
 			value = getMessageValue(english == null ? null : english.get(parsed.namespace()), path);
@@ -210,7 +214,7 @@ public final class I18n {
 		return value;
 	}
 
-	private static String getMessageValue(JsonNode namespace, String path) {
+	private static @Nullable String getMessageValue(@Nullable JsonNode namespace, @Nullable String path) {
 		if (namespace == null) {
 			return null;
 		}
@@ -242,7 +246,7 @@ public final class I18n {
 		return new ParsedKey("common", key);
 	}
 
-	private static String interpolate(String template, Map<String, ?> vars) {
+	private static String interpolate(String template, @Nullable Map<String, ?> vars) {
 		if (vars == null) {
 			return template;
 		}

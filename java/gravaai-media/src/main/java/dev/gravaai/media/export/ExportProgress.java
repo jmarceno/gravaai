@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.media.export.ExportTuning.EncodeBackend;
@@ -10,10 +12,10 @@ import dev.gravaai.media.export.ExportTuning.EncodeBackend;
  * fields; the exporter/UI fill them as the phases advance.
  */
 public record ExportProgress(int currentFrame, int totalFrames, double percentage,
-		double estimatedTimeRemaining, Double renderFps, RenderBackend renderBackend,
-		EncodeBackend encodeBackend, String encoderName, String nativeStaticLayoutSkipReason,
-		List<String> nativeStaticLayoutSkipReasons, Phase phase, Double renderProgress,
-		Double audioProgress) {
+		double estimatedTimeRemaining, @Nullable Double renderFps, @Nullable RenderBackend renderBackend,
+		@Nullable EncodeBackend encodeBackend, @Nullable String encoderName, @Nullable String nativeStaticLayoutSkipReason,
+		@Nullable List<String> nativeStaticLayoutSkipReasons, @Nullable Phase phase, @Nullable Double renderProgress,
+		@Nullable Double audioProgress) {
 
 	/** {@code ExportProgress.phase}. */
 	public enum Phase {
@@ -86,7 +88,7 @@ public record ExportProgress(int currentFrame, int totalFrames, double percentag
 				nativeStaticLayoutSkipReasons, phase, renderProgress, audioProgress);
 	}
 
-	public ExportProgress withBackends(RenderBackend nextRenderBackend,
+	public ExportProgress withBackends(@Nullable RenderBackend nextRenderBackend,
 			EncodeBackend nextEncodeBackend) {
 		return new ExportProgress(currentFrame, totalFrames, percentage, estimatedTimeRemaining,
 				renderFps, nextRenderBackend, nextEncodeBackend, encoderName,

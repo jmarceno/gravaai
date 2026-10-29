@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.clips;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -54,6 +56,8 @@ import javafx.scene.layout.VBox;
  * the importing flags) and every toast; the app side answers through {@link Host} and reports the
  * import outcome through one {@code done} callback.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingLibraryPanel extends VBox {
 
 	/** Drag payload format ({@code RECORDING_DRAG_TYPE}): a JSON array of recording paths. */
@@ -110,11 +114,11 @@ public final class RecordingLibraryPanel extends VBox {
 	private final BooleanProperty cancelling = new SimpleBooleanProperty();
 	private boolean loading;
 	private boolean busy;
-	private String error;
+	private @Nullable String error;
 	private String query = "";
 
 	/** Builds the panel; the caller mounts it and calls {@link #refresh()} when it opens. */
-	public RecordingLibraryPanel(Host host) {
+	public RecordingLibraryPanel(@Nullable Host host) {
 		this.host = host;
 		getStyleClass().addAll("editor-inspector", "clips-panel");
 		setSpacing(0);
@@ -263,7 +267,7 @@ public final class RecordingLibraryPanel extends VBox {
 	}
 
 	/** The single import entry point: the + button, double-click and the shell drop. */
-	public void addToTimeline(List<String> paths, Integer index) {
+	public void addToTimeline(List<String> paths, @Nullable Integer index) {
 		if (busy || importing.get() || paths == null || paths.isEmpty()) {
 			return;
 		}
@@ -575,7 +579,7 @@ public final class RecordingLibraryPanel extends VBox {
 			});
 		}
 
-		private void show(Image decoded, boolean ok) {
+		private void show(@Nullable Image decoded, boolean ok) {
 			pulseAnimation.stop();
 			pulse.setVisible(false);
 			if (ok && decoded != null && !decoded.isError()) {
@@ -595,7 +599,7 @@ public final class RecordingLibraryPanel extends VBox {
 		private boolean selected;
 		private boolean indeterminate;
 		private boolean disabled;
-		private Runnable onAction;
+		private @Nullable Runnable onAction;
 
 		ClipCheckbox() {
 			getStyleClass().add("clips-checkbox");

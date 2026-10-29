@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
@@ -54,7 +56,7 @@ public final class ExportTuning {
 
 	/** {@code ExportBackpressureProfileOptions}. */
 	public record BackpressureOptions(EncodeBackend encodeBackend, int width, int height,
-			int frameRate, ExportEncodingMode encodingMode, Integer hardwareConcurrency) {}
+			int frameRate, ExportEncodingMode encodingMode, @Nullable Integer hardwareConcurrency) {}
 
 	private static final int[] TARGET_QUEUE_SECONDS_X100 = {125, 200, 240};
 	private static final int[] MIN_QUEUE_LIMIT = {36, 72, 96};
@@ -115,7 +117,7 @@ public final class ExportTuning {
 		return new BackpressureProfile("webcodecs-balanced", maxEncodeQueue, 10, 24, 1);
 	}
 
-	private static int effectiveHardwareConcurrency(Integer hardwareConcurrency) {
+	private static int effectiveHardwareConcurrency(@Nullable Integer hardwareConcurrency) {
 		if (hardwareConcurrency != null && hardwareConcurrency > 0) {
 			return hardwareConcurrency;
 		}

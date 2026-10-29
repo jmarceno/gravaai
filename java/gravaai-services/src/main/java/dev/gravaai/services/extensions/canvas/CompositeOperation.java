@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions.canvas;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Locale;
 
 import io.github.humbleui.skija.BlendMode;
@@ -12,10 +14,10 @@ public final class CompositeOperation {
 
 	public static final String DEFAULT = "source-over";
 
-	private CompositeOperation() {}
+	@Nullable private CompositeOperation() {}
 
 	/** The Skija blend mode for a CSS composite operation, or null when unknown. */
-	public static BlendMode toBlendMode(String css) {
+	public static @Nullable BlendMode toBlendMode(String css) {
 		if (css == null) {
 			return null;
 		}

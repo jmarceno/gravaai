@@ -5,6 +5,8 @@ import dev.gravaai.core.project.SourceAudioTrackSettings;
 import tools.jackson.databind.node.ObjectNode;
 
 /** The {@code useSourceAudioTrackSettings} operations (plan P2.7 source-audio lanes). */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SourceAudioCommands {
 
 	private SourceAudioCommands() {}

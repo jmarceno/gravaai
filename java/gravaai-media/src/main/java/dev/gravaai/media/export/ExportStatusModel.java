@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -10,20 +12,22 @@ import dev.gravaai.core.editor.ExportPreferences.ExportPipelineModel;
  * View-model of the export status line (port of
  * {@code src/components/video-editor/exportStatusModel.ts}, plan §5.10/§5.12).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparing,
-		boolean isExportFinalizing, boolean isRenderingAudio, Double exportFinalizingProgress,
-		Integer exportFinalizingPercent, boolean isExportMuxingAndSaving,
+		boolean isExportFinalizing, boolean isRenderingAudio, @Nullable Double exportFinalizingProgress,
+		@Nullable Integer exportFinalizingPercent, boolean isExportMuxingAndSaving,
 		boolean isExportFinalSaveIndeterminate, boolean isLightningExportInProgress,
 		boolean shouldSuspendPreviewRendering, boolean isLegacyExportInProgress,
-		String renderSpeedFps, String runtimeLabel, List<String> nativeSkipReasons,
-		String nativeSkipLabel) {
+		@Nullable String renderSpeedFps, @Nullable String runtimeLabel, List<String> nativeSkipReasons,
+		@Nullable String nativeSkipLabel) {
 
 	public ExportStatusModel {
 		nativeSkipReasons = nativeSkipReasons == null ? List.of() : List.copyOf(nativeSkipReasons);
 	}
 
 	/** {@code resolveExportStatusModel}. */
-	public static ExportStatusModel resolve(boolean isExporting, ExportProgress exportProgress,
+	public static @Nullable ExportStatusModel resolve(boolean isExporting, ExportProgress exportProgress,
 			ExportFormat exportFormat, ExportPipelineModel exportPipelineModel) {
 		ExportFormat format = exportFormat == null ? ExportFormat.MP4 : exportFormat;
 		ExportPipelineModel model = exportPipelineModel == null
@@ -90,7 +94,7 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 				renderSpeedFps, runtimeLabel, nativeSkipReasons, nativeSkipLabel);
 	}
 
-	private static String resolveRuntimeLabel(ExportProgress exportProgress) {
+	private static @Nullable String resolveRuntimeLabel(ExportProgress exportProgress) {
 		if (exportProgress == null) {
 			return null;
 		}

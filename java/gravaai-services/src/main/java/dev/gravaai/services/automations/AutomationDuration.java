@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,13 +19,13 @@ public final class AutomationDuration {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
 
-	private record CacheEntry(String fingerprint, Double durationSec) {}
+	private record CacheEntry(String fingerprint, @Nullable Double durationSec) {}
 
 	private static final Map<Path, CacheEntry> DURATION_CACHE = new ConcurrentHashMap<>();
 
-	private AutomationDuration() {}
+	@Nullable private AutomationDuration() {}
 
-	public static Double probeAutomationDurationSec(Path filePath, AutomationDurationProbe probe) {
+	public static @Nullable Double probeAutomationDurationSec(Path filePath, AutomationDurationProbe probe) {
 		String fingerprint;
 		try {
 			BasicFileAttributes attributes = Files.readAttributes(filePath, BasicFileAttributes.class);

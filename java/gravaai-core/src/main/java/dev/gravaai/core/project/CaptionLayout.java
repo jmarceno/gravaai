@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.ToDoubleFunction;
@@ -11,6 +13,8 @@ import java.util.function.ToDoubleFunction;
  * here it is a {@link ToDoubleFunction} so the port stays UI-free (the compositor supplies the Skija
  * text measurement later, plan §5.8).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionLayout {
 
 	public enum WordState {
@@ -53,7 +57,7 @@ public final class CaptionLayout {
 			int activeWordIndex,
 			double activeWordProgress,
 			CaptionEditing.EditTarget editTarget,
-			int visiblePageIndex,
+			@Nullable int visiblePageIndex,
 			double opacity,
 			double translateY,
 			double scale) {}
@@ -72,7 +76,7 @@ public final class CaptionLayout {
 		return clamp(value, 0, 1);
 	}
 
-	private static boolean isFiniteNumber(Double value) {
+	private static boolean isFiniteNumber(@Nullable Double value) {
 		return value != null && Double.isFinite(value);
 	}
 
@@ -81,9 +85,9 @@ public final class CaptionLayout {
 			int cueWordIndex,
 			String text,
 			boolean forcedBreakBefore,
-			Boolean leadingSpace,
-			Double startMs,
-			Double endMs) {}
+			@Nullable Boolean leadingSpace,
+			@Nullable Double startMs,
+			@Nullable Double endMs) {}
 
 	private static List<SourceWord> splitCaptionWordsFromText(String text) {
 		List<SourceWord> words = new ArrayList<>();
@@ -136,7 +140,7 @@ public final class CaptionLayout {
 		return fromText;
 	}
 
-	private static CaptionCue getActiveCaptionCue(List<CaptionCue> cues, double timeMs) {
+	private static @Nullable CaptionCue getActiveCaptionCue(List<CaptionCue> cues, double timeMs) {
 		for (CaptionCue cue : cues) {
 			if (timeMs >= cue.startMs() && timeMs <= cue.endMs()) {
 				return cue;
@@ -384,7 +388,7 @@ public final class CaptionLayout {
 		return -1;
 	}
 
-	private static String getVisibleCaptionText(List<LineLayout> lines) {
+	private static @Nullable String getVisibleCaptionText(List<LineLayout> lines) {
 		List<String> lineTexts = new ArrayList<>();
 		for (LineLayout line : lines) {
 			StringBuilder text = new StringBuilder();
@@ -404,7 +408,7 @@ public final class CaptionLayout {
 	}
 
 	/** {@code buildActiveCaptionLayout}. */
-	public static ActiveCaptionLayout buildActiveCaptionLayout(
+	public static @Nullable ActiveCaptionLayout buildActiveCaptionLayout(
 			List<CaptionCue> cues,
 			double timeMs,
 			AutoCaptionSettings settings,

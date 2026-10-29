@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Consumer;
 
 import dev.gravaai.core.event.UiEvents;
@@ -25,7 +27,7 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 	private final PlaybackController controller;
 	private final Consumer<Runnable> fxDispatcher;
 	private volatile double rate = 1;
-	private volatile PlaybackState cached;
+	private volatile @Nullable PlaybackState cached;
 
 	private final AutoCloseable statusSubscription;
 	private final AutoCloseable timeSubscription;

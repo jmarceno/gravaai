@@ -1,5 +1,7 @@
 package dev.gravaai.services.projects;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,7 +24,7 @@ import tools.jackson.databind.JsonNode;
 public final class RecordingsDirectory {
 
 	private final UserData userData;
-	private Path customRecordingsDir;
+	private @Nullable Path customRecordingsDir;
 	private boolean recordingsDirLoaded;
 
 	public RecordingsDirectory(UserData userData) {

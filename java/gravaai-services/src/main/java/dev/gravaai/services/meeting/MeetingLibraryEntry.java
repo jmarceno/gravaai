@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 /**
@@ -12,12 +14,12 @@ public record MeetingLibraryEntry(
 		Path mediaPath,
 		String title,
 		long createdAt,
-		Long durationMs,
+		@Nullable Long durationMs,
 		boolean hasVideo,
 		boolean hasTranscript,
 		boolean hasNotes,
 		Status status,
-		String error) {
+		@Nullable String error) {
 
 	/** Badge state shown in the library. */
 	public enum Status {

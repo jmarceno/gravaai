@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -38,6 +40,8 @@ import tools.jackson.databind.node.ObjectNode;
  * implement them over {@code EditorStore}, the project manager, the compositor and the meeting
  * service; this class contains no Electron/UI dependency.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentDispatcher implements AutoCloseable {
 
 	/** Thrown for validation/routing failures; the MCP bridge turns it into an error result. */
@@ -63,7 +67,7 @@ public final class AgentDispatcher implements AutoCloseable {
 	public interface LibraryPort {
 		record ProjectEntry(String name, String path, long updatedAt, boolean isCurrent) {}
 
-		record RecordingEntry(String name, String path, long bytes, Long createdAt) {}
+		record RecordingEntry(String name, String path, long bytes, @Nullable Long createdAt) {}
 
 		record MeetingEntry(String title, String mediaPath, long createdAt) {}
 
@@ -83,7 +87,7 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	/** A validated frame-capture request (the UI-independent half of the frames tool). */
-	public record FrameRequest(List<Double> at, Double from, Double to, int count, int width) {
+	public record FrameRequest(List<Double> at, @Nullable Double from, @Nullable Double to, int count, int width) {
 		public FrameRequest {
 			at = at == null ? List.of() : List.copyOf(at);
 		}
@@ -112,7 +116,7 @@ public final class AgentDispatcher implements AutoCloseable {
 				return wire;
 			}
 
-			public static Mode fromWire(String value) {
+			public static @Nullable Mode fromWire(String value) {
 				for (Mode mode : values()) {
 					if (mode.wire.equals(value)) {
 						return mode;
@@ -122,7 +126,7 @@ public final class AgentDispatcher implements AutoCloseable {
 			}
 		}
 
-		record MeetingJob(String id, String status, Double progress, String stage, String message,
+		record MeetingJob(String id, String status, @Nullable Double progress, String stage, String message,
 				String error) {}
 
 		record MeetingFiles(String transcript, String notes, String meta) {}
@@ -468,7 +472,7 @@ public final class AgentDispatcher implements AutoCloseable {
 		return AgentToolResult.text(describeJob(settled));
 	}
 
-	private Job waitForJob(String jobId, long timeoutMs, AgentToolContext context) {
+	private @Nullable Job waitForJob(String jobId, long timeoutMs, AgentToolContext context) {
 		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
 		String lastSignature = "";
 		while (true) {
@@ -520,7 +524,7 @@ public final class AgentDispatcher implements AutoCloseable {
 		return latest.get();
 	}
 
-	private static Kind readJobKind(JsonNode value, boolean required) {
+	private static @Nullable Kind readJobKind(JsonNode value, boolean required) {
 		if (value == null || value.isMissingNode() || value.isNull()) {
 			if (required) {
 				return failure("job needs \"kind\": transcribe, export or meeting");
@@ -773,19 +777,19 @@ public final class AgentDispatcher implements AutoCloseable {
 		return node;
 	}
 
-	private static Double clamp(JsonNode value, double min, double max) {
+	private static @Nullable Double clamp(JsonNode value, double min, double max) {
 		if (value == null || !value.isNumber() || !Double.isFinite(value.asDouble())) {
 			return null;
 		}
 		return Math.min(max, Math.max(min, value.asDouble()));
 	}
 
-	private static Integer clampInt(JsonNode value, int min, int max) {
+	private static @Nullable Integer clampInt(JsonNode value, int min, int max) {
 		Double clamped = clamp(value, min, max);
 		return clamped == null ? null : (int) Math.round(clamped);
 	}
 
-	private static String isoMinute(long epochMillis) {
+	private static String isoMinute(@Nullable long epochMillis) {
 		String iso = Instant.ofEpochMilli(epochMillis).toString();
 		return iso.substring(0, 16).replace('T', ' ');
 	}

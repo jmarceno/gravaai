@@ -1,5 +1,7 @@
 package dev.gravaai.core.json;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -123,7 +125,7 @@ public final class Json {
 		}
 
 		@Override
-		public SerializableString getEscapeSequence(int ch) {
+		public @Nullable SerializableString getEscapeSequence(int ch) {
 			// Jackson asks for every character when escapes are installed; only the control
 			// characters without a short escape are customised. Everything else stays raw, like
 			// JSON.stringify does for non-ASCII text.

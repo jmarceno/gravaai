@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.media.capture.WebcamCapture;
 import dev.gravaai.media.capture.WebcamFormat;
 import java.nio.ByteBuffer;
@@ -28,7 +30,7 @@ public final class WebcamPreviewView extends StackPane {
 	private final ImageView view = new ImageView();
 
 	private volatile boolean running;
-	private Thread reader;
+	private @Nullable Thread reader;
 
 	public WebcamPreviewView() {
 		view.setPreserveRatio(false);

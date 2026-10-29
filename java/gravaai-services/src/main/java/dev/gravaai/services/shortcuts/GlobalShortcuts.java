@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +19,8 @@ import tools.jackson.databind.node.ObjectNode;
  * UI. Port of {@code src/lib/globalShortcuts.ts}; this module must stay free of DOM and JavaFX
  * APIs so services can use it.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class GlobalShortcuts {
 
 	/** The app-settings key the config is stored under (port of {@code GLOBAL_SHORTCUTS_SETTING}). */
@@ -119,7 +123,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** The stored JSON shape of a config (port of the object {@code writeAppSetting} receives). */
-	public static ObjectNode toJson(GlobalShortcutsConfig config, JsonNodeFactory nodes) {
+	public static @Nullable ObjectNode toJson(GlobalShortcutsConfig config, JsonNodeFactory nodes) {
 		ObjectNode root = nodes.objectNode();
 		root.put("enabled", config.enabled());
 		ObjectNode bindings = nodes.objectNode();
@@ -145,7 +149,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** Port of {@code keyboardEventToBinding}. */
-	public static GlobalShortcutBinding keyboardEventToBinding(GlobalShortcutKeyEvent event) {
+	public static @Nullable GlobalShortcutBinding keyboardEventToBinding(GlobalShortcutKeyEvent event) {
 		if (event == null) {
 			return null;
 		}
@@ -180,7 +184,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** Port of {@code formatGlobalBinding}, e.g. "Super + Alt + R". */
-	public static String formatGlobalBinding(GlobalShortcutBinding binding) {
+	public static @Nullable String formatGlobalBinding(GlobalShortcutBinding binding) {
 		List<String> parts = new ArrayList<>();
 		if (binding.sup()) {
 			parts.add("Super");
@@ -205,7 +209,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** Port of {@code parseCliAction}: finds {@code --toggle-recording} and friends in argv. */
-	public static GlobalShortcutAction parseCliAction(String[] argv) {
+	public static @Nullable GlobalShortcutAction parseCliAction(String[] argv) {
 		if (argv == null) {
 			return null;
 		}
@@ -286,7 +290,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** Tri-state of {@code normalizeBinding}: undefined means "keep the default". */
-	private record BindingOrUndefined(boolean defined, GlobalShortcutBinding binding) {
+	private record BindingOrUndefined(boolean defined, @Nullable GlobalShortcutBinding binding) {
 		private static final BindingOrUndefined UNDEFINED = new BindingOrUndefined(false, null);
 	}
 }

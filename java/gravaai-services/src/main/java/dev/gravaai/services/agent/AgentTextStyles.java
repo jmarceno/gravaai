@@ -4,6 +4,8 @@ import dev.gravaai.core.project.AnnotationTextStyle;
 import dev.gravaai.services.agent.AgentOpReader.StyleInput;
 
 /** Maps the agent's text-style input onto the core annotation style (defaults from EditorDefaults). */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentTextStyles {
 
 	private AgentTextStyles() {}

@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Pure crop math of the webcam crop control (port of the helpers in
  * {@code WebcamCropControl.tsx}, plan P3.4 gap 4).
@@ -9,6 +11,8 @@ package dev.gravaai.core.project;
  * {@code normalizeWebcamCropRegion}. A mirrored webcam edits the flipped rectangle and the commit
  * flips it back, so the stored crop stays in source space.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class WebcamCropMath {
 
 	/** React {@code MIN_CROP_SIZE}. */
@@ -23,15 +27,15 @@ public final class WebcamCropMath {
 		MOVE, NW, NE, SW, SE
 	}
 
-	private WebcamCropMath() {
+	@Nullable private WebcamCropMath() {
 	}
 
-	private static double clamp(double value, double min, double max) {
+	private static @Nullable double clamp(@Nullable double value, double min, @Nullable double max) {
 		return Math.min(max, Math.max(min, value));
 	}
 
 	/** {@code normalizeWebcamCropRegion}: finite numbers, x/y in 0..0.99, min 0.01 size. */
-	public static CropRegion normalize(CropRegion cropRegion) {
+	public static @Nullable CropRegion normalize(CropRegion cropRegion) {
 		CropRegion candidate = cropRegion == null ? new CropRegion(0, 0, 1, 1) : cropRegion;
 		double rawX = Double.isFinite(candidate.x()) ? candidate.x() : 0;
 		double rawY = Double.isFinite(candidate.y()) ? candidate.y() : 0;
@@ -45,13 +49,13 @@ public final class WebcamCropMath {
 	}
 
 	/** {@code isWebcamCropRegionDefault}: the whole source, untouched. */
-	public static boolean isDefault(CropRegion cropRegion) {
+	public static @Nullable boolean isDefault(CropRegion cropRegion) {
 		CropRegion crop = normalize(cropRegion);
 		return crop.x() <= 0 && crop.y() <= 0 && crop.width() >= 1 && crop.height() >= 1;
 	}
 
 	/** {@code flipCropHorizontally}: mirror a crop rect in normalised source space. */
-	public static CropRegion flipHorizontally(CropRegion cropRegion) {
+	public static @Nullable CropRegion flipHorizontally(CropRegion cropRegion) {
 		CropRegion crop = normalize(cropRegion);
 		return new CropRegion(clamp(1 - crop.x() - crop.width(), 0, 1 - crop.width()), crop.y(),
 				crop.width(), crop.height());
@@ -61,7 +65,7 @@ public final class WebcamCropMath {
 	 * {@code resizeCrop}: move or resize by a normalised delta, clamped to the source and to
 	 * {@link #MIN_CROP_SIZE} on the resized edges.
 	 */
-	public static CropRegion resize(CropRegion cropRegion, Handle handle, double deltaX,
+	public static @Nullable CropRegion resize(CropRegion cropRegion, Handle handle, double deltaX,
 			double deltaY) {
 		CropRegion crop = normalize(cropRegion);
 		if (handle == Handle.MOVE) {
@@ -91,7 +95,7 @@ public final class WebcamCropMath {
 	}
 
 	/** Keyboard delta of an arrow key ({@code getKeyboardDelta}); zero when not an arrow. */
-	public static double[] keyboardDelta(String key, boolean shift) {
+	public static @Nullable double[] keyboardDelta(String key, boolean shift) {
 		double step = shift ? KEYBOARD_FAST_STEP : KEYBOARD_STEP;
 		return switch (key) {
 			case "Left" -> new double[] {-step, 0};

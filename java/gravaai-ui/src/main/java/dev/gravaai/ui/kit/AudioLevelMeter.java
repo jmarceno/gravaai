@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -22,7 +24,7 @@ public final class AudioLevelMeter extends Pane {
 	private final Region fill = new Region();
 	private final DoubleProperty level = new SimpleDoubleProperty(0);
 	private final DoubleProperty fraction = new SimpleDoubleProperty(0);
-	private Timeline animation;
+	private @Nullable Timeline animation;
 	private boolean trackSized;
 
 	public AudioLevelMeter() {

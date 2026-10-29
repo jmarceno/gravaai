@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 
 import dev.gravaai.media.compose.RgbaFrame;
@@ -15,17 +17,19 @@ import dev.gravaai.media.playback.PlaybackFrame;
  * frames; callers that map the snapshot must hold its monitor until the submitted input has been
  * copied by the renderer queue (see {@code EditorPreviewView.submitSnapshot}).</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class PreviewFrameSnapshot {
 
 private long frameIndex;
 private double timelineSeconds;
-private Double sourceSeconds;
-private String clipId;
+private @Nullable Double sourceSeconds;
+private @Nullable String clipId;
 private boolean webcamVisible;
-private RgbaFrame sourceFrame;
-private RgbaFrame webcamFrame;
-private ByteBuffer sourcePixels;
-private ByteBuffer webcamPixels;
+private @Nullable RgbaFrame sourceFrame;
+private @Nullable RgbaFrame webcamFrame;
+private @Nullable ByteBuffer sourcePixels;
+private @Nullable ByteBuffer webcamPixels;
 
 /** Copies the decoder-owned buffers before the engine may reuse them. */
 static PreviewFrameSnapshot capture(PlaybackFrame frame) {
@@ -64,7 +68,7 @@ synchronized double timelineSeconds() {
 return timelineSeconds;
 }
 
-private static ByteBuffer copyInto(RgbaFrame frame, ByteBuffer target) {
+private static @Nullable ByteBuffer copyInto(@Nullable RgbaFrame frame, ByteBuffer target) {
 if (frame == null) {
 return null;
 }

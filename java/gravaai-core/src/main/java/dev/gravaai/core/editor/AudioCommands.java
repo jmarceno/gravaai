@@ -6,6 +6,8 @@ import java.util.List;
 import dev.gravaai.core.project.AudioRegion;
 
 /** The {@code useAudioRegionCommands} operations, one class per command. */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AudioCommands {
 
 	private AudioCommands() {}

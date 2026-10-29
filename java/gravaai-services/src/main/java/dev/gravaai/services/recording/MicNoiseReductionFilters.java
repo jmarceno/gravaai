@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +19,7 @@ public final class MicNoiseReductionFilters {
 	}
 
 	/** Keeps a known level, anything else falls back to the default. */
-	public static MicNoiseReduction normalizeMicNoiseReduction(Object value) {
+	public static MicNoiseReduction normalizeMicNoiseReduction(@Nullable Object value) {
 		for (MicNoiseReduction level : MicNoiseReduction.values()) {
 			if (level.wire().equals(value)) {
 				return level;
@@ -56,7 +58,7 @@ public final class MicNoiseReductionFilters {
 	 * Filters applied to the microphone track after its alignment filter. Balanced and strong need
 	 * the RNNoise model; without it they fall back to the light chain.
 	 */
-	public static List<String> buildMicNoiseFilters(MicNoiseReduction level, String modelPath) {
+	public static List<String> buildMicNoiseFilters(MicNoiseReduction level, @Nullable String modelPath) {
 		if (level == MicNoiseReduction.OFF) {
 			return List.of();
 		}

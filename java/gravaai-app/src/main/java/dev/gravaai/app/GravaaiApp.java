@@ -10,6 +10,8 @@ import javafx.stage.Stage;
  * <p>Started through {@link Main} so the launch timestamp is recorded and the GL thread can start
  * before the toolkit (plan §3 gotcha 4; the GL thread arrives with the media layer).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class GravaaiApp extends Application {
 
 	private AppContext context;

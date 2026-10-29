@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,6 +45,8 @@ import javafx.scene.layout.VBox;
  * highlighted. Caption generation is driven through {@link TranscriptUiService} and the panel shows
  * its progress/errors and applies the generated cues through the supplied sink.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class TranscriptPanel extends VBox {
 
 	private final EditorStore store;
@@ -79,11 +83,11 @@ public final class TranscriptPanel extends VBox {
 	private List<TranscriptWords.Word> words = List.of();
 	private Set<String> cutKeys = Set.of();
 	private Set<String> selected = new LinkedHashSet<>();
-	private String anchorKey;
-	private String activeWordKey;
-	private String feedback;
+	private @Nullable String anchorKey;
+	private @Nullable String activeWordKey;
+	private @Nullable String feedback;
 	private boolean feedbackDanger;
-	private Object appliedDoneStatus;
+	private @Nullable Object appliedDoneStatus;
 
 	public TranscriptPanel(EditorStore store, TranscriptUiService service,
 			DoubleSupplier timelinePlayheadMs, BooleanSupplier playing, PlaybackSeek seek,
@@ -463,7 +467,7 @@ public final class TranscriptPanel extends VBox {
 		return cutKeys.contains(key);
 	}
 
-	public String activeWordKey() {
+	public @Nullable String activeWordKey() {
 		return activeWordKey;
 	}
 
@@ -479,7 +483,7 @@ public final class TranscriptPanel extends VBox {
 		return feedbackLabel.getText();
 	}
 
-	public javafx.scene.control.Button wordButton(String key) {
+	public javafx.scene.control.@Nullable Button wordButton(String key) {
 		return wordButtons.get(key);
 	}
 

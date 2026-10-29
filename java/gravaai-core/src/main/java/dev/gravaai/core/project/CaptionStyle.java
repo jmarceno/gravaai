@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 /** Caption text geometry helpers (port of {@code captionStyle.ts}). */
 public final class CaptionStyle {
 
@@ -9,7 +11,7 @@ public final class CaptionStyle {
 	private static final double DEFAULT_CAPTION_REFERENCE_WIDTH =
 			1920 * (AutoCaptionSettings.defaults().maxWidth() / 100);
 
-	public record Padding(double x, double y) {}
+	public record Padding(double x, @Nullable double y) {}
 
 	/** Result of {@code getCaptionWordVisualState}. */
 	public record WordVisualState(boolean isInactive, double opacity) {}
@@ -17,13 +19,13 @@ public final class CaptionStyle {
 	private CaptionStyle() {}
 
 	/** {@code getCaptionTargetWidth}. */
-	public static double getCaptionTargetWidth(double containerWidth, double maxWidthPercent) {
+	public static double getCaptionTargetWidth(double containerWidth, @Nullable double maxWidthPercent) {
 		return Math.max(1, containerWidth * (maxWidthPercent / 100));
 	}
 
 	/** {@code getCaptionScaledFontSize}. */
 	public static double getCaptionScaledFontSize(
-			double fontSize, double containerWidth, double maxWidthPercent) {
+			@Nullable double fontSize, double containerWidth, @Nullable double maxWidthPercent) {
 		return Math.max(14, fontSize
 				* (getCaptionTargetWidth(containerWidth, maxWidthPercent)
 						/ DEFAULT_CAPTION_REFERENCE_WIDTH));
@@ -35,7 +37,7 @@ public final class CaptionStyle {
 	}
 
 	/** {@code getCaptionScaledRadius}. */
-	public static double getCaptionScaledRadius(double radius, double fontSize) {
+	public static double getCaptionScaledRadius(@Nullable double radius, double fontSize) {
 		double baseline = Math.max(1, AutoCaptionSettings.defaults().fontSize());
 		return Math.max(0, radius * (fontSize / baseline));
 	}

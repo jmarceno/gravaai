@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -47,7 +49,7 @@ public final class ExportSettingsState {
 		return preferences;
 	}
 
-	public ExportPreferences.ExportFormat exportFormat() {
+	public ExportPreferences.@Nullable ExportFormat exportFormat() {
 		return preferences.exportFormat();
 	}
 
@@ -69,7 +71,7 @@ public final class ExportSettingsState {
 		}
 	}
 
-	public ExportPreferences.ExportEncodingMode exportEncodingMode() {
+	public ExportPreferences.@Nullable ExportEncodingMode exportEncodingMode() {
 		return preferences.exportEncodingMode();
 	}
 

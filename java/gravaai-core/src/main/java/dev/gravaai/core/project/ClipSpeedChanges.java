@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -33,7 +35,7 @@ public final class ClipSpeedChanges {
 	private ClipSpeedChanges() {}
 
 	/** {@code formatClipSpeedLabel}: null for 1x, invalid or missing speed. */
-	public static String formatClipSpeedLabel(double speed) {
+	public static @Nullable String formatClipSpeedLabel(double speed) {
 		if (!Double.isFinite(speed) || speed <= 0 || speed == 1) {
 			return null;
 		}
@@ -43,12 +45,12 @@ public final class ClipSpeedChanges {
 		return label + "x";
 	}
 
-	private static boolean spansOverlap(long leftStart, long leftEnd, long rightStart, long rightEnd) {
+	private static @Nullable boolean spansOverlap(long leftStart, long leftEnd, long rightStart, long rightEnd) {
 		return leftStart < rightEnd && leftEnd > rightStart;
 	}
 
 	/** {@code planClipSpeedChange}. */
-	public static Result planClipSpeedChange(
+	public static @Nullable Result planClipSpeedChange(
 			List<ClipRegion> clipRegions, List<ZoomRegion> zoomRegions,
 			String selectedClipId, double speed) {
 		if (selectedClipId == null || !Double.isFinite(speed) || speed <= 0) {

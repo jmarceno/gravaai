@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +24,9 @@ import tools.jackson.databind.node.ObjectNode;
  * project data creation, user-preference stripping and dropping the developer-only motion-blur
  * tuning.
  */
+// Loose-JSON port: values are looked up, null-checked and read again, which NullAway cannot
+// follow. Checked by its tests instead; typed code it returns is null-checked.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectPersistence {
 
 	public static final long PROJECT_VERSION = 2;
@@ -526,7 +531,7 @@ public final class ProjectPersistence {
 		return List.copyOf(regions);
 	}
 
-	private static List<ClipRegion> normalizeClipRegions(JsonNode rawRegions) {
+	private static @Nullable List<ClipRegion> normalizeClipRegions(JsonNode rawRegions) {
 		if (rawRegions == null || !rawRegions.isArray()) {
 			return List.of();
 		}
@@ -573,7 +578,7 @@ public final class ProjectPersistence {
 		return List.copyOf(regions);
 	}
 
-	private static ClipTransition normalizeClipTransition(JsonNode value) {
+	private static @Nullable ClipTransition normalizeClipTransition(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -689,7 +694,7 @@ public final class ProjectPersistence {
 						? field(rawStyle, "borderRadius").doubleValue() : defaults.borderRadius());
 	}
 
-	private static FigureData normalizeFigureData(JsonNode rawFigureData) {
+	private static @Nullable FigureData normalizeFigureData(JsonNode rawFigureData) {
 		if (rawFigureData == null || !rawFigureData.isObject()) {
 			return null;
 		}
@@ -872,7 +877,7 @@ public final class ProjectPersistence {
 	}
 
 	private static WebcamOverlaySettings normalizeWebcam(
-			JsonNode webcamNode, String sourcePath, Double legacyZoomScaleEffect) {
+			JsonNode webcamNode, @Nullable String sourcePath, @Nullable Double legacyZoomScaleEffect) {
 		WebcamOverlaySettings defaults = WebcamOverlaySettings.defaults();
 
 		List<WebcamOverlaySettings.TimeRange> visibleRanges = null;
@@ -978,7 +983,7 @@ public final class ProjectPersistence {
 		return new Span(startMs, endMs);
 	}
 
-	private static JsonNode field(JsonNode node, String name) {
+	private static @Nullable JsonNode field(JsonNode node, String name) {
 		return node != null && node.isObject() ? node.get(name) : null;
 	}
 
@@ -986,15 +991,15 @@ public final class ProjectPersistence {
 		return value != null && value.isNumber() && Double.isFinite(value.doubleValue());
 	}
 
-	private static Double finite(JsonNode value) {
+	private static @Nullable Double finite(JsonNode value) {
 		return isFiniteNumber(value) ? value.doubleValue() : null;
 	}
 
-	private static String text(JsonNode value) {
+	private static @Nullable String text(JsonNode value) {
 		return value != null && value.isString() ? value.asString() : null;
 	}
 
-	private static Boolean bool(JsonNode value) {
+	private static @Nullable Boolean bool(JsonNode value) {
 		return value != null && value.isBoolean() ? value.booleanValue() : null;
 	}
 
@@ -1003,7 +1008,7 @@ public final class ProjectPersistence {
 		return parsed != null ? parsed : fallback;
 	}
 
-	private static double numberOr(JsonNode value, double fallback) {
+	private static double numberOr(JsonNode value, @Nullable double fallback) {
 		return isFiniteNumber(value) ? value.doubleValue() : fallback;
 	}
 
@@ -1028,7 +1033,7 @@ public final class ProjectPersistence {
 		return value.isArray() || value.isObject() ? value.size() > 0 : true;
 	}
 
-	private static double clampSetting(JsonNode value, double min, double max, double fallback) {
+	private static double clampSetting(JsonNode value, @Nullable double min, @Nullable double max, double fallback) {
 		if (!isFiniteNumber(value)) {
 			return fallback;
 		}

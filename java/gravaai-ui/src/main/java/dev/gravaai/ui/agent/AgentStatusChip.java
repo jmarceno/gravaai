@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -40,8 +42,8 @@ public final class AgentStatusChip extends HBox {
 	private final Button disable;
 	private final Tooltip tooltip = new Tooltip();
 	private final AutoCloseable subscription;
-	private Animation pingAnimation;
-	private AgentUiService.Snapshot snapshot;
+	private @Nullable Animation pingAnimation;
+	private AgentUiService.@Nullable Snapshot snapshot;
 
 	public AgentStatusChip(AgentUiService service) {
 		this.service = service;
@@ -148,7 +150,7 @@ public final class AgentStatusChip extends HBox {
 	}
 
 	/** Current snapshot the chip rendered from (tests). */
-	AgentUiService.Snapshot currentSnapshot() {
+	AgentUiService.@Nullable Snapshot currentSnapshot() {
 		return snapshot;
 	}
 

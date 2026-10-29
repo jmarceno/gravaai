@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.ui.kit.Button;
@@ -26,7 +28,7 @@ import javafx.scene.layout.VBox;
 public final class DashboardAnnouncementsView extends StackPane {
 
 	/** One banner in {@code AnnouncementConfig.banners}. */
-	public record Banner(String src, String alt, String href) {
+	public record Banner(String src, String alt, @Nullable String href) {
 	}
 
 	/** Port of the {@code dashboardAnnouncements} constant. */
@@ -103,7 +105,7 @@ public final class DashboardAnnouncementsView extends StackPane {
 		getChildren().add(card);
 	}
 
-	private HBox dots(Config config) {
+	private @Nullable HBox dots(Config config) {
 		HBox dots = new HBox(8);
 		dots.setAlignment(Pos.CENTER);
 		for (int slide = 0; slide < config.banners().size(); slide++) {
@@ -118,7 +120,7 @@ public final class DashboardAnnouncementsView extends StackPane {
 		return dots;
 	}
 
-	private Button arrowButton(String icon, String accessibleText, Runnable action) {
+	private @Nullable Button arrowButton(String icon, String accessibleText, Runnable action) {
 		Button button = new Button("", Button.Variant.SECONDARY, Button.Size.SM);
 		button.setGraphic(Icon.of(icon, 16));
 		button.setAccessibleText(accessibleText);
@@ -126,13 +128,13 @@ public final class DashboardAnnouncementsView extends StackPane {
 		return button;
 	}
 
-	private static javafx.scene.layout.Region spacer() {
+	private static javafx.scene.layout.@Nullable Region spacer() {
 		javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
 		HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 		return spacer;
 	}
 
-	private ImageView loadImage(String src) {
+	private @Nullable ImageView loadImage(String src) {
 		if (src == null || src.isBlank()) {
 			return null;
 		}

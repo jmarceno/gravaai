@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
@@ -15,6 +17,8 @@ import javafx.stage.Stage;
  * so the shortcut dispatcher can address it), the primary stage hosts the dashboard, and the tray
  * callbacks drive both.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Windows {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
@@ -27,9 +31,9 @@ public final class Windows {
 
 	private final Stage primaryStage;
 	private final boolean uiKitMode;
-	private EditorWindow editorWindow;
-	private EditorLauncher editorLauncher;
-	private GlobalShortcutHud hud;
+	private @Nullable EditorWindow editorWindow;
+	private @Nullable EditorLauncher editorLauncher;
+	private @Nullable GlobalShortcutHud hud;
 
 	public Windows(Stage primaryStage, boolean uiKitMode) {
 		this.primaryStage = primaryStage;

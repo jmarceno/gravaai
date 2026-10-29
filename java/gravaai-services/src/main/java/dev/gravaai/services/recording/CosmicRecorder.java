@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,6 +54,8 @@ import tools.jackson.databind.JsonNode;
  * on rotated outputs, so video comes straight from the compositor and audio from PulseAudio
  * (parec), then everything is muxed.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CosmicRecorder implements CosmicSession.CosmicMux {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -78,7 +82,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	/** The stop result; {@code meeting} is set for meeting recordings (speaker tracks kept). */
-	public record StopResult(boolean success, String path, String error, MeetingInfo meeting) {
+	public record StopResult(boolean success, @Nullable String path, @Nullable String error, @Nullable MeetingInfo meeting) {
 
 		public static StopResult ok(String path, MeetingInfo meeting) {
 			return new StopResult(true, path, null, meeting);
@@ -122,7 +126,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 
 	private static final class ActiveRecording {
 
-		private VideoCapture video;
+		private @Nullable VideoCapture video;
 		private List<AudioTrack> audio;
 		private Path outputPath;
 		private long startedAtMs;
@@ -131,7 +135,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		private MicNoiseReduction micNoiseReduction;
 		private long timestamp;
 		private Path manifestPath;
-		private ScheduledFuture<?> diskCheck;
+		private @Nullable ScheduledFuture<?> diskCheck;
 	}
 
 	private static final long MIN_FREE_BYTES_TO_START = 2L * 1024 * 1024 * 1024;
@@ -153,7 +157,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	private final Supplier<MicNoiseReduction> micNoiseReductionSetting;
 	private final ScheduledExecutorService diskChecker;
 
-	private ActiveRecording active;
+	private @Nullable ActiveRecording active;
 
 	public CosmicRecorder(
 			Supplier<Path> recordingsDir,
@@ -178,7 +182,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	/** Timestamp of the recording in progress, so recovery leaves its files alone. */
-	public synchronized Long getActiveCosmicTimestamp() {
+	public synchronized @Nullable Long getActiveCosmicTimestamp() {
 		return active == null ? null : active.timestamp;
 	}
 
@@ -186,7 +190,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	 * Wall clock of the screen video's first frame for the recording in progress (the webcam
 	 * track anchors to it), or null when nothing is recording.
 	 */
-	public synchronized Long getActiveCosmicStartedAtMs() {
+	public synchronized @Nullable Long getActiveCosmicStartedAtMs() {
 		return active == null ? null : active.startedAtMs;
 	}
 
@@ -195,7 +199,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	/** Free bytes available to this user in dir, or null when unknown. */
-	public static Long getFreeBytes(Path dir) {
+	public static @Nullable Long getFreeBytes(Path dir) {
 		try {
 			FileStore store = Files.getFileStore(dir);
 			return store.getUsableSpace();
@@ -204,7 +208,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}
 	}
 
-	private static String checkFreeSpaceToStart(Path dir) {
+	private static @Nullable String checkFreeSpaceToStart(Path dir) {
 		Long free = getFreeBytes(dir);
 		return free != null && free < MIN_FREE_BYTES_TO_START
 				? "Not enough free disk space to record (less than 2 GB free in " + dir + ")."
@@ -294,7 +298,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	/** The PulseAudio source whose description matches Chromium's device label. */
-	String resolvePulseMicrophone(String label) {
+	@Nullable String resolvePulseMicrophone(String label) {
 		if (label == null || label.isBlank() || "default".equalsIgnoreCase(label)) {
 			return "@DEFAULT_SOURCE@";
 		}
@@ -311,7 +315,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	/** The matching source name from {@code pactl -f json list sources} output, or null. */
-	static String pickPulseMicrophone(JsonNode sources, String label) {
+	static @Nullable String pickPulseMicrophone(JsonNode sources, String label) {
 		if (sources == null || !sources.isArray()) {
 			return null;
 		}
@@ -331,7 +335,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		return null;
 	}
 
-	private static String transposeFilter(int transform) {
+	private static @Nullable String transposeFilter(int transform) {
 		String flip = transform >= 4 ? "hflip," : "";
 		return switch (transform % 4) {
 			case 1 -> flip + "transpose=1";
@@ -1134,7 +1138,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			CompletableFuture<CosmicOutput> result,
 			AtomicBoolean settled,
 			SpawnedProcess helper,
-			int[] picked) {
+			@Nullable int[] picked) {
 		if (!settled.compareAndSet(false, true)) {
 			return;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -40,8 +42,8 @@ public final class SceneMotion {
 	 * @param cursorFollowCamera the persistent cursor-follow state
 	 */
 	public record SceneZoomRequest(List<ZoomRegionSpec> zoomRegions, double timeMs,
-			Double cursorTimeMs, Boolean connectZooms, Double zoomInDurationMs,
-			Double zoomOutDurationMs, boolean zoomClassicMode, List<CursorSample> cursorTelemetry,
+			@Nullable Double cursorTimeMs, @Nullable Boolean connectZooms, @Nullable Double zoomInDurationMs,
+			@Nullable Double zoomOutDurationMs, boolean zoomClassicMode, List<CursorSample> cursorTelemetry,
 			CursorFollowCamera.CursorFollowCameraState cursorFollowCamera) {
 
 		/** A request with default options and no cursor telemetry. */

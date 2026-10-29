@@ -1,5 +1,7 @@
 package dev.gravaai.app.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -48,6 +50,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code safeStorage}; the Java build has no libsecret backend yet, so reading a plain string kept
  * by the Electron app works, while writing reports the gap instead of persisting plaintext.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingIntegration implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.app.meeting");
@@ -109,7 +113,7 @@ public final class MeetingIntegration implements AutoCloseable {
 	private static SettingsStore settingsAdapter(AppSettingsStore settings) {
 		return new SettingsStore() {
 			@Override
-			public Object get(String key) {
+			public @Nullable Object get(String key) {
 				JsonNode node = settings.readSetting(key);
 				return node == null || node.isNull() ? null : JSON.convertValue(node, Object.class);
 			}

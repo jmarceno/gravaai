@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -39,6 +41,8 @@ import javafx.util.Duration;
  * State transitions use the motion/react values from LaunchWindow.tsx (240 ms,
  * ease [0.22, 1, 0.36, 1]) via {@link Motion#EASE_MOTION_OUT}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudBar extends HBox {
 
 	private static final String RECORD_DOT = "hud-rec-dot";
@@ -50,9 +54,9 @@ public final class HudBar extends HBox {
 	private final RecordingTimer recordingTimer = new RecordingTimer();
 	private final Label timerLabel = new Label("00:00");
 	private final Label pausedLabel = new Label("PAUSED");
-	private Timeline timerTick;
-	private FadeTransition blink;
-	private RotateTransition spinner;
+	private @Nullable Timeline timerTick;
+	private @Nullable FadeTransition blink;
+	private @Nullable RotateTransition spinner;
 	private Node currentState;
 	private HudRecordingPort.State state = HudRecordingPort.State.idle();
 
@@ -314,7 +318,7 @@ public final class HudBar extends HBox {
 	// ── helpers ───────────────────────────────────────────────────────────
 
 	private Button iconButton(String iconName, String weight, double iconSize, String tooltip,
-			String accentClass, Runnable action) {
+			@Nullable String accentClass, @Nullable Runnable action) {
 		Button button = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		button.icon(Icon.of(iconName, iconSize, weight));
 		button.setAccessibleText(tooltip);

@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -35,6 +37,8 @@ import dev.gravaai.services.meeting.ports.Trash;
  * Replaces the IPC channel group in electron/ipc/register/meeting.ts (plan §5.3, Appendix A);
  * the Lead wires the concrete ports in AppContext, the UI subscribes to the events.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingService {
 
 	/** Which file {@code meeting-save-file} rewrites. */
@@ -48,11 +52,11 @@ public final class MeetingService {
 			this.wire = wire;
 		}
 
-		public String wire() {
+		public @Nullable String wire() {
 			return wire;
 		}
 
-		public static FileKind fromWire(Object value) {
+		public static @Nullable FileKind fromWire(Object value) {
 			if (value instanceof FileKind kind) {
 				return kind;
 			}
@@ -78,7 +82,7 @@ public final class MeetingService {
 	}
 
 	/** A download progress event (meeting-asset-progress). */
-	public record AssetProgress(String id, Integer progress, boolean removed) {
+	public record AssetProgress(String id, @Nullable Integer progress, boolean removed) {
 	}
 
 	private final MeetingAssets assets;
@@ -95,7 +99,7 @@ public final class MeetingService {
 	private final List<Runnable> openListeners = new CopyOnWriteArrayList<>();
 	private final List<Consumer<AssetProgress>> assetListeners = new CopyOnWriteArrayList<>();
 	private final Object openLock = new Object();
-	private Path requestedMeeting;
+	private @Nullable Path requestedMeeting;
 
 	private MeetingService(MeetingAssets assets, AssetInstaller assetInstaller,
 			MeetingSettingsService settings, MeetingMetaStore metaStore, MeetingJobs jobs,
@@ -436,7 +440,7 @@ public final class MeetingService {
 		asyncExecutor.shutdownNow();
 	}
 
-	private static String readOptional(Path file) {
+	private static @Nullable String readOptional(Path file) {
 		try {
 			return Files.readString(file);
 		} catch (IOException error) {

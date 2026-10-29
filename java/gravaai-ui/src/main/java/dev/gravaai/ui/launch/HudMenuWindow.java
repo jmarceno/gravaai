@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -35,6 +37,8 @@ import javafx.stage.StageStyle;
  * button. Mic rows show a live level meter (PulseAudio via {@link MicLevelMonitor}); the webcam
  * menu shows a live camera preview ({@link WebcamPreviewView}).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudMenuWindow {
 
 	/** The HUD menus (HudMenuWindow.tsx {@code HudMenuId}) plus the monitor list. */
@@ -51,13 +55,13 @@ public final class HudMenuWindow {
 		}
 	};
 
-	private Stage stage;
-	private StackPane root;
-	private VBox panel;
-	private VBox content;
-	private ScrollPane scroll;
-	private Menu active;
-	private WebcamPreviewView menuPreview;
+	private @Nullable Stage stage;
+	private @Nullable StackPane root;
+	private @Nullable VBox panel;
+	private @Nullable VBox content;
+	private @Nullable ScrollPane scroll;
+	private @Nullable Menu active;
+	private @Nullable WebcamPreviewView menuPreview;
 
 	public HudMenuWindow(HudRecordingPort port) {
 		this.port = port;
@@ -69,7 +73,7 @@ public final class HudMenuWindow {
 	}
 
 	/** The visible menu, or null. */
-	public Menu activeMenu() {
+	public @Nullable Menu activeMenu() {
 		return active;
 	}
 
@@ -389,7 +393,7 @@ public final class HudMenuWindow {
 	}
 
 	/** The stage, for the app's window registry and tests. */
-	public Stage stage() {
+	public @Nullable Stage stage() {
 		return stage;
 	}
 }

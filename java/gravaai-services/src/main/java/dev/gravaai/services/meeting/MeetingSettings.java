@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +12,8 @@ import java.util.function.Predicate;
  * (electron/ipc/meeting/settings.ts). The API key itself never lives here; it is kept behind
  * {@code MeetingApiKeyStore}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record MeetingSettings(
 		MeetingServiceKind transcriptionService,
 		String whisperModel,
@@ -216,7 +220,7 @@ public record MeetingSettings(
 				autoTitle);
 	}
 
-	private static Object pick(Map<?, ?> input, String key, Predicate<Object> valid,
+	private static @Nullable Object pick(Map<?, ?> input, String key, Predicate<Object> valid,
 			Object fallback) {
 		Object value = input.get(key);
 		return valid.test(value) ? value : fallback;
@@ -230,7 +234,7 @@ public record MeetingSettings(
 		return value instanceof String text && !text.strip().isEmpty();
 	}
 
-	private static boolean isCapabilities(Object value) {
+	private static boolean isCapabilities(@Nullable Object value) {
 		if (!(value instanceof List<?> list)) {
 			return false;
 		}
@@ -245,7 +249,7 @@ public record MeetingSettings(
 		return true;
 	}
 
-	private static List<SummarizerCapability> capabilities(Object value) {
+	private static List<SummarizerCapability> capabilities(@Nullable Object value) {
 		List<SummarizerCapability> capabilities = new ArrayList<>();
 		for (Object entry : (List<?>) value) {
 			capabilities.add(SummarizerCapability.fromWire(entry));

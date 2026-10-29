@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
@@ -35,6 +37,8 @@ import javafx.scene.layout.VBox;
  * {@code useMeeting.ts}): live job progress, the notes/transcript tabs, edit/copy, re-run stages
  * and the clickable timestamp markdown.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingNotesView extends VBox {
 
 	private enum Tab {
@@ -55,14 +59,14 @@ public final class MeetingNotesView extends VBox {
 	private final VBox emptyHost = new VBox(12);
 	private final MeetingMarkdownView markdown = new MeetingMarkdownView();
 
-	private Path mediaPath;
-	private MeetingService.FilesView files;
-	private MeetingJob job;
+	private @Nullable Path mediaPath;
+	private MeetingService.@Nullable FilesView files;
+	private @Nullable MeetingJob job;
 	private Tab tab = Tab.NOTES;
-	private Tab editing;
-	private String draft;
+	private @Nullable Tab editing;
+	private @Nullable String draft;
 	private boolean loading;
-	private Subscription jobSubscription;
+	private @Nullable Subscription jobSubscription;
 
 	public MeetingNotesView(MeetingUiService service, Consumer<Double> onSeek) {
 		this.service = service;
@@ -140,7 +144,7 @@ public final class MeetingNotesView extends VBox {
 		mediaPath = null;
 	}
 
-	public Path mediaPath() {
+	public @Nullable Path mediaPath() {
 		return mediaPath;
 	}
 
@@ -378,7 +382,7 @@ public final class MeetingNotesView extends VBox {
 		}
 	}
 
-	private String currentContent() {
+	private @Nullable String currentContent() {
 		if (files == null) {
 			return null;
 		}
@@ -453,7 +457,7 @@ public final class MeetingNotesView extends VBox {
 		CompletableFuture.runAsync(() -> service.cancelJob(current.id()));
 	}
 
-	private void error(String message) {
+	private void error(@Nullable String message) {
 		boolean visible = message != null && !message.isBlank();
 		errorLabel.setText(visible ? message : "");
 		errorLabel.setVisible(visible);

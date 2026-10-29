@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ZoomDepth;
@@ -24,9 +26,9 @@ public final class ZoomSettingsPanel extends VBox {
 
 	private final EditorStore store;
 	private final VBox content = new VBox(14);
-	private ChoiceGroup modeGroup;
-	private ChoiceGroup amountGroup;
-	private Button deleteButton;
+	private @Nullable ChoiceGroup modeGroup;
+	private @Nullable ChoiceGroup amountGroup;
+	private @Nullable Button deleteButton;
 
 	public ZoomSettingsPanel(EditorStore store) {
 		this.store = store;
@@ -89,20 +91,20 @@ public final class ZoomSettingsPanel extends VBox {
 	}
 
 	/** The amount chips in depth order (1.25x, 1.5x, 1.8x, 2.2x, 3.5x, 5x). */
-	public ChoiceGroup amountGroup() {
+	public @Nullable ChoiceGroup amountGroup() {
 		return amountGroup;
 	}
 
 	/** The Auto/Manual mode chips. */
-	public ChoiceGroup modeGroup() {
+	public @Nullable ChoiceGroup modeGroup() {
 		return modeGroup;
 	}
 
-	public Button deleteButton() {
+	public @Nullable Button deleteButton() {
 		return deleteButton;
 	}
 
-	private ZoomRegion selected() {
+	private @Nullable ZoomRegion selected() {
 		String id = store.selectedZoomId();
 		if (id == null) {
 			return null;

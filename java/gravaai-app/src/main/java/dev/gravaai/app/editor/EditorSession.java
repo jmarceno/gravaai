@@ -1,5 +1,7 @@
 package dev.gravaai.app.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,6 +53,8 @@ import tools.jackson.databind.JsonNode;
  * selections), the playback engine and the two timeline adapters. It is JavaFX-free so it can be
  * tested directly; {@code EditorWindow} builds the view on top.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorSession implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.editor");
@@ -73,15 +77,15 @@ public final class EditorSession implements AutoCloseable {
 	private final AutoCloseable timeSubscription;
 	private final StoreTimelineDataSource dataSource;
 	private final TimelineCommands timelineCommands;
-	private volatile PlaybackAudioTrack audioTrack;
+	private volatile @Nullable PlaybackAudioTrack audioTrack;
 	private volatile boolean closed;
 	/** The clips playback was last given; null until media is attached. */
-	private volatile List<ClipRegion> playbackClips;
+	private volatile @Nullable List<ClipRegion> playbackClips;
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
 
-	private EditorSession(Path projectPath, ProjectDocument document, ProjectDocument mediaSource) {
+	private EditorSession(@Nullable Path projectPath, ProjectDocument document, ProjectDocument mediaSource) {
 		this.projectPath = projectPath;
 		this.document = document;
 		this.mediaSource = mediaSource;
@@ -339,7 +343,7 @@ public final class EditorSession implements AutoCloseable {
 	}
 
 	/** Audio-out engine when PulseAudio + bundled ffmpeg are available, else the silent default. */
-	private static PlaybackEngine createEngine(PlaybackMedia media) {
+	private static @Nullable PlaybackEngine createEngine(PlaybackMedia media) {
 		if (media != null && media.videoPath() != null && !media.videoPath().isBlank()) {
 			try {
 				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
@@ -357,7 +361,7 @@ public final class EditorSession implements AutoCloseable {
 		return PlaybackEngine.createDefault(DecoderFrameSourceProvider.ffmpegBacked());
 	}
 
-	private static PlaybackMedia loadMedia(ProjectDocument document) {
+	private static @Nullable PlaybackMedia loadMedia(ProjectDocument document) {
 		String videoPath = document.videoPath();
 		if (videoPath == null || videoPath.isBlank()) {
 			return null;
@@ -375,7 +379,7 @@ public final class EditorSession implements AutoCloseable {
 	}
 
 	/** The project's webcam recording, or {@code null} when it has none or it is missing. */
-	private static Path resolveWebcamPath(ProjectDocument document) {
+	private static @Nullable Path resolveWebcamPath(ProjectDocument document) {
 		try {
 			Result<ProjectMediaSources> sources = ProjectManager
 					.resolveProjectMediaSources(document.toJson());

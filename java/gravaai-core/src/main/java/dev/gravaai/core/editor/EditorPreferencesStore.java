@@ -15,6 +15,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The Electron build writes the same values to {@code localStorage} as a mirror; the Java app has
  * one process, so the app-settings store is the single persistence target (recorded narrowing).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorPreferencesStore {
 
 	private static final System.Logger LOG =

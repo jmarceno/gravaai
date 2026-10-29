@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording.ports;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,6 +18,8 @@ import dev.gravaai.platform.process.RunningProcess;
  * (ffmpeg mux runs, parec) the pipe is closed immediately so the child gets EOF, the same end
  * result as Electron's {@code stdio: ["ignore", ...]}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PlatformRecordingProcesses implements RecordingProcesses {
 
 	@Override
@@ -42,12 +46,12 @@ public final class PlatformRecordingProcesses implements RecordingProcesses {
 			}
 
 			@Override
-			public InputStream stdout() {
+			public @Nullable InputStream stdout() {
 				return options.stdout() ? running.stdout() : null;
 			}
 
 			@Override
-			public InputStream stderr() {
+			public @Nullable InputStream stderr() {
 				return options.stderr() ? running.stderr() : null;
 			}
 

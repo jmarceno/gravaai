@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Latest-wins scrub coalescing (plan §5.9): the preview panel can submit scrub positions faster than
  * a precise seek completes; the engine takes only the newest pending position.
@@ -23,7 +25,7 @@ public final class ScrubCoalescer {
 	}
 
 	/** Returns the latest pending position and clears it, or null when there is nothing to do. */
-	public synchronized Pending takeLatest() {
+	public synchronized @Nullable Pending takeLatest() {
 		if (!pending) {
 			return null;
 		}

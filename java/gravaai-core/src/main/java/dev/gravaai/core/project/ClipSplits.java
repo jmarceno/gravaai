@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -14,9 +16,9 @@ public final class ClipSplits {
 
 	public record Plan(String targetId, ClipRegion left, ClipRegion right) {}
 
-	private ClipSplits() {}
+	@Nullable private ClipSplits() {}
 
-	public static Plan planClipSplit(
+	public static @Nullable Plan planClipSplit(
 			List<ClipRegion> clipRegions, double splitMs, Supplier<String> createId) {
 		if (!Double.isFinite(splitMs)) {
 			return null;

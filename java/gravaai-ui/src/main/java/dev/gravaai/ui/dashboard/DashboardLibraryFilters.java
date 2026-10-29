@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -116,7 +118,7 @@ public final class DashboardLibraryFilters {
 	}
 
 	/** Port of {@code hasActiveFilters}: a search, a time filter or a selected folder. */
-	public static boolean hasActiveFilters(String query, Period period, List<ProjectFolder> folders,
+	public static @Nullable boolean hasActiveFilters(String query, Period period, List<ProjectFolder> folders,
 			DashboardSection section) {
 		boolean folderSelected = section instanceof DashboardSection.Folder folder
 				&& folders.stream().anyMatch(candidate -> candidate.id().equals(folder.id()));
@@ -124,7 +126,7 @@ public final class DashboardLibraryFilters {
 	}
 
 	/** The folder selected by {@code section}, or {@code null}. */
-	public static ProjectFolder selectedFolder(List<ProjectFolder> folders, DashboardSection section) {
+	public static @Nullable ProjectFolder selectedFolder(List<ProjectFolder> folders, DashboardSection section) {
 		if (!(section instanceof DashboardSection.Folder selected)) {
 			return null;
 		}

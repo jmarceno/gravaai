@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline.core;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -91,8 +93,8 @@ public final class ZoomSuggestionUtils {
 	}
 
 	/** Port of {@code shouldAutoApplyFreshRecordingZoomsForSource}. */
-	public static boolean shouldAutoApplyFreshRecordingZoomsForSource(Integer sourceWidth,
-			Integer sourceHeight, String platform) {
+	public static boolean shouldAutoApplyFreshRecordingZoomsForSource(@Nullable Integer sourceWidth,
+			@Nullable Integer sourceHeight, String platform) {
 		if ("win32".equals(platform)) {
 			return true;
 		}

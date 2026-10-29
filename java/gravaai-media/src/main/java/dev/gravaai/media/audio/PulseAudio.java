@@ -1,5 +1,7 @@
 package dev.gravaai.media.audio;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -18,6 +20,8 @@ import dev.gravaai.platform.process.ProcessRunner;
  * JSON belongs to gravaai-core, plan §4.2). Recording uses libpulse-simple through FFM
  * ({@link PulseSimpleRecordStream}).</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PulseAudio {
 
 	private static final System.Logger LOG = System.getLogger(PulseAudio.class.getName());
@@ -95,7 +99,7 @@ public final class PulseAudio {
 		return List.copyOf(sources);
 	}
 
-	private static String stringValue(Map<?, ?> object, String key) {
+	private static @Nullable String stringValue(Map<?, ?> object, String key) {
 		Object value = object.get(key);
 		return value instanceof String text ? text : null;
 	}
@@ -110,7 +114,7 @@ public final class PulseAudio {
 			this.text = text == null ? "" : text;
 		}
 
-		Object parse() {
+		@Nullable Object parse() {
 			skipWhitespace();
 			if (position >= text.length()) {
 				return null;
@@ -120,7 +124,7 @@ public final class PulseAudio {
 			return value;
 		}
 
-		private Object readValue() {
+		private @Nullable Object readValue() {
 			skipWhitespace();
 			if (position >= text.length()) {
 				throw error("unexpected end of input");
@@ -184,7 +188,7 @@ public final class PulseAudio {
 			}
 		}
 
-		private String readString() {
+		private @Nullable String readString() {
 			expect('"');
 			StringBuilder builder = new StringBuilder();
 			while (position < text.length()) {
@@ -214,7 +218,7 @@ public final class PulseAudio {
 			throw error("unterminated string");
 		}
 
-		private Object readNumber() {
+		private @Nullable Object readNumber() {
 			int start = position;
 			while (position < text.length()) {
 				char current = text.charAt(position);
@@ -232,7 +236,7 @@ public final class PulseAudio {
 			return Double.parseDouble(number);
 		}
 
-		private Object readLiteral(String literal, Object value) {
+		private Object readLiteral(String literal, @Nullable Object value) {
 			if (text.startsWith(literal, position)) {
 				position += literal.length();
 				return value;

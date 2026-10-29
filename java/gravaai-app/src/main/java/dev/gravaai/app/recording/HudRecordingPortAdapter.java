@@ -1,5 +1,7 @@
 package dev.gravaai.app.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,6 +53,8 @@ import tools.jackson.databind.JsonNode;
  * <p>Threading: the HUD calls on the FX thread; service listeners are hopped to the FX thread.
  * Long operations (countdown wait, recording start/stop, preference writes) run on virtual threads.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudRecordingPortAdapter implements HudRecordingPort, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.recording");
@@ -72,10 +76,10 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	/** The values persisted in {@code recordings-settings.json}. */
 	private record Preferences(
 			boolean microphoneEnabled,
-			String microphoneDeviceId,
+			@Nullable String microphoneDeviceId,
 			boolean systemAudioEnabled,
 			boolean webcamEnabled,
-			String webcamDeviceId) {
+			@Nullable String webcamDeviceId) {
 
 		static Preferences defaults() {
 			return new Preferences(false, null, false, false, null);
@@ -109,9 +113,9 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	private volatile boolean recordScreen = true;
 	private volatile boolean floatingWebcamPreview;
 	private volatile boolean picking;
-	private volatile WebcamRecordingService.WebcamRecording webcamRecording;
-	private volatile WebcamRecordingService webcamService;
-	private volatile CachedDevices cachedDevices;
+	private volatile WebcamRecordingService.@Nullable WebcamRecording webcamRecording;
+	private volatile @Nullable WebcamRecordingService webcamService;
+	private volatile @Nullable CachedDevices cachedDevices;
 
 	private HudRecordingPortAdapter(
 			RecordingWiring wiring,
@@ -281,7 +285,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Built on the first webcam recording, never on the startup path. */
-	private WebcamRecordingService webcamService() {
+	private @Nullable WebcamRecordingService webcamService() {
 		WebcamRecordingService service = webcamService;
 		if (service == null) {
 			synchronized (this) {
@@ -301,7 +305,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Opens the camera and waits for its first frame; null when the webcam is unavailable. */
-	private WebcamRecordingService.WebcamRecording prepareWebcamRecording(String devicePath) {
+	private WebcamRecordingService.@Nullable WebcamRecording prepareWebcamRecording(String devicePath) {
 		try {
 			WebcamRecordingService.StartResult result =
 					webcamService().prepare(System.currentTimeMillis(), devicePath, null);
@@ -322,7 +326,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Stops a webcam take that will not be used and deletes its file. */
-	private static void discardWebcam(WebcamRecordingService.WebcamRecording webcam) {
+	private static void discardWebcam(WebcamRecordingService.@Nullable WebcamRecording webcam) {
 		if (webcam == null) {
 			return;
 		}
@@ -660,7 +664,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Enumerates devices on first use (HUD menu) and caches them briefly. */
-	private CachedDevices devices() {
+	private @Nullable CachedDevices devices() {
 		CachedDevices cached = cachedDevices;
 		long now = System.currentTimeMillis();
 		if (cached != null && now - cached.atMs() < DEVICE_CACHE_TTL_MS) {
@@ -745,7 +749,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		}
 	}
 
-	private String microphoneLabel(String deviceId) {
+	private @Nullable String microphoneLabel(String deviceId) {
 		if (deviceId == null || deviceId.isBlank()) {
 			return null;
 		}
@@ -757,11 +761,11 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		return null;
 	}
 
-	private static boolean booleanValue(JsonNode node, boolean fallback) {
+	private static boolean booleanValue(@Nullable JsonNode node, boolean fallback) {
 		return node != null && node.isBoolean() ? node.booleanValue() : fallback;
 	}
 
-	private static String textValue(JsonNode node) {
+	private static @Nullable String textValue(@Nullable JsonNode node) {
 		return node != null && node.isString() && !node.asString().isBlank() ? node.asString() : null;
 	}
 

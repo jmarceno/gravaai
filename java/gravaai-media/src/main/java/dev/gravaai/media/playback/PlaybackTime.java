@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * One playhead update: timeline time plus the source time it maps to.
  *
@@ -7,5 +9,5 @@ package dev.gravaai.media.playback;
  * @param sourceSeconds the source media timestamp, or null over a gap with no clip
  * @param clipId the active clip id, or null over a gap
  */
-public record PlaybackTime(double timelineSeconds, Double sourceSeconds, String clipId) {
+public record PlaybackTime(double timelineSeconds, @Nullable Double sourceSeconds, @Nullable String clipId) {
 }

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -58,7 +60,7 @@ public final class ColorPicker extends Button {
 	private final List<Color> presetColors = new ArrayList<>();
 	private Color color = Color.BLACK;
 	private Consumer<Color> onColorChange = color -> {};
-	private Runnable onClear;
+	private @Nullable Runnable onClear;
 
 	public ColorPicker(String label) {
 		this(label, "#000000");

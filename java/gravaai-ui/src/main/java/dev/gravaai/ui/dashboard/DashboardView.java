@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,9 +89,9 @@ public final class DashboardView {
 	private String activeSettingsCategory = "general";
 	private boolean rawLoaded;
 	private boolean meetingsLoaded;
-	private Subscription meetingJobSubscription;
-	private PauseTransition meetingsRefreshTimer;
-	private AutomationsSettingsView automationsView;
+	private @Nullable Subscription meetingJobSubscription;
+	private @Nullable PauseTransition meetingsRefreshTimer;
+	private @Nullable AutomationsSettingsView automationsView;
 	private dev.gravaai.ui.agent.AgentSettingsView agentSettingsView;
 
 	public DashboardView(DashboardDependencies dependencies) {

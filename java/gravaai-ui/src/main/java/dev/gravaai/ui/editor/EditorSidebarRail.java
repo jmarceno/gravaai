@@ -13,6 +13,8 @@ import javafx.scene.layout.VBox;
  * Left icon rail of the editor (port of {@code EditorSidebar.tsx}): one ghost icon button per
  * inspector section, the active one highlighted.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorSidebarRail extends VBox {
 
 	/** Editor inspector sections, in the React rail's visual order. */

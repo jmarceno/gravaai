@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions.canvas;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -23,10 +25,10 @@ public final class CanvasColor {
 
 	private static final Map<String, Integer> NAMED = namedColors();
 
-	private CanvasColor() {}
+	@Nullable private CanvasColor() {}
 
 	/** Parses a CSS colour string to packed ARGB, or null when the value is not a colour. */
-	public static Integer parse(String css) {
+	public static @Nullable Integer parse(String css) {
 		if (css == null) {
 			return null;
 		}
@@ -61,7 +63,7 @@ public final class CanvasColor {
 	}
 
 	/** Renders a packed ARGB colour as {@code rgba(r, g, b, a)}. */
-	public static String toCss(int argb) {
+	public static @Nullable String toCss(int argb) {
 		int r = (argb >>> 16) & 0xFF;
 		int g = (argb >>> 8) & 0xFF;
 		int b = argb & 0xFF;
@@ -69,7 +71,7 @@ public final class CanvasColor {
 		return "rgba(" + r + ", " + g + ", " + b + ", " + a + ")";
 	}
 
-	private static Integer parseHex(String digits) {
+	private static @Nullable Integer parseHex(String digits) {
 		try {
 			return switch (digits.length()) {
 				case 3 -> {
@@ -101,7 +103,7 @@ public final class CanvasColor {
 		}
 	}
 
-	private static Integer parseRgb(Matcher matcher) {
+	private static @Nullable Integer parseRgb(Matcher matcher) {
 		try {
 			int r = channel(matcher.group(1));
 			int g = channel(matcher.group(2));

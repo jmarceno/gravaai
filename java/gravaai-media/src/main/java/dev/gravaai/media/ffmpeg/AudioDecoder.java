@@ -1,5 +1,7 @@
 package dev.gravaai.media.ffmpeg;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -24,6 +26,8 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * {@code AVFrame}, one {@code AVPacket} and one staging buffer, so a caller can stream a whole
  * file with a single small float array.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AudioDecoder implements AutoCloseable {
 
 	/** Output sample rate required by the playback and export paths. */
@@ -50,7 +54,7 @@ public final class AudioDecoder implements AutoCloseable {
 	private final MemorySegment staging;
 	private final MemorySegment outputPointerArray;
 	private final int audioStreamIndex;
-	private MemorySegment swr;
+	private @Nullable MemorySegment swr;
 	private int inputSampleFormat = Integer.MIN_VALUE;
 	private int inputSampleRate = Integer.MIN_VALUE;
 	private int stagingStart;

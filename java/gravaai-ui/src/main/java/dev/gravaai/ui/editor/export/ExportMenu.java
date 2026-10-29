@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -33,6 +35,8 @@ import javafx.util.Duration;
  * popover stays open through the whole flow; state changes come from {@link ExportSessionModel} and
  * {@link ExportSettingsState}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportMenu {
 
 	/** Actions the app-side export controller provides (port of {@code useExportDialogActions}). */
@@ -89,7 +93,7 @@ public final class ExportMenu {
 	private final Label completeFileLabel = new Label();
 
 	private int tipIndex;
-	private javafx.animation.Transition indeterminate;
+	private javafx.animation.@Nullable Transition indeterminate;
 
 	public ExportMenu(Node trigger, ExportSettingsState settings, ExportSessionModel session,
 			Callbacks callbacks, Supplier<OutputDimensions> dimensions,
@@ -367,7 +371,7 @@ public final class ExportMenu {
 
 	// ---- rotating export tips (useExportMessages; the announcement stream stays empty) ----
 
-	private String tipText() {
+	private @Nullable String tipText() {
 		var tips = ExportMessages.defaultTips();
 		if (tips.isEmpty()) {
 			return null;

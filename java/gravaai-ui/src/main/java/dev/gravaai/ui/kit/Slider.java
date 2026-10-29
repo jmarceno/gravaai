@@ -26,6 +26,8 @@ import javafx.scene.layout.VBox;
  * over 250 ms ease-out. The {@code label}/{@code output} row matches SliderControl: label on the
  * left (text-xs with the slider-control class), formatted value on the right.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Slider extends VBox {
 
 	private static final double TRACK_INSET = 12;

@@ -3,4 +3,5 @@
  *
  * <p>No JavaFX and no native code (plan §4.2).
  */
+@org.jspecify.annotations.NullMarked
 package dev.gravaai.core;

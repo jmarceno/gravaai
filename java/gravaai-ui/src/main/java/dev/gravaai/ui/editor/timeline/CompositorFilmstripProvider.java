@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +28,8 @@ import javafx.scene.image.WritableImage;
  * the preview/export use (source/webcam frames, layout/zoom/style/cursor/overlays/captions/fades),
  * so filmstrip, preview and export cannot disagree.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CompositorFilmstripProvider implements FilmstripProvider, AutoCloseable {
 
 	private record Key(String clipId, double timelineTimeMs, int width, int height) {
@@ -38,10 +42,10 @@ public final class CompositorFilmstripProvider implements FilmstripProvider, Aut
 	private final Set<Key> failed = ConcurrentHashMap.newKeySet();
 	private volatile Runnable onFrameReady = () -> { };
 	private volatile boolean closed;
-	private volatile String lastFailure;
+	private volatile @Nullable String lastFailure;
 
 	/** Creates one compositor renderer at the requested thumbnail size. */
-	public CompositorFilmstripProvider(int width, int height,
+	@Nullable public CompositorFilmstripProvider(int width, int height,
 			FrameAtTime.FrameInputFactory inputFactory) {
 		this(new CompositorFrameAtTime(width, height, inputFactory));
 	}
@@ -57,7 +61,7 @@ public final class CompositorFilmstripProvider implements FilmstripProvider, Aut
 	}
 
 	@Override
-	public Image frameAt(String clipId, double timelineTimeMs, int thumbWidth, int thumbHeight) {
+	public @Nullable Image frameAt(String clipId, double timelineTimeMs, int thumbWidth, int thumbHeight) {
 		if (closed) {
 			return null;
 		}
@@ -100,7 +104,7 @@ public final class CompositorFilmstripProvider implements FilmstripProvider, Aut
 	}
 
 	/** Last rendering failure, or {@code null} (GL unavailable, bad input factory, ...). */
-	public String lastFailure() {
+	public @Nullable String lastFailure() {
 		return lastFailure;
 	}
 

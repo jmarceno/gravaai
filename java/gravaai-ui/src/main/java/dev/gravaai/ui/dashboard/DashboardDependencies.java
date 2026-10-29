@@ -40,6 +40,8 @@ import dev.gravaai.ui.meeting.MeetingUiService;
  *     not up. It is lazy because AppContext creates the meetings service after the dashboard in
  *     the HUD startup path; the dashboard resolves it per load, like the React IPC calls.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record DashboardDependencies(
 		UserData userData,
 		ProjectManager projects,

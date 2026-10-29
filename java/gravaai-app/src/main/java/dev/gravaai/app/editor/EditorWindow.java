@@ -1,5 +1,7 @@
 package dev.gravaai.app.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,6 +74,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@link Services}; everything the editor itself owns (undo/redo, project state) stays in
  * {@link EditorSession}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorWindow {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
@@ -92,16 +96,16 @@ public final class EditorWindow {
 	 * @param openRecordingsFolder reveals the recordings folder in the system file manager
 	 */
 	public record Services(
-			ProjectManager projects,
-			AppSettingsStore settings,
+			@Nullable ProjectManager projects,
+			@Nullable AppSettingsStore settings,
 			Consumer<Path> openProject,
 			Consumer<Path> projectUpdated,
 			Runnable onClosed,
-			Function<String, Optional<Path>> chooseOpenFile,
-			Function<String, Optional<Path>> chooseSaveFile,
-			ProjectExporter exporter,
-			java.util.function.Supplier<RecordingService> recordings,
-			Runnable openRecordingsFolder) {
+			@Nullable Function<String, Optional<Path>> chooseOpenFile,
+			@Nullable Function<String, Optional<Path>> chooseSaveFile,
+			@Nullable ProjectExporter exporter,
+			java.util.function.@Nullable Supplier<RecordingService> recordings,
+			@Nullable Runnable openRecordingsFolder) {
 
 		/** Backwards-compatible constructor without the export controller. */
 		public Services(ProjectManager projects, AppSettingsStore settings, Consumer<Path> openProject,
@@ -145,7 +149,7 @@ public final class EditorWindow {
 	private final EditorShellView shell;
 	private final TimelineView timeline;
 	private final EditorViewActions actions;
-	private final RecordingImportController recordingImport;
+	private final @Nullable RecordingImportController recordingImport;
 	private Subscription storeSubscription;
 	private Subscription timelineSubscription;
 	private final Runnable closeNow;
@@ -154,17 +158,17 @@ public final class EditorWindow {
 	private boolean disposed;
 	private boolean closeApproved;
 	private boolean previewFrameLogged;
-	private AutoCaptionController captions;
+	private @Nullable AutoCaptionController captions;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
-	private dev.gravaai.core.event.Subscription playheadSubscription;
+	private dev.gravaai.core.event.@Nullable Subscription playheadSubscription;
 	private final java.util.concurrent.atomic.AtomicBoolean playheadScheduled =
 			new java.util.concurrent.atomic.AtomicBoolean();
 	private final java.util.concurrent.atomic.AtomicLong pendingPlayheadMs =
 			new java.util.concurrent.atomic.AtomicLong();
-	private int[] cachedVideoSize;
+	private @Nullable int[] cachedVideoSize;
 	/** The fresh-recording auto-zoom pass runs at most once per editor. */
 	private boolean freshRecordingZoomsTried;
-	private volatile Runnable onGoHome;
+	private volatile @Nullable Runnable onGoHome;
 
 	private EditorWindow(Path projectPath, Services services) throws IOException {
 		this(EditorSession.open(projectPath), services, null);
@@ -178,7 +182,7 @@ public final class EditorWindow {
 				: new RecordingImportController(new RecordingImportController.Library() {
 					@Override
 					public RecordingImportService.ImportResult importRecording(String currentPath,
-							String recordingPath, RecordingImportService.RecordingWebcamSource currentWebcam,
+							String recordingPath, RecordingImportService.@Nullable RecordingWebcamSource currentWebcam,
 							java.util.function.BooleanSupplier cancelled) throws IOException {
 						return services.recordings().get().importRecording(currentPath, recordingPath,
 								currentWebcam, cancelled);
@@ -333,7 +337,7 @@ public final class EditorWindow {
 	 * Hosts a finished recording as a new, unsaved project in the main window (React
 	 * {@code switchToEditor} after stop, or a raw recording card). The first save asks for a file.
 	 */
-	public static EditorWindow createForRecordingIn(Stage stage, Path videoPath, String webcamPath,
+	public static EditorWindow createForRecordingIn(Stage stage, Path videoPath, @Nullable String webcamPath,
 			long webcamTimeOffsetMs, Services services) {
 		if (stage == null) {
 			throw new IllegalArgumentException("stage must not be null");
@@ -578,7 +582,7 @@ public final class EditorWindow {
 	}
 
 	/** Asks whether to cancel a running export before closing; Cancel keeps the editor open. */
-	private void confirmCloseDuringExport(Runnable unused, javafx.stage.WindowEvent windowEvent) {
+	private void confirmCloseDuringExport(@Nullable Runnable unused, javafx.stage.WindowEvent windowEvent) {
 		Dialog dialog = new Dialog("Export in progress");
 		dialog.description("An export is still rendering. Close anyway and cancel it?");
 		Button keepOpen = new Button("Keep editing", Button.Variant.DEFAULT, Button.Size.SM);
@@ -627,7 +631,7 @@ public final class EditorWindow {
 				Toast.Variant.SUCCESS);
 	}
 
-	private boolean save() {
+	private @Nullable boolean save() {
 		if (session.isUnsaved()) {
 			// save-project without a path: the save dialog in the Projects folder.
 			return saveAsChosen();
@@ -647,7 +651,7 @@ public final class EditorWindow {
 	}
 
 	/** Save As through the chooser; returns false when cancelled or failed. */
-	private boolean saveAsChosen() {
+	private @Nullable boolean saveAsChosen() {
 		Optional<Path> chosen = choose("Save project as", true);
 		if (chosen.isEmpty()) {
 			return false;
@@ -668,7 +672,7 @@ public final class EditorWindow {
 		}
 	}
 
-	private Path projectsDirOrNull() {
+	private @Nullable Path projectsDirOrNull() {
 		if (services.projects() == null) {
 			return null;
 		}
@@ -687,7 +691,7 @@ public final class EditorWindow {
 		return target.resolveSibling(target.getFileName() + ".gravaai");
 	}
 
-	private void errorDialog(String title, String detail) {
+	private void errorDialog(String title, @Nullable String detail) {
 		Dialog dialog = new Dialog(title);
 		dialog.description(detail == null || detail.isBlank() ? "Unknown error" : detail);
 		Button close = new Button("Close", Button.Variant.DEFAULT, Button.Size.SM);
@@ -755,7 +759,7 @@ public final class EditorWindow {
 		return end;
 	}
 
-	private void toast(String title, String description, Toast.Variant variant) {
+	private void toast(String title, @Nullable String description, Toast.Variant variant) {
 		Toast shown = Toast.show(shell, title).variant(variant);
 		if (description != null && !description.isEmpty()) {
 			shown.description(description);
@@ -1379,7 +1383,7 @@ public final class EditorWindow {
 		}
 
 		@Override
-		public Announcements.Feed bundledAnnouncements() {
+		public Announcements.@Nullable Feed bundledAnnouncements() {
 			return Announcements.bundledFeed();
 		}
 

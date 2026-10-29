@@ -32,6 +32,8 @@ import javafx.stage.Stage;
  * Set {@code -Dgravaai.uiKit.demo=overlays} to auto-open toasts so a non-interactive screenshot
  * captures an overlay state too.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class UiKitShowcase {
 
 	private static ScrollPane galleryScroll;

@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,12 +24,12 @@ public final class RecordingPaths {
 	}
 
 	/** Key presses next to the video, never anywhere else: {@code <video>.keys.json}. */
-	public static String getKeystrokePathForVideo(String videoPath) {
+	public static @Nullable String getKeystrokePathForVideo(String videoPath) {
 		return videoPath + StorageFiles.KEYSTROKE_TELEMETRY_SUFFIX;
 	}
 
 	/** The window id of a {@code window:<id>:<n>} source id, or null. */
-	public static Integer parseWindowId(String sourceId) {
+	public static @Nullable Integer parseWindowId(String sourceId) {
 		if (sourceId == null) {
 			return null;
 		}

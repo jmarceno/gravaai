@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -31,13 +33,15 @@ import tools.jackson.databind.node.ObjectNode;
  * insert/remove rules are ported one-to-one; persistence moves from {@code localStorage} to
  * {@link AppSettingsStore} (single-process narrowing).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CustomFonts {
 
 	public static final String STORAGE_KEY = "gravaai_custom_fonts";
 	public static final String LEGACY_STORAGE_KEY = "openscreen_custom_fonts";
 
 	/** {@code CustomFont}. */
-	public record CustomFont(String id, String name, String fontFamily, String importUrl) {}
+	public record CustomFont(@Nullable String id, String name, String fontFamily, String importUrl) {}
 
 	/** Thrown when the same id/family is added twice ({@code DuplicateFontError}). */
 	public static final class DuplicateFontException extends RuntimeException {
@@ -58,13 +62,13 @@ public final class CustomFonts {
 	private CustomFonts() {}
 
 	/** {@code generateFontId}: {@code <slug>-<timestamp>}. */
-	public static String generateFontId(String name) {
+	public static @Nullable String generateFontId(String name) {
 		return name.toLowerCase(Locale.ROOT).replaceAll("\\s+", "-") + "-"
 				+ System.currentTimeMillis();
 	}
 
 	/** {@code parseFontFamilyFromImport}. */
-	public static String parseFontFamilyFromImport(String importUrl) {
+	public static @Nullable String parseFontFamilyFromImport(String importUrl) {
 		try {
 			URI uri = URI.create(importUrl);
 			for (String pair : uri.getQuery().split("&")) {

@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,10 +16,12 @@ import java.util.function.Consumer;
  * countdown window finished loading. The UI supplies {@link CountdownWindow} and receives ticks
  * through it plus {@code onRemaining} for the HUD.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CountdownService {
 
 	/** The TS result shape {@code { success, cancelled?, error? }}. */
-	public record CountdownResult(boolean success, boolean cancelled, String error) {
+	public record CountdownResult(boolean success, boolean cancelled, @Nullable String error) {
 
 		public static CountdownResult ok() {
 			return new CountdownResult(true, false, null);
@@ -90,8 +94,8 @@ public final class CountdownService {
 	private final Scheduler scheduler;
 	private final Object lock = new Object();
 
-	private Runnable finishActive;
-	private Integer activeRemaining;
+	private @Nullable Runnable finishActive;
+	private @Nullable Integer activeRemaining;
 
 	public CountdownService(
 			CountdownWindowFactory windowFactory,
@@ -108,7 +112,7 @@ public final class CountdownService {
 		return () -> remainingListeners.remove(listener);
 	}
 
-	private void notifyRemaining(Integer remaining) {
+	private void notifyRemaining(@Nullable Integer remaining) {
 		onRemaining.accept(remaining);
 		for (Consumer<Integer> listener : remainingListeners) {
 			listener.accept(remaining);
@@ -158,8 +162,8 @@ public final class CountdownService {
 	private final class CountdownState {
 
 		private final CompletableFuture<CountdownResult> future = new CompletableFuture<>();
-		private CountdownWindow window;
-		private Scheduler.Cancelable timer;
+		private @Nullable CountdownWindow window;
+		private Scheduler.@Nullable Cancelable timer;
 		private boolean settled;
 		private boolean started;
 		private int remaining;

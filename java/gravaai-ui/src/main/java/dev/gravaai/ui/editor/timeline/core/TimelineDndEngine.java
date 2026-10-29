@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline.core;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -11,6 +13,8 @@ import java.util.function.BiFunction;
  * <p>Pure geometry: clamp to the timeline, keep a minimum duration, respect row neighbours, and
  * model the primary clip row as an insertion sequence (a drag never leaves empty time there).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class TimelineDndEngine {
 
 	/** Port of the {@code hasOverlap} dependency: true when the span collides with another item. */
@@ -50,7 +54,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampSpanToBounds}. */
-	public static Span clampSpanToBounds(Span span, SpanBounds config) {
+	public static Span clampSpanToBounds(@Nullable Span span, SpanBounds config) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();
 		double rawDuration = Math.max(span.end() - span.start(), 0);
@@ -97,7 +101,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code getSiblingSpans}: the other regions on the same row, left to right. */
-	public static List<TimelineRegionSpan> getSiblingSpans(String activeItemId, String rowId,
+	public static List<TimelineRegionSpan> getSiblingSpans(String activeItemId, @Nullable String rowId,
 			List<TimelineRegionSpan> allRegionSpans) {
 		TimelineRegionSpan activeItem = find(allRegionSpans, activeItemId);
 		String resolvedRowId = rowId != null ? rowId : activeItem == null ? null : activeItem.rowId();
@@ -115,7 +119,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampResizedSpanToNeighbours}. */
-	public static Span clampResizedSpanToNeighbours(Span span, String activeItemId,
+	public static @Nullable Span clampResizedSpanToNeighbours(Span span, String activeItemId,
 			NeighbourConfig config) {
 		List<TimelineRegionSpan> siblings = getSiblingSpans(activeItemId, null,
 				config.allRegionSpans());
@@ -149,8 +153,8 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampDraggedSpanToNeighbours}. */
-	public static TimelineSpanResult clampDraggedSpanToNeighbours(Span span, String activeItemId,
-			String rowId, NeighbourConfig config) {
+	public static @Nullable TimelineSpanResult clampDraggedSpanToNeighbours(@Nullable Span span, String activeItemId,
+			@Nullable String rowId, NeighbourConfig config) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();
 		TimelineRegionSpan activeItem = find(config.allRegionSpans(), activeItemId);
@@ -194,7 +198,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code resolveResizeEnd}; {@code null} when the resize is rejected. */
-	public static Span resolveResizeEnd(String activeItemId, Span updatedSpan, ResizeConfig config) {
+	public static @Nullable Span resolveResizeEnd(String activeItemId, Span updatedSpan, ResizeConfig config) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();
 		TimelineRegionSpan activeItem = find(config.allRegionSpans(), activeItemId);
@@ -233,7 +237,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code resolveDragEnd}; {@code null} when the drag is rejected. */
-	public static DragEnd resolveDragEnd(String activeItemId, Span updatedSpan, String proposedRowId,
+	public static @Nullable DragEnd resolveDragEnd(String activeItemId, Span updatedSpan, String proposedRowId,
 			DragConfig config, BiFunction<String, String, String> resolveTargetRowId) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();
@@ -287,7 +291,7 @@ public final class TimelineDndEngine {
 		return new TimelineSpanResult(start, start + duration, sequenceIndex);
 	}
 
-	private static TimelineRegionSpan find(List<TimelineRegionSpan> regions, String id) {
+	private static @Nullable TimelineRegionSpan find(List<TimelineRegionSpan> regions, String id) {
 		for (TimelineRegionSpan region : regions) {
 			if (region.id().equals(id)) {
 				return region;

@@ -1,5 +1,7 @@
 package dev.gravaai.media.audio;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -28,6 +30,8 @@ import static java.lang.foreign.ValueLayout.JAVA_LONG;
  * {@code samples written - latency}, so a blocking write is expected and the writer thread is the
  * playback/audio thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class PulsePlaybackStream implements PlaybackAudioSink {
 
 	private static final System.Logger LOG =
@@ -78,7 +82,7 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 	private final String streamName;
 	private final MemorySegment handle;
 	private final MemorySegment errorPtr;
-	private MemorySegment scratch;
+	private @Nullable MemorySegment scratch;
 	private int scratchSamples;
 	private boolean closed;
 

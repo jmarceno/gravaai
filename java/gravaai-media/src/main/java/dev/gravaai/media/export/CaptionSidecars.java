@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -33,7 +35,7 @@ public final class CaptionSidecars {
 			return wire;
 		}
 
-		public static Format fromWire(String value) {
+		public static @Nullable Format fromWire(String value) {
 			return "srt".equals(value) ? SRT : "vtt".equals(value) ? VTT : "both".equals(value) ? BOTH : null;
 		}
 	}
@@ -46,7 +48,7 @@ public final class CaptionSidecars {
 	}
 
 	/** {@code CaptionSidecarWriteResult}. */
-	public record WriteResult(boolean wroteAny, String error) {}
+	public record WriteResult(boolean wroteAny, @Nullable String error) {}
 
 	private CaptionSidecars() {}
 

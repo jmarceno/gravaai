@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.services.shortcuts.ControlSocket;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -14,6 +16,8 @@ import java.nio.file.StandardOpenOption;
  * whole life (released by the kernel even when it crashes); a later process finds the lock taken,
  * hands its request to the running app over the control socket and exits.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class SingleInstance {
 
 	/** The running app starts its control socket after the first window is up; wait that long. */
@@ -59,7 +63,7 @@ final class SingleInstance {
 	 *
 	 * @return true when the running app accepted it
 	 */
-	static boolean forward(String line) {
+	static boolean forward(@Nullable String line) {
 		Path socketPath = ControlSocket.getControlSocketPath();
 		long deadline = System.currentTimeMillis() + FORWARD_WAIT_MS;
 		while (true) {

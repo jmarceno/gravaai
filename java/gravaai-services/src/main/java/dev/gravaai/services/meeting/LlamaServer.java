@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
@@ -23,6 +25,8 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * never holds memory between meetings and never runs at the same time as whisper (the pipeline
  * transcribes first, then starts this only for the summarisation stage).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class LlamaServer implements AutoCloseable {
 
 	/** Context window for local runs. ~1 h of talk; longer meetings are chunked. */
@@ -41,7 +45,7 @@ public final class LlamaServer implements AutoCloseable {
 	private final AssetInstaller installer;
 	private final ProcessRunnerPort processes;
 	private final HttpClient healthClient;
-	private Running running;
+	private @Nullable Running running;
 
 	public LlamaServer(MeetingAssets assets, AssetInstaller installer,
 			ProcessRunnerPort processes) {

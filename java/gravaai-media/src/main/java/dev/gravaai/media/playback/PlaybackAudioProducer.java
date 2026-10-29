@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +48,7 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	private final float[] silence;
 
 	private double timelineSeconds;
-	private PcmSource source;
+	private @Nullable PcmSource source;
 	private double segmentTimelineEnd;
 	private long samplesWritten;
 	private int latencyMicros;

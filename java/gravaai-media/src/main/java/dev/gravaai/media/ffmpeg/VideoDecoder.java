@@ -1,5 +1,7 @@
 package dev.gravaai.media.ffmpeg;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -30,6 +32,8 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  *       decoder; see {@link DecodedFrame} for the buffer lifetime contract.</li>
  * </ul>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class VideoDecoder implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(VideoDecoder.class.getName());
@@ -51,7 +55,7 @@ public final class VideoDecoder implements AutoCloseable {
 	private final long[] ptsScratch;
 	private boolean flushSent;
 	private boolean closed;
-	private DecodedFrame pending;
+	private @Nullable DecodedFrame pending;
 	private long lastPtsUs = Long.MIN_VALUE;
 
 	private VideoDecoder(Path path, Arena arena, MemorySegment formatContextPtr,
@@ -206,7 +210,7 @@ public final class VideoDecoder implements AutoCloseable {
 	 * Decodes the next frame, or returns {@code null} at end of stream. The returned frame's
 	 * buffers stay valid until the next call.
 	 */
-	public DecodedFrame next() {
+	public @Nullable DecodedFrame next() {
 		ensureOpen();
 		DecodedFrame frame = pending;
 		pending = null;
@@ -216,7 +220,7 @@ public final class VideoDecoder implements AutoCloseable {
 		return decodeNext();
 	}
 
-	private DecodedFrame decodeNext() {
+	private @Nullable DecodedFrame decodeNext() {
 		while (true) {
 			int result = ffmpeg_h.avcodec_receive_frame(codecContext, frame);
 			if (result == 0) {

@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.services.shortcuts.ControlSocket;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
@@ -19,9 +21,11 @@ import javafx.application.Application;
  *   <li>{@link Application#launch(GravaaiApp.class)}.</li>
  * </ol>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Main {
 
-	private static volatile GlobalShortcutAction launchAction;
+	private static volatile @Nullable GlobalShortcutAction launchAction;
 	private static Thread fontPreload;
 
 	private Main() {

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
@@ -17,7 +19,7 @@ import javafx.scene.shape.Polygon;
 public final class EditorTimelinePanel extends VBox {
 
 	private final Pane host = new Pane();
-	private Node content;
+	private @Nullable Node content;
 
 	public EditorTimelinePanel() {
 		getStyleClass().add("editor-timeline");
@@ -41,7 +43,7 @@ public final class EditorTimelinePanel extends VBox {
 		}
 	}
 
-	public Node content() {
+	public @Nullable Node content() {
 		return content;
 	}
 

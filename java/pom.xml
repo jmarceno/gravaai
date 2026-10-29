@@ -42,6 +42,9 @@
 		<!-- Pinned to the last 1.9.x release: jqwik 1.10.x ships an upstream prompt-injection-style
 		     notice to AI coding agents (the "jqwik Anti-AI Affair"); 1.9.3 is the last clean line.
 		     Do not bump past 1.9.3 without an explicit decision. -->
+		<errorprone.version>2.51.0</errorprone.version>
+		<nullaway.version>0.14.3</nullaway.version>
+		<jspecify.version>1.0.0</jspecify.version>
 		<jqwik.version>1.9.3</jqwik.version>
 
 		<!-- Toolchain: plan §3. Override with -Dgravaai.jdk=... on another machine. -->
@@ -52,6 +55,15 @@
 		<!-- Final artifacts (app image + AppImage) land inside the project, never on another drive. -->
 		<gravaai.dist.dir>${maven.multiModuleProjectDirectory}/dist</gravaai.dist.dir>
 	</properties>
+
+	<!-- Nullness annotations for every module (JSpecify @NullMarked / @Nullable). -->
+	<dependencies>
+		<dependency>
+			<groupId>org.jspecify</groupId>
+			<artifactId>jspecify</artifactId>
+			<version>${jspecify.version}</version>
+		</dependency>
+	</dependencies>
 
 	<dependencyManagement>
 		<dependencies>
@@ -210,7 +222,27 @@
 							     serialization. Any @SuppressWarnings needs a comment saying why. -->
 							<arg>-Xlint:all,-restricted,-serial</arg>
 							<arg>-Werror</arg>
+							<!-- NullAway: in @NullMarked code, a null that is not declared @Nullable is a
+							     compile error. Only NullAway runs; other Error Prone checks are off. The
+							     javac exports Error Prone needs are in .mvn/jvm.config. -->
+							<arg>-Xmaxerrs</arg>
+							<arg>100000</arg>
+							<arg>-XDcompilePolicy=simple</arg>
+							<arg>--should-stop=ifError=FLOW</arg>
+							<arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepExcludedPaths:.*/src/test/.*</arg>
 						</compilerArgs>
+						<annotationProcessorPaths>
+							<path>
+								<groupId>com.google.errorprone</groupId>
+								<artifactId>error_prone_core</artifactId>
+								<version>${errorprone.version}</version>
+							</path>
+							<path>
+								<groupId>com.uber.nullaway</groupId>
+								<artifactId>nullaway</artifactId>
+								<version>${nullaway.version}</version>
+							</path>
+						</annotationProcessorPaths>
 					</configuration>
 				</plugin>
 				<plugin>

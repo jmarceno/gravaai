@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,6 +37,8 @@ import javafx.util.Duration;
  * DISPLAY=:0 java -cp "<classes>:<resources>:<deps>" dev.gravaai.ui.editor.EditorSnapshot [outDir]
  * }</pre>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorSnapshot {
 
 	private static final String FIXTURE_EDITOR = """
@@ -56,7 +60,7 @@ public final class EditorSnapshot {
 					+ "\"displayDurationSeconds\":30,"
 					+ "\"controls\":{\"close\":true,\"action\":true}}]}";
 
-	private EditorSnapshot() {}
+	@Nullable private EditorSnapshot() {}
 
 	public static void main(String[] args) throws Exception {
 		AppFonts.load();
@@ -235,7 +239,7 @@ public final class EditorSnapshot {
 	 * temp file. The project browser takes a {@link Path}, and {@code public/} disappears in
 	 * P3.6, so the classpath resource is the source of truth.
 	 */
-	static Path bundledThumbnail() {
+	static @Nullable Path bundledThumbnail() {
 		String resource = "/ui/editor/wallpapers/previews/tahoe-light.jpg";
 		try (java.io.InputStream stream = EditorSnapshot.class.getResourceAsStream(resource)) {
 			if (stream == null) {

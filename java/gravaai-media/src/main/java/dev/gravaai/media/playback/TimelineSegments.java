@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -23,8 +25,8 @@ public final class TimelineSegments {
 			double startSec,
 			double endSec,
 			double speed,
-			Double outputStartSec,
-			Double outputEndSec) {
+			@Nullable Double outputStartSec,
+			@Nullable Double outputEndSec) {
 	}
 
 	/** A kept time range ({@code { startSec, endSec }}). */

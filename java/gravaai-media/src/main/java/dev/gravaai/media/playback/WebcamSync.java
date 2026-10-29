@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -23,7 +25,7 @@ public final class WebcamSync {
 	 * recorded webcam start offset and media duration clamps.
 	 */
 	public static double getWebcamMediaTargetTimeSeconds(
-			double currentTime, Double webcamDuration, Double timeOffsetMs) {
+			double currentTime, @Nullable Double webcamDuration, Double timeOffsetMs) {
 		double safeOffsetMs = timeOffsetMs != null && Double.isFinite(timeOffsetMs) ? timeOffsetMs : 0;
 		double shiftedTime = currentTime - safeOffsetMs / 1000;
 		return MediaTiming.clampMediaTimeToDuration(shiftedTime, webcamDuration);

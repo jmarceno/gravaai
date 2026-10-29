@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icons;
@@ -128,11 +130,11 @@ public final class EditorHeaderView extends HBox {
 
 	private boolean clipsOpen;
 	private boolean dirty;
-	private Runnable openExportMenu;
-	private Runnable onSave;
-	private Runnable projectBrowserOpener;
+	private @Nullable Runnable openExportMenu;
+	private @Nullable Runnable onSave;
+	private @Nullable Runnable projectBrowserOpener;
 	private Button browser;
-	private java.util.function.Consumer<Boolean> onToggleClips;
+	private java.util.function.@Nullable Consumer<Boolean> onToggleClips;
 
 	/** Replaces the Clips toggle action (the shell owns the panel swap). */
 	public void setOnToggleClips(java.util.function.Consumer<Boolean> onToggleClips) {

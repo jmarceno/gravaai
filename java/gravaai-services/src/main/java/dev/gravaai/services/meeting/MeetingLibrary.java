@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -64,7 +66,7 @@ public final class MeetingLibrary {
 		return "Meeting " + day + " " + time;
 	}
 
-	public List<MeetingLibraryEntry> listMeetings() {
+	public @Nullable List<MeetingLibraryEntry> listMeetings() {
 		Path directory = directories.recordingsDirectory();
 		List<String> names;
 		try (var files = Files.list(directory)) {
@@ -85,7 +87,7 @@ public final class MeetingLibrary {
 		return List.copyOf(entries);
 	}
 
-	private MeetingLibraryEntry entryFor(Path metaPath) {
+	private @Nullable MeetingLibraryEntry entryFor(Path metaPath) {
 		Path mediaPath = findMediaForMeta(metaPath);
 		if (mediaPath == null) {
 			return null;
@@ -143,7 +145,7 @@ public final class MeetingLibrary {
 		}
 	}
 
-	private static Path findMediaForMeta(Path metaPath) {
+	private static @Nullable Path findMediaForMeta(Path metaPath) {
 		String meta = metaPath.toString();
 		String base = meta.endsWith(".meeting.json")
 				? meta.substring(0, meta.length() - ".meeting.json".length())

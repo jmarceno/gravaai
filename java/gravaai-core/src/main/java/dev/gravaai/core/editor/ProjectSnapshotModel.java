@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -20,7 +22,7 @@ public final class ProjectSnapshotModel {
 	}
 
 	/** {@code currentSourcePath}: explicit source first, else the project path converted from file://. */
-	public static String currentSourcePath(String videoSourcePath, String videoPath) {
+	public static @Nullable String currentSourcePath(String videoSourcePath, String videoPath) {
 		if (videoSourcePath != null) {
 			return videoSourcePath;
 		}

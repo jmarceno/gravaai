@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -10,8 +12,8 @@ import java.util.List;
 public record MeetingContext(
 		String transcript,
 		String language,
-		Long durationMs,
-		String videoPath,
+		@Nullable Long durationMs,
+		@Nullable String videoPath,
 		List<MeetingVisual> visuals) {
 
 	/** A screen-context keyframe (not produced yet). */

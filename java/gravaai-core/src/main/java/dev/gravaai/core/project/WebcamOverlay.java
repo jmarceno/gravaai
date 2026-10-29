@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import tools.jackson.databind.JsonNode;
 
 /** Crop/roundness helpers used by the project normaliser (port of the pure parts of
@@ -15,7 +17,7 @@ public final class WebcamOverlay {
 		return Math.min(max, Math.max(min, value));
 	}
 
-	private static Double finite(JsonNode value) {
+	private static @Nullable Double finite(@Nullable JsonNode value) {
 		return value != null && value.isNumber() && Double.isFinite(value.doubleValue())
 				? value.doubleValue()
 				: null;

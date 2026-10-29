@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -27,6 +29,8 @@ import java.util.concurrent.Executors;
  * replacement, so a crash cannot lose both generations. Writes to the same project are queued in
  * invocation order; calls for different projects run independently.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AtomicProjectSave {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.project");
@@ -82,12 +86,12 @@ public final class AtomicProjectSave {
 		return projectPath.toAbsolutePath().normalize();
 	}
 
-	private static Path createTemporaryPath(Path parentDir, String label) {
+	private static Path createTemporaryPath(@Nullable Path parentDir, String label) {
 		return parentDir.resolve(
 				".gravaai-" + label + "-" + ProcessHandle.current().pid() + "-" + UUID.randomUUID() + ".tmp");
 	}
 
-	private static Integer getExistingFileMode(Path filePath) throws IOException {
+	private static @Nullable Integer getExistingFileMode(Path filePath) throws IOException {
 		try {
 			return ((Integer) Files.getAttribute(filePath, "unix:mode")) & 0777;
 		} catch (NoSuchFileException error) {
@@ -95,7 +99,7 @@ public final class AtomicProjectSave {
 		}
 	}
 
-	private static void writeSyncedTemporaryFile(Path filePath, String contents, Integer mode)
+	private static void writeSyncedTemporaryFile(Path filePath, String contents, @Nullable Integer mode)
 			throws IOException {
 		byte[] bytes = contents.getBytes(StandardCharsets.UTF_8);
 		try (FileChannel channel = FileChannel.open(
@@ -118,7 +122,7 @@ public final class AtomicProjectSave {
 		}
 	}
 
-	private static void syncParentDirectory(Path parentDir) throws IOException {
+	private static void syncParentDirectory(@Nullable Path parentDir) throws IOException {
 		if (java.io.File.separatorChar == '\\') {
 			return;
 		}

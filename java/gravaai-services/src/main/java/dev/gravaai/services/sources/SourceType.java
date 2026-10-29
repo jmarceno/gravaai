@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * How a selected source is captured, from {@code SelectedSource.sourceType} in
  * {@code electron/ipc/types.ts}.
@@ -21,7 +23,7 @@ public enum SourceType {
 	}
 
 	/** Parses a wire value, or null for an unknown one. */
-	public static SourceType fromWire(String value) {
+	public static @Nullable SourceType fromWire(String value) {
 		for (SourceType type : values()) {
 			if (type.wire.equals(value)) {
 				return type;

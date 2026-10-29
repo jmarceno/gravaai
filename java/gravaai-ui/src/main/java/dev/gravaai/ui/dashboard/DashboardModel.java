@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -38,6 +40,8 @@ import javafx.collections.ObservableList;
  * JavaFX toolkit. Everything that touches the disk is blocking and must be called from a background
  * thread by the view (plan §4.1); the model itself never starts threads.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class DashboardModel {
 
 	/** Port of the message {@code useMeetingLibrary.remove} throws for skipped meetings. */
@@ -77,7 +81,7 @@ public final class DashboardModel {
 	private final Map<String, RecordingEntry> rawSources = new LinkedHashMap<>();
 	private final Map<String, MeetingLibraryEntry> meetingSources = new LinkedHashMap<>();
 	private String meetingsError = "";
-	private Path projectsDir;
+	private @Nullable Path projectsDir;
 	private long now = System.currentTimeMillis();
 
 	public DashboardModel(DashboardDependencies dependencies) {
@@ -157,17 +161,17 @@ public final class DashboardModel {
 	}
 
 	/** The Projects folder path from the last snapshot (Settings -> Projects folder). */
-	public Path projectsDir() {
+	public @Nullable Path projectsDir() {
 		return projectsDir;
 	}
 
 	/** The recording behind a raw-library card ({@code entry.rawSource} in React). */
-	public RecordingEntry rawSource(String path) {
+	public @Nullable RecordingEntry rawSource(String path) {
 		return rawSources.get(path);
 	}
 
 	/** The meeting behind a Meetings-section card ({@code entry.meeting} in React). */
-	public MeetingLibraryEntry meetingSource(String path) {
+	public @Nullable MeetingLibraryEntry meetingSource(String path) {
 		return meetingSources.get(path);
 	}
 
@@ -258,7 +262,7 @@ public final class DashboardModel {
 	}
 
 	/** The folder selected in the sidebar, or {@code null}. */
-	public ProjectFolder selectedFolder() {
+	public @Nullable ProjectFolder selectedFolder() {
 		return DashboardLibraryFilters.selectedFolder(folders, section.get());
 	}
 
@@ -458,7 +462,7 @@ public final class DashboardModel {
 	 *
 	 * @return the new path (unchanged for raw files and meetings, whose media path is stable)
 	 */
-	public String renameProject(String path, String name) throws IOException {
+	public @Nullable String renameProject(String path, String name) throws IOException {
 		String clean = name == null ? "" : name.trim();
 		if (clean.isEmpty()) {
 			return path;
@@ -518,7 +522,7 @@ public final class DashboardModel {
 	 * Trashes project files (or hides raw files / trashes meetings) and returns the result. Port of
 	 * the trash handler in {@code register/project.ts}; recordings are kept unless opted in.
 	 */
-	public TrashLibraryProjects.TrashResult trashProjects(List<String> paths, boolean deleteRecordings)
+	public TrashLibraryProjects.@Nullable TrashResult trashProjects(List<String> paths, boolean deleteRecordings)
 			throws IOException {
 		if (isRaw()) {
 			hideRawRecordings(paths);

@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -52,7 +54,7 @@ public sealed interface AutomationAction
 		}
 	}
 
-	record CopyToFolder(String folder, String fileName) implements AutomationAction {
+	record CopyToFolder(String folder, @Nullable String fileName) implements AutomationAction {
 		public CopyToFolder {
 			folder = folder == null ? "" : folder;
 		}
@@ -63,7 +65,7 @@ public sealed interface AutomationAction
 		}
 	}
 
-	record MoveToFolder(String folder, String fileName) implements AutomationAction {
+	record MoveToFolder(String folder, @Nullable String fileName) implements AutomationAction {
 		public MoveToFolder {
 			folder = folder == null ? "" : folder;
 		}

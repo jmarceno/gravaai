@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,12 +28,14 @@ import tools.jackson.databind.node.ObjectNode;
  * settings; the Java app has a single process, so {@link EditorPreferencesStore} persists them to
  * {@code app-settings.json} only (recorded narrowing).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record EditorPreferences(
-		String wallpaper,
-		double shadowIntensity,
-		double backgroundBlur,
-		double zoomMotionBlur,
-		ZoomMotionBlurTuning zoomMotionBlurTuning,
+		@Nullable String wallpaper,
+		@Nullable double shadowIntensity,
+		@Nullable double backgroundBlur,
+		@Nullable double zoomMotionBlur,
+		@Nullable ZoomMotionBlurTuning zoomMotionBlurTuning,
 		boolean connectZooms,
 		double zoomInDurationMs,
 		double zoomInOverlapMs,
@@ -60,17 +64,17 @@ public record EditorPreferences(
 		double cursorClickEffectDurationMs,
 		double cursorClickBounce,
 		double cursorClickBounceDuration,
-		double cursorSway,
-		double borderRadius,
-		Padding padding,
-		WebcamOverlaySettings webcam,
-		String aspectRatio,
-		ExportPreferences.ExportEncodingMode exportEncodingMode,
+		@Nullable double cursorSway,
+		@Nullable double borderRadius,
+		@Nullable Padding padding,
+		@Nullable WebcamOverlaySettings webcam,
+		@Nullable String aspectRatio,
+		ExportPreferences.@Nullable ExportEncodingMode exportEncodingMode,
 		ExportPreferences.ExportBackendPreference exportBackendPreference,
 		ExportPreferences.ExportPipelineModel exportPipelineModel,
 		ExportPreferences.ExportQuality exportQuality,
-		int mp4FrameRate,
-		ExportPreferences.ExportFormat exportFormat,
+		@Nullable int mp4FrameRate,
+		ExportPreferences.@Nullable ExportFormat exportFormat,
 		int gifFrameRate,
 		boolean gifLoop,
 		ExportPreferences.GifSizePreset gifSizePreset,
@@ -79,11 +83,11 @@ public record EditorPreferences(
 		String borderRadiusUnit,
 		String customAspectWidth,
 		String customAspectHeight,
-		List<String> customWallpapers,
+		@Nullable List<String> customWallpapers,
 		boolean autoApplyFreshRecordingAutoZooms,
-		String whisperExecutablePath,
-		String whisperModelPath,
-		WhisperModel whisperModel) {
+		@Nullable String whisperExecutablePath,
+		@Nullable String whisperModelPath,
+		@Nullable WhisperModel whisperModel) {
 
 	public static final String EDITOR_PREFERENCES_STORAGE_KEY = "gravaai.editor.preferences";
 	public static final String EDITOR_PRESETS_STORAGE_KEY = "gravaai.editor.presets";
@@ -261,7 +265,7 @@ public record EditorPreferences(
 		return node;
 	}
 
-	private static ObjectNode paddingToJson(Padding padding) {
+	private static ObjectNode paddingToJson(@Nullable Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -271,7 +275,7 @@ public record EditorPreferences(
 		return node;
 	}
 
-	private static ObjectNode webcamToJson(WebcamOverlaySettings webcam) {
+	private static ObjectNode webcamToJson(@Nullable WebcamOverlaySettings webcam) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		if (webcam.visibleRanges() != null) {
 			var ranges = Json.nodeFactory().arrayNode();
@@ -379,7 +383,7 @@ public record EditorPreferences(
 		}
 	}
 
-	private static List<String> normalizeCustomWallpapers(JsonNode value, List<String> fallback) {
+	private static @Nullable List<String> normalizeCustomWallpapers(@Nullable JsonNode value, @Nullable List<String> fallback) {
 		if (value == null || !value.isArray()) {
 			return fallback;
 		}
@@ -392,7 +396,7 @@ public record EditorPreferences(
 		return List.copyOf(unique);
 	}
 
-	private static String normalizeNullablePath(JsonNode value) {
+	private static @Nullable String normalizeNullablePath(JsonNode value) {
 		if (value == null || !value.isString()) {
 			return null;
 		}

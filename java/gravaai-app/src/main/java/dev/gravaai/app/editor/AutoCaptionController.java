@@ -1,5 +1,7 @@
 package dev.gravaai.app.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +33,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Port of {@code useAutoCaptionController.ts}: Whisper model selection, download and delete,
  * caption generation for the open project, and applying the generated cues to the editor.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutoCaptionController implements CaptionModelUiService, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(AutoCaptionController.class.getName());
@@ -48,7 +52,7 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 	private final AutoCloseable serviceSubscription;
 	private final List<Consumer<State>> listeners = new CopyOnWriteArrayList<>();
 	private volatile State state;
-	private volatile Object appliedStatus;
+	private volatile @Nullable Object appliedStatus;
 
 	public AutoCaptionController(EditorStore store, Supplier<String> videoPath,
 			Supplier<Path> webcamPath, EditorPreferencesStore preferences, WhisperModels models,
@@ -222,7 +226,7 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 	}
 
 	/** Null when no model is available. */
-	private CaptionGenerator.Options options() {
+	private CaptionGenerator.@Nullable Options options() {
 		String modelPath = state.modelPath();
 		String video = videoPath.get();
 		if (modelPath == null || video == null) {
@@ -283,7 +287,7 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 		preferences.savePreferences(patch);
 	}
 
-	private void persistPath(String path) {
+	private void persistPath(@Nullable String path) {
 		ObjectNode patch = Json.MAPPER.createObjectNode();
 		if (path == null) {
 			patch.putNull("whisperModelPath");

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,6 +49,8 @@ import javafx.util.Duration;
  * Java equivalent (plan §7): the preview plays for reduced-motion users too, and React's
  * thumbnail {@code <video>} fallback for failed poster images has no Java counterpart.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class ProjectHoverPreview extends StackPane {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.dashboard");
@@ -61,10 +65,10 @@ final class ProjectHoverPreview extends StackPane {
 	/** React stall guard: a blocked decoder must leave the static thumbnail usable. */
 	private static final long STALL_TIMEOUT_MS = 15_000;
 
-	private final ProjectManager projects;
-	private final String projectPath;
+	private final @Nullable ProjectManager projects;
+	private final @Nullable String projectPath;
 	/** Set for a raw recording card (React {@code RawThumbnail}): no saved project to read. */
-	private final String rawVideoPath;
+	private final @Nullable String rawVideoPath;
 	private final Runnable onFinish;
 	/** Serializes the lifecycle: the start thread holds it while attaching media and playing. */
 	private final Object lifecycle = new Object();
@@ -72,13 +76,13 @@ final class ProjectHoverPreview extends StackPane {
 	private final AtomicBoolean firstFrame = new AtomicBoolean();
 	private final AtomicBoolean playingStarted = new AtomicBoolean();
 	private final AtomicReference<PreviewFrameMapper.PreviewScene> scene = new AtomicReference<>();
-	private ProjectPreview telemetryPreview;
+	private @Nullable ProjectPreview telemetryPreview;
 	private final PreviewWallpaper wallpaper = new PreviewWallpaper();
 	private final ImageView imageView = new ImageView();
 
-	private volatile PlaybackEngine engine;
-	private volatile PreviewRenderer renderer;
-	private PauseTransition stallTimeout;
+	private volatile @Nullable PlaybackEngine engine;
+	private volatile @Nullable PreviewRenderer renderer;
+	private @Nullable PauseTransition stallTimeout;
 	private volatile long lastHiddenCheckNanos;
 
 	ProjectHoverPreview(ProjectManager projects, String projectPath, Runnable onFinish) {

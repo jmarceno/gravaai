@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.URL;
 
 import dev.gravaai.core.editor.EditorStore;
@@ -47,6 +49,8 @@ import javafx.scene.shape.Rectangle;
  * and global shortcuts use for scrubbing. The panel itself never decodes or composites: that is
  * the playback engine plus {@code dev.gravaai.ui.editor.preview}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorPreviewPanel extends VBox {
 
 	private static final String PREVIEW_STYLESHEET = "/ui/editor/preview.css";
@@ -68,13 +72,13 @@ public final class EditorPreviewPanel extends VBox {
 	private final Skeleton loadingSkeleton = new Skeleton();
 	private PlaybackController playback;
 	/** Last status pushed by the engine; the panel never takes the engine lock on FX. */
-	private volatile PlaybackStatus lastStatus;
-	private AutoCloseable statusSubscription;
+	private volatile @Nullable PlaybackStatus lastStatus;
+	private @Nullable AutoCloseable statusSubscription;
 	private PreviewFrameMapper.CursorTrack cursorTrack = PreviewFrameMapper.CursorTrack.NONE;
-	private java.nio.file.Path mediaPath;
-	private Node previewContent;
+	private java.nio.file.@Nullable Path mediaPath;
+	private @Nullable Node previewContent;
 	/** Uncommitted overlay drag/resize; the composited annotation follows it live. */
-	private AnnotationOverlayController.LiveBox liveAnnotationBox;
+	private AnnotationOverlayController.@Nullable LiveBox liveAnnotationBox;
 
 	public EditorPreviewPanel(EditorStore store, EditorViewActions actions) {
 		this.store = store;
@@ -291,7 +295,7 @@ public final class EditorPreviewPanel extends VBox {
 	}
 
 	/** The recording behind the preview, or {@code null} before one is loaded. */
-	public java.nio.file.Path mediaPath() {
+	public java.nio.file.@Nullable Path mediaPath() {
 		return mediaPath;
 	}
 
@@ -403,7 +407,7 @@ public final class EditorPreviewPanel extends VBox {
 				box.size().width(), box.size().height());
 	}
 
-	private void refreshFallback(String value) {
+	private void refreshFallback(@Nullable String value) {
 		Image image = EditorWallpapers.preview(value);
 		if (image != null) {
 			wallpaper.setImage(image);
@@ -441,12 +445,12 @@ public final class EditorPreviewPanel extends VBox {
 		loadingSkeleton.resizeRelocate(x, y, width, height);
 	}
 
-	private static boolean isDefaultCrop(CropRegion crop) {
+	private static boolean isDefaultCrop(@Nullable CropRegion crop) {
 		return crop.x() <= 0 && crop.y() <= 0 && crop.width() >= 1 && crop.height() >= 1;
 	}
 
 	/** {@code getAspectRatioLabel}. */
-	public static String aspectLabelFor(String ratio) {
+	public static String aspectLabelFor(@Nullable String ratio) {
 		if (ratio == null) {
 			return "16:9";
 		}
@@ -454,7 +458,7 @@ public final class EditorPreviewPanel extends VBox {
 	}
 
 	/** {@code getAspectRatioValue}. */
-	public static double aspectValue(String ratio) {
+	public static double aspectValue(@Nullable String ratio) {
 		if (ratio == null || "native".equals(ratio)) {
 			return 16.0 / 9.0;
 		}

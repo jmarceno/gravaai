@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -52,6 +54,8 @@ import tools.jackson.databind.node.ObjectNode;
  * state untouched and names the failing op index. The app's EditorPort executes the resulting state
  * (through its core {@code EditorStore} commands).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentPlanner {
 
 	/** What the pure core cannot know: source length, cursor telemetry, id counters. */
@@ -126,7 +130,7 @@ public final class AgentPlanner {
 	}
 
 	/** Failed batch: the input state is untouched. */
-	public record Failure(String error, int opIndex) implements Result {}
+	public record Failure(@Nullable String error, int opIndex) implements Result {}
 
 	private static final Set<String> HISTORY_OPS = Set.of("undo", "redo", "revert_ai");
 	private static final Set<String> ARRAY_SETTING_KEYS = Set.of("zoomRegions", "trimRegions",
@@ -214,7 +218,7 @@ public final class AgentPlanner {
 
 	private record Span(long startMs, long endMs) {}
 
-	private static void push(Draft draft, Highlight.Kind kind, long startMs, long endMs,
+	private static void push(Draft draft, Highlight.Kind kind, @Nullable long startMs, @Nullable long endMs,
 			String label) {
 		draft.highlights.add(new Highlight(kind, startMs, endMs, label));
 	}
@@ -227,7 +231,7 @@ public final class AgentPlanner {
 		return Math.round(seconds * 1000);
 	}
 
-	private static double speedOf(ClipRegion clip) {
+	private static double speedOf(@Nullable ClipRegion clip) {
 		return Double.isFinite(clip.speed()) && clip.speed() > 0 ? clip.speed() : 1;
 	}
 
@@ -262,7 +266,7 @@ public final class AgentPlanner {
 				+ (Math.max(clip.startMs(), timeMs) - clip.startMs()) * speedOf(clip));
 	}
 
-	private static ClipRegion clipForSource(long sourceMs, List<ClipRegion> clips, boolean startEdge) {
+	private static @Nullable ClipRegion clipForSource(long sourceMs, List<ClipRegion> clips, boolean startEdge) {
 		for (ClipRegion clip : clips) {
 			long start = Clips.getClipSourceStartMs(clip);
 			long end = Clips.getClipSourceEndMs(clip);
@@ -273,12 +277,12 @@ public final class AgentPlanner {
 		return null;
 	}
 
-	private static long sourceToTimelineMs(long sourceMs, ClipRegion clip) {
+	private static @Nullable long sourceToTimelineMs(long sourceMs, ClipRegion clip) {
 		return Math.round(clip.startMs() + (sourceMs - Clips.getClipSourceStartMs(clip))
 				/ speedOf(clip));
 	}
 
-	private static Span mapSourcePiece(long startSourceMs, long endSourceMs,
+	private static @Nullable Span mapSourcePiece(long startSourceMs, long endSourceMs,
 			List<ClipRegion> after) {
 		ClipRegion startClip = clipForSource(startSourceMs, after, true);
 		ClipRegion endClip = clipForSource(endSourceMs, after, false);
@@ -613,7 +617,7 @@ public final class AgentPlanner {
 	}
 
 	private static void assertSpanFree(List<? extends Object> regions, Span candidate,
-			Map<String, String> shortById, String label, String ignoreId) {
+			Map<String, String> shortById, String label, @Nullable String ignoreId) {
 		for (Object region : regions) {
 			String id;
 			long startMs;
@@ -818,7 +822,7 @@ public final class AgentPlanner {
 
 	// Clip ops ------------------------------------------------------------------------------
 
-	private static ClipRegion findClip(Draft draft, String shortId) {
+	private static @Nullable ClipRegion findClip(Draft draft, String shortId) {
 		String id = draft.ids.clipIdByShort().get(shortId.trim());
 		if (id == null) {
 			fail(shortId + " not found; clips: "

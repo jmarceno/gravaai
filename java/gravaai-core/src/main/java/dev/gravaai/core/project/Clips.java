@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -95,7 +97,7 @@ public final class Clips {
 	}
 
 	/** {@code mapSourceTimeToTimelineTime}. */
-	public static long mapSourceTimeToTimelineTime(double timeMs, List<ClipRegion> clips) {
+	public static @Nullable long mapSourceTimeToTimelineTime(double timeMs, List<ClipRegion> clips) {
 		long roundedTimeMs = Math.round(timeMs);
 		List<ClipRegion> sortedClips = sortClipRegions(clips);
 
@@ -115,7 +117,7 @@ public final class Clips {
 	}
 
 	/** {@code findClipAtTimelineTime}. */
-	public static ClipRegion findClipAtTimelineTime(double timeMs, List<ClipRegion> clips) {
+	public static @Nullable ClipRegion findClipAtTimelineTime(double timeMs, List<ClipRegion> clips) {
 		for (ClipRegion clip : sortClipRegions(clips)) {
 			if (timeMs >= clip.startMs() && timeMs < clip.endMs()) {
 				return clip;
@@ -125,7 +127,7 @@ public final class Clips {
 	}
 
 	/** {@code extendAutoFullTrackClip}: grow the untouched full-track clip; otherwise null. */
-	public static List<ClipRegion> extendAutoFullTrackClip(
+	public static @Nullable List<ClipRegion> extendAutoFullTrackClip(
 			List<ClipRegion> clips,
 			String autoClipId,
 			Long previousAutoEndMs,

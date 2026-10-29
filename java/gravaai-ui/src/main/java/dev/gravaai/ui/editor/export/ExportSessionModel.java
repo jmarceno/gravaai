@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +15,8 @@ import dev.gravaai.media.export.ExportProgress;
  * it like the React hook: views subscribe with {@link #onChange(Runnable)} and re-render, the
  * app-side controller mutates it on the FX thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportSessionModel {
 
 	/** The four popover states of the React export menu. */
@@ -23,14 +27,14 @@ public final class ExportSessionModel {
 			CaptionSidecars.Payload captionSidecar) {}
 
 	private boolean exporting;
-	private ExportProgress progress;
-	private String error;
+	private @Nullable ExportProgress progress;
+	private @Nullable String error;
 	private boolean dropdownOpen;
-	private String exportedFilePath;
+	private @Nullable String exportedFilePath;
 	private boolean hasPendingExportSave;
-	private PendingExportSave pendingExportSave;
+	private @Nullable PendingExportSave pendingExportSave;
 	private int exportRunId;
-	private Integer cancelledExportRunId;
+	private @Nullable Integer cancelledExportRunId;
 	private final List<Runnable> listeners = new ArrayList<>();
 	private boolean notifying;
 
@@ -68,7 +72,7 @@ public final class ExportSessionModel {
 		return progress;
 	}
 
-	public void setProgress(ExportProgress progress) {
+	public void setProgress(@Nullable ExportProgress progress) {
 		if (this.progress != progress) {
 			this.progress = progress;
 			changed();
@@ -79,7 +83,7 @@ public final class ExportSessionModel {
 		return error;
 	}
 
-	public void setError(String error) {
+	public void setError(@Nullable String error) {
 		if (!java.util.Objects.equals(this.error, error)) {
 			this.error = error;
 			changed();
@@ -101,7 +105,7 @@ public final class ExportSessionModel {
 		return exportedFilePath;
 	}
 
-	public void setExportedFilePath(String exportedFilePath) {
+	public void setExportedFilePath(@Nullable String exportedFilePath) {
 		if (!java.util.Objects.equals(this.exportedFilePath, exportedFilePath)) {
 			this.exportedFilePath = exportedFilePath;
 			changed();
@@ -112,7 +116,7 @@ public final class ExportSessionModel {
 		return hasPendingExportSave;
 	}
 
-	public PendingExportSave pendingExportSave() {
+	public @Nullable PendingExportSave pendingExportSave() {
 		return pendingExportSave;
 	}
 
@@ -124,7 +128,7 @@ public final class ExportSessionModel {
 	}
 
 	/** {@code clearPendingExportSave}: drops the pending save; the caller discards the staged file. */
-	public PendingExportSave clearPendingExportSave() {
+	public @Nullable PendingExportSave clearPendingExportSave() {
 		PendingExportSave discarded = pendingExportSave;
 		pendingExportSave = null;
 		if (hasPendingExportSave) {

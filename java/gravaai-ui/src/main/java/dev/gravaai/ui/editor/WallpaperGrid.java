@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -26,9 +28,9 @@ public final class WallpaperGrid extends GridPane {
 	private final Runnable onAdd;
 	private final Consumer<String> onSelect;
 	private List<EditorWallpapers.Tile> tiles;
-	private String selected;
+	private @Nullable String selected;
 
-	public WallpaperGrid(List<EditorWallpapers.Tile> tiles, String selected,
+	public WallpaperGrid(List<EditorWallpapers.Tile> tiles, @Nullable String selected,
 			Consumer<String> onSelect, Runnable onAdd) {
 		this.tiles = tiles;
 		this.selected = selected;

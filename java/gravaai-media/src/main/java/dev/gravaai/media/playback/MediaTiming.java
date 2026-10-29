@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Media timing helpers for the preview playback engine, ported from {@code src/lib/mediaTiming.ts}
  * (plan §5.9): playhead clamping, duration reconciliation, companion-audio delay inference, the
@@ -14,7 +16,7 @@ public final class MediaTiming {
 	}
 
 	/** {@code clampMediaTimeToDuration}: a negative time becomes 0, a known duration caps it. */
-	public static double clampMediaTimeToDuration(double targetTime, Double duration) {
+	public static @Nullable double clampMediaTimeToDuration(double targetTime, @Nullable Double duration) {
 		double safeTargetTime = Math.max(0, targetTime);
 		if (duration == null || !Double.isFinite(duration)) {
 			return safeTargetTime;
@@ -27,7 +29,7 @@ public final class MediaTiming {
 	private static final double PREVIEW_MEDIA_DURATION_SHORTFALL_TOLERANCE_RATIO = 0.01;
 
 	/** {@code resolvePreviewMediaDuration}: discard implausibly short reported durations. */
-	public static Double resolvePreviewMediaDuration(Double reportedDuration, Double timelineDuration) {
+	public static @Nullable Double resolvePreviewMediaDuration(Double reportedDuration, Double timelineDuration) {
 		if (reportedDuration == null || !Double.isFinite(reportedDuration)) {
 			return null;
 		}

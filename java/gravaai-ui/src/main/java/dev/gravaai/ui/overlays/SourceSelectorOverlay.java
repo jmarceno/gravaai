@@ -1,5 +1,7 @@
 package dev.gravaai.ui.overlays;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +41,8 @@ import dev.gravaai.ui.kit.Button;
  * // wire recording-state-changed -> selector.recordingStateChanged(recording)
  * }</pre>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SourceSelectorOverlay implements SourceService.SourceSelectorUi {
 
 	/** {@code createSourceSelectorWindow}: 620x420, min 350, max 500 (windows.ts). */
@@ -56,11 +60,11 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 	private final SourceService sourceService;
 	private final BooleanSupplier recordingActive;
 
-	private Stage stage;
-	private VBox list;
-	private Label statusLabel;
-	private Label errorLabel;
-	private Button refreshButton;
+	private @Nullable Stage stage;
+	private @Nullable VBox list;
+	private @Nullable Label statusLabel;
+	private @Nullable Label errorLabel;
+	private @Nullable Button refreshButton;
 	private final ScrollPane scroll = new ScrollPane();
 	private boolean selecting;
 
@@ -237,13 +241,13 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 		}
 	}
 
-	private void setStatus(String text, boolean visible) {
+	private void setStatus(@Nullable String text, boolean visible) {
 		statusLabel.setText(text == null ? "" : text);
 		statusLabel.setManaged(visible);
 		statusLabel.setVisible(visible);
 	}
 
-	private void showError(String message) {
+	private void showError(@Nullable String message) {
 		boolean visible = message != null && !message.isBlank();
 		errorLabel.setText(visible ? message : "");
 		errorLabel.setManaged(visible);

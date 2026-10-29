@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -25,7 +27,7 @@ public final class WhisperModels {
 	}
 
 	/** One download progress update. */
-	public record Progress(DownloadState state, int percent, Path path, String error) {
+	public record Progress(DownloadState state, int percent, @Nullable Path path, @Nullable String error) {
 	}
 
 	private static final String LARGE_TURBO_URL =
@@ -55,7 +57,7 @@ public final class WhisperModels {
 	}
 
 	/** {@code getWhisperModelStatus}: the path when the model file is readable, else null. */
-	public Path existingPath(WhisperModel model) {
+	public @Nullable Path existingPath(WhisperModel model) {
 		Path path = pathFor(model);
 		return Files.isReadable(path) ? path : null;
 	}

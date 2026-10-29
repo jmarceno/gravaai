@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.clips;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Kit;
 import dev.gravaai.ui.kit.KitRoot;
@@ -75,5 +77,5 @@ public final class ClipImportOverlay extends StackPane {
 		}
 	}
 
-	private ChangeListener<Number> fit;
+	private @Nullable ChangeListener<Number> fit;
 }

@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -28,7 +30,7 @@ public final class KeystrokeTypes {
 			return wire;
 		}
 
-		public static KeyModifier fromWire(String value) {
+		public static @Nullable KeyModifier fromWire(String value) {
 			for (KeyModifier modifier : values()) {
 				if (modifier.wire.equals(value)) {
 					return modifier;

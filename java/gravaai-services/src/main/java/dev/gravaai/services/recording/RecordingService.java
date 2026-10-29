@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -37,6 +39,8 @@ import tools.jackson.databind.JsonNode;
  * sidecars. UI work (HUD hiding, area border, cursor restore) is injected through
  * {@link HudHooks}; the app wires the JavaFX implementation.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -71,10 +75,10 @@ public final class RecordingService {
 
 	private final List<Runnable> stopFromTrayListeners = new CopyOnWriteArrayList<>();
 
-	private volatile String currentVideoPath;
-	private volatile RecordingEvents.RecordingSession currentRecordingSession;
-	private RecordingImportService importService;
-	private RecordingThumbnails thumbnails;
+	private volatile @Nullable String currentVideoPath;
+	private volatile RecordingEvents.@Nullable RecordingSession currentRecordingSession;
+	private @Nullable RecordingImportService importService;
+	private @Nullable RecordingThumbnails thumbnails;
 
 	public RecordingService(
 			Supplier<Path> recordingsDir,
@@ -303,7 +307,7 @@ public final class RecordingService {
 		currentVideoPath = null;
 	}
 
-	public RecordingEvents.RecordingSession getCurrentRecordingSession() {
+	public RecordingEvents.@Nullable RecordingSession getCurrentRecordingSession() {
 		return currentRecordingSession;
 	}
 
@@ -313,7 +317,7 @@ public final class RecordingService {
 	}
 
 	/** {@code get-recorded-video-path}: newest non-empty screen recording in the recordings folder. */
-	public String getRecordedVideoPath() {
+	public @Nullable String getRecordedVideoPath() {
 		Path dir = recordingsDir.get();
 		List<Path> candidates = new ArrayList<>();
 		try (var entries = Files.list(dir)) {

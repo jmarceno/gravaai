@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -13,6 +15,8 @@ import dev.gravaai.services.meeting.CancelSignal;
  * src/components/video-editor/captions/useAutoCaptionController.ts): idle -> extracting ->
  * transcribing -> parsing -> done/error/cancelled. The editor/AppContext subscribes and drives it.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutoCaptionService implements AutoCloseable {
 
 	public enum State {
@@ -30,8 +34,8 @@ public final class AutoCaptionService implements AutoCloseable {
 			State state,
 			int progress,
 			String message,
-			List<CaptionCue> cues,
-			String error) {
+			@Nullable List<CaptionCue> cues,
+			@Nullable String error) {
 
 		public Status {
 			cues = cues == null ? List.of() : List.copyOf(cues);
@@ -55,7 +59,7 @@ public final class AutoCaptionService implements AutoCloseable {
 	private final ExecutorService executor;
 	private final List<Consumer<Status>> listeners = new CopyOnWriteArrayList<>();
 	private volatile Status status = new Status(State.IDLE, 0, "", List.of(), null);
-	private volatile CancelSignal.Flag cancelSignal;
+	private volatile CancelSignal.@Nullable Flag cancelSignal;
 
 	public AutoCaptionService(CaptionGenerator generator, ExecutorService executor) {
 		this(generator::generateFromVideo, executor);

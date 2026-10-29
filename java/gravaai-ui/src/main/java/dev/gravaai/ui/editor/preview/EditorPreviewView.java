@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.gravaai.media.compose.Background;
@@ -28,6 +30,8 @@ import javafx.scene.layout.Region;
  * (the GL context and compositor are size-bound). While no renderer is ready the control shows the
  * previous image (or nothing), and the first compositor frame replaces it.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorPreviewView extends Region {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.preview");
@@ -41,16 +45,16 @@ public final class EditorPreviewView extends Region {
 	private final ReadOnlyBooleanWrapper ready = new ReadOnlyBooleanWrapper(false);
 	private final PreviewVideoReadiness readiness = new PreviewVideoReadiness(this::publishReady);
 
-	private PlaybackController controller;
-	private AutoCloseable frameSubscription;
-	private AutoCloseable statusSubscription;
-	private AutoCloseable timeSubscription;
-	private volatile PreviewRenderer renderer;
+	private @Nullable PlaybackController controller;
+	private @Nullable AutoCloseable frameSubscription;
+	private @Nullable AutoCloseable statusSubscription;
+	private @Nullable AutoCloseable timeSubscription;
+	private volatile @Nullable PreviewRenderer renderer;
 	/** Last status pushed by the engine; used for repaints without locking the engine on FX. */
-	private volatile PlaybackStatus lastStatus;
+	private volatile @Nullable PlaybackStatus lastStatus;
 	/** Stable copy of the last decoded frame, replayed without seeking the engine. */
-	private volatile PreviewFrameSnapshot lastFrame;
-	private volatile Runnable framePresentedListener;
+	private volatile @Nullable PreviewFrameSnapshot lastFrame;
+	private volatile @Nullable Runnable framePresentedListener;
 	/** Extension render hooks handed to every renderer this view starts (P3.3). */
 	private volatile FrameOverlayHooks overlayHooks = FrameOverlayHooks.NONE;
 	private int targetWidth = -1;
@@ -165,7 +169,7 @@ public final class EditorPreviewView extends Region {
 	 * appearance repaint must not seek, because {@code PlaybackEngine.seek} flushes/restarts the
 	 * audio track and audibly cracks while playing.
 	 */
-	private boolean submitSnapshot(PreviewFrameSnapshot snapshot, PreviewRenderer target,
+	private boolean submitSnapshot(@Nullable PreviewFrameSnapshot snapshot, @Nullable PreviewRenderer target,
 			PreviewFrameMapper.PreviewScene current, boolean updateReadiness) {
 		if (snapshot == null || target == null || current == null) {
 			return false;
@@ -254,7 +258,7 @@ public final class EditorPreviewView extends Region {
 	}
 
 	/** Last retained decoded frame (diagnostics/tests); null before the first frame arrives. */
-	PreviewFrameSnapshot lastFrameSnapshot() {
+	@Nullable PreviewFrameSnapshot lastFrameSnapshot() {
 		return lastFrame;
 	}
 
@@ -385,7 +389,7 @@ public final class EditorPreviewView extends Region {
 	}
 
 	/** Renderer failure, or null. */
-	public Throwable rendererFailure() {
+	public @Nullable Throwable rendererFailure() {
 		PreviewRenderer active = renderer;
 		return active == null ? null : active.failure();
 	}
@@ -407,7 +411,7 @@ public final class EditorPreviewView extends Region {
 		}
 	}
 
-	private static void closeQuietly(AutoCloseable handle) {
+	private static void closeQuietly(@Nullable AutoCloseable handle) {
 		if (handle == null) {
 			return;
 		}

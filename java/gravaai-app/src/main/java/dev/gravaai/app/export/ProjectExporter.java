@@ -1,5 +1,7 @@
 package dev.gravaai.app.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -42,6 +44,8 @@ import javafx.stage.Window;
  * {@link #runTo} path is unchanged. Extension render hooks (plan §5.18) run in every exported
  * frame through the compositor, with the same phase order as the editor preview.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectExporter {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.export");
@@ -50,10 +54,10 @@ public final class ProjectExporter {
 	private final ExportPublisher publisher;
 	private final EditorPreferencesStore preferencesStore;
 	/** Extension render hooks (plan §5.18); null until the app wires the extension host. */
-	private ExtensionHost extensionHost;
+	private @Nullable ExtensionHost extensionHost;
 
 	public ProjectExporter(ExportCoordinator coordinator, ExportPublisher publisher,
-			EditorPreferencesStore preferencesStore) {
+			@Nullable EditorPreferencesStore preferencesStore) {
 		this.coordinator = coordinator;
 		this.publisher = publisher;
 		this.preferencesStore = preferencesStore;
@@ -113,7 +117,7 @@ public final class ProjectExporter {
 		model.setPendingExportSave(null);
 		discardStagingDir();
 		try {
-			Path stagingDir = Files.createTempDirectory("gravaai-export-");
+			@Nullable Path stagingDir = Files.createTempDirectory("gravaai-export-");
 			try {
 				Files.setPosixFilePermissions(stagingDir,
 						java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
@@ -205,7 +209,7 @@ public final class ProjectExporter {
 	}
 
 	/** Toast in the export window ({@code null} owner: the toast is skipped, logged instead). */
-	private static Toast showToast(Window owner, String title) {
+	private static @Nullable Toast showToast(Window owner, String title) {
 		javafx.scene.Node node = owner != null && owner.getScene() != null
 				? owner.getScene().getRoot() : null;
 		if (node == null) {
@@ -296,7 +300,7 @@ public final class ProjectExporter {
 	}
 
 	/** {@code clearPendingExportSave}: drops the pending save and deletes its staged file. */
-	public void discardPendingExportSave(ExportSessionModel.PendingExportSave pending) {
+	public void discardPendingExportSave(ExportSessionModel.@Nullable PendingExportSave pending) {
 		if (pending == null || pending.stagedFile() == null) {
 			return;
 		}
@@ -317,7 +321,7 @@ public final class ProjectExporter {
 		}
 	}
 
-	private static void deleteRecursively(Path directory) {
+	private static void deleteRecursively(@Nullable Path directory) {
 		if (directory == null || !Files.isDirectory(directory)) {
 			return;
 		}
@@ -336,13 +340,13 @@ public final class ProjectExporter {
 		}
 	}
 
-	private static String errorMessage(Throwable error) {
+	private static @Nullable String errorMessage(Throwable error) {
 		String message = error.getMessage();
 		return message == null || message.isBlank() ? error.toString() : message;
 	}
 
 	/** Headless export on the calling thread (acceptance harness / tests). */
-	public ExportRunner.Outcome runTo(EditorSession session, String format, Path destination)
+	public ExportRunner.@Nullable Outcome runTo(EditorSession session, String format, Path destination)
 			throws IOException {
 		ExportPreferences defaults = ExportPreferences.defaults();
 		ExportPreferences preferences = new ExportPreferences(defaults.exportEncodingMode(),
@@ -372,7 +376,7 @@ public final class ProjectExporter {
 	 * Materialises the project wallpaper resources into a temp root ({@code wallpapers/...}) so the
 	 * compositor can read them from the filesystem in the packaged app.
 	 */
-	private static Path stageWallpapers(EditorSession session) {
+	private static @Nullable Path stageWallpapers(EditorSession session) {
 		String wallpaper = session.store().state().wallpaper();
 		if (wallpaper == null || !wallpaper.startsWith("/wallpapers/")) {
 			return null;

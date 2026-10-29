@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -59,12 +61,12 @@ public final class MeetingView extends Region {
 	private final VBox playerHost = new VBox(10);
 	private final MeetingNotesView notes;
 
-	private Path mediaPath;
-	private MeetingMeta meta;
+	private @Nullable Path mediaPath;
+	private @Nullable MeetingMeta meta;
 	private boolean hasVideo;
 	private boolean editingTitle;
-	private Node player;
-	private Subscription jobSubscription;
+	private @Nullable Node player;
+	private @Nullable Subscription jobSubscription;
 	private Subscription openSubscription;
 
 	/** AppContext entry point (real service). */
@@ -163,7 +165,7 @@ public final class MeetingView extends Region {
 		loadMeta();
 	}
 
-	public Path mediaPath() {
+	public @Nullable Path mediaPath() {
 		return mediaPath;
 	}
 
@@ -392,7 +394,7 @@ public final class MeetingView extends Region {
 				|| lower.endsWith(".mkv");
 	}
 
-	private static String formatDateTime(String iso) {
+	private static @Nullable String formatDateTime(String iso) {
 		if (iso == null || iso.isBlank()) {
 			return null;
 		}

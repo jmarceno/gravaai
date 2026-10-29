@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -14,7 +16,7 @@ import java.util.List;
 public record FadeSpec(List<Window> windows) {
 
 	/** One dip-to-black window in timeline milliseconds. */
-	public record Window(double startMs, double peakMs, Double holdUntilMs, double endMs) {
+	public record Window(double startMs, double peakMs, @Nullable Double holdUntilMs, double endMs) {
 	}
 
 	public static final FadeSpec NONE = new FadeSpec(List.of());

@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -29,7 +31,7 @@ public enum WebcamCorner {
 	}
 
 	/** {@code fromWire} without a fallback: null for unknown values. */
-	public static WebcamCorner fromWireOrNull(String value) {
+	public static @Nullable WebcamCorner fromWireOrNull(String value) {
 		for (WebcamCorner corner : values()) {
 			if (corner.wire.equals(value)) {
 				return corner;

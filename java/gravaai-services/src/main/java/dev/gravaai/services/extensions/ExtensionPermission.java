@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * The closed permission set of {@code EXTENSIONS.md} ("Permissions"). A manifest may only request
  * these; every host API that needs one checks it before acting.
@@ -26,12 +28,12 @@ public enum ExtensionPermission {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
 	/** The permission for a manifest string, or null when it is not in the closed set. */
-	public static ExtensionPermission fromWire(String value) {
+	public static @Nullable ExtensionPermission fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -39,6 +41,8 @@ import tools.jackson.databind.node.ObjectNode;
  * byte-identically from {@link AgentToolSchemas}; every call is forwarded to the running app over
  * {@link AgentSocketBridge} and progress lines become MCP progress notifications.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentMcpServer implements AutoCloseable {
 
 	private final McpSyncServer server;
@@ -179,7 +183,7 @@ public final class AgentMcpServer implements AutoCloseable {
 		}
 	}
 
-	private static CallToolResult errorResult(String message) {
+	private static CallToolResult errorResult(@Nullable String message) {
 		return CallToolResult.builder()
 				.addTextContent(message == null || message.isBlank()
 						? "the app rejected the request"

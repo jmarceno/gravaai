@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 
 /**
@@ -14,7 +16,7 @@ public record AutomationContext(
 		AutomationMediaKind kind,
 		AutomationExportFormat format,
 		String notesPath,
-		Double durationSec,
+		@Nullable Double durationSec,
 		Instant at) {
 
 	public AutomationContext {

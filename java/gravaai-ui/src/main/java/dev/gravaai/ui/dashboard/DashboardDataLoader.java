@@ -23,6 +23,8 @@ import dev.gravaai.ui.meeting.MeetingUiService;
  * {@link DashboardDependencies#meetings()} supplier so a service that comes up after the dashboard
  * is still found.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class DashboardDataLoader {
 
 	/** Port of the React failure the hook surfaces when the meeting list cannot be read. */

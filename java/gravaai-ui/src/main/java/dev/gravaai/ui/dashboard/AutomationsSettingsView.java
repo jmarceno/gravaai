@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +53,8 @@ import javafx.util.Duration;
  * the same 400 ms debounce as the React page (and flushed before a run); the engine and file store
  * belong to {@code services.automations} and are reached through {@link AutomationsController}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutomationsSettingsView extends VBox {
 
 	/** Port of {@code SAVE_DEBOUNCE_MS}. */
@@ -74,10 +78,10 @@ public final class AutomationsSettingsView extends VBox {
 	private final VBox content = new VBox(20);
 	private final PauseTransition saveTimer = new PauseTransition(Duration.millis(SAVE_DEBOUNCE_MS));
 
-	private AutomationsFile file;
-	private AutomationsFile unsaved;
+	private @Nullable AutomationsFile file;
+	private @Nullable AutomationsFile unsaved;
 	private boolean loading = true;
-	private String error;
+	private @Nullable String error;
 	private boolean saving;
 
 	public AutomationsSettingsView(AutomationsController controller) {
@@ -673,7 +677,7 @@ public final class AutomationsSettingsView extends VBox {
 			return box;
 		}
 
-		private Node actionDetails(AutomationAction action, int index) {
+		private @Nullable Node actionDetails(AutomationAction action, int index) {
 			HBox row = new HBox(8);
 			row.getStyleClass().add("automations-settings__action-details");
 			row.setAlignment(Pos.CENTER_LEFT);
@@ -776,7 +780,7 @@ public final class AutomationsSettingsView extends VBox {
 		}
 
 		private void replaceFolderQuietly(AutomationRule target, int index, String folder,
-				String fileName, boolean copyAction) {
+				@Nullable String fileName, boolean copyAction) {
 			replaceActionQuietly(target, index, copyAction
 					? new AutomationAction.CopyToFolder(folder, fileName)
 					: new AutomationAction.MoveToFolder(folder, fileName));
@@ -874,7 +878,7 @@ public final class AutomationsSettingsView extends VBox {
 		}
 	}
 
-	private static AutomationConditionType conditionType(String wire) {
+	private static @Nullable AutomationConditionType conditionType(String wire) {
 		for (AutomationConditionType type : AutomationConditionType.values()) {
 			if (type.wire().equals(wire)) {
 				return type;

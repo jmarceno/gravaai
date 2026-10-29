@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,7 +26,7 @@ public final class MeetingText {
 	}
 
 	/** Port of {@code meetingTitle}: the saved title, else the creation date/time, else "Meeting". */
-	public static String meetingTitle(MeetingMeta meta, Long fallbackMs) {
+	public static String meetingTitle(@Nullable MeetingMeta meta, @Nullable Long fallbackMs) {
 		if (meta != null && meta.title() != null && !meta.title().trim().isEmpty()) {
 			return meta.title().trim();
 		}
@@ -49,7 +51,7 @@ public final class MeetingText {
 	}
 
 	/** Port of {@code formatMeetingDuration}: "1 h 5 min", "5 min 3 s", "3 s" or null. */
-	public static String formatMeetingDuration(Long ms) {
+	public static @Nullable String formatMeetingDuration(@Nullable Long ms) {
 		if (ms == null || ms == 0) {
 			return null;
 		}
@@ -64,14 +66,14 @@ public final class MeetingText {
 	}
 
 	/** Port of {@code formatSize}: "1.2 GB" or "574 MB". */
-	public static String formatSize(long bytes) {
+	public static @Nullable String formatSize(long bytes) {
 		return bytes >= 1_000_000_000L
 				? String.format(Locale.ROOT, "%.1f GB", bytes / 1_000_000_000.0)
 				: Math.round(bytes / 1_000_000.0) + " MB";
 	}
 
 	/** Port of the thumbnail status badge labels; {@code null} hides the badge. */
-	public static String libraryStatusLabel(MeetingLibraryEntry.Status status) {
+	public static @Nullable String libraryStatusLabel(MeetingLibraryEntry.Status status) {
 		if (status == null) {
 			return null;
 		}

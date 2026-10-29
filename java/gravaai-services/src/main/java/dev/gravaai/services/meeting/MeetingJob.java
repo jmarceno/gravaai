@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 /**
@@ -13,7 +15,7 @@ public record MeetingJob(
 		Status status,
 		Stage stage,
 		String message,
-		Integer progress,
+		@Nullable Integer progress,
 		String error,
 		String createdAt,
 		String finishedAt) {

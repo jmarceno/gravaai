@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -43,7 +45,7 @@ public final class AgentHighlightsController implements AutoCloseable {
 	private final AtomicLong ids = new AtomicLong();
 	private final AutoCloseable subscription;
 	private final Scheduler scheduler;
-	private AutoCloseable pendingClear;
+	private @Nullable AutoCloseable pendingClear;
 
 	public AgentHighlightsController(AgentUiService service) {
 		this(service, FX_SCHEDULER);

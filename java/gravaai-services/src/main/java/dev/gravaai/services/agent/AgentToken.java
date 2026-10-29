@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -69,7 +71,7 @@ public final class AgentToken {
 	}
 
 	/** {@code tokensMatch}: constant-time comparison of equal-length UTF-8 tokens. */
-	public static boolean tokensMatch(String expected, Object received) {
+	public static boolean tokensMatch(String expected, @Nullable Object received) {
 		if (!(received instanceof String text) || text.length() != expected.length()) {
 			return false;
 		}

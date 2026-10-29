@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,13 +21,15 @@ import dev.gravaai.media.audio.AtempoChain;
  * every audio file used here starts at input index 1. The builder de-duplicates paths and returns
  * the ffmpeg inputs in that order.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportAudioGraph {
 
 	/** One full-length timeline-bound audio track (system/mic/mixed/embedded). */
-	public record TrackInput(String audioPath, double gain) {}
+	public record TrackInput(@Nullable String audioPath, double gain) {}
 
 	/** One additional audio region placed at {@code startMs} on the output timeline. */
-	public record RegionInput(String audioPath, double startMs, double endMs, double gain) {}
+	public record RegionInput(@Nullable String audioPath, double startMs, double endMs, double gain) {}
 
 	/** An output-timeline range (ms) where the recording's own audio is silent: a muted clip. */
 	public record MutedRange(double startMs, double endMs) {}

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -35,13 +37,15 @@ import java.util.List;
  *        the TS exporter's {@code timestamp}/{@code currentVideoTime}, while zoom, annotations,
  *        fade and the wallpaper follow the timeline time
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record FrameInput(
 		long frameIndex,
 		double timeSeconds,
-		RgbaFrame sourceFrame,
-		RgbaFrame webcamFrame,
+		@Nullable RgbaFrame sourceFrame,
+		@Nullable RgbaFrame webcamFrame,
 		List<CursorSample> cursorSamples,
-		Background background,
+		@Nullable Background background,
 		double backgroundBlur,
 		LayoutSpec layout,
 		ZoomSpec zoom,

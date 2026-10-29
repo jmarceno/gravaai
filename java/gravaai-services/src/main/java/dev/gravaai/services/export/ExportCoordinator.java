@@ -1,5 +1,7 @@
 package dev.gravaai.services.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -29,11 +31,13 @@ import dev.gravaai.services.automations.AutomationTriggers;
  * <p>The AppContext wires this: the UI calls {@link #start}, receives progress through the
  * listener (marshalled to the FX thread by the caller) and can {@link #cancel()} the running job.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportCoordinator implements AutoCloseable {
 
 	/** All the settings of one export request. */
-	public record Request(ExportFormat format, int width, int height, int frameRate, int bitrate,
-			ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
+	public record Request(@Nullable ExportFormat format, int width, int height, int frameRate, int bitrate,
+			@Nullable ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
 			Path destination, boolean reveal, boolean overwrite,
 			CaptionSidecars.Payload captionSidecars, ExportAudioPlan audioPlan) {
 

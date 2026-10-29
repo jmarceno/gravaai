@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ColorAlphaType;
 import io.github.humbleui.skija.ColorSpace;
@@ -57,6 +59,8 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * that context's thread. The caller flushes the surface after {@link #render}; this class
  * flushes as well so the PBO readback sees the frame and raster images can be released.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Compositor implements AutoCloseable {
 	/**
 	 * The webcam is drawn several times smaller than its source, so it samples the mipmapped
@@ -70,9 +74,9 @@ public final class Compositor implements AutoCloseable {
 	private final ColorSpace colorSpace;
 	private int width;
 	private int height;
-	private Background cachedBackground;
+	private @Nullable Background cachedBackground;
 	private double cachedBackgroundBlur = -1;
-	private Image cachedBackgroundImage;
+	private @Nullable Image cachedBackgroundImage;
 	private int cachedWidth = -1;
 	private int cachedHeight = -1;
 	// Stage 3 camera animation state: springs are advanced per rendered frame using content
@@ -82,7 +86,7 @@ public final class Compositor implements AutoCloseable {
 	private final SpringSmoothing.SpringState zoomSpringY = SpringSmoothing.createSpringState();
 	private final CursorFollowCamera.CursorFollowCameraState cursorFollowCamera =
 			CursorFollowCamera.createCursorFollowCameraState();
-	private Double lastContentTimeMs;
+	private @Nullable Double lastContentTimeMs;
 	private volatile ZoomTransform.AppliedTransform lastAppliedTransform =
 			new ZoomTransform.AppliedTransform(1, 0, 0);
 	// Stage 5: zoom motion blur. The state mirrors the TS motion-blur frame history; the effect
@@ -91,11 +95,11 @@ public final class Compositor implements AutoCloseable {
 			ZoomTransform.createMotionBlurState();
 	private volatile MotionBlur.Effect lastMotionBlurEffect = MotionBlur.Effect.NONE;
 	// Stage 8: the video mask rect is the annotation coordinate rect (TS layoutCache.maskRect).
-	private volatile Rect lastMaskRect;
-	private Surface blurSurface;
+	private volatile @Nullable Rect lastMaskRect;
+	private @Nullable Surface blurSurface;
 	// Persistent GL textures for the screen and webcam frames (no per-frame copies or allocations).
 	private final GpuFrameTextures frameTextures = new GpuFrameTextures();
-	private SkiaGlSurface currentTarget;
+	private @Nullable SkiaGlSurface currentTarget;
 	private final CursorRenderer cursorRenderer = new CursorRenderer();
 	// Extension render hooks (Phase 3, plan §5.18); NONE keeps the frame byte-identical.
 	private volatile FrameOverlayHooks overlayHooks = FrameOverlayHooks.NONE;
@@ -243,7 +247,7 @@ public final class Compositor implements AutoCloseable {
 
 	// ---- stage 1: background -------------------------------------------------------------
 
-	private void renderBackground(Canvas canvas, Background background, double backgroundBlur) {
+	private void renderBackground(Canvas canvas, @Nullable Background background, double backgroundBlur) {
 		Image image = backgroundImage(background, backgroundBlur);
 		canvas.drawImageRect(image,
 				Rect.makeXYWH(0, 0, width, height),

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Cursor overlay configuration for one compositor frame (plan §5.8 stage 6), media-local like the
  * other specs: the services adapter maps the editor cursor settings into it.
@@ -24,9 +26,9 @@ package dev.gravaai.media.compose;
 public record CursorSpec(boolean showCursor, CursorStyle style, double dotRadius,
 		double smoothingFactor, double stiffnessMultiplier, double dampingMultiplier,
 		double massMultiplier, double motionBlur, CursorClickEffect clickEffect,
-		int clickColorArgb, double clickEffectScale, double clickEffectOpacity,
+		@Nullable int clickColorArgb, double clickEffectScale, double clickEffectOpacity,
 		double clickEffectDurationMs, double clickBounce, double clickBounceDurationMs,
-		double sway) {
+		@Nullable double sway) {
 
 	/** Defaults from {@code DEFAULT_CURSOR_CONFIG} (cursor hidden). */
 	public static final CursorSpec DEFAULT = new CursorSpec(false, CursorStyle.TAHOE, 28, 0.18,

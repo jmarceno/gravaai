@@ -1,5 +1,7 @@
 package dev.gravaai.services.projects;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -15,14 +17,14 @@ final class ProjectPaths {
 
 	private static final String MEDIA_URL_PATH = "/video";
 
-	private ProjectPaths() {
+	@Nullable private ProjectPaths() {
 	}
 
 	/**
 	 * Port of {@code normalizeVideoSourcePath}: trims, turns the old loopback media-server URL back
 	 * into the file path it served, unwraps {@code file://} URLs, and otherwise keeps the value.
 	 */
-	static String normalizeVideoSourcePath(String videoPath) {
+	static @Nullable String normalizeVideoSourcePath(String videoPath) {
 		if (videoPath == null) {
 			return null;
 		}
@@ -49,7 +51,7 @@ final class ProjectPaths {
 	}
 
 	/** Port of {@code getLocalMediaServerPath}: only the loopback media-server video URL yields a path. */
-	static String getLocalMediaServerPath(String resource) {
+	static @Nullable String getLocalMediaServerPath(String resource) {
 		try {
 			URI uri = URI.create(resource);
 			String scheme = uri.getScheme();

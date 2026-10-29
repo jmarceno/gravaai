@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -60,7 +62,7 @@ public final class RecordingEvents {
 	}
 
 	/** {@code { videoPath, webcamPath, timeOffsetMs, hideOverlayCursorByDefault }} pushed to the UI. */
-	public record RecordingSession(String videoPath, String webcamPath, long timeOffsetMs, Boolean hideOverlayCursorByDefault) {
+	public record RecordingSession(String videoPath, @Nullable String webcamPath, long timeOffsetMs, @Nullable Boolean hideOverlayCursorByDefault) {
 	}
 
 	private final List<Consumer<RecordingSession>> sessionChanged = new CopyOnWriteArrayList<>();

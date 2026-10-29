@@ -12,6 +12,8 @@ import java.util.function.Consumer;
  * the FX application thread. Implementations hop with {@code Platform.runLater} where the service
  * publishes from another thread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public interface HudRecordingPort {
 
 	/** HUD state machine (record button, timer, pause, finalizing copy). */

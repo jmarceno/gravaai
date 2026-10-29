@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions.canvas;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
@@ -40,6 +42,8 @@ import io.github.humbleui.types.Rect;
  * Skija {@link Canvas} belongs to the caller (a raster surface in tests, the compositor's GPU
  * surface in preview/export); this object only draws into it and closes its own path builder.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Canvas2D implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(Canvas2D.class.getName());
@@ -57,7 +61,7 @@ public final class Canvas2D implements AutoCloseable {
 	private final double height;
 	private final Deque<Snapshot> savedStates = new ArrayDeque<>();
 
-	private PathBuilder path;
+	private @Nullable PathBuilder path;
 	private double lastX;
 	private double lastY;
 	private double subpathStartX;
@@ -65,9 +69,9 @@ public final class Canvas2D implements AutoCloseable {
 	private boolean contourOpen;
 
 	private int fillColor = 0xFF000000;
-	private CanvasGradient fillGradient;
+	private @Nullable CanvasGradient fillGradient;
 	private int strokeColor = 0xFF000000;
-	private CanvasGradient strokeGradient;
+	private @Nullable CanvasGradient strokeGradient;
 	private double lineWidth = 1.0;
 	private double globalAlpha = 1.0;
 	private BlendMode composite = BlendMode.SRC_OVER;
@@ -610,7 +614,7 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	@HostAccess.Export
-	public double getCanvasHeight() {
+	public @Nullable double getCanvasHeight() {
 		return height;
 	}
 
@@ -656,7 +660,7 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	private void drawImageRect(
-			CanvasImage image,
+			@Nullable CanvasImage image,
 			double sx,
 			double sy,
 			double sw,
@@ -675,7 +679,7 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private Font createFont() {
+	private @Nullable Font createFont() {
 		FontStyle style = font.bold() && font.italic()
 				? FontStyle.BOLD_ITALIC
 				: font.bold() ? FontStyle.BOLD : font.italic() ? FontStyle.ITALIC : FontStyle.NORMAL;
@@ -695,7 +699,7 @@ public final class Canvas2D implements AutoCloseable {
 		return new Font(typeface, (float) font.size());
 	}
 
-	private Path snapshotPath() {
+	private @Nullable Path snapshotPath() {
 		if (path == null) {
 			return null;
 		}
@@ -781,7 +785,7 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private Snapshot snapshot() {
+	private @Nullable Snapshot snapshot() {
 		return new Snapshot(
 				fillColor, fillGradient, strokeColor, strokeGradient, lineWidth, globalAlpha, composite,
 				shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, font, textAlign, textBaseline,
@@ -809,7 +813,7 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	/** Parses a fill/stroke style value: a CSS colour string or a gradient host object. */
-	private static Style style(Object value) {
+	private static @Nullable Style style(Object value) {
 		if (value instanceof CanvasGradient gradient) {
 			return new Style(0x00000000, gradient);
 		}
@@ -837,7 +841,7 @@ public final class Canvas2D implements AutoCloseable {
 		return true;
 	}
 
-	private static void closeQuietly(AutoCloseable closeable) {
+	private static void closeQuietly(@Nullable AutoCloseable closeable) {
 		if (closeable == null) {
 			return;
 		}
@@ -859,7 +863,7 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	/** The paint plus the Skija resources backing it; closing releases all three. */
-	private record PaintResources(Paint paint, Shader shader, ImageFilter filter) implements AutoCloseable {
+	private record PaintResources(Paint paint, @Nullable Shader shader, @Nullable ImageFilter filter) implements AutoCloseable {
 		@Override
 		public void close() {
 			paint.close();
@@ -868,9 +872,9 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private record Style(int color, CanvasGradient gradient) {}
+	private @Nullable record Style(int color, @Nullable CanvasGradient gradient) {}
 
-	private record Snapshot(
+	private @Nullable record Snapshot(
 			int fillColor,
 			CanvasGradient fillGradient,
 			int strokeColor,
@@ -890,11 +894,11 @@ public final class Canvas2D implements AutoCloseable {
 			double miterLimit) {}
 
 	/** A parsed CSS {@code font} shorthand: family, size and the bold/italic bits. */
-	private record FontSpec(String family, double size, boolean bold, boolean italic, String css) {
+	private @Nullable record FontSpec(String family, double size, boolean bold, boolean italic, String css) {
 
 		static final FontSpec DEFAULT = new FontSpec("sans-serif", 10, false, false, DEFAULT_FONT);
 
-		static FontSpec parse(String css) {
+		static @Nullable FontSpec parse(String css) {
 			if (css == null) {
 				return null;
 			}

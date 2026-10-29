@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import dev.gravaai.core.project.CropRegion;
@@ -29,15 +31,17 @@ import dev.gravaai.media.playback.PlaybackFrame;
  * GL context; the preview panel owns one immutable {@link PreviewScene} snapshot so the decode
  * thread never reads a mutable editor store.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PreviewFrameMapper {
 
 	/** The parts of the editor state that do not depend on the frame. */
-	public record PreviewScene(Background background, double backgroundBlur, LayoutSpec layout,
+	public record PreviewScene(@Nullable Background background, double backgroundBlur, LayoutSpec layout,
 			FrameStyle style, ZoomSpec zoom, CursorTrack cursor, CursorSpec cursorSpec,
-			WebcamSpec webcam, java.nio.file.Path videoWallpaper,
+			WebcamSpec webcam, java.nio.file.@Nullable Path videoWallpaper,
 			List<dev.gravaai.media.compose.AnnotationSpec> annotations,
 			dev.gravaai.media.compose.CaptionSpec captions,
-			dev.gravaai.media.compose.KeystrokeSpec keystrokes,
+			dev.gravaai.media.compose.@Nullable KeystrokeSpec keystrokes,
 			dev.gravaai.media.compose.FadeSpec fade, ProjectEditorState editor) {
 
 		/**
@@ -254,7 +258,7 @@ public final class PreviewFrameMapper {
 		return new LayoutSpec(paddingFor(state.padding()), cropFor(state.cropRegion()));
 	}
 
-	static LayoutPadding paddingFor(Padding padding) {
+	static LayoutPadding paddingFor(@Nullable Padding padding) {
 		if (padding == null) {
 			return LayoutPadding.NONE;
 		}
@@ -262,7 +266,7 @@ public final class PreviewFrameMapper {
 				Boolean.TRUE.equals(padding.linked()));
 	}
 
-	static LayoutCrop cropFor(CropRegion crop) {
+	static LayoutCrop cropFor(@Nullable CropRegion crop) {
 		if (crop == null) {
 			return LayoutCrop.FULL;
 		}

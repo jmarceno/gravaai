@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -36,7 +38,7 @@ import javafx.scene.shape.Circle;
 public final class AnnotationOverlayController {
 
 	/** Uncommitted box of the annotation being dragged/resized, in percent of the recording rect. */
-	public record LiveBox(String id, AnnotationPosition position, AnnotationSize size) {
+	public record LiveBox(String id, AnnotationPosition position, @Nullable AnnotationSize size) {
 	}
 
 	private static final double HANDLE_SIZE = 12;
@@ -52,8 +54,8 @@ public final class AnnotationOverlayController {
 	private final java.util.Map<String, Pane> nodes = new LinkedHashMap<>();
 	private final List<AnnotationRegion> visible = new ArrayList<>();
 	private List<String> renderedIds = List.of();
-	private String renderedSelected;
-	private Gesture gesture;
+	private @Nullable String renderedSelected;
+	private @Nullable Gesture gesture;
 	private java.util.function.Consumer<LiveBox> liveBoxListener = box -> { };
 
 	/**
@@ -135,7 +137,7 @@ public final class AnnotationOverlayController {
 		return result;
 	}
 
-	private void rebuild(List<AnnotationRegion> next, String selected) {
+	private void rebuild(List<AnnotationRegion> next, @Nullable String selected) {
 		visible.clear();
 		visible.addAll(next);
 		renderedIds = next.stream().map(AnnotationRegion::id).toList();
@@ -403,7 +405,7 @@ public final class AnnotationOverlayController {
 	}
 
 	/** Node for an annotation id, for tests. */
-	Pane nodeFor(String id) {
+	@Nullable Pane nodeFor(String id) {
 		return nodes.get(id);
 	}
 
@@ -427,7 +429,7 @@ public final class AnnotationOverlayController {
 		gesture = null;
 	}
 
-	private static boolean eq(String left, String right) {
+	private static boolean eq(@Nullable String left, @Nullable String right) {
 		return left == null ? right == null : left.equals(right);
 	}
 }

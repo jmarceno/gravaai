@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,29 +19,31 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code electron/ipc/project/session.ts} (plan §5.6.6: the webcam track keeps its own time
  * offset so the editor can align it with the screen recording).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingSessionManifest {
 
 	/** What the UI/editor needs to know about a recording's linked webcam track. */
-	public record RecordingSessionData(String videoPath, String webcamPath, long timeOffsetMs) {
+	public @Nullable record RecordingSessionData(String videoPath, @Nullable String webcamPath, long timeOffsetMs) {
 	}
 
 	/** The manifest shape written by version 2. */
-	record RecordingSessionManifestFile(int version, String videoFileName, String webcamFileName, long timeOffsetMs) {
+	@Nullable record RecordingSessionManifestFile(int version, String videoFileName, String webcamFileName, long timeOffsetMs) {
 	}
 
 	private static final int MANIFEST_VERSION = 2;
 
-	private RecordingSessionManifest() {
+	@Nullable private RecordingSessionManifest() {
 	}
 
-	private static long normalizeRecordingTimeOffsetMs(Object value) {
+	private static @Nullable long normalizeRecordingTimeOffsetMs(@Nullable Object value) {
 		return value instanceof Number number && Double.isFinite(number.doubleValue())
 				? Math.round(number.doubleValue())
 				: 0;
 	}
 
 	/** {@code getRecordingSessionManifestPath}: next to the video, with the video's stem. */
-	public static Path getRecordingSessionManifestPath(String videoPath) {
+	public static @Nullable Path getRecordingSessionManifestPath(String videoPath) {
 		Path path = Path.of(videoPath);
 		String fileName = path.getFileName().toString();
 		int extensionStart = fileName.lastIndexOf('.');
@@ -49,7 +53,7 @@ public final class RecordingSessionManifest {
 				.resolve(baseName + StorageFiles.RECORDING_SESSION_MANIFEST_SUFFIX);
 	}
 
-	private static String normalizeVideoSourcePath(String videoPath) {
+	private static @Nullable String normalizeVideoSourcePath(String videoPath) {
 		if (videoPath == null) {
 			return null;
 		}
@@ -78,7 +82,7 @@ public final class RecordingSessionManifest {
 	}
 
 	/** {@code resolveRecordingSessionManifest}: the manifest when the webcam file still exists. */
-	public static RecordingSessionData resolveRecordingSessionManifest(String videoPath) {
+	public static @Nullable RecordingSessionData resolveRecordingSessionManifest(String videoPath) {
 		String normalizedVideoPath = normalizeVideoSourcePath(videoPath);
 		if (normalizedVideoPath == null) {
 			return null;
@@ -112,7 +116,7 @@ public final class RecordingSessionManifest {
 	}
 
 	/** {@code resolveLinkedWebcamPath}: the legacy {@code <stem>-webcam.<ext>} sibling. */
-	public static String resolveLinkedWebcamPath(String videoPath) {
+	public static @Nullable String resolveLinkedWebcamPath(String videoPath) {
 		String normalizedVideoPath = normalizeVideoSourcePath(videoPath);
 		if (normalizedVideoPath == null) {
 			return null;
@@ -142,7 +146,7 @@ public final class RecordingSessionManifest {
 	}
 
 	/** {@code resolveRecordingSession}: manifest first, legacy sibling second. */
-	public static RecordingSessionData resolveRecordingSession(String videoPath) {
+	public static @Nullable RecordingSessionData resolveRecordingSession(String videoPath) {
 		RecordingSessionData manifestSession = resolveRecordingSessionManifest(videoPath);
 		if (manifestSession != null) {
 			return manifestSession;

@@ -10,6 +10,8 @@ package dev.gravaai.media.compose;
  * @param interactionType the interaction type ({@code click}, {@code double-click},
  *        {@code right-click}, {@code middle-click}, {@code mouseup}), may be null
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record CursorSample(double timeSeconds, double x, double y, String cursorType,
 		String interactionType) {
 

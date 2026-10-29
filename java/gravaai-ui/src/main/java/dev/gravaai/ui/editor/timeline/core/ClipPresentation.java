@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline.core;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -10,13 +12,15 @@ import java.util.List;
  * gains a gap. These helpers map between the authored media time and the displayed span, and add
  * the tiny screen-space magnet that snaps region edges to cuts/edges.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ClipPresentation {
 
 	/** Port of {@code CLIP_SEAM_GAP_PX}. */
 	public static final double CLIP_SEAM_GAP_PX = 24;
 
 	/** Port of the {@code ClipPresentation} type: media span plus its displayed span. */
-	public record Presentation(Span span, Span displaySpan) {
+	public record Presentation(Span span, @Nullable Span displaySpan) {
 	}
 
 	/** Which side of a span snaps/seeks ({@code "start"} / {@code "end"} in the TS code). */
@@ -29,7 +33,7 @@ public final class ClipPresentation {
 	}
 
 	/** Port of {@code getClipDisplaySpan}: visual gutters never become gaps in media time. */
-	public static Span getClipDisplaySpan(Span span, List<Span> allClips, double msPerPixel) {
+	public static @Nullable Span getClipDisplaySpan(Span span, List<Span> allClips, double msPerPixel) {
 		if (!(msPerPixel > 0)) {
 			return span;
 		}
@@ -53,7 +57,7 @@ public final class ClipPresentation {
 	}
 
 	/** Port of {@code getEmbeddedCaptionSpan}: clip caption previews to the owning filmstrip. */
-	public static Span getEmbeddedCaptionSpan(Span span, List<Presentation> clips) {
+	public static @Nullable Span getEmbeddedCaptionSpan(Span span, List<Presentation> clips) {
 		Presentation clip = null;
 		for (Presentation candidate : clips) {
 			if (span.start() < candidate.span().end() && span.end() > candidate.span().start()) {
@@ -155,7 +159,7 @@ public final class ClipPresentation {
 		boolean matches(Presentation presentation);
 	}
 
-	private static Presentation find(List<Presentation> clips, PresentationFilter filter) {
+	private static @Nullable Presentation find(List<Presentation> clips, PresentationFilter filter) {
 		for (Presentation presentation : clips) {
 			if (filter.matches(presentation)) {
 				return presentation;

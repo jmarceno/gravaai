@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 import dev.gravaai.media.compose.Background;
@@ -12,13 +14,15 @@ import dev.gravaai.media.compose.MediaFrameReader;
  *
  * <p>Used on the decode/engine threads; the owning surface closes it exactly once on dispose.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PreviewWallpaper implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.preview");
 
 	private final Object lock = new Object();
-	private MediaFrameReader reader;
-	private Path readerPath;
+	private @Nullable MediaFrameReader reader;
+	private @Nullable Path readerPath;
 	private volatile boolean closed;
 
 	/**

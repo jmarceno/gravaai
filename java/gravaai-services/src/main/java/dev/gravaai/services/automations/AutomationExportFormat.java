@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 /** Port of {@code AutomationExportFormat}. */
 public enum AutomationExportFormat {
 	MP4("mp4"),
@@ -11,11 +13,11 @@ public enum AutomationExportFormat {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
-	public static AutomationExportFormat fromWire(String value) {
+	public static @Nullable AutomationExportFormat fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

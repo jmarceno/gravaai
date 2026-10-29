@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -37,7 +39,7 @@ public final class CosmicSources {
 	}
 
 	/** The output name embedded in a COSMIC source id (empty for a missing id). */
-	public static String outputNameForSourceId(String sourceId) {
+	public static String outputNameForSourceId(@Nullable String sourceId) {
 		if (sourceId == null) {
 			return "";
 		}
@@ -67,7 +69,7 @@ public final class CosmicSources {
 	}
 
 	/** The output containing a pointer position, used to resolve a click on the capture picker. */
-	public static CosmicOutput outputAt(List<CosmicOutput> outputs, double x, double y) {
+	public static @Nullable CosmicOutput outputAt(List<CosmicOutput> outputs, double x, double y) {
 		for (CosmicOutput output : outputs) {
 			if (x >= output.x() && x < output.x() + output.width()
 					&& y >= output.y() && y < output.y() + output.height()) {

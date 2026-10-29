@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.app.editor.EditorSkeletonWindow;
 import dev.gravaai.app.agent.AgentWiring;
 import dev.gravaai.app.export.ProjectExporter;
@@ -76,6 +78,8 @@ import tools.jackson.databind.JsonNode;
  * global-shortcut service drive the HUD, and the recording services come from
  * {@link RecordingWiring} (plan P1.6/P1.8/P1.9).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AppContext {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
@@ -84,41 +88,41 @@ public final class AppContext {
 	private final GlobalShortcutAction pendingAction;
 	private final AppIcons icons;
 
-	private Stage primaryStage;
-	private Windows windows;
-	private AppSettingsStore appSettings;
-	private GlobalShortcutDispatcher dispatcher;
-	private GlobalShortcutsService shortcutsService;
-	private SessionBus bus;
-	private Portal portal;
-	private FileManager fileManager;
-	private Notifications notifications;
-	private AutomationService automationService;
-	private Tray tray;
-	private AutoCloseable trayRecordingSubscription;
-	private DashboardView dashboardView;
+	private @Nullable Stage primaryStage;
+	private @Nullable Windows windows;
+	private @Nullable AppSettingsStore appSettings;
+	private @Nullable GlobalShortcutDispatcher dispatcher;
+	private @Nullable GlobalShortcutsService shortcutsService;
+	private @Nullable SessionBus bus;
+	private @Nullable Portal portal;
+	private @Nullable FileManager fileManager;
+	private @Nullable Notifications notifications;
+	private @Nullable AutomationService automationService;
+	private @Nullable Tray tray;
+	private @Nullable AutoCloseable trayRecordingSubscription;
+	private @Nullable DashboardView dashboardView;
 	/** The dashboard scene kept for single-window navigation (plan §5.1). */
-	private Scene dashboardScene;
+	private @Nullable Scene dashboardScene;
 	/** The editor currently hosted by the primary stage, or null on the dashboard. */
-	private EditorWindow activeEditor;
+	private @Nullable EditorWindow activeEditor;
 	/** True while the main window swaps dashboard <-> editor (no window was "closed"). */
 	private boolean switchingViews;
-	private ProjectManager projects;
-	private RecentProjectsStore recentProjects;
+	private @Nullable ProjectManager projects;
+	private @Nullable RecentProjectsStore recentProjects;
 	private final List<EditorWindow> editorWindows = new ArrayList<>();
-	private RecordingWiring recordingWiring;
-	private HudWindowController hudController;
-	private LazyHudRecordingPort lazyHudPort;
-	private HudRecordingPortAdapter hudPort;
-	private HudOverlayWindow hudWindow;
-	private MeetingIntegration meeting;
-	private MeetingWindow meetingWindow;
-	private AgentWiring agentWiring;
-	private ProjectExporter exporter;
-	private ExportCoordinator exportCoordinator;
+	private @Nullable RecordingWiring recordingWiring;
+	private @Nullable HudWindowController hudController;
+	private @Nullable LazyHudRecordingPort lazyHudPort;
+	private @Nullable HudRecordingPortAdapter hudPort;
+	private @Nullable HudOverlayWindow hudWindow;
+	private @Nullable MeetingIntegration meeting;
+	private @Nullable MeetingWindow meetingWindow;
+	private @Nullable AgentWiring agentWiring;
+	private @Nullable ProjectExporter exporter;
+	private @Nullable ExportCoordinator exportCoordinator;
 	// P3.3 extension host (plan §5.18): userData/extensions drives the render hooks of the editor
 	// preview and the exporter. Created off the startup path; a failure disables extensions only.
-	private ExtensionHost extensionHost;
+	private @Nullable ExtensionHost extensionHost;
 	private boolean backgroundServicesStarted;
 	private boolean shutdown;
 
@@ -128,7 +132,7 @@ public final class AppContext {
 		this.icons = new AppIcons(userData);
 	}
 
-	public static AppContext create(GlobalShortcutAction pendingAction) {
+	public static @Nullable AppContext create(GlobalShortcutAction pendingAction) {
 		return new AppContext(UserData.resolve(), pendingAction);
 	}
 
@@ -549,7 +553,7 @@ public final class AppContext {
 		}
 	}
 
-	private EditorSession activeEditorSession() {
+	private @Nullable EditorSession activeEditorSession() {
 		for (int index = editorWindows.size() - 1; index >= 0; index--) {
 			EditorWindow window = editorWindows.get(index);
 			if (window.stage().isShowing()) {
@@ -1050,7 +1054,7 @@ public final class AppContext {
 				}
 
 				@Override
-				public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
+				public java.util.concurrent.@Nullable CompletableFuture<String> recordingThumbnail(String videoPath) {
 					RecordingWiring wiring = recordingWiring;
 					if (wiring == null) {
 						return java.util.concurrent.CompletableFuture.completedFuture(null);
@@ -1234,7 +1238,7 @@ public final class AppContext {
 		}
 	}
 
-	private EditorWindow.Services editorServices() {
+	private EditorWindow.@Nullable Services editorServices() {
 		if (appSettings == null) {
 			appSettings = new AppSettingsStore(userData.appSettingsFile());
 		}
@@ -1252,7 +1256,7 @@ public final class AppContext {
 	}
 
 	/** Shows {@code window} as the main window content; {@code path} is null for an unsaved recording. */
-	private void hostEditor(EditorWindow window, Path path, boolean startup) {
+	private void hostEditor(EditorWindow window, @Nullable Path path, boolean startup) {
 		window.setOnGoHome(() -> javafx.application.Platform.runLater(this::openDashboard));
 		activeEditor = window;
 		editorWindows.add(window);
@@ -1272,7 +1276,7 @@ public final class AppContext {
 	}
 
 	/** The recording service for the editor's Clips panel ({@code null} before recording init). */
-	private RecordingService recordingService() {
+	private @Nullable RecordingService recordingService() {
 		RecordingWiring wiring = recordingWiring;
 		return wiring == null ? null : wiring.recording();
 	}
@@ -1293,7 +1297,7 @@ public final class AppContext {
 	}
 
 	/** Instant poster for the startup skeleton: the project preview sidecar next to the file. */
-	private static javafx.scene.image.Image loadPoster(Path projectPath) {
+	private static javafx.scene.image.@Nullable Image loadPoster(Path projectPath) {
 		try {
 			Path thumbnail = dev.gravaai.services.projects.ProjectManager
 					.getProjectThumbnailPath(projectPath);
@@ -1307,7 +1311,7 @@ public final class AppContext {
 	}
 
 	/** Fallback poster: one frame from the project video through the bundled ffmpeg CLI. */
-	private static Path extractPoster(Path projectPath) throws java.io.IOException,
+	private static @Nullable Path extractPoster(Path projectPath) throws java.io.IOException,
 			InterruptedException {
 		var document = dev.gravaai.core.project.ProjectDocument.load(projectPath);
 		String video = document.videoPath();
@@ -1370,7 +1374,7 @@ public final class AppContext {
 			appSettings = new AppSettingsStore(userData.appSettingsFile());
 			GlobalShortcutSettings settingsPort = new GlobalShortcutSettings() {
 				@Override
-				public JsonNode read() {
+				public @Nullable JsonNode read() {
 					return appSettings.readSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING);
 				}
 

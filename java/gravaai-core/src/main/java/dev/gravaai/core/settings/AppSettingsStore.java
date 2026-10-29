@@ -1,5 +1,7 @@
 package dev.gravaai.core.settings;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
@@ -41,7 +43,7 @@ public final class AppSettingsStore {
 	 * {@code readAppSetting}: the TS function returns {@code unknown | null}, so both a missing key
 	 * and an explicit JSON {@code null} read as {@code null} here.
 	 */
-	public JsonNode readSetting(String key) {
+	public @Nullable JsonNode readSetting(String key) {
 		JsonNode value = read().get(key);
 		return value == null || value.isNull() ? null : value;
 	}

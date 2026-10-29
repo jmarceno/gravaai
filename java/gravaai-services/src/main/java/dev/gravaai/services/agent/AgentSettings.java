@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -18,6 +20,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code src/components/video-editor/agent/settings.ts}, plan §5.16): dotted-path writes validated
  * through the project normaliser, plus the {@code captions_style} shorthand.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentSettings {
 
 	private static final Set<String> ARRAY_SETTINGS = Set.of("zoomRegions", "trimRegions",
@@ -125,7 +129,7 @@ public final class AgentSettings {
 				+ "\"; use a built-in one, a #RRGGBB colour or a linear-gradient(...)");
 	}
 
-	private static List<String> splitPath(String path) {
+	private static @Nullable List<String> splitPath(String path) {
 		List<String> segments = new ArrayList<>();
 		for (String segment : path.split("\\.")) {
 			if (!segment.isBlank()) {
@@ -138,7 +142,7 @@ public final class AgentSettings {
 		return segments;
 	}
 
-	private static JsonNode readStoredPath(JsonNode value, List<String> segments) {
+	private static @Nullable JsonNode readStoredPath(JsonNode value, List<String> segments) {
 		JsonNode cursor = value;
 		for (String segment : segments) {
 			if (cursor == null || !cursor.isObject() || !cursor.has(segment)) {
@@ -167,7 +171,7 @@ public final class AgentSettings {
 		writePath(child, segments.subList(1, segments.size()), value);
 	}
 
-	private static String findBlockedChange(JsonNode value, JsonNode stored) {
+	private static @Nullable String findBlockedChange(JsonNode value, JsonNode stored) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}

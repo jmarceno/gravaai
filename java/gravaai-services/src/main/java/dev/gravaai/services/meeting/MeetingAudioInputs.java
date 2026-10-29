@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 /**
@@ -10,5 +12,5 @@ import java.nio.file.Path;
  * @param mic the microphone sidecar, or {@code null}
  * @param system the system-audio sidecar, or {@code null}
  */
-public record MeetingAudioInputs(Path mediaPath, Path mic, Path system) {
+public record MeetingAudioInputs(Path mediaPath, @Nullable Path mic, @Nullable Path system) {
 }

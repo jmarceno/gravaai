@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
@@ -28,6 +30,8 @@ import javafx.scene.shape.Rectangle;
  * edge drags independently and keeps at least 10% of the frame. Done commits the region, any
  * other close (backdrop, Escape, ×) restores the snapshot taken on open, like the React modal.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CropEditorDialog {
 
 	private static final double MIN_SPAN = 0.1;
@@ -106,7 +110,7 @@ public final class CropEditorDialog {
 	}
 
 	/** Pure edge drag (CropControl handlePointerMove), deltas in normalised frame units. */
-	static CropRegion drag(CropRegion start, String edge, double deltaX, double deltaY) {
+	static CropRegion drag(@Nullable CropRegion start, String edge, double deltaX, double deltaY) {
 		double x = start.x();
 		double y = start.y();
 		double width = start.width();
@@ -139,10 +143,10 @@ public final class CropEditorDialog {
 		private double aspect;
 		private double maxWidth = 896;
 		private double maxHeight = 480;
-		private Edge dragging;
+		private @Nullable Edge dragging;
 		private double startX;
 		private double startY;
-		private CropRegion startCrop;
+		private @Nullable CropRegion startCrop;
 
 		CropSurface() {
 			setStyle("-fx-background-color: #000000; -fx-background-radius: 8px; "

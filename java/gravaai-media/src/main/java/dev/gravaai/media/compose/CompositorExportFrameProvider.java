@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Objects;
@@ -38,6 +40,8 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * {@link #reset()} runs {@link Compositor#reset()} on the GL thread so the GIF exporter's
  * palette+output passes and reused providers start from a clean spring/motion-blur history.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CompositorExportFrameProvider implements ExportFrameProvider {
 
 	private static final System.Logger LOG =
@@ -63,11 +67,11 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 	private final Compositor compositor;
 	private final LinkedBlockingQueue<Consumer<GlState>> tasks = new LinkedBlockingQueue<>();
 	private final Object startLock = new Object();
-	private Thread thread;
-	private CompletableFuture<Void> ready;
+	private @Nullable Thread thread;
+	private @Nullable CompletableFuture<Void> ready;
 	private volatile boolean closed;
 	// Caller thread only: the next frame's input, decoded while the GPU renders the current one.
-	private FrameInput prefetched;
+	private @Nullable FrameInput prefetched;
 	private double prefetchedTime = Double.NaN;
 
 	/**
@@ -196,7 +200,7 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 	}
 
 	/** The prefetched input for {@code timeSeconds}, or null (a non-sequential request). */
-	private FrameInput takePrefetched(double timeSeconds) {
+	private @Nullable FrameInput takePrefetched(double timeSeconds) {
 		FrameInput input = prefetched;
 		double time = prefetchedTime;
 		prefetched = null;

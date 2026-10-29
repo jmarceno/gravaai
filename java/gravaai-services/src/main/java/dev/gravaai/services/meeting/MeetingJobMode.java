@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /** Which pipeline stages a meeting job runs (electron/ipc/register/meeting.ts JOB_MODES). */
@@ -16,12 +18,12 @@ public enum MeetingJobMode {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
 	/** Null when the value is not a supported mode (the IPC handler answers 400 then). */
-	public static MeetingJobMode fromWire(Object value) {
+	public static @Nullable MeetingJobMode fromWire(Object value) {
 		if (!(value instanceof String text)) {
 			return null;
 		}

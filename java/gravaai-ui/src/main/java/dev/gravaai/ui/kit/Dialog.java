@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
@@ -34,6 +36,8 @@ import javafx.scene.layout.VBox;
  * dialog.show(anyNodeInsideKitRoot);
  * }</pre>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Dialog {
 
 	private final String title;
@@ -50,10 +54,10 @@ public final class Dialog {
 	private boolean dismissable = true;
 	private double width = 512;
 	private Runnable onClose = () -> {};
-	private KitRoot root;
-	private StackPane container;
-	private Region backdrop;
-	private javafx.beans.value.ChangeListener<Number> layerFitListener;
+	private @Nullable KitRoot root;
+	private @Nullable StackPane container;
+	private @Nullable Region backdrop;
+	private javafx.beans.value.@Nullable ChangeListener<Number> layerFitListener;
 
 	private final EventHandler<KeyEvent> escape = event -> {
 		if (event.getCode() == KeyCode.ESCAPE && dismissable) {

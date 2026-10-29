@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -53,7 +55,7 @@ public final class SourceAudioSettings {
 	}
 
 	/** Parses the whole {@code sourceAudioTrackSettingsByClip} map. */
-	public static Map<String, SourceAudioTrackSettings> parseAll(ObjectNode byClip) {
+	public static Map<String, SourceAudioTrackSettings> parseAll(@Nullable ObjectNode byClip) {
 		Map<String, SourceAudioTrackSettings> parsed = new LinkedHashMap<>();
 		if (byClip == null) {
 			return parsed;

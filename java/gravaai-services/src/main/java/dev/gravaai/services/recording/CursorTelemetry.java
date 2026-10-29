@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,7 +51,7 @@ public final class CursorTelemetry {
 			return wire;
 		}
 
-		static CursorInteractionType fromWire(String value) {
+		static @Nullable CursorInteractionType fromWire(String value) {
 			for (CursorInteractionType type : values()) {
 				if (type.wire.equals(value)) {
 					return type;
@@ -81,7 +83,7 @@ public final class CursorTelemetry {
 			return wire;
 		}
 
-		static CursorVisualType fromWire(String value) {
+		static @Nullable CursorVisualType fromWire(String value) {
 			for (CursorVisualType type : values()) {
 				if (type.wire.equals(value)) {
 					return type;
@@ -96,8 +98,8 @@ public final class CursorTelemetry {
 			double timeMs,
 			double cx,
 			double cy,
-			CursorInteractionType interactionType,
-			CursorVisualType cursorType) {
+			@Nullable CursorInteractionType interactionType,
+			@Nullable CursorVisualType cursorType) {
 	}
 
 	public static double clamp(double value, double min, double max) {

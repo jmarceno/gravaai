@@ -1,5 +1,7 @@
 package dev.gravaai.core.result;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Function;
 
 /**
@@ -7,19 +9,21 @@ import java.util.function.Function;
  *
  * @param <T> the success value type
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public sealed interface Result<T> permits Result.Ok, Result.Err {
 
 	/** The operation succeeded. */
 	record Ok<T>(T value) implements Result<T> {}
 
 	/** The operation failed with a human-readable message. */
-	record Err<T>(String error) implements Result<T> {}
+	record Err<T>(@Nullable String error) implements Result<T> {}
 
 	static <T> Result<T> ok(T value) {
 		return new Ok<>(value);
 	}
 
-	static <T> Result<T> err(String error) {
+	static <T> Result<T> err(@Nullable String error) {
 		return new Err<>(error);
 	}
 
@@ -27,11 +31,11 @@ public sealed interface Result<T> permits Result.Ok, Result.Err {
 		return this instanceof Ok<?>;
 	}
 
-	default boolean isErr() {
+	default @Nullable boolean isErr() {
 		return this instanceof Err<?>;
 	}
 
-	default T orElse(T fallback) {
+	default T orElse(@Nullable T fallback) {
 		return this instanceof Ok<T> ok ? ok.value() : fallback;
 	}
 

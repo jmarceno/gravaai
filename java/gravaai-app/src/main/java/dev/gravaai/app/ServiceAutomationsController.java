@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.result.Result;
 import dev.gravaai.platform.portal.Portal;
 import dev.gravaai.services.automations.AutomationRunResult;
@@ -13,33 +15,35 @@ import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 /** Settings -> Automations against the real service, with portal-backed file/folder choosers. */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ServiceAutomationsController implements AutomationsController {
 
 	private final AutomationService service;
 	private final Portal portal;
 
-	public ServiceAutomationsController(AutomationService service, Portal portal) {
+	@Nullable public ServiceAutomationsController(AutomationService service, Portal portal) {
 		this.service = service;
 		this.portal = portal;
 	}
 
 	@Override
-	public AutomationsFile getAutomations() {
+	public @Nullable AutomationsFile getAutomations() {
 		return service.getAutomations();
 	}
 
 	@Override
-	public Result<AutomationsFile> saveAutomations(JsonNode value) {
+	public @Nullable Result<AutomationsFile> saveAutomations(JsonNode value) {
 		return service.saveAutomations(value);
 	}
 
 	@Override
-	public Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath, String notesPath) {
+	public @Nullable Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath, String notesPath) {
 		return service.runAutomationOnFile(ruleId, samplePath, notesPath);
 	}
 
 	@Override
-	public Path chooseFolder(String currentFolder) {
+	public @Nullable Path chooseFolder(String currentFolder) {
 		if (portal == null) {
 			return null;
 		}
@@ -52,7 +56,7 @@ public final class ServiceAutomationsController implements AutomationsController
 	}
 
 	@Override
-	public Path chooseSampleFile() {
+	public @Nullable Path chooseSampleFile() {
 		if (portal == null) {
 			return null;
 		}

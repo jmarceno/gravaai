@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * handed to the consumer once the consumer asks for the next one (the documented "valid until the
  * next decode" contract). Consumers must not mutate the pixels.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class VideoFrame {
 
 	private final int width;

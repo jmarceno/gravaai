@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -34,7 +36,7 @@ public enum ClipCameraLayout {
 	}
 
 	/** {@code fromWire} without a fallback: null for unknown or missing values. */
-	public static ClipCameraLayout fromWireOrNull(String value) {
+	public static @Nullable ClipCameraLayout fromWireOrNull(String value) {
 		for (ClipCameraLayout layout : values()) {
 			if (layout.wire.equals(value)) {
 				return layout;

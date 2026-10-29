@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,6 +17,8 @@ import tools.jackson.databind.JsonNode;
  * strict parse, version comparison and audience/date/version/impression filtering plus priority
  * ordering. The bundled feed for this release is empty apart from the 4:3 aspect setting.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Announcements {
 
 	public enum Audience {
@@ -40,11 +44,11 @@ public final class Announcements {
 			this.wire = wire;
 		}
 
-		public String wire() {
+		public @Nullable String wire() {
 			return wire;
 		}
 
-		static Presentation fromWire(String value) {
+		static @Nullable Presentation fromWire(String value) {
 			for (Presentation presentation : values()) {
 				if (presentation != POPUP && presentation.wire.equals(value)) {
 					return presentation;
@@ -63,7 +67,7 @@ public final class Announcements {
 			this.wire = wire;
 		}
 
-		static MediaMode fromWire(String value) {
+		static @Nullable MediaMode fromWire(String value) {
 			for (MediaMode mode : values()) {
 				if (mode.wire.equals(value)) {
 					return mode;
@@ -73,25 +77,25 @@ public final class Announcements {
 		}
 	}
 
-	public record Media(String type, String url, String alt, String posterUrl) {}
+	public @Nullable record Media(@Nullable String type, String url, @Nullable String alt, @Nullable String posterUrl) {}
 
 	public sealed interface Action permits UrlAction, SectionAction {}
 
-	public record UrlAction(String label, String url) implements Action {}
+	public @Nullable record UrlAction(String label, String url) implements Action {}
 
-	public record SectionAction(String label, String section) implements Action {}
+	public @Nullable record SectionAction(String label, @Nullable String section) implements Action {}
 
-	public record Controls(
-			Boolean close, Boolean dismiss, Boolean action, Boolean navigation,
-			Boolean indicators) {}
+	public @Nullable record Controls(
+			@Nullable Boolean close, @Nullable Boolean dismiss, @Nullable Boolean action, @Nullable Boolean navigation,
+			@Nullable Boolean indicators) {}
 
-	public record Announcement(
-			String id, String title, String body, Presentation presentation, Audience audience,
-			int priority, MediaMode mediaMode, Integer displayDurationSeconds,
-			Integer maxImpressions, Controls controls, Media media, Action action, String startsAt,
-			String endsAt, String minVersion, String maxVersion) {}
+	public @Nullable record Announcement(
+			String id, String title, String body, @Nullable Presentation presentation, Audience audience,
+			int priority, @Nullable MediaMode mediaMode, @Nullable Integer displayDurationSeconds,
+			@Nullable Integer maxImpressions, @Nullable Controls controls, @Nullable Media media, @Nullable Action action, @Nullable String startsAt,
+			@Nullable String endsAt, @Nullable String minVersion, @Nullable String maxVersion) {}
 
-	public record Feed(String aspectRatio, List<Announcement> announcements) {
+	public @Nullable record Feed(@Nullable String aspectRatio, List<Announcement> announcements) {
 
 		public static final Feed EMPTY = new Feed(null, List.of());
 	}
@@ -103,15 +107,15 @@ public final class Announcements {
 	private static final int MAX_LABEL_LENGTH = 80;
 	private static final int MAX_URL_LENGTH = 2_048;
 
-	private Announcements() {}
+	@Nullable private Announcements() {}
 
 	/** {@code BUNDLED_ANNOUNCEMENT_FEED}. */
-	public static Feed bundledFeed() {
+	public static @Nullable Feed bundledFeed() {
 		return new Feed("4:3", List.of());
 	}
 
 	/** {@code parseAnnouncementFeed}. */
-	public static Feed parseFeed(JsonNode value) {
+	public static @Nullable Feed parseFeed(JsonNode value) {
 		if (value == null || !value.isObject() || !value.path("announcements").isArray()) {
 			return Feed.EMPTY;
 		}
@@ -131,7 +135,7 @@ public final class Announcements {
 		return new Feed(aspectRatio, List.copyOf(items));
 	}
 
-	private static Announcement parseAnnouncement(JsonNode value) {
+	private static @Nullable Announcement parseAnnouncement(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -161,7 +165,7 @@ public final class Announcements {
 				readTrimmedString(value.get("maxVersion"), 64));
 	}
 
-	private static Media parseMedia(JsonNode value) {
+	private static @Nullable Media parseMedia(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -177,7 +181,7 @@ public final class Announcements {
 		return new Media(type, url, readTrimmedString(value.get("alt"), 300), posterUrl);
 	}
 
-	private static Action parseAction(JsonNode value) {
+	private static @Nullable Action parseAction(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -191,12 +195,12 @@ public final class Announcements {
 		return url != null ? new UrlAction(label, url) : new SectionAction(label, section);
 	}
 
-	private static boolean isEditorSection(String value) {
+	private static @Nullable boolean isEditorSection(@Nullable String value) {
 		return value != null && List.of("scene", "cursor", "webcam", "captions", "settings",
 				"extensions").contains(value);
 	}
 
-	private static Controls parseControls(JsonNode value) {
+	private static @Nullable Controls parseControls(JsonNode value) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -208,15 +212,15 @@ public final class Announcements {
 				&& controls.indicators() == null ? null : controls;
 	}
 
-	private static Boolean booleanOrNull(JsonNode value) {
+	private static @Nullable Boolean booleanOrNull(JsonNode value) {
 		return value != null && value.isBoolean() ? value.booleanValue() : null;
 	}
 
-	private static String text(JsonNode value) {
+	private static @Nullable String text(JsonNode value) {
 		return value != null && value.isString() ? value.asString() : null;
 	}
 
-	private static String readTrimmedString(JsonNode value, int maxLength) {
+	private static @Nullable String readTrimmedString(JsonNode value, int maxLength) {
 		if (value == null || !value.isString()) {
 			return null;
 		}
@@ -224,7 +228,7 @@ public final class Announcements {
 		return !trimmed.isEmpty() && trimmed.length() <= maxLength ? trimmed : null;
 	}
 
-	private static String readDate(JsonNode value) {
+	private static @Nullable String readDate(JsonNode value) {
 		String date = readTrimmedString(value, 64);
 		if (date == null) {
 			return null;
@@ -242,7 +246,7 @@ public final class Announcements {
 		}
 	}
 
-	private static String readAspectRatio(JsonNode value) {
+	private static @Nullable String readAspectRatio(JsonNode value) {
 		String ratio = readTrimmedString(value, 16);
 		if (ratio == null || !ratio.matches("^(\\d{1,3}):(\\d{1,3})$")) {
 			return null;
@@ -254,7 +258,7 @@ public final class Announcements {
 		return width > 0 && height > 0 && numeric >= 0.4 && numeric <= 3 ? ratio : null;
 	}
 
-	private static Integer readBoundedInteger(JsonNode value, int minimum, int maximum) {
+	private static @Nullable Integer readBoundedInteger(JsonNode value, int minimum, int maximum) {
 		if (value == null || !value.isNumber() || !Double.isFinite(value.doubleValue())) {
 			return null;
 		}
@@ -262,7 +266,7 @@ public final class Announcements {
 		return rounded >= minimum && rounded <= maximum ? (int) rounded : null;
 	}
 
-	private static String readSafeUrl(JsonNode value, boolean allowRelative) {
+	private static @Nullable String readSafeUrl(JsonNode value, boolean allowRelative) {
 		String url = readTrimmedString(value, MAX_URL_LENGTH);
 		if (url == null) {
 			return null;
@@ -366,7 +370,7 @@ public final class Announcements {
 	}
 
 	/** Parses a feed from stored JSON ({@code null}/blank → empty feed). */
-	public static Feed parseFeedJson(String json) {
+	public static @Nullable Feed parseFeedJson(String json) {
 		return json == null || json.isBlank() ? Feed.EMPTY
 				: parseFeed(Json.parseJsonWithByteOrderMark(json));
 	}

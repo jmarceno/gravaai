@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +44,11 @@ public final class EditorStore {
 	private final UiEvents<EditorStore> changes = new UiEvents<>();
 
 	private ProjectEditorState state;
-	private String selectedClipId;
-	private String selectedZoomId;
-	private String selectedAnnotationId;
-	private String selectedAudioId;
-	private String selectedCaptionId;
+	private @Nullable String selectedClipId;
+	private @Nullable String selectedZoomId;
+	private @Nullable String selectedAnnotationId;
+	private @Nullable String selectedAudioId;
+	private @Nullable String selectedCaptionId;
 	private String activeEffectSection = SECTION_SCENE;
 
 	public EditorStore(ProjectEditorState initialState) {
@@ -110,14 +112,14 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
-	public void setAudioRegions(List<AudioRegion> regions) {
+	public void setAudioRegions(@Nullable List<AudioRegion> regions) {
 		ObjectNode json = editorJson();
 		json.set("audioRegions", ProjectDocument.writeAudioRegions(regions));
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
 	/** Replaces the canonical raw source-audio settings map (unknown keys preserved). */
-	public void setSourceAudioTrackSettingsByClip(tools.jackson.databind.node.ObjectNode next) {
+	public void setSourceAudioTrackSettingsByClip(tools.jackson.databind.node.@Nullable ObjectNode next) {
 		state = state.withSourceAudioTrackSettingsByClip(next);
 	}
 
@@ -190,43 +192,43 @@ public final class EditorStore {
 		return true;
 	}
 
-	public String selectedClipId() {
+	public @Nullable String selectedClipId() {
 		return selectedClipId;
 	}
 
-	public void setSelectedClipId(String id) {
+	public void setSelectedClipId(@Nullable String id) {
 		this.selectedClipId = id;
 	}
 
-	public String selectedZoomId() {
+	public @Nullable String selectedZoomId() {
 		return selectedZoomId;
 	}
 
-	public void setSelectedZoomId(String id) {
+	public void setSelectedZoomId(@Nullable String id) {
 		this.selectedZoomId = id;
 	}
 
-	public String selectedAnnotationId() {
+	public @Nullable String selectedAnnotationId() {
 		return selectedAnnotationId;
 	}
 
-	public void setSelectedAnnotationId(String id) {
+	public void setSelectedAnnotationId(@Nullable String id) {
 		this.selectedAnnotationId = id;
 	}
 
-	public String selectedAudioId() {
+	public @Nullable String selectedAudioId() {
 		return selectedAudioId;
 	}
 
-	public void setSelectedAudioId(String id) {
+	public void setSelectedAudioId(@Nullable String id) {
 		this.selectedAudioId = id;
 	}
 
-	public String selectedCaptionId() {
+	public @Nullable String selectedCaptionId() {
 		return selectedCaptionId;
 	}
 
-	public void setSelectedCaptionId(String id) {
+	public void setSelectedCaptionId(@Nullable String id) {
 		this.selectedCaptionId = id;
 	}
 
@@ -239,8 +241,8 @@ public final class EditorStore {
 	}
 
 	/** Clears every timeline selection except the given one. */
-	public void clearSelectionsExcept(String keepClip, String keepZoom, String keepAnnotation,
-			String keepAudio, String keepCaption) {
+	public void clearSelectionsExcept(@Nullable String keepClip, @Nullable String keepZoom, @Nullable String keepAnnotation,
+			@Nullable String keepAudio, @Nullable String keepCaption) {
 		selectedClipId = keepClip;
 		selectedZoomId = keepZoom;
 		selectedAnnotationId = keepAnnotation;

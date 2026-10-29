@@ -34,6 +34,8 @@ import dev.gravaai.ui.launch.HudOverlayWindow;
  *       {@code HudRecordingPort.State.countdownActive}.</li>
  * </ul>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class HudWindowController implements HudController {
 
 	/** Max wait for the FX thread; a stuck FX thread must not hang the recording start. */

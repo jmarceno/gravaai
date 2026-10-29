@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /** Zoom depth 1-6 (TS {@code ZoomDepth} union). */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public enum ZoomDepth {
 	ONE(1), TWO(2), THREE(3), FOUR(4), FIVE(5), SIX(6);
 

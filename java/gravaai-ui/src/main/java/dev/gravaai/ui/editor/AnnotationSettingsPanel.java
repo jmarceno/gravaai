@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +48,8 @@ import javafx.scene.layout.VBox;
  * undo/redo and project saving see the same state. Image annotations keep their content from the
  * annotation tool (there is no image-picker seam in the core model yet).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AnnotationSettingsPanel extends VBox {
 
 	public record PositionPreset(String id, String label, double x, double y) {}
@@ -253,7 +257,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		return new VBox(10, header("Blur"), strength, color.node());
 	}
 
-	private Node imageSection(AnnotationRegion region) {
+	private @Nullable Node imageSection(AnnotationRegion region) {
 		Label note = new Label(
 				"Image annotations are captured from the annotation tool; the selected image "
 						+ "content is shown in the preview.");
@@ -273,7 +277,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		apply(new AnnotationCommands.ChangeStyle(region.id(), patch));
 	}
 
-	private AnnotationRegion selected() {
+	private @Nullable AnnotationRegion selected() {
 		String selectedId = store.selectedAnnotationId();
 		if (selectedId == null) {
 			return null;
@@ -297,7 +301,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		return new ArrayList<>(families.values());
 	}
 
-	private LazyColorField colorField(String label, String value, java.util.function.Consumer<String> onChange) {
+	private LazyColorField colorField(String label, @Nullable String value, java.util.function.Consumer<String> onChange) {
 		Input input = new Input();
 		input.setText(value == null ? "#FFFFFF" : value);
 		input.setPrefWidth(110);
@@ -356,7 +360,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		return row;
 	}
 
-	private static boolean matches(AnnotationPosition position, PositionPreset preset) {
+	private static boolean matches(@Nullable AnnotationPosition position, PositionPreset preset) {
 		return position != null && Math.abs(position.x() - preset.x()) < 0.01
 				&& Math.abs(position.y() - preset.y()) < 0.01;
 	}
@@ -393,12 +397,12 @@ public final class AnnotationSettingsPanel extends VBox {
 	}
 
 	/** Colour swatch palette for text/background/figure/blur colours. */
-	public static List<String> colorSwatches() {
+	public static @Nullable List<String> colorSwatches() {
 		return COLOR_SWATCHES;
 	}
 
 	/** Accepts {@code #rgb}/{@code #rrggbb} (with or without #) and returns {@code #RRGGBB}. */
-	public static String parseHexColor(String raw) {
+	public static @Nullable String parseHexColor(String raw) {
 		if (raw == null) {
 			return null;
 		}

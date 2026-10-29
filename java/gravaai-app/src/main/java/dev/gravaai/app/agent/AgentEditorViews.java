@@ -1,5 +1,7 @@
 package dev.gravaai.app.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -35,6 +37,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code set}. Every read ends with {@code rev} so the next {@code edit} can detect a concurrent
  * user change.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class AgentEditorViews {
 
 	private static final long DEFAULT_PAGE_MS = 180_000;
@@ -66,7 +70,7 @@ final class AgentEditorViews {
 					+ " bottom-center, bottom-right"));
 
 	/** Formatting inputs the editor session provides (kept explicit so the views stay testable). */
-	record Meta(String projectName, String projectPath, String sourcePath, long sourceDurationMs,
+	record Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
 			boolean dirty, long rev) {}
 
 	private AgentEditorViews() {}

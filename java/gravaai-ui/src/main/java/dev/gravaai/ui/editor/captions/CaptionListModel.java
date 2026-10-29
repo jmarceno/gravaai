@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -60,12 +62,12 @@ public final class CaptionListModel {
 	}
 
 	/** Port of {@code canMerge}: only when a later cue exists. */
-	public static boolean canMerge(int index, int cueCount) {
+	public static @Nullable boolean canMerge(int index, int cueCount) {
 		return index >= 0 && index < cueCount - 1;
 	}
 
 	/** Port of the {@code clampNumber(currentTimeMs, cue.startMs, cue.endMs)} split position. */
-	public static double splitAt(CaptionCue cue, double currentTimeMs) {
+	public static @Nullable double splitAt(CaptionCue cue, double currentTimeMs) {
 		return Math.min(cue.endMs(), Math.max(cue.startMs(), currentTimeMs));
 	}
 
@@ -73,7 +75,7 @@ public final class CaptionListModel {
 	 * Port of {@code commitText}: returns the normalized text when it is non-empty and different,
 	 * else null (the panel then restores the stored text).
 	 */
-	public static String decideTextCommit(String draft, CaptionCue cue) {
+	public static @Nullable String decideTextCommit(String draft, CaptionCue cue) {
 		if (cue == null) {
 			return null;
 		}
@@ -85,14 +87,14 @@ public final class CaptionListModel {
 	}
 
 	/** One committed timing range in milliseconds. */
-	public record TimingCommit(long startMs, long endMs) {
+	public @Nullable record TimingCommit(long startMs, long endMs) {
 	}
 
 	/**
 	 * Port of {@code commitTiming}: parses both drafts, rejects unparsable or inverted ranges and
 	 * returns null when the timing did not change.
 	 */
-	public static TimingCommit decideTimingCommit(String startDraft, String endDraft,
+	public static @Nullable TimingCommit decideTimingCommit(String startDraft, String endDraft,
 			CaptionCue cue) {
 		if (cue == null) {
 			return null;
@@ -128,7 +130,7 @@ public final class CaptionListModel {
 	}
 
 	/** Port of the deleted-cue selection rule: dropping the selected cue clears the selection. */
-	public static String selectionAfterDelete(String selectedCaptionId, String deletedId) {
+	public static @Nullable String selectionAfterDelete(String selectedCaptionId, String deletedId) {
 		return deletedId != null && deletedId.equals(selectedCaptionId) ? null : selectedCaptionId;
 	}
 

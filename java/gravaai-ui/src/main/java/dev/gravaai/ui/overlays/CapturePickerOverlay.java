@@ -1,5 +1,7 @@
 package dev.gravaai.ui.overlays;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,7 +98,7 @@ public final class CapturePickerOverlay implements AutoCloseable {
 		stages.clear();
 	}
 
-	private void finish(CapturePickRequest request) {
+	private void finish(@Nullable CapturePickRequest request) {
 		if (completed) {
 			return;
 		}
@@ -242,13 +244,13 @@ public final class CapturePickerOverlay implements AutoCloseable {
 		private final Region screenBorder;
 		private final Region areaPreview;
 
-		private CapturePickerWindow hoveredWindow;
+		private @Nullable CapturePickerWindow hoveredWindow;
 		private boolean screenTarget;
 		private double pressX;
 		private double pressY;
 		private boolean pressed;
 		private boolean drawing;
-		private AreaRect area;
+		private @Nullable AreaRect area;
 
 		PickState(
 				int displayId,
@@ -296,7 +298,7 @@ public final class CapturePickerOverlay implements AutoCloseable {
 			}
 		}
 
-		CapturePickRequest released(double x, double y) {
+		@Nullable CapturePickRequest released(double x, double y) {
 			boolean wasDrawing = drawing;
 			AreaRect drawnArea = area;
 			pressed = false;
@@ -319,7 +321,7 @@ public final class CapturePickerOverlay implements AutoCloseable {
 			return currentPick();
 		}
 
-		CapturePickRequest currentPick() {
+		@Nullable CapturePickRequest currentPick() {
 			if (hoveredWindow != null) {
 				return new CapturePickRequest(
 						"window", null, null, null, null, hoveredWindow.id(), displayId, false);

@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 /** Port of {@code AutomationActionType}. */
 public enum AutomationActionType {
 	COPY_PATH("copy-path"),
@@ -16,11 +18,11 @@ public enum AutomationActionType {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
-	public static AutomationActionType fromWire(String value) {
+	public static @Nullable AutomationActionType fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

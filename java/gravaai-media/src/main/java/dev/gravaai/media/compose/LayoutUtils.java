@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Port of {@code src/components/video-editor/videoPlayback/layoutUtils.ts} (plan §5.8 stage 2:
  * aspect, padding, crop). The maths is ported 1:1, including the padding scale factor and the
@@ -61,7 +63,7 @@ public final class LayoutUtils {
 	 * @param videoHeight the source video height in pixels
 	 */
 	public static PaddedLayout computePaddedLayout(int width, int height, LayoutPadding padding,
-			FrameInsets frameInsets, LayoutCrop cropRegion, int videoWidth, int videoHeight) {
+			@Nullable FrameInsets frameInsets, LayoutCrop cropRegion, int videoWidth, int videoHeight) {
 		LayoutPadding p = padding == null ? LayoutPadding.NONE : padding;
 		LayoutCrop crop = cropRegion == null ? LayoutCrop.FULL : cropRegion;
 

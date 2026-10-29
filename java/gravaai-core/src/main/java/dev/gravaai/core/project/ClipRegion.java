@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A kept clip on the timeline (port of {@code ClipRegion} in types.ts).
  *
@@ -10,11 +12,11 @@ public record ClipRegion(
 		String id,
 		long startMs,
 		long endMs,
-		Long sourceStartMs,
-		Long sourceMinMs,
-		Long sourceMaxMs,
+		@Nullable Long sourceStartMs,
+		@Nullable Long sourceMinMs,
+		@Nullable Long sourceMaxMs,
 		double speed,
-		Boolean muted,
-		Boolean showSourceAudio,
-		ClipCameraLayout cameraLayout,
-		ClipTransition transitionOut) {}
+		@Nullable Boolean muted,
+		@Nullable Boolean showSourceAudio,
+		@Nullable ClipCameraLayout cameraLayout,
+		@Nullable ClipTransition transitionOut) {}

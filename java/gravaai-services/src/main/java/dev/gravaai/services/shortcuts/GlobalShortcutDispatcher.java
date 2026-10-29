@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -30,8 +32,8 @@ public final class GlobalShortcutDispatcher {
 
 	private record LastAction(GlobalShortcutAction action, long at) {}
 
-	private PendingAction pendingAction;
-	private LastAction lastAction;
+	private @Nullable PendingAction pendingAction;
+	private @Nullable LastAction lastAction;
 
 	public GlobalShortcutDispatcher(Supplier<GlobalShortcutHud> hudProvider) {
 		this(hudProvider, System::currentTimeMillis, GlobalShortcutDispatcher::defaultLog);

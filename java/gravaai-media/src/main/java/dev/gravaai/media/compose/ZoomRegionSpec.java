@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A zoom region as the compositor consumes it (media-local port of the {@code ZoomRegion} type
  * in {@code video-editor/types.ts}).
@@ -12,7 +14,7 @@ package dev.gravaai.media.compose;
  * @param mode auto/manual, or {@code null} when unspecified (TS optional field)
  */
 public record ZoomRegionSpec(String id, int startMs, int endMs, ZoomDepth depth, ZoomFocus focus,
-		ZoomMode mode) {
+		@Nullable ZoomMode mode) {
 
 	public ZoomRegionSpec {
 		if (id == null || id.isBlank()) {

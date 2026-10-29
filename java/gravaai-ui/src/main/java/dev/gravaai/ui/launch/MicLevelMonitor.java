@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.media.audio.PulseAudio;
 import dev.gravaai.media.audio.PulseRecordStream;
 import java.util.function.Consumer;
@@ -19,7 +21,7 @@ public final class MicLevelMonitor implements AutoCloseable {
 	private static final long PUBLISH_INTERVAL_NANOS = 16_000_000; // ~60 Hz
 
 	private volatile boolean running = true;
-	private volatile PulseRecordStream stream;
+	private volatile @Nullable PulseRecordStream stream;
 
 	private MicLevelMonitor() {
 	}

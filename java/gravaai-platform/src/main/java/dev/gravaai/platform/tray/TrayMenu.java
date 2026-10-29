@@ -1,5 +1,7 @@
 package dev.gravaai.platform.tray;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -73,7 +75,7 @@ public final class TrayMenu {
 	}
 
 	/** The item with {@code id}, or {@code null} for the root and unknown ids. */
-	public Item item(int id) {
+	public @Nullable Item item(int id) {
 		for (Item item : items) {
 			if (item.id() == id) {
 				return item;

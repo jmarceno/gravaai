@@ -1,5 +1,7 @@
 package dev.gravaai.core.settings;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A partial update of {@code recordings-settings.json} (port of the
  * {@code RecordingPreferencesPatch} interface in
@@ -9,8 +11,8 @@ package dev.gravaai.core.settings;
  * is not written.
  */
 public record RecordingPreferencesPatch(
-		Boolean microphoneEnabled,
-		String microphoneDeviceId,
-		Boolean systemAudioEnabled,
-		Boolean webcamEnabled,
-		String webcamDeviceId) {}
+		@Nullable Boolean microphoneEnabled,
+		@Nullable String microphoneDeviceId,
+		@Nullable Boolean systemAudioEnabled,
+		@Nullable Boolean webcamEnabled,
+		@Nullable String webcamDeviceId) {}

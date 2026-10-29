@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -33,7 +35,7 @@ public enum WhisperModel {
 
 	/** Null for unknown or missing ids, like the TS {@code in WHISPER_MODELS} check. */
 	@JsonCreator
-	public static WhisperModel fromWire(String value) {
+	public static @Nullable WhisperModel fromWire(String value) {
 		for (WhisperModel model : values()) {
 			if (model.wire.equals(value)) {
 				return model;

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -33,18 +35,18 @@ public final class MeetingMarkdownParser {
 	}
 
 	/** A bullet or checklist item; {@code checked} is null for plain bullets. */
-	public record Bullet(int depth, Boolean checked, String text) implements Block {
+	public record Bullet(int depth, @Nullable Boolean checked, String text) implements Block {
 	}
 
 	/** A plain paragraph line. */
 	public record Paragraph(String text) implements Block {
 	}
 
-	private MeetingMarkdownParser() {
+	@Nullable private MeetingMarkdownParser() {
 	}
 
 	/** Port of parseTimestampSeconds: seconds for a leading [HH:MM:SS], else null. */
-	public static Integer parseTimestampSeconds(String text) {
+	public static @Nullable Integer parseTimestampSeconds(String text) {
 		if (text == null) {
 			return null;
 		}

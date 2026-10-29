@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -29,6 +31,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The temp files survive a crash (the Matroska video can be read unfinalised, raw PCM has no
  * header), so only the in-memory metadata is lost: this manifest keeps it on disk while recording.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CosmicSession {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -48,7 +52,7 @@ public final class CosmicSession {
 			return wire;
 		}
 
-		static CosmicAudioRole fromWire(String value) {
+		static @Nullable CosmicAudioRole fromWire(String value) {
 			for (CosmicAudioRole role : values()) {
 				if (role.wire.equals(value)) {
 					return role;
@@ -59,7 +63,7 @@ public final class CosmicSession {
 	}
 
 	/** One audio track in the manifest. */
-	public record CosmicAudioTrack(CosmicAudioRole role, String path, Long startedAtMs) {
+	public record CosmicAudioTrack(CosmicAudioRole role, String path, @Nullable Long startedAtMs) {
 	}
 
 	/**
@@ -72,8 +76,8 @@ public final class CosmicSession {
 			long pid,
 			String createdAt,
 			String outputPath,
-			String videoPath,
-			Long startedAtMs,
+			@Nullable String videoPath,
+			@Nullable Long startedAtMs,
 			boolean keepSpeakerTracks,
 			MicNoiseReduction micNoiseReduction,
 			List<CosmicAudioTrack> audio) {
@@ -85,7 +89,7 @@ public final class CosmicSession {
 
 	/** Everything the mux needs for a normal stop or a recovery. */
 	public record CosmicMuxInput(
-			String videoPath,
+			@Nullable String videoPath,
 			List<CosmicAudioInput> audio,
 			long startedAtMs,
 			String outputPath,
@@ -95,7 +99,7 @@ public final class CosmicSession {
 	}
 
 	/** Result of one mux run. */
-	public record CosmicMuxResult(boolean success, String error) {
+	public record CosmicMuxResult(boolean success, @Nullable String error) {
 
 		public static CosmicMuxResult ok() {
 			return new CosmicMuxResult(true, null);
@@ -109,11 +113,11 @@ public final class CosmicSession {
 	/** Muxes the temp files into the final recording; the recorder supplies the ffmpeg pipeline. */
 	@FunctionalInterface
 	public interface CosmicMux {
-		CosmicMuxResult mux(CosmicMuxInput input) throws Exception;
+		@Nullable CosmicMuxResult mux(CosmicMuxInput input) throws Exception;
 	}
 
 	/** One recording offered to the recoverable-recordings banner. */
-	public record RecoverableRecording(
+	public @Nullable record RecoverableRecording(
 			String id,
 			Path manifestPath,
 			String createdAt,
@@ -126,25 +130,25 @@ public final class CosmicSession {
 	public sealed interface RecoveryMuxInputResult
 			permits RecoveryMuxInputResult.Ready, RecoveryMuxInputResult.Failed {
 
-		record Ready(CosmicMuxInput input) implements RecoveryMuxInputResult {
+		@Nullable record Ready(CosmicMuxInput input) implements RecoveryMuxInputResult {
 		}
 
-		record Failed(String error) implements RecoveryMuxInputResult {
+		@Nullable record Failed(String error) implements RecoveryMuxInputResult {
 		}
 	}
 
 	/** Meeting recordings keep per-speaker tracks; the caller registers them. */
-	public record MeetingInfo(boolean hasVideo) {
+	public @Nullable record MeetingInfo(boolean hasVideo) {
 	}
 
 	/** Result of a recovery. */
-	public record RecoverResult(boolean success, String path, MeetingInfo meeting, String error) {
+	public @Nullable record RecoverResult(boolean success, @Nullable String path, @Nullable MeetingInfo meeting, @Nullable String error) {
 
-		static RecoverResult ok(String path, MeetingInfo meeting) {
+		static @Nullable RecoverResult ok(String path, MeetingInfo meeting) {
 			return new RecoverResult(true, path, meeting, null);
 		}
 
-		static RecoverResult err(String error) {
+		static @Nullable RecoverResult err(String error) {
 			return new RecoverResult(false, null, null, error);
 		}
 	}
@@ -158,10 +162,10 @@ public final class CosmicSession {
 	/** {@code JSON.stringify(manifest, null, "\t")}, the indentation the TS writer uses. */
 	private static final PrettyPrinter TAB_FORMAT = tabFormat();
 
-	private CosmicSession() {
+	@Nullable private CosmicSession() {
 	}
 
-	public static Path sessionManifestPath(Path recordingsDir, long timestamp) {
+	public static @Nullable Path sessionManifestPath(Path recordingsDir, long timestamp) {
 		return recordingsDir.resolve(".recording-" + timestamp + ".session.json");
 	}
 
@@ -173,7 +177,7 @@ public final class CosmicSession {
 		Files.move(temporaryPath, manifestPath, StandardCopyOption.REPLACE_EXISTING);
 	}
 
-	private static ObjectNode toJson(CosmicSessionManifest manifest) {
+	private static @Nullable ObjectNode toJson(CosmicSessionManifest manifest) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("version", manifest.version());
 		node.put("timestamp", manifest.timestamp());
@@ -198,7 +202,7 @@ public final class CosmicSession {
 		return node;
 	}
 
-	private static void putNullableLong(ObjectNode node, String field, Long value) {
+	private static void putNullableLong(ObjectNode node, String field, @Nullable Long value) {
 		if (value == null) {
 			node.putNull(field);
 		} else {
@@ -206,7 +210,7 @@ public final class CosmicSession {
 		}
 	}
 
-	private static PrettyPrinter tabFormat() {
+	private static @Nullable PrettyPrinter tabFormat() {
 		Separators separators = Separators.createDefaultInstance()
 				.withObjectNameValueSpacing(Separators.Spacing.AFTER)
 				.withObjectEmptySeparator("")
@@ -218,7 +222,7 @@ public final class CosmicSession {
 	}
 
 	/** True when the file sits directly in the recordings dir and belongs to this recording. */
-	private static boolean isOwnTempFile(JsonNode file, Path recordingsDir, long timestamp) {
+	private static @Nullable boolean isOwnTempFile(JsonNode file, Path recordingsDir, long timestamp) {
 		if (file == null || !file.isString()) {
 			return false;
 		}
@@ -229,12 +233,12 @@ public final class CosmicSession {
 				&& path.getFileName().toString().startsWith(".recording-" + timestamp + ".");
 	}
 
-	private static boolean isFiniteNumber(JsonNode node) {
+	private static @Nullable boolean isFiniteNumber(JsonNode node) {
 		return node != null && node.isNumber() && Double.isFinite(node.asDouble());
 	}
 
 	/** Parses a manifest; anything malformed or pointing outside its folder is null. */
-	public static CosmicSessionManifest parseSessionManifest(String text, Path manifestPath) {
+	public static @Nullable CosmicSessionManifest parseSessionManifest(String text, Path manifestPath) {
 		JsonNode value;
 		try {
 			value = Json.parseJsonWithByteOrderMark(text);
@@ -329,7 +333,7 @@ public final class CosmicSession {
 				List.copyOf(audio));
 	}
 
-	public static CosmicSessionManifest readSessionManifest(Path manifestPath) {
+	public static @Nullable CosmicSessionManifest readSessionManifest(Path manifestPath) {
 		try {
 			return parseSessionManifest(Files.readString(manifestPath, StandardCharsets.UTF_8), manifestPath);
 		} catch (IOException error) {
@@ -435,7 +439,7 @@ public final class CosmicSession {
 	}
 
 	/** Manifest path for a banner item id, or null if the id is not a timestamp. */
-	public static Path recoverableManifestPath(Path recordingsDir, Object id) {
+	public static @Nullable Path recoverableManifestPath(Path recordingsDir, Object id) {
 		if (id instanceof String value && TIMESTAMP_ID_PATTERN.matcher(value).matches()) {
 			return sessionManifestPath(recordingsDir, Long.parseLong(value));
 		}

@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 /** The {@code kind} field of an automation context: a screen recording or a meeting. */
 public enum AutomationMediaKind {
 	SCREEN("screen"),
@@ -11,11 +13,11 @@ public enum AutomationMediaKind {
 		this.wire = wire;
 	}
 
-	public String wire() {
+	public @Nullable String wire() {
 		return wire;
 	}
 
-	public static AutomationMediaKind fromWire(String value) {
+	public static @Nullable AutomationMediaKind fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

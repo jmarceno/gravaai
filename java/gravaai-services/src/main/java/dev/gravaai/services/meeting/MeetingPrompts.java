@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -18,6 +20,8 @@ import java.util.regex.Pattern;
  * {@code src/main/resources/meeting/prompts/*.txt} so a test can compare them byte-for-byte
  * with the TypeScript source until Electron is deleted (plan §5.14).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingPrompts {
 
 	public static final String SUMMARY_PROMPT = loadResource("summary.txt");
@@ -33,7 +37,7 @@ public final class MeetingPrompts {
 	private MeetingPrompts() {
 	}
 
-	private static String loadResource(String name) {
+	private static @Nullable String loadResource(String name) {
 		try (InputStream stream = MeetingPrompts.class
 				.getResourceAsStream("/meeting/prompts/" + name)) {
 			if (stream == null) {
@@ -45,7 +49,7 @@ public final class MeetingPrompts {
 		}
 	}
 
-	private static Map<String, String> languageNames() {
+	private static @Nullable Map<String, String> languageNames() {
 		String[][] entries = {
 				{"ar", "Arabic"}, {"ca", "Catalan"}, {"cs", "Czech"}, {"da", "Danish"},
 				{"de", "German"}, {"el", "Greek"}, {"en", "English"}, {"es", "Spanish"},
@@ -63,7 +67,7 @@ public final class MeetingPrompts {
 		return Collections.unmodifiableMap(names);
 	}
 
-	public static String languageName(String code) {
+	public static @Nullable String languageName(String code) {
 		if (code == null || code.isEmpty()) {
 			return null;
 		}
@@ -71,7 +75,7 @@ public final class MeetingPrompts {
 	}
 
 	/** whisper-1 reports the language as a name ("portuguese"); map it back to a code. */
-	public static String languageCodeFromName(String name) {
+	public static @Nullable String languageCodeFromName(String name) {
 		if (name == null || name.isEmpty()) {
 			return null;
 		}

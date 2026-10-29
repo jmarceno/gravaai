@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,6 +28,8 @@ import java.util.Set;
  * <p>Offsets are Java {@code String} indices, i.e. UTF-16 code units, exactly like the JavaScript
  * original, so the same fixture offsets hold.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CosmicShortcuts {
 
 	/** Port of {@code GRAVAAI_DESCRIPTION_PREFIX}. */
@@ -135,7 +139,7 @@ public final class CosmicShortcuts {
 	}
 
 	/** Port of {@code findCosmicConflict}: another (non-Gravaai) entry using the same keys. */
-	public static CosmicShortcutEntry findCosmicConflict(
+	public static @Nullable CosmicShortcutEntry findCosmicConflict(
 			GlobalShortcutBinding binding, List<CosmicShortcutEntry> entries) {
 		List<String> modifiers = bindingModifiers(binding);
 		for (CosmicShortcutEntry entry : entries) {
@@ -269,7 +273,7 @@ public final class CosmicShortcuts {
 	}
 
 	/** Port of {@code lineAlignedEnd}. */
-	private static int lineAlignedEnd(String text, int offset) {
+	private static @Nullable int lineAlignedEnd(String text, int offset) {
 		int i = offset;
 		while (i < text.length()
 				&& (text.charAt(i) == ' ' || text.charAt(i) == '\t' || text.charAt(i) == '\r')) {
@@ -278,7 +282,7 @@ public final class CosmicShortcuts {
 		return i < text.length() && text.charAt(i) == '\n' ? i + 1 : offset;
 	}
 
-	private static String readIfExists(Path file) throws IOException {
+	private static @Nullable String readIfExists(Path file) throws IOException {
 		try {
 			return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
 		} catch (NoSuchFileException error) {
@@ -286,7 +290,7 @@ public final class CosmicShortcuts {
 		}
 	}
 
-	private static String trimToNull(String value) {
+	private static @Nullable String trimToNull(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}
@@ -429,7 +433,7 @@ public final class CosmicShortcuts {
 			}
 		}
 
-		private Token peek() {
+		private @Nullable Token peek() {
 			return pos < tokens.size() ? tokens.get(pos) : null;
 		}
 

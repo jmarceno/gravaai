@@ -1,5 +1,7 @@
 package dev.gravaai.services.projects;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +53,8 @@ import tools.jackson.databind.JsonNode;
  * <p>File IO is blocking; callers on the UI thread must run these methods on a background thread
  * (plan §4.1).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectManager {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.projects");
@@ -65,7 +69,7 @@ public final class ProjectManager {
 	private final RecentProjectsStore recentProjects;
 	private final ProjectThumbnailGenerator thumbnailGenerator;
 	private final Map<Path, CompletableFuture<ProjectThumbnailReady>> thumbnailJobs = new ConcurrentHashMap<>();
-	private volatile Path currentProjectPath;
+	private volatile @Nullable Path currentProjectPath;
 
 	public ProjectManager(UserData userData, RecordingsDirectory recordingsDirectory,
 			RecentProjectsStore recentProjects, ProjectThumbnailGenerator thumbnailGenerator) {
@@ -76,14 +80,14 @@ public final class ProjectManager {
 	}
 
 	/** The projects folder for the current recordings directory (port of {@code getProjectsDir}). */
-	public Path getProjectsDir() throws IOException {
+	public @Nullable Path getProjectsDir() throws IOException {
 		Path projectsDir = StorageFiles.projectsDir(recordingsDirectory.getRecordingsDir());
 		Files.createDirectories(projectsDir);
 		return projectsDir;
 	}
 
 	/** Port of {@code getProjectThumbnailPath}: the preview lives next to the project file. */
-	public static Path getProjectThumbnailPath(Path projectPath) {
+	public static @Nullable Path getProjectThumbnailPath(Path projectPath) {
 		return StorageFiles.projectThumbnailPath(projectPath);
 	}
 
@@ -92,7 +96,7 @@ public final class ProjectManager {
 		this.currentProjectPath = projectPath;
 	}
 
-	public Path currentProjectPath() {
+	public @Nullable Path currentProjectPath() {
 		return currentProjectPath;
 	}
 
@@ -100,7 +104,7 @@ public final class ProjectManager {
 	 * Port of {@code buildProjectLibraryEntry}: one card. Returns {@code null} for paths that are not
 	 * project files (missing, a directory, another extension).
 	 */
-	public ProjectLibraryEntry buildProjectLibraryEntry(Path projectPath, Path projectsDir,
+	public @Nullable ProjectLibraryEntry buildProjectLibraryEntry(Path projectPath, Path projectsDir,
 			Consumer<ProjectThumbnailReady> onThumbnailReady) {
 		try {
 			Path normalizedPath = projectPath.toAbsolutePath().normalize();
@@ -154,7 +158,7 @@ public final class ProjectManager {
 	 * by last edit, newest first. The recent history is rewritten to the listed entries.
 	 */
 	public ProjectLibrary listProjectLibraryEntries(
-			Consumer<ProjectThumbnailReady> onThumbnailReady) throws IOException {
+			@Nullable Consumer<ProjectThumbnailReady> onThumbnailReady) throws IOException {
 		Path projectsDir = getProjectsDir();
 		List<Path> projectPaths = new ArrayList<>();
 		try (DirectoryStream<Path> entries = Files.newDirectoryStream(projectsDir)) {
@@ -227,14 +231,14 @@ public final class ProjectManager {
 	}
 
 	/** Port of {@code adoptLegacyProfilePaths}: points media at the current profile folder. */
-	public JsonNode adoptLegacyProfilePaths(JsonNode project) {
+	public @Nullable JsonNode adoptLegacyProfilePaths(JsonNode project) {
 		Path appDataPath = userData.dir().toAbsolutePath().normalize().getParent();
 		return LegacyProfilePaths.remapLegacyProfilePaths(project,
 				LegacyProfilePaths.profileDirRenames(appDataPath));
 	}
 
 	/** Port of {@code isLoadableProjectData}: the minimum a project card/preview can read. */
-	public static boolean isLoadableProjectData(JsonNode projectData) {
+	public static @Nullable boolean isLoadableProjectData(JsonNode projectData) {
 		if (projectData == null || !projectData.isObject()) {
 			return false;
 		}
@@ -256,7 +260,7 @@ public final class ProjectManager {
 	 * Port of {@code resolveProjectMediaSources}: the recording files a project needs. Only the
 	 * fields the dashboard reads are touched (the full editor model belongs to P2).
 	 */
-	public static Result<ProjectMediaSources> resolveProjectMediaSources(JsonNode project) {
+	public static @Nullable Result<ProjectMediaSources> resolveProjectMediaSources(JsonNode project) {
 		if (project == null || !project.isObject()) {
 			return Result.err("Invalid project file format");
 		}
@@ -292,12 +296,12 @@ public final class ProjectManager {
 	}
 
 	/** The listed projects, without a thumbnail-ready callback (dashboard refresh). */
-	public List<ProjectLibraryEntry> listProjectEntries() throws IOException {
+	public @Nullable List<ProjectLibraryEntry> listProjectEntries() throws IOException {
 		return listProjectLibraryEntries(null).entries();
 	}
 
 	/** Port of the rename handler's recent-metadata step; a failure becomes a warning string. */
-	public Optional<String> rememberRecentProject(String projectPath) {
+	public @Nullable Optional<String> rememberRecentProject(String projectPath) {
 		return RecentMetadata.persist(() -> {
 			try {
 				recentProjects.rememberRecentProject(projectPath);
@@ -308,7 +312,7 @@ public final class ProjectManager {
 	}
 
 	/** Port of the trash handler's recent-metadata step: drops trashed projects from the history. */
-	public Optional<String> forgetRecentProjects(List<String> deletedPaths) {
+	public @Nullable Optional<String> forgetRecentProjects(List<String> deletedPaths) {
 		return RecentMetadata.persist(() -> {
 			List<String> remaining = new ArrayList<>();
 			for (String path : recentProjects.loadRecentProjectPaths()) {
@@ -331,7 +335,7 @@ public final class ProjectManager {
 	}
 
 	/** Port of the trash handler's {@code resolveRecordingPaths}: the media a project references. */
-	public List<Path> resolveProjectRecordingPaths(Path projectPath) throws IOException {
+	public @Nullable List<Path> resolveProjectRecordingPaths(Path projectPath) throws IOException {
 		Result<ProjectMediaSources> media = resolveProjectMediaSources(readProject(projectPath));
 		if (media.isErr()) {
 			return List.of();
@@ -349,7 +353,7 @@ public final class ProjectManager {
 	 * Port of {@code refreshProjectThumbnail}: decode the first frame and cache it, discarding the
 	 * result when the project changed meanwhile. Concurrent calls for the same project share one job.
 	 */
-	public CompletableFuture<ProjectThumbnailReady> refreshProjectThumbnail(
+	public @Nullable CompletableFuture<ProjectThumbnailReady> refreshProjectThumbnail(
 			Path projectPath, ProjectRevision revision) {
 		Path key = projectPath.toAbsolutePath().normalize();
 		CompletableFuture<ProjectThumbnailReady> task = thumbnailJobs.computeIfAbsent(key,
@@ -380,7 +384,7 @@ public final class ProjectManager {
 		}
 	}
 
-	private ProjectThumbnailReady refreshProjectThumbnailNow(Path projectPath, ProjectRevision revision) {
+	private @Nullable ProjectThumbnailReady refreshProjectThumbnailNow(Path projectPath, ProjectRevision revision) {
 		Path thumbnailPath = getProjectThumbnailPath(projectPath);
 		Path temporary = null;
 		try {
@@ -442,7 +446,7 @@ public final class ProjectManager {
 	 *     an empty string deletes it, like {@code undefined} / {@code null} in the TS renderer API
 	 * @return the thumbnail path, or {@code null} after a delete / when no file exists
 	 */
-	public static Path saveProjectThumbnail(Path projectPath, String thumbnailDataUrl) throws IOException {
+	public static @Nullable Path saveProjectThumbnail(Path projectPath, String thumbnailDataUrl) throws IOException {
 		Path thumbnailPath = getProjectThumbnailPath(projectPath);
 		if (thumbnailDataUrl == null) {
 			return Files.exists(thumbnailPath) ? thumbnailPath : null;

@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +24,8 @@ import io.github.humbleui.types.Rect;
  * export, preview and the editor agree on paging. Per-word "spoken" highlighting is disabled in
  * TS too ({@code getCaptionWordVisualState}). Known difference: DM Sans instead of SF Pro.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class CaptionRenderer {
 
 	private static final double CAPTION_LINE_HEIGHT = 1.32;
@@ -135,8 +139,8 @@ final class CaptionRenderer {
 				paint);
 	}
 
-	private static double scaledFontSize(double fontSize, int containerWidth,
-			double maxWidthPercent) {
+	private static double scaledFontSize(@Nullable double fontSize, int containerWidth,
+			@Nullable double maxWidthPercent) {
 		double targetWidth = Math.max(1, containerWidth * (maxWidthPercent / 100.0));
 		double referenceWidth = 1920 * (DEFAULT_MAX_WIDTH / 100.0);
 		return Math.max(14, fontSize * (targetWidth / referenceWidth));

@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +17,8 @@ import dev.gravaai.media.ffmpeg.VideoDecoder;
  * (plan §5.7/§5.9, software decode only). The converter's reusable swscale buffer is copied into a
  * per-frame direct buffer because the decode-ahead ring keeps frames alive.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 
 	private static final System.Logger LOG =
@@ -23,9 +27,9 @@ public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 
 	private final Path path;
 	/** Opened lazily on the decode worker thread: FFM confined arenas belong to their opener. */
-	private VideoDecoder decoder;
+	private @Nullable VideoDecoder decoder;
 	private final double durationSeconds;
-	private FrameConverter converter;
+	private @Nullable FrameConverter converter;
 	private boolean closed;
 	/** Recycled per-frame direct buffers so steady-state decoding allocates nothing. */
 	private final java.util.Deque<ByteBuffer> pooledBuffers = new java.util.ArrayDeque<>();
@@ -58,7 +62,7 @@ public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 	}
 
 	@Override
-	public VideoFrame next() {
+	public @Nullable VideoFrame next() {
 		ensureOpen();
 		DecodedFrame frame;
 		do {

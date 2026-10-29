@@ -1,5 +1,7 @@
 package dev.gravaai.platform.x11;
 
+import org.jspecify.annotations.Nullable;
+
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
@@ -29,6 +31,8 @@ import java.util.Optional;
  * normal case inside the app). Outside the app — for tests and the platform smoke — the bridge
  * falls back to {@code XOpenDisplay(NULL)}, so the same code can find windows of a running app.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class X11Bridge implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.x11");
@@ -61,15 +65,15 @@ public final class X11Bridge implements AutoCloseable {
 	private final MemorySegment display;
 	private final boolean ownsDisplay;
 	private final long root;
-	private final MethodHandle internAtom;
-	private final MethodHandle queryTree;
-	private final MethodHandle fetchName;
-	private final MethodHandle free;
-	private final MethodHandle sendEvent;
-	private final MethodHandle ungrabPointer;
-	private final MethodHandle flush;
-	private final MethodHandle closeDisplay;
-	private final MethodHandle shapeCombineRectangles;
+	private final @Nullable MethodHandle internAtom;
+	private final @Nullable MethodHandle queryTree;
+	private final @Nullable MethodHandle fetchName;
+	private final @Nullable MethodHandle free;
+	private final @Nullable MethodHandle sendEvent;
+	private final @Nullable MethodHandle ungrabPointer;
+	private final @Nullable MethodHandle flush;
+	private final @Nullable MethodHandle closeDisplay;
+	private final @Nullable MethodHandle shapeCombineRectangles;
 
 	private X11Bridge(Linker linker, MemorySegment display, boolean ownsDisplay) throws Throwable {
 		this.display = display;
@@ -261,12 +265,12 @@ public final class X11Bridge implements AutoCloseable {
 		}
 	}
 
-	private static MethodHandle downcall(Linker linker, SymbolLookup lookup, String name,
+	private static @Nullable MethodHandle downcall(Linker linker, SymbolLookup lookup, String name,
 			FunctionDescriptor descriptor) {
 		return linker.downcallHandle(lookup.findOrThrow(name), descriptor);
 	}
 
-	private static MemorySegment gdkDisplay(Linker linker) {
+	private static @Nullable MemorySegment gdkDisplay(Linker linker) {
 		try {
 			SymbolLookup gdk = SymbolLookup.libraryLookup("libgdk-3.so.0", Arena.global());
 			MethodHandle defaultDisplay = linker.downcallHandle(gdk.findOrThrow("gdk_display_get_default"),
@@ -286,7 +290,7 @@ public final class X11Bridge implements AutoCloseable {
 		}
 	}
 
-	private static MemorySegment openDisplay(Linker linker) {
+	private static @Nullable MemorySegment openDisplay(Linker linker) {
 		try {
 			SymbolLookup x11 = SymbolLookup.libraryLookup("libX11.so.6", Arena.global());
 			MethodHandle handle = linker.downcallHandle(x11.findOrThrow("XOpenDisplay"), FunctionDescriptor.of(ADDRESS, ADDRESS));

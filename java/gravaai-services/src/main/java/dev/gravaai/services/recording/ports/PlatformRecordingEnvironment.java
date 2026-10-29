@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording.ports;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +12,8 @@ import dev.gravaai.platform.nativehelpers.NativeHelpers;
  * {@link RecordingEnvironment} backed by the platform native-helper locator and PATH lookup
  * (plan §5.5, §5.7). The app wires it into {@code AppContext}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PlatformRecordingEnvironment implements RecordingEnvironment {
 
 	@Override
@@ -37,7 +41,7 @@ public final class PlatformRecordingEnvironment implements RecordingEnvironment 
 	}
 
 	@Override
-	public Path rnnoiseModel() {
+	public @Nullable Path rnnoiseModel() {
 		Path model = NativeHelpers.nativeDir().resolve("models").resolve("rnnoise").resolve("voice.rnnn");
 		return Files.isRegularFile(model) ? model : null;
 	}

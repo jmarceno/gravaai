@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import io.github.humbleui.skija.BlendMode;
@@ -24,6 +26,8 @@ import io.github.humbleui.types.Rect;
  * <p>Cursor sprites come from {@link CursorAssets} (the committed SVG cursor sets, rasterised
  * and anchored exactly like the TS asset pipeline).</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class CursorRenderer {
 
 	/** {@code CURSOR_DIRECTIONAL_BLUR_STRENGTH}. */
@@ -70,7 +74,7 @@ final class CursorRenderer {
 			new FilterMipmap(FilterMode.LINEAR, MipmapMode.LINEAR);
 
 	/** The cursor visual state (TS {@code getCursorVisualState} result). */
-	record VisualState(String cursorType, CursorSample clickSample, double clickBounceProgress,
+	record VisualState(String cursorType, @Nullable CursorSample clickSample, double clickBounceProgress,
 			double clickProgress) {
 	}
 
@@ -80,14 +84,14 @@ final class CursorRenderer {
 	private double x = 0.5;
 	private double y = 0.5;
 	private boolean initialized;
-	private Double lastTimeMs;
+	private @Nullable Double lastTimeMs;
 	private double swayRotation;
 	private double lastPx;
 	private double lastPy;
-	private Double lastRenderedTimeMs;
+	private @Nullable Double lastRenderedTimeMs;
 	private double lastDrawH;
 	private boolean visible;
-	private ZoomTransform.DirectionalMotionBlur lastBlur;
+	private ZoomTransform.@Nullable DirectionalMotionBlur lastBlur;
 
 	void reset() {
 		initialized = false;
@@ -323,7 +327,7 @@ final class CursorRenderer {
 				latestClick != null && isClickEvent ? latestClick : null, bounceProgress, progress);
 	}
 
-	private static CursorSample findLatestInteractionSample(List<CursorSample> samples,
+	private static @Nullable CursorSample findLatestInteractionSample(List<CursorSample> samples,
 			double timeMs) {
 		for (int index = samples.size() - 1; index >= 0; index -= 1) {
 			CursorSample sample = samples.get(index);
@@ -369,7 +373,7 @@ final class CursorRenderer {
 	}
 
 	/** {@code computeCursorSwayRotation}. */
-	static double computeSwayRotation(double dx, double dy, double deltaMs, double sway) {
+	static double computeSwayRotation(double dx, double dy, double deltaMs, @Nullable double sway) {
 		if (sway <= 0) {
 			return 0;
 		}
@@ -453,7 +457,7 @@ final class CursorRenderer {
 	 * {@code width = height * aspectRatio}); the shadow pass tints it black at
 	 * {@code CURSOR_SHADOW_ALPHA} and blurs it by {@code CURSOR_SHADOW_BLUR}.
 	 */
-	private static void drawSprite(Canvas canvas, CursorAssets.Asset asset, double drawH,
+	private static void drawSprite(Canvas canvas, CursorAssets.@Nullable Asset asset, double drawH,
 			boolean shadow) {
 		Image image = asset.image();
 		float height = (float) drawH;

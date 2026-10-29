@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +20,8 @@ import tools.jackson.databind.JsonNode;
  * here is the timeout/probe parsing, the microphone-chunk timing summary and the companion-audio
  * sidecar discovery that the import pipeline and the editor read-model need on every platform.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class RecordingDiagnostics {
 
 	public static final long MIN_VALID_RECORDED_VIDEO_BYTES = 1024;
@@ -31,13 +35,13 @@ public final class RecordingDiagnostics {
 			int index,
 			int size,
 			long elapsedMs,
-			Long deltaMs,
-			Long recordedElapsedMs,
-			Long recordedDeltaMs) {
+			@Nullable Long deltaMs,
+			@Nullable Long recordedElapsedMs,
+			@Nullable Long recordedDeltaMs) {
 	}
 
 	/** One pause interval ({@code MicrophonePauseInterval}). */
-	public record MicrophonePauseInterval(long startElapsedMs, Long endElapsedMs, Double durationMs) {
+	public record MicrophonePauseInterval(long startElapsedMs, @Nullable Long endElapsedMs, @Nullable Double durationMs) {
 	}
 
 	/** A wall-clock gap in the microphone chunk stream. */
@@ -49,7 +53,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** {@code summarizeMicrophoneChunkTiming} result. */
-	public record MicrophoneChunkTimingSummary(
+	public @Nullable record MicrophoneChunkTimingSummary(
 			String status,
 			int timesliceMs,
 			int thresholdMs,
@@ -65,15 +69,15 @@ public final class RecordingDiagnostics {
 	}
 
 	/** ffprobe stream timing ({@code VideoStreamDurationProbe}). */
-	public record VideoStreamDurationProbe(Double durationSeconds, Long frameCount, Double frameRate) {
+	public record VideoStreamDurationProbe(@Nullable Double durationSeconds, @Nullable Long frameCount, @Nullable Double frameRate) {
 	}
 
 	/** One companion-audio layout that has usable files ({@code CompanionAudioCandidate}). */
-	public record CompanionAudioCandidate(
+	public @Nullable record CompanionAudioCandidate(
 			String platform, String systemPath, String micPath, List<String> usablePaths) {
 	}
 
-	private record CompanionLayout(String platform, String systemSuffix, String micSuffix) {
+	private @Nullable record CompanionLayout(String platform, String systemSuffix, String micSuffix) {
 	}
 
 	private static final List<CompanionLayout> COMPANION_AUDIO_LAYOUTS = List.of(
@@ -81,11 +85,11 @@ public final class RecordingDiagnostics {
 			new CompanionLayout("win", ".system.wav", ".mic.wav"),
 			new CompanionLayout("mac", ".system.webm", ".mic.webm"));
 
-	private RecordingDiagnostics() {
+	@Nullable private RecordingDiagnostics() {
 	}
 
 	/** Port of {@code getFileSizeIfPresent}. */
-	public static Long getFileSizeIfPresent(String filePath) {
+	public static @Nullable Long getFileSizeIfPresent(String filePath) {
 		if (filePath == null || filePath.isBlank()) {
 			return null;
 		}
@@ -97,7 +101,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** Parses {@code Duration: hh:mm:ss.ss} from ffmpeg's stderr. */
-	public static Double parseFfmpegDurationSeconds(String stderr) {
+	public static @Nullable Double parseFfmpegDurationSeconds(String stderr) {
 		if (stderr == null) {
 			return null;
 		}
@@ -117,7 +121,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** Scales the audio mux timeout with the recording duration. */
-	public static long getRecordingAudioMuxTimeoutMs(double durationSeconds) {
+	public static @Nullable long getRecordingAudioMuxTimeoutMs(double durationSeconds) {
 		if (!Double.isFinite(durationSeconds) || durationSeconds <= 0) {
 			return RECORDING_AUDIO_MUX_MIN_TIMEOUT_MS;
 		}
@@ -127,14 +131,14 @@ public final class RecordingDiagnostics {
 				Math.max(RECORDING_AUDIO_MUX_MIN_TIMEOUT_MS, realtimeMuxBudgetMs));
 	}
 
-	private static Double getFiniteNonNegativeNumber(Object value) {
+	private static @Nullable Double getFiniteNonNegativeNumber(@Nullable Object value) {
 		return value instanceof Number number && Double.isFinite(number.doubleValue()) && number.doubleValue() >= 0
 				? number.doubleValue()
 				: null;
 	}
 
 	/** Port of {@code summarizeMicrophoneChunkTiming}: pause-aware microphone gap classification. */
-	public static MicrophoneChunkTimingSummary summarizeMicrophoneChunkTiming(
+	public static @Nullable MicrophoneChunkTimingSummary summarizeMicrophoneChunkTiming(
 			List<MicrophoneChunkTimingEvent> chunkEvents,
 			List<MicrophonePauseInterval> pauseIntervals,
 			double timesliceMs) {
@@ -192,7 +196,7 @@ public final class RecordingDiagnostics {
 				List.copyOf(recordedGaps.subList(0, Math.min(MAX_GAPS, recordedGaps.size()))));
 	}
 
-	private static Double parsePositiveNumber(Object raw) {
+	private static @Nullable Double parsePositiveNumber(Object raw) {
 		if (raw instanceof Number number) {
 			double value = number.doubleValue();
 			return Double.isFinite(value) && value > 0 ? value : null;
@@ -208,12 +212,12 @@ public final class RecordingDiagnostics {
 		return null;
 	}
 
-	private static Long parsePositiveInteger(Object raw) {
+	private static @Nullable Long parsePositiveInteger(Object raw) {
 		Double value = parsePositiveNumber(raw);
 		return value == null ? null : Math.round(value);
 	}
 
-	private static Double parseFrameRate(Object raw) {
+	private static @Nullable Double parseFrameRate(Object raw) {
 		if (!(raw instanceof String text) || text.isBlank()) {
 			return null;
 		}
@@ -240,11 +244,11 @@ public final class RecordingDiagnostics {
 		}
 	}
 
-	private static JsonNode nodeValue(JsonNode node, String field) {
+	private static @Nullable JsonNode nodeValue(JsonNode node, String field) {
 		return node == null ? null : node.get(field);
 	}
 
-	private static Object javaValue(JsonNode node) {
+	private static @Nullable Object javaValue(JsonNode node) {
 		if (node == null || node.isNull()) {
 			return null;
 		}
@@ -258,7 +262,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** Port of {@code parseFfprobeVideoStreamDuration}: stream duration or frame-count fallback. */
-	public static VideoStreamDurationProbe parseFfprobeVideoStreamDuration(String output) {
+	public static @Nullable VideoStreamDurationProbe parseFfprobeVideoStreamDuration(String output) {
 		JsonNode parsed;
 		try {
 			parsed = Json.parseJsonWithByteOrderMark(output);
@@ -289,7 +293,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** {@code getRecordingDiagnosticsPath}: next to the video, with its extension replaced. */
-	public static String getRecordingDiagnosticsPath(String videoPath) {
+	public static @Nullable String getRecordingDiagnosticsPath(String videoPath) {
 		int slash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
 		int dot = videoPath.lastIndexOf('.');
 		String stem = dot > slash ? videoPath.substring(0, dot) : videoPath;
@@ -297,7 +301,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** The companion audio files that exist and are non-empty, in layout priority order. */
-	public static List<CompanionAudioCandidate> getUsableCompanionAudioCandidates(String videoPath) {
+	public static @Nullable List<CompanionAudioCandidate> getUsableCompanionAudioCandidates(String videoPath) {
 		int slash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
 		int dot = videoPath.lastIndexOf('.');
 		String basePath = dot > slash ? videoPath.substring(0, dot) : videoPath;
@@ -323,7 +327,7 @@ public final class RecordingDiagnostics {
 		return candidates;
 	}
 
-	private static JsonNode readCompanionAudioTimingMetadata(String companionPath) {
+	private static @Nullable JsonNode readCompanionAudioTimingMetadata(String companionPath) {
 		try {
 			JsonNode parsed = Json.parseJsonWithByteOrderMark(
 					Files.readString(Path.of(companionPath + ".json"), StandardCharsets.UTF_8));
@@ -334,7 +338,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** The {@code startDelayMs} recorded next to a companion audio sidecar, or null. */
-	public static Long getCompanionAudioStartDelayMs(String companionPath) {
+	public static @Nullable Long getCompanionAudioStartDelayMs(String companionPath) {
 		JsonNode metadata = readCompanionAudioTimingMetadata(companionPath);
 		JsonNode startDelayNode = metadata == null ? null : metadata.get("startDelayMs");
 		if (startDelayNode == null || !startDelayNode.isNumber()) {

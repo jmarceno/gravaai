@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.storage.UserData;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,12 +23,12 @@ public final class AppIcons {
 
 	private final Path directory;
 
-	public AppIcons(UserData userData) {
+	@Nullable public AppIcons(UserData userData) {
 		this.directory = userData.dir().resolve("icons");
 	}
 
 	/** Extracts {@code app-icons/<name>} when it exists; null when this build does not ship it. */
-	public Path loadOrNull(String name) {
+	public @Nullable Path loadOrNull(String name) {
 		if (getClass().getResource("/app-icons/" + name) == null) {
 			return null;
 		}
@@ -40,7 +42,7 @@ public final class AppIcons {
 	 * read-only and tolerant of a build that does not ship an optional size. Invalid or missing
 	 * resources return {@code null} instead of preventing the app from starting.
 	 */
-	public Image loadImageOrNull(String name) {
+	public @Nullable Image loadImageOrNull(String name) {
 		if (name == null || name.isBlank()) {
 			return null;
 		}

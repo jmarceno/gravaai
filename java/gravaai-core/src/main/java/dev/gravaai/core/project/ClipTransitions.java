@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,7 +9,7 @@ import java.util.List;
 public final class ClipTransitions {
 
 	/** A dip to black in timeline ms; holdUntilMs is only set when the next clip starts after a gap. */
-	public record FadeWindow(double startMs, double peakMs, Double holdUntilMs, double endMs) {}
+	public record FadeWindow(double startMs, double peakMs, @Nullable Double holdUntilMs, double endMs) {}
 
 	private ClipTransitions() {}
 

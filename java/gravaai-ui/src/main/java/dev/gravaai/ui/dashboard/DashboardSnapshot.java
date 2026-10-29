@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 
@@ -28,7 +30,7 @@ public record DashboardSnapshot(
 		List<RecoverableRecording> recoverableRecordings,
 		DashboardLibraryData preferences,
 		List<MeetingLibraryEntry> meetings,
-		String meetingsError) {
+		@Nullable String meetingsError) {
 
 	public DashboardSnapshot {
 		projects = List.copyOf(projects);

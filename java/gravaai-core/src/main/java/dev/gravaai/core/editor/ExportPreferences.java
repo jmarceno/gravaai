@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -11,18 +13,20 @@ import tools.jackson.databind.node.ObjectNode;
  * Export preferences shared by the editor settings and the export dialog (port of
  * {@code src/components/video-editor/exportPreferences.ts}, plan §5.11).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public record ExportPreferences(
-		ExportEncodingMode exportEncodingMode,
+		@Nullable ExportEncodingMode exportEncodingMode,
 		ExportBackendPreference exportBackendPreference,
 		ExportPipelineModel exportPipelineModel,
 		ExportQuality exportQuality,
-		int mp4FrameRate,
-		ExportFormat exportFormat,
+		@Nullable int mp4FrameRate,
+		@Nullable ExportFormat exportFormat,
 		int gifFrameRate,
-		boolean gifLoop,
+		@Nullable boolean gifLoop,
 		GifSizePreset gifSizePreset,
 		PublishDestination publishDestination,
-		boolean includeCaptionSidecar) {
+		@Nullable boolean includeCaptionSidecar) {
 
 	public enum ExportEncodingMode {
 		FAST("fast"), BALANCED("balanced"), QUALITY("quality");

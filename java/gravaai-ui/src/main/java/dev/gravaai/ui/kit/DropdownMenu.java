@@ -25,6 +25,8 @@ import javafx.scene.layout.VBox;
  * {@code .ddLabel} from LaunchWindow.module.css), separators 94% wide. Keyboard: up/down +
  * enter, escape closes (Popup).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class DropdownMenu {
 
 	private record Row(HBox node, Runnable action) {}

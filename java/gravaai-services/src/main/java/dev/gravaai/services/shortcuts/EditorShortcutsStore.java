@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -37,7 +39,7 @@ public final class EditorShortcutsStore {
 	}
 
 	/** Port of the {@code get-shortcuts} handler: the stored tree, or null on any read/parse error. */
-	public JsonNode read() {
+	public @Nullable JsonNode read() {
 		try {
 			return Json.parseJsonWithByteOrderMark(new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8));
 		} catch (IOException | RuntimeException error) {

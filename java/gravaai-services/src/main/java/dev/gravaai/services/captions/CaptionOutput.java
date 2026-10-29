@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 /** Port of electron/ipc/captions/output.ts: read whisper's JSON timing, fall back to SRT. */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionOutput {
 
 	private static final System.Logger LOG =

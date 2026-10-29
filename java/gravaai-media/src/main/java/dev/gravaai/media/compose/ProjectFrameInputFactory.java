@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -34,6 +36,8 @@ import dev.gravaai.media.playback.WebcamSync;
  * directory holding {@code wallpapers/} (the app's assets or the repo's {@code public/}); a
  * missing asset degrades to black.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFactory, AutoCloseable {
 
 	private final ProjectEditorState editor;
@@ -45,8 +49,8 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final Path wallpaperRoot;
 	private final int frameRate;
 	private final MediaFrameReader videoFrames;
-	private final MediaFrameReader webcamFrames;
-	private Background staticBackground;
+	private final @Nullable MediaFrameReader webcamFrames;
+	private @Nullable Background staticBackground;
 	// The editor state is fixed for this factory, so the overlay specs resolve once (the keystroke
 	// spec reads the .keys.json sidecar).
 	private final LayoutSpec layout;
@@ -58,7 +62,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final CaptionSpec captions;
 	private final KeystrokeSpec keystrokes;
 	private final FadeSpec fade;
-	private MediaFrameReader wallpaperFrames;
+	private @Nullable MediaFrameReader wallpaperFrames;
 	private boolean closed;
 
 	/**
@@ -151,7 +155,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	 * rendered background by identity); a video wallpaper loops over its duration like
 	 * {@code syncBackgroundFrame}.
 	 */
-	private Background backgroundAt(double timelineSeconds) {
+	private @Nullable Background backgroundAt(double timelineSeconds) {
 		Path video = ProjectEditorInputs.videoWallpaperPath(editor, wallpaperRoot);
 		if (video == null) {
 			if (staticBackground == null) {
@@ -171,7 +175,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	}
 
 	/** Maps a timeline time to the source timestamp through the clip sequence. */
-	private Double mapTimelineToSourceSeconds(double timelineSeconds) {
+	private @Nullable Double mapTimelineToSourceSeconds(double timelineSeconds) {
 		List<ClipRegion> clips = editor.clipRegions() == null ? List.of()
 				: editor.clipRegions();
 		if (clips.isEmpty()) {

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline.core;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -17,11 +19,11 @@ public final class TimelineAudioPlacement {
 	public record AudioPlacement(int trackIndex, long durationMs) {
 	}
 
-	private TimelineAudioPlacement() {
+	@Nullable private TimelineAudioPlacement() {
 	}
 
 	/** {@code resolveAudioPlacement}; {@code null} when there is no usable slot. */
-	public static AudioPlacement resolveAudioPlacement(List<AudioRegion> audioRegions, long startPos,
+	public static @Nullable AudioPlacement resolveAudioPlacement(List<AudioRegion> audioRegions, long startPos,
 			long totalMs, long audioDurationMs, Integer preferredTrackIndex) {
 		long maxRemainingDuration = totalMs - startPos;
 		if (audioDurationMs <= 0 || maxRemainingDuration <= 0) {

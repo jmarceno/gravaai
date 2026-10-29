@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -65,6 +67,8 @@ import javafx.scene.text.Text;
  * {@code glassAmber} #67460f/#83570f, {@code glassRed} #652425/#802a2b, captions #b58b12/#facc15),
  * 8 px block radius, and the 85% block height inside its row.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class TimelineView extends Region {
 
 	private static final double AXIS_HEIGHT = TimelineLayout.TIMELINE_AXIS_HEIGHT_PX;
@@ -163,7 +167,7 @@ public final class TimelineView extends Region {
 	private Span range = new Span(0, 1000);
 	private Span fullRange = new Span(0, 1000);
 	private boolean rangeInitialised;
-	private TimelineSelection selection;
+	private @Nullable TimelineSelection selection;
 	private List<AgentHighlight> agentHighlights = List.of();
 	private double currentTimeMs;
 	private List<RowLayout> rowLayouts = List.of();
@@ -179,23 +183,23 @@ public final class TimelineView extends Region {
 	}
 
 	private DragMode dragMode = DragMode.NONE;
-	private String dragItemId;
-	private String dragRowId;
+	private @Nullable String dragItemId;
+	private @Nullable String dragRowId;
 	private double dragStartX;
-	private Span dragOriginalSpan;
-	private Span dragLiveSpan;
+	private @Nullable Span dragOriginalSpan;
+	private @Nullable Span dragLiveSpan;
 	private boolean dragged;
 	private boolean pressedEmpty;
 	/** Seek-drag in progress (empty lane press or playhead grab, React isSeeking / cap drag). */
 	private boolean scrubbing;
 	/** Pointer over the playhead cap/line: the cap expands and shows the time (React isHovered). */
 	private boolean playheadHovered;
-	private Span hoverGhost;
-	private String hoverGhostKind;
+	private @Nullable Span hoverGhost;
+	private @Nullable String hoverGhostKind;
 	private double minItemDurationMs = 100;
 	private List<CaptionTimeline.Fragment> captionFragments = List.of();
 	private List<TimelineSourceAudioTrack> sourceAudioTracks = List.of();
-	private FilmstripProvider filmstripProvider = FilmstripProvider.empty();
+	private @Nullable FilmstripProvider filmstripProvider = FilmstripProvider.empty();
 	private static final int FILMSTRIP_THUMB_WIDTH = 160;
 	private static final int FILMSTRIP_THUMB_HEIGHT = 90;
 	private static final int FILMSTRIP_CACHE_LIMIT = 768;
@@ -211,11 +215,11 @@ public final class TimelineView extends Region {
 
 	private record FilmstripKey(String clipId, double sourceTimeMs, int width, int height) {
 	}
-	private AgentTimelineHighlights agentOverlay;
-	private AgentHighlightsController agentController;
-	private javafx.collections.ListChangeListener<AgentHighlightView> agentHighlightsListener;
-	private java.util.function.Consumer<String> onCaptionSelected;
-	private Runnable onItemPressed;
+	private @Nullable AgentTimelineHighlights agentOverlay;
+	private @Nullable AgentHighlightsController agentController;
+	private javafx.collections.@Nullable ListChangeListener<AgentHighlightView> agentHighlightsListener;
+	private java.util.function.@Nullable Consumer<String> onCaptionSelected;
+	private @Nullable Runnable onItemPressed;
 	private boolean selectAllBlocksActive;
 	private TimelineShortcuts.Bindings shortcutBindings = TimelineShortcuts.defaults();
 	private boolean macPlatform;
@@ -329,11 +333,11 @@ public final class TimelineView extends Region {
 		return currentTimeMs;
 	}
 
-	public TimelineSelection selection() {
+	public @Nullable TimelineSelection selection() {
 		return selection;
 	}
 
-	public void setSelection(TimelineSelection selection) {
+	public void setSelection(@Nullable TimelineSelection selection) {
 		this.selection = selection;
 		redraw();
 	}
@@ -956,7 +960,7 @@ public final class TimelineView extends Region {
 		this.macPlatform = mac;
 	}
 
-	private TimelineSelection captionHitAt(double x, double y) {
+	private @Nullable TimelineSelection captionHitAt(double x, double y) {
 		for (TimelineRenderItem item : items) {
 			if (item.variant() != TimelineRenderItem.Variant.CAPTION) {
 				continue;
@@ -1010,7 +1014,7 @@ public final class TimelineView extends Region {
 	}
 
 	private void keyAction(KeyCode code, boolean ctrl, boolean meta, boolean shift, boolean alt,
-			KeyEvent event) {
+			@Nullable KeyEvent event) {
 		boolean primary = macPlatform ? meta : ctrl;
 		boolean deleteShortcut = TimelineShortcuts.matches(code, ctrl, meta, shift, alt,
 				shortcutBindings.deleteSelected(), macPlatform)
@@ -1157,13 +1161,13 @@ public final class TimelineView extends Region {
 		return true;
 	}
 
-	private static void consume(KeyEvent event) {
+	private static void consume(@Nullable KeyEvent event) {
 		if (event != null) {
 			event.consume();
 		}
 	}
 
-	private TimelineRenderItem clipAtPlayhead() {
+	private @Nullable TimelineRenderItem clipAtPlayhead() {
 		TimelineRenderItem selected = selection != null
 				&& TimelineSelection.CLIP.equals(selection.kind()) ? itemById(selection.id()) : null;
 		if (selected != null && currentTimeMs >= selected.span().start()
@@ -1236,7 +1240,7 @@ public final class TimelineView extends Region {
 	}
 
 	/** The mounted agent overlay, or null (tests/shell inspection). */
-	public AgentTimelineHighlights agentOverlay() {
+	public @Nullable AgentTimelineHighlights agentOverlay() {
 		return agentOverlay;
 	}
 
@@ -1294,7 +1298,7 @@ public final class TimelineView extends Region {
 		return fragmentId;
 	}
 
-	private CaptionTimeline.Fragment captionFragment(String fragmentId) {
+	private CaptionTimeline.@Nullable Fragment captionFragment(String fragmentId) {
 		for (CaptionTimeline.Fragment fragment : captionFragments) {
 			if (fragment.id().equals(fragmentId)) {
 				return fragment;
@@ -1303,12 +1307,12 @@ public final class TimelineView extends Region {
 		return null;
 	}
 
-	public Span hoverGhostSpan() {
+	public @Nullable Span hoverGhostSpan() {
 		return hoverGhost;
 	}
 
 	/** "zoom" or "caption" while an add ghost is drawn, else null. */
-	public String hoverGhostKind() {
+	public @Nullable String hoverGhostKind() {
 		return hoverGhostKind;
 	}
 
@@ -1319,13 +1323,13 @@ public final class TimelineView extends Region {
 	}
 
 	/** Height of one row in view-local pixels, or -1 when the row does not exist. */
-	public double rowHeight(String rowId) {
+	public @Nullable double rowHeight(String rowId) {
 		RowLayout row = rowById(rowId);
 		return row == null ? -1 : row.height();
 	}
 
 	/** The media span a caption added at this x would occupy (clamped inside one clip). */
-	public Span captionSpanAt(double x) {
+	public @Nullable Span captionSpanAt(double x) {
 		Span embedded = ClipPresentation.getEmbeddedCaptionSpan(
 				new Span(timeAtX(x), timeAtX(x) + CAPTION_GHOST_MS), clipPresentation);
 		if (embedded == null) {
@@ -1355,7 +1359,7 @@ public final class TimelineView extends Region {
 		return spans;
 	}
 
-	private boolean hasOverlap(Span span, String excludeId, String rowId) {
+	private boolean hasOverlap(Span span, String excludeId, @Nullable String rowId) {
 		for (TimelineRenderItem item : items) {
 			if (item.id().equals(excludeId)) {
 				continue;
@@ -1384,7 +1388,7 @@ public final class TimelineView extends Region {
 		return List.copyOf(targets);
 	}
 
-	private RowLayout rowById(String rowId) {
+	private @Nullable RowLayout rowById(@Nullable String rowId) {
 		for (RowLayout row : rowLayouts) {
 			if (row.id().equals(rowId)) {
 				return row;
@@ -1393,7 +1397,7 @@ public final class TimelineView extends Region {
 		return null;
 	}
 
-	private TimelineRenderItem itemById(String itemId) {
+	private @Nullable TimelineRenderItem itemById(String itemId) {
 		for (TimelineRenderItem item : items) {
 			if (item.id().equals(itemId)) {
 				return item;
@@ -1457,7 +1461,7 @@ public final class TimelineView extends Region {
 	}
 
 	/** Which block is under a point, if any (top-most rows win). */
-	public TimelineSelection hitTest(double x, double y) {
+	public @Nullable TimelineSelection hitTest(double x, double y) {
 		for (TimelineRenderItem item : items) {
 			BlockBounds bounds = blockBounds.get(item.id());
 			if (bounds != null && bounds.contains(x, y)) {
@@ -1656,7 +1660,7 @@ public final class TimelineView extends Region {
 		filmstripFrameCounts.put(item.id(), drawn);
 	}
 
-	private Image filmstripFrame(String clipId, double sourceTimeMs) {
+	private @Nullable Image filmstripFrame(String clipId, double sourceTimeMs) {
 		FilmstripKey key = new FilmstripKey(clipId, sourceTimeMs, FILMSTRIP_THUMB_WIDTH,
 				FILMSTRIP_THUMB_HEIGHT);
 		Image cached = filmstripCache.get(key);

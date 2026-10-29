@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,6 +40,8 @@ import javafx.scene.layout.VBox;
  * notes run, language/model choices, the OpenAI-compatible API fields, automatic processing,
  * the notes prompt and the download manager.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingSettingsView extends VBox {
 
 	/** Port of {@code LANGUAGES}. */
@@ -53,12 +57,12 @@ public final class MeetingSettingsView extends VBox {
 	private final MeetingUiService service;
 	private final VBox rows = new VBox(24);
 
-	private MeetingSettings.View view;
+	private MeetingSettings.@Nullable View view;
 	private List<MeetingService.AssetStatus> assets = List.of();
 	private final Map<String, Integer> progress = new LinkedHashMap<>();
-	private Subscription assetSubscription;
+	private @Nullable Subscription assetSubscription;
 	private boolean loading = true;
-	private String error;
+	private @Nullable String error;
 
 	public MeetingSettingsView(MeetingUiService service) {
 		this.service = service;

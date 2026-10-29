@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -28,7 +30,7 @@ public record ExtensionManifest(
 		List<String> screenshots,
 		String main,
 		Set<ExtensionPermission> permissions,
-		JsonNode contributes) {
+		@Nullable JsonNode contributes) {
 
 	/** The manifest file name every extension directory must contain. */
 	public static final String FILE_NAME = "gravaai-extension.json";

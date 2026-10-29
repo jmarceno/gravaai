@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.function.Supplier;
 
@@ -12,8 +14,8 @@ import java.util.function.Supplier;
  *     cancelled
  * @param media the playback host, or null until the media playback layer is wired
  */
-public record MeetingViewActions(Runnable onClose, Supplier<Path> importFileChooser,
-		MeetingMediaHost media) {
+public record MeetingViewActions(Runnable onClose, @Nullable Supplier<Path> importFileChooser,
+		@Nullable MeetingMediaHost media) {
 
 	public MeetingViewActions {
 		onClose = onClose == null ? () -> { } : onClose;

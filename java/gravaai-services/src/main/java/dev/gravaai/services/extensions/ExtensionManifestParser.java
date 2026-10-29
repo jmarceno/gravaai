@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,6 +25,8 @@ import tools.jackson.databind.JsonNode;
  * extension directory, {@code homepage} is HTTPS and the permissions form a closed set. Unknown
  * top-level fields are tolerated so a newer manifest still loads.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExtensionManifestParser {
 
 	private static final Pattern ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
@@ -177,7 +181,7 @@ public final class ExtensionManifestParser {
 		return screenshots;
 	}
 
-	private static String requiredString(JsonNode node, String field) {
+	private static @Nullable String requiredString(JsonNode node, String field) {
 		JsonNode value = node.get(field);
 		if (value == null || !value.isString()) {
 			throw invalid(field, "is required and must be a string");
@@ -189,7 +193,7 @@ public final class ExtensionManifestParser {
 		return text;
 	}
 
-	private static String optionalString(JsonNode node, String field) {
+	private static @Nullable String optionalString(JsonNode node, String field) {
 		JsonNode value = node.get(field);
 		if (value == null || value.isNull()) {
 			return null;

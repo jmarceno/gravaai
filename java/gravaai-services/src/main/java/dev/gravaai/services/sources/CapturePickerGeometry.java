@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -112,7 +114,7 @@ public final class CapturePickerGeometry {
 	}
 
 	/** The frontmost entry under the point, from a list ordered front to back. */
-	public static <T extends RectEntry> T frontmostAt(List<T> entries, double x, double y) {
+	public static <T extends RectEntry> @Nullable T frontmostAt(List<T> entries, double x, double y) {
 		for (T entry : entries) {
 			if (rectContains(entry.rect(), x, y)) {
 				return entry;

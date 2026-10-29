@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.WeakHashMap;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -44,12 +46,12 @@ public final class Toast {
 	private final Label descriptionLabel = new Label();
 	private final VBox host;
 	private final PauseTransition timer = new PauseTransition();
-	private Duration duration;
+	private @Nullable Duration duration;
 	private Variant variant = Variant.DEFAULT;
 	private String title;
 	private String description = "";
-	private String actionLabel;
-	private Runnable action;
+	private @Nullable String actionLabel;
+	private @Nullable Runnable action;
 	private Runnable onDismiss = () -> {};
 	private boolean dismissed;
 

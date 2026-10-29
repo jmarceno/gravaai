@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.ProjectEditorState;
 
 /**
@@ -29,7 +31,7 @@ public interface TimelineDataSource {
 	}
 
 	/** Filmstrip thumbnails for the clip row (empty provider keeps the placeholder cells). */
-	default FilmstripProvider filmstripProvider() {
+	default @Nullable FilmstripProvider filmstripProvider() {
 		return FilmstripProvider.empty();
 	}
 

@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -18,6 +20,8 @@ import java.util.function.Supplier;
  * .meeting.json so a crash shows up as "interrupted" with a retry. Ported from
  * electron/ipc/meeting/jobs.ts.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class MeetingJobs {
 
 	/** Finished jobs kept around for the UI. */
@@ -43,12 +47,12 @@ public final class MeetingJobs {
 		private final Path mediaPath;
 		private final MeetingJobMode mode;
 		private MeetingJob.Status status;
-		private MeetingJob.Stage stage;
+		private MeetingJob.@Nullable Stage stage;
 		private String message;
-		private Integer progress;
-		private String error;
+		private @Nullable Integer progress;
+		private @Nullable String error;
 		private final String createdAt;
-		private String finishedAt;
+		private @Nullable String finishedAt;
 
 		private JobState(String id, Path mediaPath, MeetingJobMode mode, String createdAt) {
 			this.id = id;
@@ -260,7 +264,7 @@ public final class MeetingJobs {
 		}
 	}
 
-	private static MeetingMetaPatch lastJob(MeetingJobMode mode, String status, String error,
+	private static MeetingMetaPatch lastJob(MeetingJobMode mode, String status, @Nullable String error,
 			String at) {
 		return new MeetingMetaPatch().lastJob(new MeetingMeta.LastJob(mode.wire(), status, error, at));
 	}

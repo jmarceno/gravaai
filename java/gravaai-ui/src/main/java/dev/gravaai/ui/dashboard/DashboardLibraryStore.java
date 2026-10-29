@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,6 +34,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Writes are atomic (temp file in the same directory + rename). The file is read once at
  * construction like a localStorage snapshot; call {@link #load()} to reread.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class DashboardLibraryStore {
 
 	/** {@code localStorage} key names from the React dashboard; one key per JSON value. */
@@ -121,7 +125,7 @@ public final class DashboardLibraryStore {
 		return new DashboardLibraryData(folders, data.hiddenRawPaths(), data.rawNames(), data.colors());
 	}
 
-	private static List<ProjectFolder> readFolders(JsonNode value) {
+	private static List<ProjectFolder> readFolders(@Nullable JsonNode value) {
 		List<ProjectFolder> folders = new ArrayList<>();
 		if (value == null || !value.isArray()) {
 			return folders;
@@ -155,7 +159,7 @@ public final class DashboardLibraryStore {
 		return folders;
 	}
 
-	private static List<String> readStringArray(JsonNode value) {
+	private static List<String> readStringArray(@Nullable JsonNode value) {
 		List<String> values = new ArrayList<>();
 		if (value == null || !value.isArray()) {
 			return values;
@@ -168,7 +172,7 @@ public final class DashboardLibraryStore {
 		return values;
 	}
 
-	private static Map<String, String> readStringMap(JsonNode value) {
+	private static Map<String, String> readStringMap(@Nullable JsonNode value) {
 		Map<String, String> values = new LinkedHashMap<>();
 		if (value == null || !value.isObject()) {
 			return values;
@@ -181,7 +185,7 @@ public final class DashboardLibraryStore {
 		return values;
 	}
 
-	private static List<String> readColors(JsonNode metadata) {
+	private static List<String> readColors(@Nullable JsonNode metadata) {
 		if (metadata == null || !metadata.isObject()) {
 			return List.of();
 		}

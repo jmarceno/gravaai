@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -55,7 +57,7 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 	private final Button copyTokenButton;
 	private final AutoCloseable subscription;
 
-	private AgentUiService.Snapshot snapshot;
+	private AgentUiService.@Nullable Snapshot snapshot;
 	private boolean busy;
 	private boolean revealed;
 	private boolean updating;
@@ -203,7 +205,7 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 		}
 	}
 
-	private static VBox section(String title, String description, Node control) {
+	private static VBox section(@Nullable String title, @Nullable String description, @Nullable Node control) {
 		VBox section = new VBox(10);
 		section.getStyleClass().add("agent-settings__section");
 		if (title != null) {
@@ -343,7 +345,7 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 		}
 	}
 
-	private void copy(String label, String text) {
+	private void copy(String label, @Nullable String text) {
 		if (text == null || text.isBlank()) {
 			toast("Nothing to copy yet", Toast.Variant.WARNING);
 			return;
@@ -367,7 +369,7 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 	}
 
 	/** The last snapshot the page rendered from (tests). */
-	AgentUiService.Snapshot currentSnapshot() {
+	AgentUiService.@Nullable Snapshot currentSnapshot() {
 		return snapshot;
 	}
 

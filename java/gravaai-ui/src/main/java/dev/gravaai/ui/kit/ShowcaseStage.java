@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.geometry.Rectangle2D;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -15,7 +17,7 @@ import javafx.stage.Stage;
 public final class ShowcaseStage {
 
 	/** The widest usable screen (landscape preferred, then the largest area). */
-	public static Screen showcaseScreen() {
+	public static @Nullable Screen showcaseScreen() {
 		Screen best = null;
 		double bestArea = -1;
 		for (Screen screen : Screen.getScreens()) {

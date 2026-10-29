@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.EnumMap;
@@ -41,11 +43,11 @@ final class CompositorFonts {
 	private static final Map<Face, Typeface> TYPEFACES = new EnumMap<>(Face.class);
 	private static final Map<Face, Data> DATA = new EnumMap<>(Face.class);
 
-	private CompositorFonts() {
+	@Nullable private CompositorFonts() {
 	}
 
 	/** The DM Sans typeface for a face, or null when the bundled resource is unavailable. */
-	static synchronized Typeface typeface(Face face) {
+	static synchronized @Nullable Typeface typeface(Face face) {
 		Typeface cached = TYPEFACES.get(face);
 		if (cached != null) {
 			return cached;

@@ -16,6 +16,8 @@ import dev.gravaai.services.meeting.OpenAiClient.RequestOptions;
  * ({@code ChatSummarizer}): one request for a short meeting, per-part notes plus a merge pass for
  * a long one, then the title.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ChatSummarizer implements Summarizer {
 
 	/**

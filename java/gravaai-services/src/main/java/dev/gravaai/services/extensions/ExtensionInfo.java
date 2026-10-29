@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 /**
@@ -9,4 +11,4 @@ import java.nio.file.Path;
  * @param error null unless {@code state} is {@link ExtensionState#FAILED}
  */
 public record ExtensionInfo(
-		String id, Path root, ExtensionManifest manifest, ExtensionState state, String error) {}
+		String id, @Nullable Path root, @Nullable ExtensionManifest manifest, ExtensionState state, String error) {}

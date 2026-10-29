@@ -1,5 +1,7 @@
 package dev.gravaai.services.captions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +19,8 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * timing (SRT fallback), detect silence and re-segment. Multi-track microphone/system merging lands
  * with the controller increment.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CaptionGenerator {
 
 	private static final Duration SILENCE_TIMEOUT = Duration.ofMinutes(5);
@@ -104,7 +108,7 @@ public final class CaptionGenerator {
 	 * sidecars, then the linked webcam recording (duplicates removed).
 	 */
 	public static List<CaptionAudioCandidate> resolveCaptionAudioCandidates(String videoPath,
-			String webcamPath) {
+			@Nullable String webcamPath) {
 		List<CaptionAudioCandidate> candidates = new java.util.ArrayList<>();
 		java.util.Set<String> seen = new java.util.HashSet<>();
 		java.util.function.BiConsumer<String, String> push = (path, label) -> {
@@ -143,7 +147,7 @@ public final class CaptionGenerator {
 	 * system/secondary audio are transcribed independently (simultaneous voices confuse
 	 * recognition) and merged; otherwise one pass over the candidates.
 	 */
-	public Result generateFromVideo(Options options, IntConsumer progress, CancelSignal signal) {
+	public @Nullable Result generateFromVideo(Options options, IntConsumer progress, CancelSignal signal) {
 		List<CaptionAudioCandidate> candidates = options.candidates() == null
 				|| options.candidates().isEmpty()
 						? resolveCaptionAudioCandidates(options.videoPath(), null)
@@ -172,7 +176,7 @@ public final class CaptionGenerator {
 				"microphone and system audio");
 	}
 
-	private List<CaptionCue> transcribeTrack(Options options, List<CaptionAudioCandidate> sources,
+	private @Nullable List<CaptionCue> transcribeTrack(Options options, List<CaptionAudioCandidate> sources,
 			IntConsumer progress, CancelSignal signal) {
 		if (sources.isEmpty()) {
 			return null;

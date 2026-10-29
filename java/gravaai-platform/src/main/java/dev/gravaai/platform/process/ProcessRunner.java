@@ -1,5 +1,7 @@
 package dev.gravaai.platform.process;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -30,12 +32,12 @@ import java.util.function.Consumer;
 public final class ProcessRunner {
 
 	private final List<String> command;
-	private Consumer<String> stdoutLine;
-	private Consumer<String> stderrLine;
+	private @Nullable Consumer<String> stdoutLine;
+	private @Nullable Consumer<String> stderrLine;
 	private boolean rawStdout;
 	private boolean rawStderr;
-	private Duration timeout;
-	private Path workingDirectory;
+	private @Nullable Duration timeout;
+	private @Nullable Path workingDirectory;
 	private final Map<String, String> environment = new LinkedHashMap<>();
 
 	private ProcessRunner(List<String> command) {

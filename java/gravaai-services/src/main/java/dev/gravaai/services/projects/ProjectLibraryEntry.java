@@ -1,5 +1,7 @@
 package dev.gravaai.services.projects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * One project file shown in the dashboard library (port of {@code ProjectLibraryEntry} in
  * {@code src/components/video-editor/ProjectBrowserDialog.tsx}).
@@ -21,7 +23,7 @@ public record ProjectLibraryEntry(
 		String name,
 		long createdAt,
 		long updatedAt,
-		String thumbnailPath,
+		@Nullable String thumbnailPath,
 		boolean isCurrent,
 		boolean isInProjectsDirectory) {
 }

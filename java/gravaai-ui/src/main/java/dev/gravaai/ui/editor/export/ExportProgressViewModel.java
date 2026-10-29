@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.core.editor.ExportPreferences.ExportPipelineModel;
 import dev.gravaai.media.export.ExportCancelledException;
@@ -10,6 +12,8 @@ import dev.gravaai.media.export.ExportStatusModel;
  * View-model of the export progress panel (port of
  * {@code src/components/video-editor/export/useExportStatusViewModel.ts}, plan §5.12).
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportProgressViewModel {
 
 	private static final String PREPARING = "Preparing export...";
@@ -19,7 +23,7 @@ public final class ExportProgressViewModel {
 	private ExportProgress progress;
 	private ExportFormat format = ExportFormat.MP4;
 	private ExportPipelineModel pipelineModel = ExportPipelineModel.MODERN;
-	private ExportStatusModel status = ExportStatusModel.resolve(false, null, ExportFormat.MP4,
+	private @Nullable ExportStatusModel status = ExportStatusModel.resolve(false, null, ExportFormat.MP4,
 			ExportPipelineModel.MODERN);
 
 	/** Replaces the snapshot. */
@@ -48,7 +52,7 @@ public final class ExportProgressViewModel {
 		return pipelineModel;
 	}
 
-	public ExportStatusModel status() {
+	public @Nullable ExportStatusModel status() {
 		return status;
 	}
 
@@ -83,7 +87,7 @@ public final class ExportProgressViewModel {
 	}
 
 	/** {@code exportRenderSpeedLabel}. */
-	public String exportRenderSpeedLabel() {
+	public @Nullable String exportRenderSpeedLabel() {
 		if (status.renderSpeedFps() == null) {
 			return null;
 		}
@@ -130,7 +134,7 @@ public final class ExportProgressViewModel {
 	}
 
 	/** Parse-safe failure text; cancellations are not failures. */
-	public static String errorText(Throwable error) {
+	public static @Nullable String errorText(Throwable error) {
 		if (error == null || error instanceof ExportCancelledException) {
 			return null;
 		}

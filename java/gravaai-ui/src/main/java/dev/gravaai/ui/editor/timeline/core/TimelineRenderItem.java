@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.timeline.core;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ZoomDepth;
 import dev.gravaai.core.project.ZoomMode;
@@ -15,19 +17,19 @@ public record TimelineRenderItem(
 		String id,
 		String rowId,
 		Span span,
-		Span sourceSpan,
+		@Nullable Span sourceSpan,
 		String label,
-		String audioPath,
-		Double audioGain,
-		Boolean audioNormalize,
-		ZoomDepth zoomDepth,
-		ZoomMode zoomMode,
-		Double speedValue,
-		Boolean showSourceAudio,
-		Boolean muted,
-		Double fadeInMs,
-		Double fadeOutMs,
-		ClipCameraLayout cameraLayout,
+		@Nullable String audioPath,
+		@Nullable Double audioGain,
+		@Nullable Boolean audioNormalize,
+		@Nullable ZoomDepth zoomDepth,
+		@Nullable ZoomMode zoomMode,
+		@Nullable Double speedValue,
+		@Nullable Boolean showSourceAudio,
+		@Nullable Boolean muted,
+		@Nullable Double fadeInMs,
+		@Nullable Double fadeOutMs,
+		@Nullable ClipCameraLayout cameraLayout,
 		Variant variant) {
 
 	/** Port of the {@code variant} union. */

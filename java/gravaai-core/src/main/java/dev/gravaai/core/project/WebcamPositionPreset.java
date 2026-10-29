@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -31,7 +33,7 @@ public enum WebcamPositionPreset {
 		return BOTTOM_RIGHT;
 	}
 
-	public static WebcamPositionPreset fromWireOrNull(String value) {
+	public static @Nullable WebcamPositionPreset fromWireOrNull(String value) {
 		for (WebcamPositionPreset preset : values()) {
 			if (preset.wire.equals(value)) {
 				return preset;

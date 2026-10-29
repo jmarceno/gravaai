@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A capture source the user selected, from {@code SelectedSource} in
  * {@code electron/ipc/types.ts}.
@@ -10,12 +12,12 @@ package dev.gravaai.services.sources;
 public record SelectedSource(
 		String id,
 		String name,
-		String displayId,
+		@Nullable String displayId,
 		SourceType sourceType,
-		String appName,
-		String windowTitle,
-		CaptureArea area,
-		String originalName) {
+		@Nullable String appName,
+		@Nullable String windowTitle,
+		@Nullable CaptureArea area,
+		@Nullable String originalName) {
 
 	/** A screen the source list offers. */
 	public static SelectedSource screen(String id, String name, String displayId) {
@@ -23,7 +25,7 @@ public record SelectedSource(
 	}
 
 	/** A window the source list offers. */
-	public static SelectedSource window(String id, String name, String displayId, String appName, String windowTitle) {
+	public static SelectedSource window(String id, String name, String displayId, @Nullable String appName, String windowTitle) {
 		return new SelectedSource(id, name, displayId, SourceType.WINDOW, appName, windowTitle, null, null);
 	}
 

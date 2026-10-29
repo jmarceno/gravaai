@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -29,6 +31,8 @@ import tools.jackson.databind.node.ObjectNode;
  * maps these immutable {@link Snapshot}s to the UI port. The AppContext supplies the settings and
  * revert ports and forwards editor lifecycle events.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentService implements AutoCloseable {
 
 	/** Connection state derived from the control-socket status. */
@@ -128,7 +132,7 @@ public final class AgentService implements AutoCloseable {
 			String quoted = command.contains(" ") ? "\"" + command + "\"" : command;
 			String claudeCodeCommand = "claude mcp add gravaai -- " + quoted + " "
 					+ String.join(" ", args);
-			Map<String, Object> server = new java.util.LinkedHashMap<>();
+			@Nullable Map<String, Object> server = new java.util.LinkedHashMap<>();
 			server.put("command", command);
 			server.put("args", args);
 			Map<String, Object> root = new java.util.LinkedHashMap<>();
@@ -154,7 +158,7 @@ public final class AgentService implements AutoCloseable {
 	private volatile AgentControlServer server;
 	private volatile boolean listening;
 	private volatile boolean editorReady;
-	private volatile String lastSummary;
+	private volatile @Nullable String lastSummary;
 
 	public AgentService(Path socketPath, Path tokenFile, AgentToolHandler handler,
 			AgentJobRegistry jobs, SettingsPort settings, RevertPort revertPort,

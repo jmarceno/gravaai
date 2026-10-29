@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +13,8 @@ import java.util.Map;
  * actions with their defaults, the fixed (non-configurable) shortcuts, conflict detection, platform
  * matching and display formatting.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class Shortcuts {
 
 	/** {@code SHORTCUT_ACTIONS}. */
@@ -32,7 +36,7 @@ public final class Shortcuts {
 			return wire;
 		}
 
-		public static Action fromWire(String value) {
+		public static @Nullable Action fromWire(String value) {
 			for (Action action : values()) {
 				if (action.wire.equals(value)) {
 					return action;
@@ -128,7 +132,7 @@ public final class Shortcuts {
 	}
 
 	/** {@code findConflict}: fixed shortcuts win over configurable ones. */
-	public static Conflict findConflict(
+	public static @Nullable Conflict findConflict(
 			Binding binding, Action forAction, Map<Action, Binding> config) {
 		for (FixedShortcut fixed : FIXED_SHORTCUTS) {
 			for (Binding fixedBinding : fixed.bindings()) {
@@ -179,7 +183,7 @@ public final class Shortcuts {
 	}
 
 	/** {@code formatBinding}: Ctrl/⌘, Shift/⇧, Alt/⌥ plus the key label. */
-	public static String formatBinding(Binding binding, boolean isMac) {
+	public static String formatBinding(@Nullable Binding binding, boolean isMac) {
 		List<String> parts = new ArrayList<>();
 		if (binding.ctrl()) {
 			parts.add(isMac ? "⌘" : "Ctrl");

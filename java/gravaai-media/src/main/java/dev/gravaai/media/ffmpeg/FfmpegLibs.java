@@ -1,5 +1,7 @@
 package dev.gravaai.media.ffmpeg;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -37,6 +39,8 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * segment because FFmpeg serialises {@code av_log} internally; do not call
  * {@link #setLogLevel(int)} concurrently with decoding.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class FfmpegLibs {
 
 	private static final System.Logger LOG = System.getLogger(FfmpegLibs.class.getName());
@@ -201,7 +205,7 @@ public final class FfmpegLibs {
 	}
 
 	/** Reads a {@code const char *} return value, tolerating NULL (for wrapper classes). */
-	public static String readCString(MemorySegment segment) {
+	public static @Nullable String readCString(MemorySegment segment) {
 		if (segment == null || segment.address() == 0) {
 			return null;
 		}

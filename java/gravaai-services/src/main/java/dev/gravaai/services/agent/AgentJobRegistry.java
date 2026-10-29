@@ -1,5 +1,7 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +16,8 @@ import dev.gravaai.core.json.Json;
  * plan §5.16). The renderer/worker reports progress into it; {@code inspect jobs}, {@code job
  * status} and {@code job wait} read from it.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AgentJobRegistry {
 
 	/** {@code AgentJobKind}. */
@@ -32,7 +36,7 @@ public final class AgentJobRegistry {
 			return wire;
 		}
 
-		public static Kind fromWire(String value) {
+		public static @Nullable Kind fromWire(String value) {
 			for (Kind kind : values()) {
 				if (kind.wire.equals(value)) {
 					return kind;
@@ -60,7 +64,7 @@ public final class AgentJobRegistry {
 			return wire;
 		}
 
-		public static Status fromWire(String value) {
+		public static @Nullable Status fromWire(String value) {
 			for (Status status : values()) {
 				if (status.wire.equals(value)) {
 					return status;
@@ -77,12 +81,12 @@ public final class AgentJobRegistry {
 		private final String label;
 		private final long createdAt;
 		private Status status = Status.QUEUED;
-		private Double progress;
-		private String message;
-		private String error;
-		private Object result;
-		private Long finishedAt;
-		private Runnable cancel;
+		private @Nullable Double progress;
+		private @Nullable String message;
+		private @Nullable String error;
+		private @Nullable Object result;
+		private @Nullable Long finishedAt;
+		private @Nullable Runnable cancel;
 
 		private Job(String id, Kind kind, String label, Runnable cancel) {
 			this.id = id;
@@ -135,7 +139,7 @@ public final class AgentJobRegistry {
 	}
 
 	/** Fields of an update; null means "not provided" (like the TS optional patch fields). */
-	public record Patch(Status status, Double progress, String message, String error, Object result) {
+	public record Patch(@Nullable Status status, @Nullable Double progress, @Nullable String message, @Nullable String error, @Nullable Object result) {
 		public static Patch of(Status status) {
 			return new Patch(status, null, null, null, null);
 		}
@@ -164,7 +168,7 @@ public final class AgentJobRegistry {
 	}
 
 	/** {@code update}: out-of-order reports never move a finished job back to running. */
-	public synchronized Job update(String id, Patch patch) {
+	public synchronized @Nullable Job update(String id, Patch patch) {
 		Job job = jobs.get(id);
 		if (job == null) {
 			return null;
@@ -198,7 +202,7 @@ public final class AgentJobRegistry {
 		return job;
 	}
 
-	public synchronized Job get(String id) {
+	public synchronized @Nullable Job get(String id) {
 		return jobs.get(id);
 	}
 

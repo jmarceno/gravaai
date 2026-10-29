@@ -25,6 +25,8 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * }
  * }
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public class AVChannelLayout {
 
     AVChannelLayout() {

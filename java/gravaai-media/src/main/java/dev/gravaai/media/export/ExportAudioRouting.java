@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +15,8 @@ import dev.gravaai.core.project.AudioRegion;
  * {@code audioProcessorShared.ts}, plan §5.10). These are pure decisions shared by the export audio
  * graph builder.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportAudioRouting {
 
 	/** {@code SOURCE_AUDIO_NORMALIZE_GAIN}. */
@@ -56,7 +60,7 @@ public final class ExportAudioRouting {
 	}
 
 	/** {@code ResolvedAudioTrack}. */
-	public record ResolvedTrack(String id, TrackKind kind, String path, double gain,
+	public record ResolvedTrack(String id, TrackKind kind, @Nullable String path, double gain,
 			double timelineStartMs, double timelineEndMs) {}
 
 	/** {@code ResolvedAudioPlan}. */
@@ -76,7 +80,7 @@ public final class ExportAudioRouting {
 	private ExportAudioRouting() {}
 
 	/** {@code resolveSourceAudioFallbackPaths}. */
-	public static FallbackPaths resolveSourceAudioFallbackPaths(String videoSource,
+	public static @Nullable FallbackPaths resolveSourceAudioFallbackPaths(String videoSource,
 			List<String> sourceAudioFallbackPaths) {
 		List<String[]> normalized = new ArrayList<>();
 		if (sourceAudioFallbackPaths != null) {
@@ -102,7 +106,7 @@ public final class ExportAudioRouting {
 	}
 
 	/** {@code normalizeSourceAudioFallbackPath}. */
-	public static String normalizeFallbackPath(String resourceOrPath) {
+	public static @Nullable String normalizeFallbackPath(String resourceOrPath) {
 		if (resourceOrPath == null) {
 			return null;
 		}

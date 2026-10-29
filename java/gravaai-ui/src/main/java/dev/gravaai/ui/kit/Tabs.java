@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -32,7 +34,7 @@ public final class Tabs extends VBox {
 
 	private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
 
-	private record Tab(String value, javafx.scene.control.ToggleButton button, Node content) {}
+	private record Tab(String value, javafx.scene.control.ToggleButton button, @Nullable Node content) {}
 
 	private final Track track = new Track();
 	private final StackPane panel = new StackPane();

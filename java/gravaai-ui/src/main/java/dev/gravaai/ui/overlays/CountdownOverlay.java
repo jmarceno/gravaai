@@ -1,5 +1,7 @@
 package dev.gravaai.ui.overlays;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -32,7 +34,7 @@ public final class CountdownOverlay implements CountdownService.CountdownWindowF
 	/** Card {@code size-44} (Tailwind 11rem). */
 	private static final double CARD_SIZE = 176;
 
-	private Window active;
+	private @Nullable Window active;
 
 	/**
 	 * Creates and shows the countdown window, from any thread.

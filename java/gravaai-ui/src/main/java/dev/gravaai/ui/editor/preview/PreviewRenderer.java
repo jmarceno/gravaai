@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.preview;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -25,6 +27,8 @@ import javafx.scene.image.ImageView;
  * engine lock). The 60 Hz GL loop draws the latest queued copy and only re-uploads when a new frame
  * arrived; older copies are coalesced away.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class PreviewRenderer implements AutoCloseable {
 
 	private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
@@ -40,8 +44,8 @@ public final class PreviewRenderer implements AutoCloseable {
 	private final AtomicLong shutdownSerial = new AtomicLong();
 	private final Object shutdownLock = new Object();
 
-	private GlPreviewThread thread;
-	private volatile Throwable failure;
+	private @Nullable GlPreviewThread thread;
+	private volatile @Nullable Throwable failure;
 	private volatile boolean closed;
 	private volatile boolean shutdownRequested;
 	/** Geometry of the last drawn frame (annotation overlay positions). */
@@ -210,7 +214,7 @@ public final class PreviewRenderer implements AutoCloseable {
 	}
 
 	/** The failure that stopped the compositor, or null. */
-	public Throwable failure() {
+	public @Nullable Throwable failure() {
 		return failure;
 	}
 

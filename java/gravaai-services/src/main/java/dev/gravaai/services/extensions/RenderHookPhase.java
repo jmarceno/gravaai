@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Render pipeline phases of {@code EXTENSIONS.md} ("Render Pipeline"). {@code background} exists in
  * the type surface but is reserved and never dispatched.
@@ -26,11 +28,11 @@ public enum RenderHookPhase {
 	}
 
 	/** False only for the reserved {@code background} phase. */
-	public boolean dispatched() {
+	public @Nullable boolean dispatched() {
 		return dispatched;
 	}
 
-	public static RenderHookPhase fromWire(String value) {
+	public static @Nullable RenderHookPhase fromWire(String value) {
 		if (value == null) {
 			return null;
 		}

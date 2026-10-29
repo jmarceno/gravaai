@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,16 +20,18 @@ import dev.gravaai.core.project.ProjectEditorState;
  * asset root is passed in, so the app can point at its packaged assets while tests point at
  * {@code public/}. Missing wallpaper assets degrade to black instead of failing a preview frame.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ProjectEditorInputs {
 
 	private static final System.Logger LOG =
 			System.getLogger(ProjectEditorInputs.class.getName());
 
-	private ProjectEditorInputs() {
+	@Nullable private ProjectEditorInputs() {
 	}
 
 	/** Resolves the project wallpaper to a compositor background. */
-	public static Background background(ProjectEditorState editor, Path wallpaperRoot) {
+	public static @Nullable Background background(ProjectEditorState editor, Path wallpaperRoot) {
 		String wallpaper = editor.wallpaper();
 		if (wallpaper == null || wallpaper.isBlank()) {
 			return Background.black();
@@ -64,7 +68,7 @@ public final class ProjectEditorInputs {
 	 * {@code wallpaperRoot}, a {@code file://} URL or an absolute path. Null for image/CSS
 	 * wallpapers or a missing file.
 	 */
-	public static Path videoWallpaperPath(ProjectEditorState editor, Path wallpaperRoot) {
+	public static @Nullable Path videoWallpaperPath(ProjectEditorState editor, Path wallpaperRoot) {
 		String wallpaper = editor.wallpaper();
 		if (!Background.isVideoWallpaper(wallpaper)) {
 			return null;
@@ -338,7 +342,7 @@ public final class ProjectEditorInputs {
 		return windows.isEmpty() ? FadeSpec.NONE : new FadeSpec(windows);
 	}
 
-	private static int parseColour(String value) {
+	private static @Nullable int parseColour(@Nullable String value) {
 		if (value == null || value.length() < 7) {
 			return 0xFF2563EB;
 		}
@@ -352,7 +356,7 @@ public final class ProjectEditorInputs {
 		return 0xFF2563EB;
 	}
 
-	private static Integer parseColourOrNull(String value) {
+	private static @Nullable Integer parseColourOrNull(@Nullable String value) {
 		if (value == null || value.isBlank() || "transparent".equalsIgnoreCase(value.strip())) {
 			return null;
 		}

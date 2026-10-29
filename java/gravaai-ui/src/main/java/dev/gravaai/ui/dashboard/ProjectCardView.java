@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 import javafx.animation.PauseTransition;
@@ -41,6 +43,8 @@ import javafx.scene.shape.Rectangle;
  * selecting/busy): raw cards play the recording itself like React's {@code RawThumbnail}
  * {@code <video>}; audio-only raw entries and meeting cards never preview.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 final class ProjectCardView extends VBox {
 
 	private final DashboardModel model;
@@ -50,12 +54,12 @@ final class ProjectCardView extends VBox {
 	private final Label nameLabel = new Label();
 	private final VBox nameHost = new VBox();
 	/** The thumbnail host (package-visible for the hover-preview test). */
-	StackPane thumbnailHost;	/** {@code hovering} in ProjectCard.tsx: mouse-only pointer enter/leave over the whole card. */
+	@Nullable StackPane thumbnailHost;	/** {@code hovering} in ProjectCard.tsx: mouse-only pointer enter/leave over the whole card. */
 	private boolean hovering;
 	/** The last computed {@code previewActive} ({@code hovering && !selecting && !busy}). */
 	private boolean previewActive;
-	private PauseTransition hoverTimer;
-	private ProjectHoverPreview hoverPreview;
+	private @Nullable PauseTransition hoverTimer;
+	private @Nullable ProjectHoverPreview hoverPreview;
 	private final javafx.beans.InvalidationListener hoverGuardListener = observable ->
 			refreshHoverPreview();
 	private boolean hoverGuardAttached;
@@ -374,7 +378,7 @@ final class ProjectCardView extends VBox {
 		return model.rawSource(entry.path()) != null;
 	}
 
-	private MeetingLibraryEntry meetingSource() {
+	private @Nullable MeetingLibraryEntry meetingSource() {
 		return model.meetingSource(entry.path());
 	}
 

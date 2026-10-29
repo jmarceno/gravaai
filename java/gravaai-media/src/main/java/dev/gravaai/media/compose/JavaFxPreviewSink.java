@@ -1,5 +1,7 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,6 +29,8 @@ import dev.gravaai.media.gl.GlPreviewThread;
  * {@link GlPreviewThread} with this sink as the consumer, and call {@link #attach} from the FX
  * thread once the {@code ImageView} exists. Nothing here touches GL.</p>
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 
 	private static final System.Logger LOG = System.getLogger(JavaFxPreviewSink.class.getName());
@@ -36,14 +40,14 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	private final Semaphore presented = new Semaphore(1);
 	private final AtomicLong framesReceived = new AtomicLong();
 	private final AtomicLong framesDropped = new AtomicLong();
-	private volatile PixelBuffer<ByteBuffer>[] buffers;
-	private volatile WritableImage[] images;
-	private volatile ImageView view;
-	private volatile Runnable presentedListener;
+	private volatile @Nullable PixelBuffer<ByteBuffer>[] buffers;
+	private volatile @Nullable WritableImage[] images;
+	private volatile @Nullable ImageView view;
+	private volatile @Nullable Runnable presentedListener;
 	private volatile int target;
 	private final Object latestLock = new Object();
 	/** Newest frame that arrived while FX was presenting (latest wins). */
-	private ByteBuffer latest;
+	private @Nullable ByteBuffer latest;
 	private boolean latestPending;
 
 	public JavaFxPreviewSink(int width, int height) {
@@ -154,7 +158,7 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	}
 
 	/** Copies into the free buffer and schedules its presentation; the caller holds the permit. */
-	private void present(ByteBuffer pixelsTopFirst, int bytes) {
+	private void present(@Nullable ByteBuffer pixelsTopFirst, int bytes) {
 		PixelBuffer<ByteBuffer>[] localBuffers = buffers;
 		WritableImage[] localImages = images;
 		int index = target;

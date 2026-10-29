@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.UnaryOperator;
 
 import dev.gravaai.services.meeting.ports.MeetingApiKeyStore;
@@ -42,7 +44,7 @@ public final class MeetingSettingsService {
 	}
 
 	/** The API key never leaves the main process; null when none is stored. */
-	public String readApiKey() {
+	public @Nullable String readApiKey() {
 		return apiKeys.read().orElse(null);
 	}
 

@@ -1,21 +1,25 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
  * Validates what a capture-picker window reports and builds the selected sources, ported from
  * {@code electron/ipc/sourceArea.ts}.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class SourceArea {
 
 	/** Smallest area worth recording, in points. */
 	public static final int MIN_CAPTURE_AREA_SIZE = 32;
 
-	private SourceArea() {
+	@Nullable private SourceArea() {
 	}
 
 	/** A display the picker can draw on. */
-	public record PickerDisplay(int id, CaptureArea bounds) {
+	public @Nullable record PickerDisplay(int id, CaptureArea bounds) {
 	}
 
 	/**
@@ -23,7 +27,7 @@ public final class SourceArea {
 	 * the display it was drawn on; a window must be one the picker offered; a screen must be a
 	 * connected display.
 	 */
-	public static CapturePick normalizeCapturePick(
+	public static @Nullable CapturePick normalizeCapturePick(
 			CapturePickRequest input,
 			List<PickerDisplay> displays,
 			List<CapturePickerWindow> windows) {
@@ -81,7 +85,7 @@ public final class SourceArea {
 		return new CapturePick.Area(left, top, areaWidth, areaHeight, display.id(), record);
 	}
 
-	private static boolean isFiniteNumber(Double value) {
+	private static boolean isFiniteNumber(@Nullable Double value) {
 		return value != null && Double.isFinite(value);
 	}
 
@@ -94,7 +98,7 @@ public final class SourceArea {
 	}
 
 	/** The same source the window list offers for this window. */
-	public static SelectedSource createWindowSource(CapturePickerWindow window) {
+	public static @Nullable SelectedSource createWindowSource(CapturePickerWindow window) {
 		String title = window.title() == null || window.title().isEmpty()
 				? (window.appName() == null || window.appName().isEmpty() ? "Window" : window.appName())
 				: window.title();
@@ -104,7 +108,7 @@ public final class SourceArea {
 	}
 
 	/** The rectangle of an area source, or null when the source is not a usable area. */
-	public static CaptureArea getSourceArea(SelectedSource source) {
+	public static @Nullable CaptureArea getSourceArea(SelectedSource source) {
 		if (source == null || source.id() == null || !source.id().startsWith("area:")) {
 			return null;
 		}

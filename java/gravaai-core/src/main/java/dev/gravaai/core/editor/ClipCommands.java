@@ -1,5 +1,7 @@
 package dev.gravaai.core.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,8 +39,8 @@ public final class ClipCommands {
 		return ids;
 	}
 
-	private static ClipRegion replace(ClipRegion clip, Boolean muted, ClipCameraLayout cameraLayout,
-			ClipTransition transitionOut, Boolean showSourceAudio) {
+	private static ClipRegion replace(ClipRegion clip, @Nullable Boolean muted, @Nullable ClipCameraLayout cameraLayout,
+			@Nullable ClipTransition transitionOut, @Nullable Boolean showSourceAudio) {
 		return new ClipRegion(clip.id(), clip.startMs(), clip.endMs(), clip.sourceStartMs(),
 				clip.sourceMinMs(), clip.sourceMaxMs(), clip.speed(),
 				muted != null ? muted : clip.muted(),

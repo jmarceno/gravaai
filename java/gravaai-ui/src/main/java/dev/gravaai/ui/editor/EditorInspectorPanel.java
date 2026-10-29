@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.DoubleFunction;
@@ -53,6 +55,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Every control edits the shared {@link EditorStore} through {@link EditorMutations}, so the
  * preview, undo/redo and project saving see the same state.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class EditorInspectorPanel extends VBox {
 
 	/** A transient inspector editor driven by the timeline selection, independent of the rail. */
@@ -78,14 +82,14 @@ public final class EditorInspectorPanel extends VBox {
 			new java.util.EnumMap<>(EditorSidebarRail.Section.class);
 	private final Switch advancedSwitch = new Switch();
 	private final Label advancedLabel = new Label("Advanced");
-	private dev.gravaai.ui.editor.transcript.CaptionModelUiService captionModels;
-	private AutoCloseable captionModelSubscription;
-	private dev.gravaai.ui.editor.transcript.TranscriptPanel transcriptPanel;
+	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
+	private @Nullable AutoCloseable captionModelSubscription;
+	private dev.gravaai.ui.editor.transcript.@Nullable TranscriptPanel transcriptPanel;
 	private Runnable onAddCustomFont = () -> { };
 	private boolean annotationMode;
-	private AnnotationSettingsPanel annotationPanel;
+	private @Nullable AnnotationSettingsPanel annotationPanel;
 	private SelectionEditor selectionEditor = SelectionEditor.NONE;
-	private ZoomSettingsPanel zoomPanel;
+	private @Nullable ZoomSettingsPanel zoomPanel;
 	private Runnable onShortcutsConfig = () -> { };
 	private Runnable onTutorial = () -> { };
 
@@ -260,7 +264,7 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
-	private static void closeQuietly(AutoCloseable closeable) {
+	private static void closeQuietly(@Nullable AutoCloseable closeable) {
 		if (closeable == null) {
 			return;
 		}
@@ -285,11 +289,11 @@ public final class EditorInspectorPanel extends VBox {
 		scroll.setVvalue(0);
 	}
 
-	private boolean isSelectionMode() {
+	private @Nullable boolean isSelectionMode() {
 		return annotationMode || selectionEditor != SelectionEditor.NONE;
 	}
 
-	private String selectionTitle() {
+	private @Nullable String selectionTitle() {
 		return switch (selectionEditor) {
 			case ANNOTATION -> "Annotation";
 			case ZOOM -> "Zoom";
@@ -300,7 +304,7 @@ public final class EditorInspectorPanel extends VBox {
 		};
 	}
 
-	private Node sectionContent() {
+	private @Nullable Node sectionContent() {
 	if (annotationMode) {
 		if (annotationPanel == null) {
 			annotationPanel = new AnnotationSettingsPanel(store, actions);
@@ -346,11 +350,11 @@ public final class EditorInspectorPanel extends VBox {
 	}
 
 	/** The zoom editor when it has been built (test/diagnostic hook). */
-	public ZoomSettingsPanel zoomSettingsPanel() {
+	public @Nullable ZoomSettingsPanel zoomSettingsPanel() {
 		return zoomPanel;
 	}
 
-	private Node clipSelectionSection() {
+	private @Nullable Node clipSelectionSection() {
 		ClipRegion clip = selectedClip();
 		if (clip == null) {
 			return emptySelection("Select a clip to edit its speed and audio.");
@@ -371,7 +375,7 @@ public final class EditorInspectorPanel extends VBox {
 		return root;
 	}
 
-	private Node audioSelectionSection() {
+	private @Nullable Node audioSelectionSection() {
 		AudioRegion audio = selectedAudio();
 		if (audio == null) {
 			return emptySelection("Select an audio region to edit its volume.");
@@ -391,7 +395,7 @@ public final class EditorInspectorPanel extends VBox {
 		return root;
 	}
 
-	private Node captionSelectionSection() {
+	private @Nullable Node captionSelectionSection() {
 		CaptionCue cue = selectedCaption();
 		if (cue == null) {
 			return emptySelection("Select a caption to edit its text.");
@@ -413,7 +417,7 @@ public final class EditorInspectorPanel extends VBox {
 		return root;
 	}
 
-	private ClipRegion selectedClip() {
+	private @Nullable ClipRegion selectedClip() {
 		String id = store.selectedClipId();
 		if (id == null) {
 			return null;
@@ -426,7 +430,7 @@ public final class EditorInspectorPanel extends VBox {
 		return null;
 	}
 
-	private AudioRegion selectedAudio() {
+	private @Nullable AudioRegion selectedAudio() {
 		String id = store.selectedAudioId();
 		if (id == null) {
 			return null;
@@ -439,7 +443,7 @@ public final class EditorInspectorPanel extends VBox {
 		return null;
 	}
 
-	private CaptionCue selectedCaption() {
+	private @Nullable CaptionCue selectedCaption() {
 		String id = store.selectedCaptionId();
 		if (id == null) {
 			return null;
@@ -541,7 +545,7 @@ public final class EditorInspectorPanel extends VBox {
 		}
 	}
 
-	private Node colorTab(String selected) {
+	private Node colorTab(@Nullable String selected) {
 		VBox box = new VBox(12);
 		GridPane grid = new GridPane();
 		grid.getStyleClass().add("editor-tiles");
@@ -599,7 +603,7 @@ public final class EditorInspectorPanel extends VBox {
 		return button;
 	}
 
-	private Node gradientTab(String selected) {
+	private Node gradientTab(@Nullable String selected) {
 		GridPane grid = new GridPane();
 		grid.getStyleClass().add("editor-tiles");
 		for (int column = 0; column < 5; column++) {
@@ -627,7 +631,7 @@ public final class EditorInspectorPanel extends VBox {
 		return grid;
 	}
 
-	private Node paddingControls(Padding padding) {
+	private Node paddingControls(@Nullable Padding padding) {
 		boolean linked = !Boolean.FALSE.equals(padding.linked());
 		VBox box = new VBox(12);
 		if (advanced) {
@@ -816,7 +820,7 @@ public final class EditorInspectorPanel extends VBox {
 		}
 	}
 
-	private String matchedMotionPreset(dev.gravaai.core.project.ProjectEditorState state) {
+	private @Nullable String matchedMotionPreset(dev.gravaai.core.project.ProjectEditorState state) {
 		return CursorMotionPresets.getMatchingCursorMotionPresetId(
 				new CursorMotionPresets.SelectionInput(state.zoomInDurationMs(),
 						state.zoomOutDurationMs(), state.cursorSize(), state.cursorSmoothing(),
@@ -1126,7 +1130,7 @@ public final class EditorInspectorPanel extends VBox {
 		return group;
 	}
 
-	private Node colorInput(String label, String value, Consumer<String> onChange) {
+	private Node colorInput(String label, @Nullable String value, Consumer<String> onChange) {
 		HBox row = new HBox(8);
 		row.setAlignment(Pos.CENTER_LEFT);
 		Label caption = new Label(label);
@@ -1286,7 +1290,7 @@ public final class EditorInspectorPanel extends VBox {
 		return row;
 	}
 
-	private Slider slider(String label, double value, double min, double max, double step,
+	private Slider slider(String label, @Nullable double value, double min, double max, double step,
 			DoubleFunction<String> formatter, Consumer<Double> onCommit) {
 		Slider slider = new Slider(label);
 		slider.range(min, max).step(step).formatter(formatter).sliderControl();

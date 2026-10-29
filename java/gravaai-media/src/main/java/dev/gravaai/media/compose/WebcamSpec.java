@@ -1,12 +1,14 @@
 package dev.gravaai.media.compose;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /** Webcam overlay settings for one compositor frame (plan §5.8 stage 7), media-local. */
-public record WebcamSpec(boolean enabled, String positionPreset, String corner, double positionX,
-		double positionY, double size, double width, double height, boolean mirror,
-		double roundness, double shadow, double margin, boolean reactToZoom, LayoutCrop cropRegion,
-		List<VisibleRange> visibleRanges, double timeOffsetMs) {
+public record WebcamSpec(boolean enabled, String positionPreset, String corner, @Nullable double positionX,
+		@Nullable double positionY, double size, @Nullable double width, @Nullable double height, boolean mirror,
+		@Nullable double roundness, @Nullable double shadow, @Nullable double margin, boolean reactToZoom, LayoutCrop cropRegion,
+		List<VisibleRange> visibleRanges, @Nullable double timeOffsetMs) {
 
 	/** A webcam visibility window in timeline milliseconds (TS {@code TimeRange}). */
 	public record VisibleRange(double startMs, double endMs) {

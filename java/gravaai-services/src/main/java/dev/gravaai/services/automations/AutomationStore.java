@@ -26,6 +26,8 @@ import tools.jackson.databind.JsonNode;
  * commit with a temporary file plus rename. Writes to one file run in call order on a single
  * thread, so concurrent saves cannot interleave.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class AutomationStore implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");

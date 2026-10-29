@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +26,8 @@ import org.graalvm.polyglot.Engine;
  * <p>Threading: the host and its contexts are used from one thread at a time (the editor/render
  * thread), which is what the compositor already guarantees for its canvas.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExtensionHost implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(ExtensionHost.class.getName());
@@ -32,10 +36,10 @@ public final class ExtensionHost implements AutoCloseable {
 	private static final class Entry {
 		final Path root;
 		final String key;
-		ExtensionManifest manifest;
+		@Nullable ExtensionManifest manifest;
 		ExtensionState state = ExtensionState.DISCOVERED;
-		String error;
-		LoadedExtension loaded;
+		@Nullable String error;
+		@Nullable LoadedExtension loaded;
 
 		Entry(Path root, String key) {
 			this.root = root;
@@ -51,7 +55,7 @@ public final class ExtensionHost implements AutoCloseable {
 	private final Path extensionsDir;
 	private final ExtensionRenderHookRegistry renderHooks = new ExtensionRenderHookRegistry();
 	private final Map<String, Entry> entries = new LinkedHashMap<>();
-	private Engine engine;
+	private @Nullable Engine engine;
 	private boolean closed;
 
 	public ExtensionHost(Path extensionsDir) {
@@ -127,7 +131,7 @@ public final class ExtensionHost implements AutoCloseable {
 	}
 
 	/** One extension by manifest id, or null. */
-	public synchronized ExtensionInfo extension(String id) {
+	public synchronized @Nullable ExtensionInfo extension(String id) {
 		Entry entry = entries.get(id);
 		if (entry != null) {
 			return entry.info();

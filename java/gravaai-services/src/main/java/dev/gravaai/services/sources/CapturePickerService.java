@@ -1,5 +1,7 @@
 package dev.gravaai.services.sources;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,8 @@ import dev.gravaai.services.recording.CosmicOutput;
  * macOS screen/area rules are platform code (plan §2.3); the selection-only completion helpers are
  * kept for a future X11 source list.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class CapturePickerService {
 
 	/** Waits for the next click and reports the output under it. */
@@ -27,8 +31,8 @@ public final class CapturePickerService {
 
 	/** What the capture-picker overlay asks for; {@code lastArea} is always null (never reused). */
 	public record CapturePickerContext(
-			CaptureArea displayBounds,
-			CaptureArea lastArea,
+			@Nullable CaptureArea displayBounds,
+			@Nullable CaptureArea lastArea,
 			boolean allowArea,
 			List<CapturePickerWindow> windows,
 			double cursorX,
@@ -45,8 +49,8 @@ public final class CapturePickerService {
 	private final Supplier<double[]> cursorPoint;
 	private final Supplier<SourceListPicker> sourceListPicker;
 
-	private CompletableFuture<SourceService.PickResult> activePick;
-	private Consumer<CapturePick> resolvePendingPick;
+	private @Nullable CompletableFuture<SourceService.PickResult> activePick;
+	private @Nullable Consumer<CapturePick> resolvePendingPick;
 	private List<CapturePickerWindow> loadedWindows = List.of();
 
 	public CapturePickerService(
@@ -166,7 +170,7 @@ public final class CapturePickerService {
 		finishPick(SourceArea.normalizeCapturePick(selectionOnly, displays.get(), loadedWindows));
 	}
 
-	private void finishPick(CapturePick pick) {
+	private void finishPick(@Nullable CapturePick pick) {
 		Consumer<CapturePick> resolve;
 		synchronized (this) {
 			resolve = resolvePendingPick;

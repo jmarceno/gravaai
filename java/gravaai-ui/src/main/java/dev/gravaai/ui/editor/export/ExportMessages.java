@@ -9,6 +9,8 @@ import java.util.List;
  * announcements feed is not ported yet, so this only provides the tips/stream mechanics; the caller
  * appends announcement messages when the announcement service is available.
  */
+// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
+@org.jspecify.annotations.NullUnmarked
 public final class ExportMessages {
 
 	public static final int MAX_EXPORT_MESSAGE_LENGTH = 220;

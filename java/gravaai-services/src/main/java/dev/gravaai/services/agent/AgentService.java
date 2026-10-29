@@ -31,8 +31,6 @@ import tools.jackson.databind.node.ObjectNode;
  * maps these immutable {@link Snapshot}s to the UI port. The AppContext supplies the settings and
  * revert ports and forwards editor lifecycle events.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentService implements AutoCloseable {
 
 	/** Connection state derived from the control-socket status. */
@@ -49,10 +47,16 @@ public final class AgentService implements AutoCloseable {
 	/** One entry of the recent-activity list (agent tool call / edit / error). */
 	public record ActivityEntry(long atMillis, String label, boolean failed) {}
 
-	/** One immutable view of the agent service (mirror of the UI port snapshot). */
+	/**
+	 * One immutable view of the agent service (mirror of the UI port snapshot).
+	 *
+	 * @param token the current token, or null when the token file is not readable (the UI shows
+	 *     its placeholder)
+	 * @param lastSummary the last non-failed activity label, or null before any activity
+	 */
 	public record Snapshot(boolean enabled, boolean listening, boolean editorReady,
-			List<Client> clients, String token, String socketPath, String mcpCommand,
-			String claudeCodeCommand, String jsonConfig, String lastSummary,
+			List<Client> clients, @Nullable String token, String socketPath, String mcpCommand,
+			String claudeCodeCommand, String jsonConfig, @Nullable String lastSummary,
 			List<ActivityEntry> recentActivity) {
 		public Snapshot {
 			clients = clients == null ? List.of() : List.copyOf(clients);
@@ -155,7 +159,8 @@ public final class AgentService implements AutoCloseable {
 	private final List<Consumer<List<Highlight>>> highlightListeners = new CopyOnWriteArrayList<>();
 	private final List<ActivityEntry> activity = new CopyOnWriteArrayList<>();
 
-	private volatile AgentControlServer server;
+	/** Null until the control server is started (or after a failed start). */
+	private volatile @Nullable AgentControlServer server;
 	private volatile boolean listening;
 	private volatile boolean editorReady;
 	private volatile @Nullable String lastSummary;

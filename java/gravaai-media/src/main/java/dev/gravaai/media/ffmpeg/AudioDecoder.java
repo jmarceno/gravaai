@@ -1,7 +1,5 @@
 package dev.gravaai.media.ffmpeg;
 
-import org.jspecify.annotations.Nullable;
-
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -26,8 +24,6 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * {@code AVFrame}, one {@code AVPacket} and one staging buffer, so a caller can stream a whole
  * file with a single small float array.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AudioDecoder implements AutoCloseable {
 
 	/** Output sample rate required by the playback and export paths. */
@@ -54,7 +50,8 @@ public final class AudioDecoder implements AutoCloseable {
 	private final MemorySegment staging;
 	private final MemorySegment outputPointerArray;
 	private final int audioStreamIndex;
-	private @Nullable MemorySegment swr;
+	/** swresample context once the input format is known; {@link MemorySegment#NULL} before. */
+	private MemorySegment swr = MemorySegment.NULL;
 	private int inputSampleFormat = Integer.MIN_VALUE;
 	private int inputSampleRate = Integer.MIN_VALUE;
 	private int stagingStart;
@@ -236,7 +233,7 @@ public final class AudioDecoder implements AutoCloseable {
 				"av_seek_frame");
 		ffmpeg_h.avformat_flush(formatContext);
 		ffmpeg_h.avcodec_flush_buffers(codecContext);
-		if (swr != null && swr.address() != 0) {
+		if (swr.address() != 0) {
 			// Flush swresample's internal buffers (out = NULL).
 			ffmpeg_h.swr_convert(swr, MemorySegment.NULL, 0, MemorySegment.NULL, 0);
 		}
@@ -311,12 +308,12 @@ public final class AudioDecoder implements AutoCloseable {
 	}
 
 	private int convertFrame() {
-		ensureResampler();
+		MemorySegment resampler = ensureResampler();
 		int samples = AVFrame.nb_samples(frame);
 		if (samples <= 0) {
 			return 0;
 		}
-		int converted = ffmpeg_h.swr_convert(swr, outputPointerArray, STAGING_FRAMES,
+		int converted = ffmpeg_h.swr_convert(resampler, outputPointerArray, STAGING_FRAMES,
 				AVFrameUtils.extendedData(frame), samples);
 		if (converted < 0) {
 			throw new FfmpegException("swr_convert", converted);
@@ -325,7 +322,7 @@ public final class AudioDecoder implements AutoCloseable {
 	}
 
 	private boolean drainResampler() {
-		if (swr == null || swr.address() == 0) {
+		if (swr.address() == 0) {
 			return false;
 		}
 		int drained = ffmpeg_h.swr_convert(swr, outputPointerArray, STAGING_FRAMES,
@@ -341,16 +338,16 @@ public final class AudioDecoder implements AutoCloseable {
 		return false;
 	}
 
-	private void ensureResampler() {
+	private MemorySegment ensureResampler() {
 		int sampleFormat = AVFrame.format(frame);
 		int sampleRate = AVFrame.sample_rate(frame) > 0
 				? AVFrame.sample_rate(frame)
 				: 48000;
-		if (swr != null && swr.address() != 0
+		if (swr.address() != 0
 				&& sampleFormat == inputSampleFormat && sampleRate == inputSampleRate) {
-			return;
+			return swr;
 		}
-		if (swr != null && swr.address() != 0) {
+		if (swr.address() != 0) {
 			ffmpeg_h.swr_free(swrPtr);
 			swr = MemorySegment.NULL;
 		}
@@ -373,6 +370,7 @@ public final class AudioDecoder implements AutoCloseable {
 		FfmpegException.check(ffmpeg_h.swr_init(swr), "swr_init");
 		inputSampleFormat = sampleFormat;
 		inputSampleRate = sampleRate;
+		return swr;
 	}
 
 	private void ensureOpen() {

@@ -106,10 +106,11 @@ public final class ClipCommands {
 		private final String id;
 		private final double start;
 		private final double end;
-		private final Integer sequenceIndex;
+		/** Null for a plain move/resize; set to reorder within the compacted clip sequence. */
+		private final @Nullable Integer sequenceIndex;
 		private final long sourceDurationMs;
 
-		public ChangeSpan(String id, double start, double end, Integer sequenceIndex,
+		public ChangeSpan(String id, double start, double end, @Nullable Integer sequenceIndex,
 				long sourceDurationMs) {
 			this.id = id;
 			this.start = start;

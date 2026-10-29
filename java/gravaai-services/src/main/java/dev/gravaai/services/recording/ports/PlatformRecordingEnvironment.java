@@ -12,8 +12,6 @@ import dev.gravaai.platform.nativehelpers.NativeHelpers;
  * {@link RecordingEnvironment} backed by the platform native-helper locator and PATH lookup
  * (plan §5.5, §5.7). The app wires it into {@code AppContext}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PlatformRecordingEnvironment implements RecordingEnvironment {
 
 	@Override
@@ -28,13 +26,16 @@ public final class PlatformRecordingEnvironment implements RecordingEnvironment 
 
 	@Override
 	public Path ffmpeg() {
-		Path binary = NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg");
-		if (Files.isRegularFile(binary)) {
-			return binary;
-		}
-		Path flat = NativeHelpers.nativeDir().resolve("ffmpeg");
-		if (Files.isRegularFile(flat)) {
-			return flat;
+		Path nativeDirectory = NativeHelpers.nativeDir();
+		if (nativeDirectory != null) {
+			Path binary = nativeDirectory.resolve("ffmpeg").resolve("bin").resolve("ffmpeg");
+			if (Files.isRegularFile(binary)) {
+				return binary;
+			}
+			Path flat = nativeDirectory.resolve("ffmpeg");
+			if (Files.isRegularFile(flat)) {
+				return flat;
+			}
 		}
 		// Development builds may place the CLI one directory up from the bundled libs.
 		return NativeHelpers.path("ffmpeg");
@@ -42,7 +43,11 @@ public final class PlatformRecordingEnvironment implements RecordingEnvironment 
 
 	@Override
 	public @Nullable Path rnnoiseModel() {
-		Path model = NativeHelpers.nativeDir().resolve("models").resolve("rnnoise").resolve("voice.rnnn");
+		Path nativeDirectory = NativeHelpers.nativeDir();
+		if (nativeDirectory == null) {
+			return null;
+		}
+		Path model = nativeDirectory.resolve("models").resolve("rnnoise").resolve("voice.rnnn");
 		return Files.isRegularFile(model) ? model : null;
 	}
 

@@ -32,8 +32,6 @@ import dev.gravaai.media.compose.RgbaFrame;
  * pumps the audio track, which keeps every step deterministic. Paused scrubs decode on the
  * {@link Dependencies#worker()} (latest wins), never on the caller's thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PlaybackEngine implements PlaybackController {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.media.playback");
@@ -707,7 +705,7 @@ public final class PlaybackEngine implements PlaybackController {
 		anchorClockSeconds = clock.positionSeconds();
 	}
 
-	private @Nullable double clampTimelineLocked(double seconds) {
+	private double clampTimelineLocked(double seconds) {
 		if (!Double.isFinite(seconds)) {
 			return 0;
 		}
@@ -748,11 +746,14 @@ public final class PlaybackEngine implements PlaybackController {
 		double sourceSeconds = Math.max(0, sourceMs / 1000.0);
 		Double webcamSourceSeconds = null;
 		boolean webcamVisible = false;
-		if (webcamSource != null) {
+		FrameSource openWebcam = webcamSource;
+		PlaybackMedia currentMedia = media;
+		if (openWebcam != null && currentMedia != null) {
 			webcamSourceSeconds = WebcamSync.getWebcamMediaTargetTimeSeconds(
-					timelineSeconds, webcamSource.durationSeconds(), (double) media.webcamTimeOffsetMs());
+					timelineSeconds, openWebcam.durationSeconds(),
+					(double) currentMedia.webcamTimeOffsetMs());
 			webcamVisible = WebcamSync.isWebcamVisibleAtSourceTime(
-					media.webcamVisibleRanges(), webcamSourceSeconds);
+					currentMedia.webcamVisibleRanges(), webcamSourceSeconds);
 		}
 		return new FramePlan(generation, index, timelineSeconds, clip.id(), sourceSeconds,
 				videoSource, webcamSource, webcamSourceSeconds, webcamVisible);
@@ -771,13 +772,15 @@ public final class PlaybackEngine implements PlaybackController {
 					: plan.video().frameAt(plan.sourceSeconds());
 		}
 		RgbaFrame webcamFrame = null;
-		if (plan.webcam() != null && plan.webcamVisible()) {
+		FrameSource planWebcam = plan.webcam();
+		Double planWebcamSeconds = plan.webcamSeconds();
+		if (planWebcam != null && planWebcamSeconds != null && plan.webcamVisible()) {
 			try {
-				webcamFrame = plan.webcam().frameAt(plan.webcamSeconds());
+				webcamFrame = planWebcam.frameAt(planWebcamSeconds);
 			} catch (RuntimeException error) {
 				// A webcam decode error must not blank the screen video of the same frame.
 				LOG.log(System.Logger.Level.WARNING, "webcam frame could not be decoded at "
-						+ plan.webcamSeconds() + " s: " + error);
+						+ planWebcamSeconds + " s: " + error);
 			}
 		}
 		PlaybackFrame frame = new PlaybackFrame(
@@ -868,10 +871,10 @@ public final class PlaybackEngine implements PlaybackController {
 			long generation,
 			long frameIndex,
 			double timelineSeconds,
-			String clipId,
+			@Nullable String clipId,
 			double sourceSeconds,
-			FrameSource video,
-			FrameSource webcam,
+			@Nullable FrameSource video,
+			@Nullable FrameSource webcam,
 			@Nullable Double webcamSeconds,
 			boolean webcamVisible) {
 	}

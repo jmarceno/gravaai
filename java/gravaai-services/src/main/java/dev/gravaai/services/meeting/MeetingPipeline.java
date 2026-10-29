@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,8 +18,6 @@ import dev.gravaai.services.meeting.OpenAiClient.OpenAiEndpoint;
  * recording, so a stage can be re-run alone and new ones (screen context) can slot in between.
  * Ported from electron/ipc/meeting/pipeline.ts.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingPipeline {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.meeting");
@@ -48,7 +48,7 @@ public final class MeetingPipeline {
 	}
 
 	public void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-			CancelSignal signal, MeetingJobs.StageListener onStatus) {
+			CancelSignal signal, MeetingJobs.@Nullable StageListener onStatus) {
 		MeetingJobs.StageListener status = onStatus == null ? (stage, message, progress) -> {
 		} : onStatus;
 		MeetingStatusCallback transcribeStatus = (message, progress) ->
@@ -123,7 +123,8 @@ public final class MeetingPipeline {
 					onStatus,
 					signal);
 			segments = result.segments();
-			language = result.language();
+			String detected = result.language();
+			language = detected != null ? detected : settings.language();
 			source = "api:" + settings.apiTranscriptionModel();
 		} else {
 			MeetingAsset model = assets.whisperModels().get(settings.whisperModel());
@@ -140,7 +141,8 @@ public final class MeetingPipeline {
 			Transcript.ParsedTranscript result = whisper.transcribe(inputs, modelPath.toString(),
 					vadModelPath.toString(), settings.language(), onStatus, signal);
 			segments = result.segments();
-			language = result.language();
+			String detected = result.language();
+			language = detected != null ? detected : settings.language();
 			source = "whisper:" + settings.whisperModel();
 		}
 

@@ -20,8 +20,6 @@ import java.util.regex.Pattern;
  * {@code src/main/resources/meeting/prompts/*.txt} so a test can compare them byte-for-byte
  * with the TypeScript source until Electron is deleted (plan §5.14).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingPrompts {
 
 	public static final String SUMMARY_PROMPT = loadResource("summary.txt");
@@ -37,7 +35,7 @@ public final class MeetingPrompts {
 	private MeetingPrompts() {
 	}
 
-	private static @Nullable String loadResource(String name) {
+	private static String loadResource(String name) {
 		try (InputStream stream = MeetingPrompts.class
 				.getResourceAsStream("/meeting/prompts/" + name)) {
 			if (stream == null) {
@@ -49,7 +47,7 @@ public final class MeetingPrompts {
 		}
 	}
 
-	private static @Nullable Map<String, String> languageNames() {
+	private static Map<String, String> languageNames() {
 		String[][] entries = {
 				{"ar", "Arabic"}, {"ca", "Catalan"}, {"cs", "Czech"}, {"da", "Danish"},
 				{"de", "German"}, {"el", "Greek"}, {"en", "English"}, {"es", "Spanish"},
@@ -67,15 +65,20 @@ public final class MeetingPrompts {
 		return Collections.unmodifiableMap(names);
 	}
 
-	public static @Nullable String languageName(String code) {
+	/** @param code the language code, or null when the caller did not detect one */
+	public static @Nullable String languageName(@Nullable String code) {
 		if (code == null || code.isEmpty()) {
 			return null;
 		}
 		return LANGUAGE_NAMES.get(code.toLowerCase(Locale.ROOT));
 	}
 
-	/** whisper-1 reports the language as a name ("portuguese"); map it back to a code. */
-	public static @Nullable String languageCodeFromName(String name) {
+	/**
+	 * whisper-1 reports the language as a name ("portuguese"); map it back to a code.
+	 *
+	 * @param name the reported name, or null when the API reported none
+	 */
+	public static @Nullable String languageCodeFromName(@Nullable String name) {
 		if (name == null || name.isEmpty()) {
 			return null;
 		}
@@ -99,8 +102,10 @@ public final class MeetingPrompts {
 	/**
 	 * Small models drift into English when the prompt is English, so the detected language is
 	 * restated as the last instruction before the content.
+	 *
+	 * @param language the detected language, or null when none was detected (no instruction)
 	 */
-	public static String withLanguageInstruction(String template, String language) {
+	public static String withLanguageInstruction(String template, @Nullable String language) {
 		String name = languageName(language);
 		if (name == null) {
 			return template;

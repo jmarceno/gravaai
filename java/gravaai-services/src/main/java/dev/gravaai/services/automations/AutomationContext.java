@@ -8,14 +8,17 @@ import java.time.Instant;
  * The resolved values an automation template can use (port of {@code AutomationContext}). The
  * optional parts are nullable; {@code at} is the instant the rule ran.
  *
+ * @param kind the media kind, or null when the caller did not report it
+ * @param format the export format, or null for recordings/unknown
+ * @param notesPath the meeting notes sidecar, or null when there is none
  * @param durationSec null when the duration is unknown (probe failed or no probe)
  */
 public record AutomationContext(
 		AutomationTrigger trigger,
 		String path,
-		AutomationMediaKind kind,
-		AutomationExportFormat format,
-		String notesPath,
+		@Nullable AutomationMediaKind kind,
+		@Nullable AutomationExportFormat format,
+		@Nullable String notesPath,
 		@Nullable Double durationSec,
 		Instant at) {
 

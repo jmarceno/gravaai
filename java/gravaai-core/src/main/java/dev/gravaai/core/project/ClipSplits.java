@@ -16,7 +16,7 @@ public final class ClipSplits {
 
 	public record Plan(String targetId, ClipRegion left, ClipRegion right) {}
 
-	@Nullable private ClipSplits() {}
+	private ClipSplits() {}
 
 	public static @Nullable Plan planClipSplit(
 			List<ClipRegion> clipRegions, double splitMs, Supplier<String> createId) {

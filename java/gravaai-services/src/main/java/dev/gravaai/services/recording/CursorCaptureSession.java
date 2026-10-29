@@ -40,8 +40,6 @@ import dev.gravaai.services.sources.WindowBounds;
  * which are only ever written next to the recording. Samples are taken every 33 ms with drift
  * compensation so CPU load cannot create large gaps.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CursorCaptureSession implements CursorTelemetrySource, KeystrokeSource {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");

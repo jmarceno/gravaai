@@ -12,15 +12,13 @@ import java.util.List;
  * gains a gap. These helpers map between the authored media time and the displayed span, and add
  * the tiny screen-space magnet that snaps region edges to cuts/edges.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ClipPresentation {
 
 	/** Port of {@code CLIP_SEAM_GAP_PX}. */
 	public static final double CLIP_SEAM_GAP_PX = 24;
 
 	/** Port of the {@code ClipPresentation} type: media span plus its displayed span. */
-	public record Presentation(Span span, @Nullable Span displaySpan) {
+	public record Presentation(Span span, Span displaySpan) {
 	}
 
 	/** Which side of a span snaps/seeks ({@code "start"} / {@code "end"} in the TS code). */
@@ -33,7 +31,7 @@ public final class ClipPresentation {
 	}
 
 	/** Port of {@code getClipDisplaySpan}: visual gutters never become gaps in media time. */
-	public static @Nullable Span getClipDisplaySpan(Span span, List<Span> allClips, double msPerPixel) {
+	public static Span getClipDisplaySpan(Span span, List<Span> allClips, double msPerPixel) {
 		if (!(msPerPixel > 0)) {
 			return span;
 		}
@@ -127,8 +125,9 @@ public final class ClipPresentation {
 		return snapRegionSpan(span, targets, clips, msPerPixel, null);
 	}
 
+	/** {@code edge} null snaps both edges, otherwise only the given one. */
 	public static Span snapRegionSpan(Span span, List<Double> targets, List<Presentation> clips,
-			double msPerPixel, Edge edge) {
+			double msPerPixel, @Nullable Edge edge) {
 		if (!(msPerPixel > 0)) {
 			return span;
 		}

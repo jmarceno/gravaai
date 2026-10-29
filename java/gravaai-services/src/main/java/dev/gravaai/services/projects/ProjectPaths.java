@@ -17,14 +17,16 @@ final class ProjectPaths {
 
 	private static final String MEDIA_URL_PATH = "/video";
 
-	@Nullable private ProjectPaths() {
+	private ProjectPaths() {
 	}
 
 	/**
 	 * Port of {@code normalizeVideoSourcePath}: trims, turns the old loopback media-server URL back
 	 * into the file path it served, unwraps {@code file://} URLs, and otherwise keeps the value.
+	 *
+	 * @param videoPath the raw stored path, or null when the project omits it
 	 */
-	static @Nullable String normalizeVideoSourcePath(String videoPath) {
+	static @Nullable String normalizeVideoSourcePath(@Nullable String videoPath) {
 		if (videoPath == null) {
 			return null;
 		}

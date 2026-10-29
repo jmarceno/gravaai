@@ -13,11 +13,11 @@ public enum AutomationExportFormat {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	public static @Nullable AutomationExportFormat fromWire(String value) {
+	public static @Nullable AutomationExportFormat fromWire(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

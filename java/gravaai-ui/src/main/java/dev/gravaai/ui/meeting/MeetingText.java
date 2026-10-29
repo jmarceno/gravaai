@@ -10,6 +10,7 @@ import java.time.format.FormatStyle;
 import java.util.Locale;
 
 import dev.gravaai.services.meeting.MeetingJob;
+import dev.gravaai.services.meeting.MeetingJob.Stage;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.meeting.MeetingMeta;
 
@@ -87,7 +88,7 @@ public final class MeetingText {
 	}
 
 	/** Port of {@code STAGE_LABEL} in {@code MeetingNotes.tsx}. */
-	public static String stageLabel(MeetingJob.Stage stage) {
+	public static String stageLabel(@Nullable Stage stage) {
 		if (stage == null) {
 			return "Waiting to start";
 		}

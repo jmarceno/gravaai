@@ -55,8 +55,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Every control edits the shared {@link EditorStore} through {@link EditorMutations}, so the
  * preview, undo/redo and project saving see the same state.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorInspectorPanel extends VBox {
 
 	/** A transient inspector editor driven by the timeline selection, independent of the rail. */
@@ -289,11 +287,11 @@ public final class EditorInspectorPanel extends VBox {
 		scroll.setVvalue(0);
 	}
 
-	private @Nullable boolean isSelectionMode() {
+	private boolean isSelectionMode() {
 		return annotationMode || selectionEditor != SelectionEditor.NONE;
 	}
 
-	private @Nullable String selectionTitle() {
+	private String selectionTitle() {
 		return switch (selectionEditor) {
 			case ANNOTATION -> "Annotation";
 			case ZOOM -> "Zoom";
@@ -631,7 +629,7 @@ public final class EditorInspectorPanel extends VBox {
 		return grid;
 	}
 
-	private Node paddingControls(@Nullable Padding padding) {
+	private Node paddingControls(Padding padding) {
 		boolean linked = !Boolean.FALSE.equals(padding.linked());
 		VBox box = new VBox(12);
 		if (advanced) {
@@ -972,6 +970,8 @@ public final class EditorInspectorPanel extends VBox {
 		boolean downloading = models != null && models.downloadStatus()
 				== dev.gravaai.ui.editor.transcript.CaptionModelUiService.DownloadStatus.DOWNLOADING;
 		boolean hasModel = models != null && models.modelPath() != null;
+		int downloadProgress = models == null ? 0 : models.downloadProgress();
+		@Nullable String modelId = models == null ? null : models.modelId();
 		int cueCount = store.state().autoCaptions().size();
 
 		VBox controls = new VBox(12);
@@ -1016,7 +1016,7 @@ public final class EditorInspectorPanel extends VBox {
 		ChoiceGroup modelChoice = new ChoiceGroup();
 		modelChoice.item("large-v3-turbo-q5_0", "Large turbo (574 MB)");
 		modelChoice.item("small", "Small (488 MB)");
-		modelChoice.setValue(models == null || models.modelId() == null ? "" : models.modelId());
+		modelChoice.setValue(modelId == null ? "" : modelId);
 		modelChoice.onValueChange(value -> {
 			if (captionModels != null && value != null && !value.isEmpty()) {
 				captionModels.selectModel(value);
@@ -1027,12 +1027,16 @@ public final class EditorInspectorPanel extends VBox {
 
 		Button modelButton;
 		if (downloading) {
-			modelButton = new Button("Downloading... " + models.downloadProgress() + "%",
+			modelButton = new Button("Downloading... " + downloadProgress + "%",
 					Button.Variant.DEFAULT, Button.Size.MD);
 			modelButton.setDisable(true);
 		} else if (hasModel) {
 			modelButton = new Button("Delete Model", Button.Variant.OUTLINE, Button.Size.MD);
-			modelButton.setOnAction(event -> captionModels.deleteSmallModel());
+			modelButton.setOnAction(event -> {
+				if (captionModels != null) {
+					captionModels.deleteSmallModel();
+				}
+			});
 		} else {
 			modelButton = new Button("Download Model", Button.Variant.DEFAULT, Button.Size.MD);
 			modelButton.setOnAction(event -> {
@@ -1077,7 +1081,7 @@ public final class EditorInspectorPanel extends VBox {
 		controls.getChildren().add(generateBox);
 		if (downloading) {
 			javafx.scene.control.ProgressBar download = new javafx.scene.control.ProgressBar(
-					models.downloadProgress() / 100.0);
+					downloadProgress / 100.0);
 			download.setMaxWidth(Double.MAX_VALUE);
 			controls.getChildren().add(download);
 		}
@@ -1290,7 +1294,7 @@ public final class EditorInspectorPanel extends VBox {
 		return row;
 	}
 
-	private Slider slider(String label, @Nullable double value, double min, double max, double step,
+	private Slider slider(String label, double value, double min, double max, double step,
 			DoubleFunction<String> formatter, Consumer<Double> onCommit) {
 		Slider slider = new Slider(label);
 		slider.range(min, max).step(step).formatter(formatter).sliderControl();

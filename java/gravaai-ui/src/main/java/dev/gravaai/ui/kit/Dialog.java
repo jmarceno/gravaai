@@ -36,8 +36,6 @@ import javafx.scene.layout.VBox;
  * dialog.show(anyNodeInsideKitRoot);
  * }</pre>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Dialog {
 
 	private final String title;
@@ -142,9 +140,10 @@ public final class Dialog {
 		layer.setPickOnBounds(true);
 		layer.getChildren().clear();
 
-		container = new StackPane();
-		container.setPadding(new Insets(40));
-		container.setPickOnBounds(true);
+		StackPane dialogContainer = new StackPane();
+		container = dialogContainer;
+		dialogContainer.setPadding(new Insets(40));
+		dialogContainer.setPickOnBounds(true);
 		backdrop = new Region();
 		backdrop.getStyleClass().add("dialog__backdrop");
 		backdrop.setPickOnBounds(true);
@@ -174,14 +173,14 @@ public final class Dialog {
 		if (footerNodes.length > 0) {
 			panel.getChildren().add(footer);
 		}
-		container.getChildren().addAll(backdrop, panel);
+		dialogContainer.getChildren().addAll(backdrop, panel);
 		// Plain Pane layout would shrink a managed child to its preferred size on the next pulse.
-		container.setManaged(false);
-		layer.getChildren().add(container);
+		dialogContainer.setManaged(false);
+		layer.getChildren().add(dialogContainer);
 		backdrop.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		// The dialog layer is a plain Pane: it does not lay out its children, and on the first
 		// show its size can still be 0x0, so size the container here and keep it in sync.
-		layerFitListener = (observable, oldValue, newValue) -> container.resizeRelocate(0, 0,
+		layerFitListener = (observable, oldValue, newValue) -> dialogContainer.resizeRelocate(0, 0,
 				Math.max(1, layer.getWidth()), Math.max(1, layer.getHeight()));
 		layer.widthProperty().addListener(layerFitListener);
 		layer.heightProperty().addListener(layerFitListener);

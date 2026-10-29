@@ -19,8 +19,6 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * timing (SRT fallback), detect silence and re-segment. Multi-track microphone/system merging lands
  * with the controller increment.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionGenerator {
 
 	private static final Duration SILENCE_TIMEOUT = Duration.ofMinutes(5);
@@ -147,7 +145,7 @@ public final class CaptionGenerator {
 	 * system/secondary audio are transcribed independently (simultaneous voices confuse
 	 * recognition) and merged; otherwise one pass over the candidates.
 	 */
-	public @Nullable Result generateFromVideo(Options options, IntConsumer progress, CancelSignal signal) {
+	public Result generateFromVideo(Options options, IntConsumer progress, CancelSignal signal) {
 		List<CaptionAudioCandidate> candidates = options.candidates() == null
 				|| options.candidates().isEmpty()
 						? resolveCaptionAudioCandidates(options.videoPath(), null)

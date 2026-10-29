@@ -14,7 +14,7 @@ public final class CompositeOperation {
 
 	public static final String DEFAULT = "source-over";
 
-	@Nullable private CompositeOperation() {}
+	private CompositeOperation() {}
 
 	/** The Skija blend mode for a CSS composite operation, or null when unknown. */
 	public static @Nullable BlendMode toBlendMode(String css) {

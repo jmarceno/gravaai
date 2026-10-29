@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,15 +11,14 @@ import java.util.List;
  * announcements feed is not ported yet, so this only provides the tips/stream mechanics; the caller
  * appends announcement messages when the announcement service is available.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportMessages {
 
 	public static final int MAX_EXPORT_MESSAGE_LENGTH = 220;
 	public static final int DEFAULT_MESSAGE_DURATION_SECONDS = 6;
 
-	/** One rotating export message. */
-	public record Message(String id, String text, int durationSeconds, String announcementId) {
+	/** One rotating export message; {@code announcementId} is null for plain tips. */
+	public record Message(String id, String text, int durationSeconds,
+			@Nullable String announcementId) {
 		public Message {
 			if (id == null || id.isBlank()) {
 				throw new IllegalArgumentException("message id is required");

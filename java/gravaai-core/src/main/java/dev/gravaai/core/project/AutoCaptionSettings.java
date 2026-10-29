@@ -1,20 +1,18 @@
 package dev.gravaai.core.project;
 
-import org.jspecify.annotations.Nullable;
-
 /** Global auto-caption settings. */
 public record AutoCaptionSettings(
 		boolean enabled,
 		boolean timelineQuickAdd,
 		String language,
 		String fontFamily,
-		@Nullable double fontSize,
-		@Nullable double bottomOffset,
-		@Nullable double maxWidth,
-		@Nullable int maxRows,
+		double fontSize,
+		double bottomOffset,
+		double maxWidth,
+		int maxRows,
 		AutoCaptionAnimation animationStyle,
-		@Nullable double boxRadius,
-		@Nullable String textColor,
+		double boxRadius,
+		String textColor,
 		String inactiveTextColor,
 		double backgroundOpacity) {
 

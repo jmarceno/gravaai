@@ -1,35 +1,45 @@
 package dev.gravaai.media.compose;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
 
 /**
  * Captions for one compositor frame (plan §5.8 stage 9), media-local like {@link FrameInput}:
  * the resolved auto-caption settings plus the cues that can be visible at the frame time.
+ *
+ * <p>Every component is non-null: the project model's optional fields are resolved to the TS
+ * defaults by the caller at the boundary ({@link ProjectEditorInputs#captionSpec}), so the
+ * renderer never has to guess.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record CaptionSpec(
 		boolean enabled,
 		String fontFamily,
-		@Nullable double fontSize,
-		@Nullable double bottomOffset,
-		@Nullable double maxWidth,
-		@Nullable int maxRows,
+		double fontSize,
+		double bottomOffset,
+		double maxWidth,
+		int maxRows,
 		String animationStyle,
-		@Nullable double boxRadius,
-		@Nullable String textColor,
+		double boxRadius,
+		String textColor,
 		String inactiveTextColor,
 		double backgroundOpacity,
 		List<Cue> cues) {
 
+	/** The TS default caption font stack (SF Pro is not redistributable; DM Sans substitutes). */
+	static final String DEFAULT_FONT_FAMILY =
+			"\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif";
+
+	/** The TS default caption text colour. */
+	static final String DEFAULT_TEXT_COLOR = "#FFFFFF";
+
+	/** The TS default inactive (already spoken) caption text colour. */
+	static final String DEFAULT_INACTIVE_TEXT_COLOR = "#A3A3A3";
+
 	/** One caption cue ({@code startMs..endMs} inclusive at the end like the renderer). */
 	public record Cue(String id, long startMs, long endMs, String text,
-			@Nullable List<dev.gravaai.core.project.CaptionCueWord> words) {
+			List<dev.gravaai.core.project.CaptionCueWord> words) {
 
 		public Cue {
-			words = words == null ? List.of() : List.copyOf(words);
+			words = List.copyOf(words);
 		}
 
 		/** A cue without word timings (proportional timing, like the TS no-timing path). */
@@ -39,18 +49,11 @@ public record CaptionSpec(
 	}
 
 	/** No captions. */
-	public static final CaptionSpec DISABLED = new CaptionSpec(false,
-			"\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif", 30, 3, 62, 1,
-			"none", 17.5, "#FFFFFF", "#A3A3A3", 0.9, List.of());
+	public static final CaptionSpec DISABLED = new CaptionSpec(false, DEFAULT_FONT_FAMILY, 30, 3,
+			62, 1, "none", 17.5, DEFAULT_TEXT_COLOR, DEFAULT_INACTIVE_TEXT_COLOR, 0.9, List.of());
 
 	public CaptionSpec {
-		cues = cues == null ? List.of() : List.copyOf(cues);
-		fontFamily = fontFamily == null || fontFamily.isBlank()
-				? "\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif"
-				: fontFamily;
-		animationStyle = animationStyle == null ? "none" : animationStyle;
-		textColor = textColor == null ? "#FFFFFF" : textColor;
-		inactiveTextColor = inactiveTextColor == null ? "#A3A3A3" : inactiveTextColor;
+		cues = List.copyOf(cues);
 	}
 
 	/** Copies with a different cue list, keeping the settings. */

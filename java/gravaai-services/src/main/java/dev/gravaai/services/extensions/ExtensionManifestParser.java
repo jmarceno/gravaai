@@ -25,8 +25,6 @@ import tools.jackson.databind.JsonNode;
  * extension directory, {@code homepage} is HTTPS and the permissions form a closed set. Unknown
  * top-level fields are tolerated so a newer manifest still loads.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExtensionManifestParser {
 
 	private static final Pattern ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
@@ -181,7 +179,8 @@ public final class ExtensionManifestParser {
 		return screenshots;
 	}
 
-	private static @Nullable String requiredString(JsonNode node, String field) {
+	/** @return the required field value; throws when it is absent or not a string */
+	private static String requiredString(JsonNode node, String field) {
 		JsonNode value = node.get(field);
 		if (value == null || !value.isString()) {
 			throw invalid(field, "is required and must be a string");

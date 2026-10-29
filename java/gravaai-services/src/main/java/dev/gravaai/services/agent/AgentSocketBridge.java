@@ -40,8 +40,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>{@code --mcp} keeps one bridge and forwards every MCP tool call through it; the app itself
  * builds a second bridge only in tests.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentSocketBridge implements AutoCloseable {
 
 	/** {@code CONNECT_TIMEOUT_MS}. */
@@ -107,7 +105,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 
 	/** Sends one tool call; the returned future completes with the app's result or error. */
 	public CompletableFuture<AgentToolResult> request(String tool, JsonNode args) {
-		return request(tool, args, null);
+		return request(tool, args, update -> {});
 	}
 
 	/** Sends one tool call and reports the app's intermediate progress lines. */
@@ -194,7 +192,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 			} catch (MissingTokenException missing) {
 				result.completeExceptionally(missing);
 			} catch (IOException | RuntimeException error) {
-				if (launchApp != null && launchApp.getAsBoolean()) {
+				if (launchApp.getAsBoolean()) {
 					retryAfterLaunch(result, error);
 				} else {
 					result.completeExceptionally(error);
@@ -252,7 +250,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 		}
 		ObjectNode handshake = Json.nodeFactory().objectNode();
 		handshake.put("token", token.get());
-		handshake.put("client", clientName == null ? "MCP client" : clientName.get());
+		handshake.put("client", clientName.get());
 		try {
 			writeLine(channel, handshake);
 			String ack = readLine(channel);
@@ -354,11 +352,9 @@ public final class AgentSocketBridge implements AutoCloseable {
 			JsonNode update = message.path("progress");
 			Double total = update.path("total").isNumber() ? update.path("total").asDouble() : null;
 			String text = update.path("message").isString() ? update.path("message").asString() : null;
-			if (pending.onProgress() != null) {
-				pending.onProgress().accept(new AgentProgressUpdate(
-						update.path("progress").isNumber() ? update.path("progress").asDouble() : 0,
-						total, text));
-			}
+			pending.onProgress().accept(new AgentProgressUpdate(
+					update.path("progress").isNumber() ? update.path("progress").asDouble() : 0,
+					total, text));
 			return;
 		}
 		if (id >= 0 && pending != null) {

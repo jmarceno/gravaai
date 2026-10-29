@@ -13,20 +13,18 @@ import tools.jackson.databind.node.ObjectNode;
  * Export preferences shared by the editor settings and the export dialog (port of
  * {@code src/components/video-editor/exportPreferences.ts}, plan §5.11).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record ExportPreferences(
-		@Nullable ExportEncodingMode exportEncodingMode,
+		ExportEncodingMode exportEncodingMode,
 		ExportBackendPreference exportBackendPreference,
 		ExportPipelineModel exportPipelineModel,
 		ExportQuality exportQuality,
-		@Nullable int mp4FrameRate,
-		@Nullable ExportFormat exportFormat,
+		int mp4FrameRate,
+		ExportFormat exportFormat,
 		int gifFrameRate,
-		@Nullable boolean gifLoop,
+		boolean gifLoop,
 		GifSizePreset gifSizePreset,
 		PublishDestination publishDestination,
-		@Nullable boolean includeCaptionSidecar) {
+		boolean includeCaptionSidecar) {
 
 	public enum ExportEncodingMode {
 		FAST("fast"), BALANCED("balanced"), QUALITY("quality");
@@ -42,8 +40,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects the default. */
 		@JsonCreator
-		public static ExportEncodingMode fromWire(String value) {
+		public static ExportEncodingMode fromWire(@Nullable String value) {
 			for (ExportEncodingMode mode : values()) {
 				if (mode.wire.equals(value)) {
 					return mode;
@@ -67,8 +66,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects the default. */
 		@JsonCreator
-		public static ExportBackendPreference fromWire(String value) {
+		public static ExportBackendPreference fromWire(@Nullable String value) {
 			for (ExportBackendPreference preference : values()) {
 				if (preference.wire.equals(value)) {
 					return preference;
@@ -93,7 +93,7 @@ public record ExportPreferences(
 		}
 
 		@JsonCreator
-		public static ExportPipelineModel fromWire(String value) {
+		public static ExportPipelineModel fromWire(@Nullable String value) {
 			return MODERN;
 		}
 	}
@@ -112,8 +112,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects the default. */
 		@JsonCreator
-		public static ExportQuality fromWire(String value) {
+		public static ExportQuality fromWire(@Nullable String value) {
 			for (ExportQuality quality : values()) {
 				if (quality.wire.equals(value)) {
 					return quality;
@@ -137,8 +138,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects MP4. */
 		@JsonCreator
-		public static ExportFormat fromWire(String value) {
+		public static ExportFormat fromWire(@Nullable String value) {
 			return "gif".equals(value) ? GIF : MP4;
 		}
 	}
@@ -157,8 +159,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects the default. */
 		@JsonCreator
-		public static GifSizePreset fromWire(String value) {
+		public static GifSizePreset fromWire(@Nullable String value) {
 			for (GifSizePreset preset : values()) {
 				if (preset.wire.equals(value)) {
 					return preset;
@@ -182,8 +185,9 @@ public record ExportPreferences(
 			return wire;
 		}
 
+		/** Wire parser; {@code null} (field absent) selects LINK. */
 		@JsonCreator
-		public static PublishDestination fromWire(String value) {
+		public static PublishDestination fromWire(@Nullable String value) {
 			return "local".equals(value) ? LOCAL : LINK;
 		}
 	}
@@ -193,24 +197,27 @@ public record ExportPreferences(
 	/** {@code GIF_FRAME_RATES}. */
 	public static final int[] GIF_FRAME_RATES = {15, 20, 25, 30};
 
-	/** {@code normalizeExportEncodingMode}. */
-	public static ExportEncodingMode normalizeExportEncodingMode(JsonNode value) {
+	/** {@code normalizeExportEncodingMode}; {@code null} when the stored field is missing. */
+	public static ExportEncodingMode normalizeExportEncodingMode(@Nullable JsonNode value) {
 		return ExportEncodingMode.fromWire(value != null && value.isString() ? value.asString() : null);
 	}
 
-	/** {@code normalizeExportBackendPreference}. */
-	public static ExportBackendPreference normalizeExportBackendPreference(JsonNode value) {
+	/** {@code normalizeExportBackendPreference}; {@code null} when the stored field is missing. */
+	public static ExportBackendPreference normalizeExportBackendPreference(@Nullable JsonNode value) {
 		return ExportBackendPreference.fromWire(
 				value != null && value.isString() ? value.asString() : null);
 	}
 
-	/** {@code normalizeExportPipelineModel}: persisted selections migrate to the modern pipeline. */
-	public static ExportPipelineModel normalizeExportPipelineModel(JsonNode value) {
+	/**
+	 * {@code normalizeExportPipelineModel}: persisted selections migrate to the modern pipeline;
+	 * {@code value} is ignored (and may be null when the field is absent).
+	 */
+	public static ExportPipelineModel normalizeExportPipelineModel(@Nullable JsonNode value) {
 		return ExportPipelineModel.MODERN;
 	}
 
-	/** {@code normalizeExportMp4FrameRate}. */
-	public static int normalizeExportMp4FrameRate(JsonNode value) {
+	/** {@code normalizeExportMp4FrameRate}; {@code null} when the stored field is missing. */
+	public static int normalizeExportMp4FrameRate(@Nullable JsonNode value) {
 		if (value == null || !value.isNumber()) {
 			return 30;
 		}
@@ -223,7 +230,8 @@ public record ExportPreferences(
 		return 30;
 	}
 
-	private static int normalizeGifFrameRate(JsonNode value) {
+	/** GIF frame-rate normaliser; {@code null} when the stored field is missing. */
+	private static int normalizeGifFrameRate(@Nullable JsonNode value) {
 		if (value == null || !value.isNumber()) {
 			return 15;
 		}
@@ -236,8 +244,8 @@ public record ExportPreferences(
 		return 15;
 	}
 
-	/** {@code normalizeExportPreferences}. */
-	public static ExportPreferences normalizeExportPreferences(JsonNode raw) {
+	/** {@code normalizeExportPreferences}; {@code null} means "no stored preferences object". */
+	public static ExportPreferences normalizeExportPreferences(@Nullable JsonNode raw) {
 		JsonNode source = raw != null && raw.isObject() ? raw : Json.nodeFactory().objectNode();
 		JsonNode quality = source.get("exportQuality");
 		String qualityText = quality != null && quality.isString() ? quality.asString() : null;

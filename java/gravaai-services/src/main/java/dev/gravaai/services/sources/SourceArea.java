@@ -8,18 +8,16 @@ import java.util.List;
  * Validates what a capture-picker window reports and builds the selected sources, ported from
  * {@code electron/ipc/sourceArea.ts}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SourceArea {
 
 	/** Smallest area worth recording, in points. */
 	public static final int MIN_CAPTURE_AREA_SIZE = 32;
 
-	@Nullable private SourceArea() {
+	private SourceArea() {
 	}
 
 	/** A display the picker can draw on. */
-	public @Nullable record PickerDisplay(int id, CaptureArea bounds) {
+	public record PickerDisplay(int id, CaptureArea bounds) {
 	}
 
 	/**
@@ -66,7 +64,9 @@ public final class SourceArea {
 		Double y = input.y();
 		Double width = input.width();
 		Double height = input.height();
-		if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(width) || !isFiniteNumber(height)) {
+		if (x == null || y == null || width == null || height == null
+				|| !Double.isFinite(x) || !Double.isFinite(y)
+				|| !Double.isFinite(width) || !Double.isFinite(height)) {
 			return null;
 		}
 		CaptureArea bounds = display.bounds();
@@ -83,10 +83,6 @@ public final class SourceArea {
 		}
 
 		return new CapturePick.Area(left, top, areaWidth, areaHeight, display.id(), record);
-	}
-
-	private static boolean isFiniteNumber(@Nullable Double value) {
-		return value != null && Double.isFinite(value);
 	}
 
 	/** The selected source for a confirmed area pick. */

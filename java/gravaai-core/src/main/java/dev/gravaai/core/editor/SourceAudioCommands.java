@@ -1,12 +1,12 @@
 package dev.gravaai.core.editor;
 
+import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.SourceAudioSettings;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** The {@code useSourceAudioTrackSettings} operations (plan P2.7 source-audio lanes). */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SourceAudioCommands {
 
 	private SourceAudioCommands() {}
@@ -36,12 +36,16 @@ public final class SourceAudioCommands {
 				return false;
 			}
 			ObjectNode raw = store.state().sourceAudioTrackSettingsByClip();
-			SourceAudioTrackSettings current = SourceAudioSettings.parse(
-					raw == null ? null : raw.get(clipId));
+			// No map yet is the same as an empty map for parse/merge.
+			ObjectNode byClip = raw == null ? Json.nodeFactory().objectNode() : raw;
+			JsonNode clipSettings = byClip.get(clipId);
+			SourceAudioTrackSettings current = clipSettings == null
+					? SourceAudioTrackSettings.EMPTY
+					: SourceAudioSettings.parse(clipSettings);
 			SourceAudioTrackSettings next = current.withTrack(trackId,
 					new SourceAudioTrackSettings.Track(SourceAudioSettings.clampVolume(volume),
 							normalize));
-			store.setSourceAudioTrackSettingsByClip(SourceAudioSettings.merge(raw, clipId, next));
+			store.setSourceAudioTrackSettingsByClip(SourceAudioSettings.merge(byClip, clipId, next));
 			return true;
 		}
 	}

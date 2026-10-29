@@ -16,7 +16,7 @@ public final class MediaTiming {
 	}
 
 	/** {@code clampMediaTimeToDuration}: a negative time becomes 0, a known duration caps it. */
-	public static @Nullable double clampMediaTimeToDuration(double targetTime, @Nullable Double duration) {
+	public static double clampMediaTimeToDuration(double targetTime, @Nullable Double duration) {
 		double safeTargetTime = Math.max(0, targetTime);
 		if (duration == null || !Double.isFinite(duration)) {
 			return safeTargetTime;

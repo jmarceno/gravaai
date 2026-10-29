@@ -97,7 +97,7 @@ public final class Clips {
 	}
 
 	/** {@code mapSourceTimeToTimelineTime}. */
-	public static @Nullable long mapSourceTimeToTimelineTime(double timeMs, List<ClipRegion> clips) {
+	public static long mapSourceTimeToTimelineTime(double timeMs, List<ClipRegion> clips) {
 		long roundedTimeMs = Math.round(timeMs);
 		List<ClipRegion> sortedClips = sortClipRegions(clips);
 

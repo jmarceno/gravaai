@@ -38,8 +38,6 @@ import javafx.scene.layout.VBox;
  * with a Copy button instead. The service applies COSMIC's file splice; this page only renders and
  * captures.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class GlobalShortcutsSettingsView extends VBox {
 
 	/** {@code MODIFIER_CODES} in the React source. */
@@ -79,6 +77,10 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		});
 	}
 
+	private GlobalShortcutsConfig loadedConfig() {
+		return java.util.Objects.requireNonNull(config, "global-shortcuts config not loaded");
+	}
+
 	private void rebuild() {
 		rows.getChildren().clear();
 		if (config == null) {
@@ -94,11 +96,12 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			errorBanner.setManaged(false);
 		}
 
-		Switch enabled = new Switch("", config.enabled());
+		GlobalShortcutsConfig current = loadedConfig();
+		Switch enabled = new Switch("", current.enabled());
 		enabled.setAccessibleText("Global shortcuts");
 		enabled.setDisable(busy || !cosmic);
 		enabled.onCheckedChange(checked ->
-				apply(new GlobalShortcutsConfig(checked, config.bindings())));
+				apply(new GlobalShortcutsConfig(checked, current.bindings())));
 		rows.getChildren().add(new SettingsRow("Global shortcuts", cosmic
 				? "Work in every app. Gravaai adds them to COSMIC's keyboard shortcuts for you."
 				: "Your desktop doesn't let apps add shortcuts. Bind these commands in its keyboard settings:",
@@ -108,7 +111,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			buildCliCommands(rows);
 			return;
 		}
-		if (!config.enabled()) {
+		if (!current.enabled()) {
 			return;
 		}
 		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
@@ -138,19 +141,31 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			Button copy = new Button("Copy", Button.Variant.SECONDARY, Button.Size.SM);
 			copy.setOnAction(event -> copyCommand(command));
 			host.getChildren().add(new SettingsRow(
-					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action), "", copy));
+					java.util.Objects.requireNonNull(
+					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
+					"missing shortcut label for " + action), "", copy));
 		}
 	}
 
 	private Region buildActionRow(GlobalShortcutAction action) {
-		String label = GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action);
-		GlobalShortcutBinding binding = config.bindings().get(action);
+		String label = java.util.Objects.requireNonNull(
+					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
+					"missing shortcut label for " + action);
+		GlobalShortcutBinding binding = loadedConfig().bindings().get(action);
 		String conflict = status == null ? null : status.conflicts().get(action);
 		boolean isCapturing = capturing == action;
 
-		Button bindingButton = new Button(isCapturing ? "Press a shortcut…"
-				: binding == null ? "Not set" : GlobalShortcuts.formatGlobalBinding(binding),
-				Button.Variant.SECONDARY, Button.Size.SM);
+		String bindingLabel;
+		if (isCapturing) {
+			bindingLabel = "Press a shortcut…";
+		} else if (binding == null) {
+			bindingLabel = "Not set";
+		} else {
+			bindingLabel = java.util.Objects.requireNonNull(
+					GlobalShortcuts.formatGlobalBinding(binding),
+					"could not format shortcut binding " + binding);
+		}
+		Button bindingButton = new Button(bindingLabel, Button.Variant.SECONDARY, Button.Size.SM);
 		bindingButton.getStyleClass().add("global-shortcuts-settings__binding");
 		bindingButton.setMinWidth(132);
 		bindingButton.setDisable(busy);
@@ -162,9 +177,9 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		clear.setDisable(busy || binding == null || isCapturing);
 		clear.setOnAction(event -> {
 			java.util.Map<GlobalShortcutAction, GlobalShortcutBinding> bindings =
-					new java.util.LinkedHashMap<>(config.bindings());
+					new java.util.LinkedHashMap<>(loadedConfig().bindings());
 			bindings.put(action, null);
-			apply(new GlobalShortcutsConfig(config.enabled(), bindings));
+			apply(new GlobalShortcutsConfig(loadedConfig().enabled(), bindings));
 		});
 
 		HBox controls = new HBox(4, bindingButton, clear);
@@ -214,9 +229,9 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		GlobalShortcutAction action = capturing;
 		stopCapture();
 		java.util.Map<GlobalShortcutAction, GlobalShortcutBinding> bindings =
-				new java.util.LinkedHashMap<>(config.bindings());
+				new java.util.LinkedHashMap<>(loadedConfig().bindings());
 		bindings.put(action, binding);
-		apply(new GlobalShortcutsConfig(config.enabled(), bindings));
+		apply(new GlobalShortcutsConfig(loadedConfig().enabled(), bindings));
 	}
 
 	private void stopCapture() {

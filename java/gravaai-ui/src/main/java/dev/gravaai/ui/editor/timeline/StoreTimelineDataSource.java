@@ -21,18 +21,17 @@ import dev.gravaai.core.project.ProjectEditorState;
  * (playback engine); the timeline only reads. Subscribe with {@link #onChange(Runnable)} and call
  * {@link TimelineView#refreshData()} on the FX thread to repaint after edits.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class StoreTimelineDataSource implements TimelineDataSource {
 
 	private final EditorStore store;
 	private final LongSupplier totalDurationMs;
 	private final DoubleSupplier playheadMs;
-	private final @Nullable WaveformProvider waveforms;
+	private final WaveformProvider waveforms;
 	private Supplier<List<ZoomSuggestionUtils.CursorTelemetryPoint>> cursorTelemetry = List::of;
 
+	/** @param waveforms optional waveform source; {@code null} means "no waveforms yet". */
 	public StoreTimelineDataSource(EditorStore store, LongSupplier totalDurationMs,
-			DoubleSupplier playheadMs, WaveformProvider waveforms) {
+			DoubleSupplier playheadMs, @Nullable WaveformProvider waveforms) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.totalDurationMs = totalDurationMs == null ? () -> 0L : totalDurationMs;
 		this.playheadMs = playheadMs == null ? () -> 0.0 : playheadMs;

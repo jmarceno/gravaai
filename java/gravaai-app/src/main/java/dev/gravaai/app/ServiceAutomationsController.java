@@ -15,30 +15,30 @@ import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 /** Settings -> Automations against the real service, with portal-backed file/folder choosers. */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ServiceAutomationsController implements AutomationsController {
 
 	private final AutomationService service;
-	private final Portal portal;
+	private final @Nullable Portal portal;
 
-	@Nullable public ServiceAutomationsController(AutomationService service, Portal portal) {
+	/** @param portal the xdg-desktop-portal file chooser, or {@code null} when unavailable */
+	public ServiceAutomationsController(AutomationService service, @Nullable Portal portal) {
 		this.service = service;
 		this.portal = portal;
 	}
 
 	@Override
-	public @Nullable AutomationsFile getAutomations() {
+	public AutomationsFile getAutomations() {
 		return service.getAutomations();
 	}
 
 	@Override
-	public @Nullable Result<AutomationsFile> saveAutomations(JsonNode value) {
+	public Result<AutomationsFile> saveAutomations(JsonNode value) {
 		return service.saveAutomations(value);
 	}
 
 	@Override
-	public @Nullable Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath, String notesPath) {
+	public Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath,
+			@Nullable String notesPath) {
 		return service.runAutomationOnFile(ruleId, samplePath, notesPath);
 	}
 

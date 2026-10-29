@@ -2,8 +2,6 @@
 
 package dev.gravaai.media.ffmpeg.gen;
 
-import org.jspecify.annotations.Nullable;
-
 import java.lang.invoke.*;
 import java.lang.foreign.*;
 import java.nio.ByteOrder;
@@ -6752,7 +6750,7 @@ public class ffmpeg_h extends ffmpeg_h$shared {
      * int sws_scale(SwsContext *c, const uint8_t *const srcSlice[], const int srcStride[], int srcSliceY, int srcSliceH, uint8_t *const dst[], const int dstStride[])
      * }
      */
-    public static int sws_scale(@Nullable MemorySegment c, MemorySegment srcSlice, MemorySegment srcStride, int srcSliceY, int srcSliceH, MemorySegment dst, MemorySegment dstStride) {
+    public static int sws_scale(MemorySegment c, MemorySegment srcSlice, MemorySegment srcStride, int srcSliceY, int srcSliceH, MemorySegment dst, MemorySegment dstStride) {
         var mh$ = sws_scale.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
@@ -6819,7 +6817,7 @@ public class ffmpeg_h extends ffmpeg_h$shared {
      * int sws_setColorspaceDetails(SwsContext *c, const int inv_table[4], int srcRange, const int table[4], int dstRange, int brightness, int contrast, int saturation)
      * }
      */
-    public static int sws_setColorspaceDetails(@Nullable MemorySegment c, MemorySegment inv_table, int srcRange, MemorySegment table, int dstRange, int brightness, int contrast, int saturation) {
+    public static int sws_setColorspaceDetails(MemorySegment c, MemorySegment inv_table, int srcRange, MemorySegment table, int dstRange, int brightness, int contrast, int saturation) {
         var mh$ = sws_setColorspaceDetails.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
@@ -7187,7 +7185,7 @@ public class ffmpeg_h extends ffmpeg_h$shared {
      * int swr_convert(struct SwrContext *s, uint8_t *const *out, int out_count, const uint8_t *const *in, int in_count)
      * }
      */
-    public static int swr_convert(@Nullable MemorySegment s, MemorySegment out, int out_count, MemorySegment in, int in_count) {
+    public static int swr_convert(MemorySegment s, MemorySegment out, int out_count, MemorySegment in, int in_count) {
         var mh$ = swr_convert.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {

@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording.ports;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -19,7 +21,7 @@ public interface RecordingEnvironment {
 	Path ffmpeg();
 
 	/** The RNNoise model file, or null when it is not bundled. */
-	Path rnnoiseModel();
+	@Nullable Path rnnoiseModel();
 
 	/** Resolves a system tool such as {@code parec} or {@code pactl} on PATH. */
 	Path command(String name) throws IOException;

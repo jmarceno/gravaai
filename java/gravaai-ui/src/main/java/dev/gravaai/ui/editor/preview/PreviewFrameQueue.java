@@ -21,8 +21,6 @@ import dev.gravaai.media.compose.RgbaFrame;
  * <p>Only one producer (the engine's render thread) and one consumer (the {@code gl-preview}
  * thread) are expected, matching {@code PlaybackController.onFrame}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PreviewFrameQueue {
 
 	private final Object lock = new Object();
@@ -90,12 +88,12 @@ public final class PreviewFrameQueue {
 
 	/** One reusable frame buffer pair (source + webcam). */
 	private static final class Slot {
-		private ByteBuffer sourcePixels;
-		private ByteBuffer webcamPixels;
-		private ByteBuffer wallpaperPixels;
+		private @Nullable ByteBuffer sourcePixels;
+		private @Nullable ByteBuffer webcamPixels;
+		private @Nullable ByteBuffer wallpaperPixels;
 		private @Nullable RgbaFrame sourceFrame;
 		private @Nullable RgbaFrame webcamFrame;
-		private FrameInput frame;
+		private @Nullable FrameInput frame;
 
 		void copy(FrameInput input) {
 			sourceFrame = copy(input.sourceFrame(), true);
@@ -155,7 +153,7 @@ public final class PreviewFrameQueue {
 			return new RgbaFrame(frame.width(), frame.height(), target);
 		}
 
-		FrameInput frame() {
+		@Nullable FrameInput frame() {
 			return frame;
 		}
 	}

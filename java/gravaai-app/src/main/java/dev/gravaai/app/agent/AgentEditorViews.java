@@ -37,8 +37,6 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code set}. Every read ends with {@code rev} so the next {@code edit} can detect a concurrent
  * user change.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentEditorViews {
 
 	private static final long DEFAULT_PAGE_MS = 180_000;
@@ -101,9 +99,14 @@ final class AgentEditorViews {
 		return String.join("\n", lines);
 	}
 
-	/** {@code formatTimeline}: one line per clip/zoom/speed/annotation/audio in the window. */
-	static String timeline(ProjectEditorState state, long sourceDurationMs, Double from, Double to,
-			long rev) {
+	/**
+	 * {@code formatTimeline}: one line per clip/zoom/speed/annotation/audio in the window.
+	 *
+	 * @param from start of the window in seconds, or {@code null} for the beginning
+	 * @param to end of the window in seconds, or {@code null} for one default page
+	 */
+	static String timeline(ProjectEditorState state, long sourceDurationMs, @Nullable Double from,
+			@Nullable Double to, long rev) {
 		AgentIds ids = AgentIds.of(state);
 		long editedMs = editedDurationMs(state, sourceDurationMs);
 		long fromMs = Math.max(0, Math.round((from == null ? 0 : from) * 1000));
@@ -227,9 +230,14 @@ final class AgentEditorViews {
 		return String.join("\n", lines);
 	}
 
-	/** {@code formatTranscript}: words grouped by cue with {@code ~} cut markers and pauses. */
-	static String transcript(ProjectEditorState state, long sourceDurationMs, Double from,
-			Double to, long rev) {
+	/**
+	 * {@code formatTranscript}: words grouped by cue with {@code ~} cut markers and pauses.
+	 *
+	 * @param from start of the window in seconds, or {@code null} for the beginning
+	 * @param to end of the window in seconds, or {@code null} for one default page
+	 */
+	static String transcript(ProjectEditorState state, long sourceDurationMs,
+			@Nullable Double from, @Nullable Double to, long rev) {
 		AgentIds ids = AgentIds.of(state);
 		long fromMs = Math.max(0, Math.round((from == null ? 0 : from) * 1000));
 		long toMs = to != null ? Math.min(sourceDurationMs, Math.round(to * 1000))
@@ -296,8 +304,12 @@ final class AgentEditorViews {
 		return String.join("\n", lines);
 	}
 
-	/** {@code formatSettings}: flat key=value list of everything {@code set} can change. */
-	static String settings(ProjectEditorState state, String topic, long rev) {
+	/**
+	 * {@code formatSettings}: flat key=value list of everything {@code set} can change.
+	 *
+	 * @param topic a setting-key filter, or {@code null} to list every setting
+	 */
+	static String settings(ProjectEditorState state, @Nullable String topic, long rev) {
 		ObjectNode editor = ProjectDocument.writeEditor(state, Json.nodeFactory().objectNode());
 		List<String[]> settings = new ArrayList<>();
 		for (Map.Entry<String, JsonNode> entry : editor.properties()) {

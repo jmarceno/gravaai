@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryNotEmptyException;
@@ -22,7 +24,8 @@ public final class FileActions {
 	private FileActions() {}
 
 	/** Port of {@code FileActionOptions}. */
-	public record FileActionOptions(AutomationContext context, String folder, String fileName, Path homedir) {}
+	public record FileActionOptions(AutomationContext context, String folder,
+			@Nullable String fileName, Path homedir) {}
 
 	/** Port of {@code RunDetachedCommandOptions}. */
 	public record RunDetachedCommandOptions(String program, List<String> args, Path cwd, Path homedir) {}
@@ -85,7 +88,8 @@ public final class FileActions {
 		builder.start();
 	}
 
-	private static String targetBaseName(String fileName, AutomationContext context) {
+	/** @param fileName the optional target file-name template, or null to keep the source name */
+	private static String targetBaseName(@Nullable String fileName, AutomationContext context) {
 		String template = fileName != null && !fileName.trim().isEmpty() ? fileName : "{name}";
 		return AutomationText.sanitizeFileName(AutomationText.expandAutomationTemplate(template, context));
 	}

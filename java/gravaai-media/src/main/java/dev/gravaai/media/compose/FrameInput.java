@@ -37,8 +37,6 @@ import java.util.List;
  *        the TS exporter's {@code timestamp}/{@code currentVideoTime}, while zoom, annotations,
  *        fade and the wallpaper follow the timeline time
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record FrameInput(
 		long frameIndex,
 		double timeSeconds,
@@ -93,8 +91,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,
@@ -117,8 +115,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,
@@ -136,8 +134,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,
@@ -156,8 +154,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,
@@ -177,8 +175,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,
@@ -199,8 +197,8 @@ public record FrameInput(
 	public FrameInput(
 			long frameIndex,
 			double timeSeconds,
-			RgbaFrame sourceFrame,
-			RgbaFrame webcamFrame,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
 			List<CursorSample> cursorSamples,
 			Background background,
 			double backgroundBlur,

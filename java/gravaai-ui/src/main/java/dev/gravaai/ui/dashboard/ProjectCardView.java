@@ -43,8 +43,6 @@ import javafx.scene.shape.Rectangle;
  * selecting/busy): raw cards play the recording itself like React's {@code RawThumbnail}
  * {@code <video>}; audio-only raw entries and meeting cards never preview.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class ProjectCardView extends VBox {
 
 	private final DashboardModel model;
@@ -207,13 +205,19 @@ final class ProjectCardView extends VBox {
 				: new ProjectHoverPreview(dependencies.projects(), entry.path(),
 						this::unmountHoverPreview);
 		hoverPreview = preview;
-		thumbnailHost.getChildren().add(preview);
+		StackPane thumbnail = thumbnailHost;
+		if (thumbnail != null) {
+			thumbnail.getChildren().add(preview);
+		}
 		preview.start();
 	}
 
 	private void unmountHoverPreview() {
 		if (hoverPreview != null) {
-			thumbnailHost.getChildren().remove(hoverPreview);
+			StackPane thumbnail = thumbnailHost;
+			if (thumbnail != null) {
+				thumbnail.getChildren().remove(hoverPreview);
+			}
 			hoverPreview = null;
 		}
 	}

@@ -12,8 +12,6 @@ import dev.gravaai.core.editor.ExportPreferences.ExportPipelineModel;
  * View-model of the export status line (port of
  * {@code src/components/video-editor/exportStatusModel.ts}, plan §5.10/§5.12).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparing,
 		boolean isExportFinalizing, boolean isRenderingAudio, @Nullable Double exportFinalizingProgress,
 		@Nullable Integer exportFinalizingPercent, boolean isExportMuxingAndSaving,
@@ -26,9 +24,17 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 		nativeSkipReasons = nativeSkipReasons == null ? List.of() : List.copyOf(nativeSkipReasons);
 	}
 
-	/** {@code resolveExportStatusModel}. */
-	public static @Nullable ExportStatusModel resolve(boolean isExporting, ExportProgress exportProgress,
-			ExportFormat exportFormat, ExportPipelineModel exportPipelineModel) {
+	/**
+	 * {@code resolveExportStatusModel}.
+	 *
+	 * @param exportProgress the latest progress snapshot, or {@code null} when no export is running
+	 * @param exportFormat the selected export format, or {@code null} for the MP4 default
+	 * @param exportPipelineModel the selected pipeline model, or {@code null} for the modern default
+	 * @return the status model, never {@code null}
+	 */
+	public static ExportStatusModel resolve(boolean isExporting,
+			@Nullable ExportProgress exportProgress, @Nullable ExportFormat exportFormat,
+			@Nullable ExportPipelineModel exportPipelineModel) {
 		ExportFormat format = exportFormat == null ? ExportFormat.MP4 : exportFormat;
 		ExportPipelineModel model = exportPipelineModel == null
 				? ExportPipelineModel.MODERN
@@ -39,16 +45,21 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 				&& (exportProgress == null || exportProgress.phase() == ExportProgress.Phase.PREPARING);
 		boolean isExportFinalizing = exportProgress != null
 				&& exportProgress.phase() == ExportProgress.Phase.FINALIZING;
-		boolean isRenderingAudio = isExportFinalizing && exportProgress.audioProgress() != null;
-		double rawFinalizingProgress = exportProgress != null && exportProgress.renderProgress() != null
-				? exportProgress.renderProgress()
-				: exportProgress == null ? 100 : exportProgress.percentage();
-		Double exportFinalizingProgress = isExportFinalizing
-				? Math.max(0, Math.min(100,
-						Double.isFinite(rawFinalizingProgress) ? rawFinalizingProgress : 0))
-				: null;
+		boolean isRenderingAudio = exportProgress != null
+				&& exportProgress.phase() == ExportProgress.Phase.FINALIZING
+				&& exportProgress.audioProgress() != null;
+		double rawFinalizingProgress = 100;
+		if (exportProgress != null) {
+			Double renderProgress = exportProgress.renderProgress();
+			rawFinalizingProgress = renderProgress != null
+					? renderProgress
+					: exportProgress.percentage();
+		}
+		double finalizingProgress = Math.max(0, Math.min(100,
+				Double.isFinite(rawFinalizingProgress) ? rawFinalizingProgress : 0));
+		Double exportFinalizingProgress = isExportFinalizing ? finalizingProgress : null;
 		Integer exportFinalizingPercent = isExportFinalizing
-				? (int) Math.round(exportFinalizingProgress)
+				? (int) Math.round(finalizingProgress)
 				: null;
 		boolean isExportMuxingAndSaving = isExportFinalizing
 				&& format == ExportFormat.MP4
@@ -75,12 +86,18 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 						? String.format(Locale.ROOT, "%.1f", exportProgress.renderFps())
 						: null;
 		String runtimeLabel = resolveRuntimeLabel(exportProgress);
-		List<String> nativeSkipReasons = exportProgress != null
-				&& !exportProgress.nativeStaticLayoutSkipReasons().isEmpty()
-						? exportProgress.nativeStaticLayoutSkipReasons()
-						: exportProgress != null && exportProgress.nativeStaticLayoutSkipReason() != null
-								? List.of(exportProgress.nativeStaticLayoutSkipReason())
-								: List.of();
+		List<String> nativeSkipReasons = List.of();
+		if (exportProgress != null) {
+			List<String> skipReasons = exportProgress.nativeStaticLayoutSkipReasons();
+			if (skipReasons != null && !skipReasons.isEmpty()) {
+				nativeSkipReasons = skipReasons;
+			} else {
+				String skipReason = exportProgress.nativeStaticLayoutSkipReason();
+				if (skipReason != null) {
+					nativeSkipReasons = List.of(skipReason);
+				}
+			}
+		}
 		String nativeSkipLabel = nativeSkipReasons.isEmpty()
 				? null
 				: "Native skipped: " + nativeSkipReasons.get(0)
@@ -94,7 +111,7 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 				renderSpeedFps, runtimeLabel, nativeSkipReasons, nativeSkipLabel);
 	}
 
-	private static @Nullable String resolveRuntimeLabel(ExportProgress exportProgress) {
+	private static @Nullable String resolveRuntimeLabel(@Nullable ExportProgress exportProgress) {
 		if (exportProgress == null) {
 			return null;
 		}

@@ -13,12 +13,16 @@ public enum MeetingServiceKind {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	/** The enum for a settings value, or null when it is not one of the two allowed strings. */
-	public static @Nullable MeetingServiceKind fromWire(Object value) {
+	/**
+	 * The enum for a settings value, or null when it is not one of the two allowed strings.
+	 *
+	 * @param value the raw settings value, or null when the setting is absent
+	 */
+	public static @Nullable MeetingServiceKind fromWire(@Nullable Object value) {
 		if (!(value instanceof String text)) {
 			return null;
 		}

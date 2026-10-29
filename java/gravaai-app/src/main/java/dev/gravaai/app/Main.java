@@ -21,12 +21,11 @@ import javafx.application.Application;
  *   <li>{@link Application#launch(GravaaiApp.class)}.</li>
  * </ol>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Main {
 
 	private static volatile @Nullable GlobalShortcutAction launchAction;
-	private static Thread fontPreload;
+	/** Background font preload thread; {@code null} on the direct-editor startup path. */
+	private static @Nullable Thread fontPreload;
 
 	private Main() {
 	}
@@ -88,7 +87,7 @@ public final class Main {
 		Application.launch(GravaaiApp.class, args);
 	}
 
-	static Thread fontPreload() {
+	static @Nullable Thread fontPreload() {
 		return fontPreload;
 	}
 
@@ -108,7 +107,7 @@ public final class Main {
 	}
 
 	/** The launch action that must be dispatched once the HUD is ready, or null. */
-	static GlobalShortcutAction launchAction() {
+	static @Nullable GlobalShortcutAction launchAction() {
 		return launchAction;
 	}
 }

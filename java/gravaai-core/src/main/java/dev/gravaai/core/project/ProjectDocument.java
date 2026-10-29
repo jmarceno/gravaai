@@ -21,8 +21,6 @@ import tools.jackson.databind.node.ObjectNode;
  * developer motion-blur tuning are dropped exactly like {@code createProjectData} +
  * {@code stripPersistedDevMotionBlurSettings} do in the TS sources.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectDocument {
 
 	/** Every editor field this build knows; they are rewritten from the typed state on save. */
@@ -202,7 +200,7 @@ public final class ProjectDocument {
 		return editor;
 	}
 
-	private static ObjectNode writePadding(@Nullable Padding padding) {
+	private static ObjectNode writePadding(Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -212,7 +210,7 @@ public final class ProjectDocument {
 		return node;
 	}
 
-	private static ObjectNode writeCropRegion(@Nullable CropRegion crop) {
+	private static ObjectNode writeCropRegion(CropRegion crop) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("x", crop.x());
 		node.put("y", crop.y());

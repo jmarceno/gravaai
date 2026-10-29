@@ -53,8 +53,6 @@ import javafx.util.Duration;
  * // shutdown: hud.dispose()
  * }</pre>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudOverlayWindow implements GlobalShortcutHud {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud");
@@ -421,10 +419,10 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		// Opaque window sized exactly to its content: [webcam preview] [hint] bar, top to bottom.
 		double width = Math.max(barWidth, hintWidth);
 		double height = barHeight + hintHeight;
-		boolean previewVisible = webcamPreview != null && webcamPreview.isVisible();
-		if (previewVisible) {
-			width = Math.max(width, webcamPreview.frameWidth());
-			height += webcamPreview.frameHeight() + PREVIEW_GAP;
+		HudWebcamPreview preview = webcamPreview;
+		if (preview != null && preview.isVisible()) {
+			width = Math.max(width, preview.frameWidth());
+			height += preview.frameHeight() + PREVIEW_GAP;
 		}
 		Rectangle2D bounds = hudScreen().getVisualBounds();
 		width = Math.min(width, bounds.getWidth());
@@ -447,7 +445,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		if (visible) {
 			HudWebcamPreview preview = webcamPreview();
 			String device = cameraPath(state);
-			if (!preview.isVisible() || !Objects.equals(previewDevice, device)) {
+			if (device != null && (!preview.isVisible() || !Objects.equals(previewDevice, device))) {
 				preview.start(device);
 				previewDevice = device;
 			}
@@ -522,14 +520,17 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	}
 
 	/**
-	 * The screen the HUD lives on. Default: the primary display (same as electron/windows.ts).
+	 * The screen the HUD lives on: the primary display by default (same as electron/windows.ts);
 	 * {@code -Dgravaai.hud.screen=widest} is the development/screenshot variant for this machine,
 	 * whose primary display is portrait.
 	 */
-	static @Nullable Screen hudScreen() {
+	static Screen hudScreen() {
 		String setting = System.getProperty("gravaai.hud.screen", "");
 		if (setting.equals("widest")) {
-			return dev.gravaai.ui.kit.ShowcaseStage.showcaseScreen();
+			Screen widest = dev.gravaai.ui.kit.ShowcaseStage.showcaseScreen();
+			if (widest != null) {
+				return widest;
+			}
 		}
 		return Screen.getPrimary();
 	}

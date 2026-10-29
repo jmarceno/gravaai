@@ -74,8 +74,6 @@ import tools.jackson.databind.node.ObjectNode;
  * {@link Services}; everything the editor itself owns (undo/redo, project state) stays in
  * {@link EditorSession}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorWindow {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
@@ -104,7 +102,7 @@ public final class EditorWindow {
 			@Nullable Function<String, Optional<Path>> chooseOpenFile,
 			@Nullable Function<String, Optional<Path>> chooseSaveFile,
 			@Nullable ProjectExporter exporter,
-			java.util.function.@Nullable Supplier<RecordingService> recordings,
+			java.util.function.@Nullable Supplier<@Nullable RecordingService> recordings,
 			@Nullable Runnable openRecordingsFolder) {
 
 		/** Backwards-compatible constructor without the export controller. */
@@ -165,7 +163,7 @@ public final class EditorWindow {
 			new java.util.concurrent.atomic.AtomicBoolean();
 	private final java.util.concurrent.atomic.AtomicLong pendingPlayheadMs =
 			new java.util.concurrent.atomic.AtomicLong();
-	private @Nullable int[] cachedVideoSize;
+	private int @Nullable [] cachedVideoSize;
 	/** The fresh-recording auto-zoom pass runs at most once per editor. */
 	private boolean freshRecordingZoomsTried;
 	private volatile @Nullable Runnable onGoHome;
@@ -174,29 +172,45 @@ public final class EditorWindow {
 		this(EditorSession.open(projectPath), services, null);
 	}
 
-	private EditorWindow(EditorSession session, Services services, Stage hostStage) {
+	private EditorWindow(EditorSession session, Services services, @Nullable Stage hostStage) {
 		this.services = services == null ? Services.bare() : services;
 		this.session = session;
 		this.actions = new Actions();
-		this.recordingImport = services.recordings() == null ? null
-				: new RecordingImportController(new RecordingImportController.Library() {
+		java.util.function.Supplier<@Nullable RecordingService> recordingSupplier = services.recordings();
+		if (recordingSupplier == null) {
+			this.recordingImport = null;
+		} else {
+			java.util.function.Supplier<@Nullable RecordingService> recordings = recordingSupplier;
+			this.recordingImport = new RecordingImportController(
+					new RecordingImportController.Library() {
 					@Override
 					public RecordingImportService.ImportResult importRecording(String currentPath,
 							String recordingPath, RecordingImportService.@Nullable RecordingWebcamSource currentWebcam,
 							java.util.function.BooleanSupplier cancelled) throws IOException {
-						return services.recordings().get().importRecording(currentPath, recordingPath,
+						RecordingService recordingService = recordings.get();
+						if (recordingService == null) {
+							throw new IOException("the recording service is not attached yet");
+						}
+						return recordingService.importRecording(currentPath, recordingPath,
 								currentWebcam, cancelled);
 					}
 
 					@Override
 					public void discardRecordingImport(String output) throws IOException {
-						services.recordings().get().discardRecordingImport(output);
+						RecordingService recordingService = recordings.get();
+						if (recordingService == null) {
+							throw new IOException("the recording service is not attached yet");
+						}
+						recordingService.discardRecordingImport(output);
 					}
 
 					@Override
 					public java.util.List<dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint>
 							getCursorTelemetry(String videoPath) {
-						return services.recordings().get().getCursorTelemetry(videoPath);
+						RecordingService recordingService = recordings.get();
+						return recordingService == null
+								? java.util.List.of()
+								: recordingService.getCursorTelemetry(videoPath);
 					}
 				}, new RecordingImportController.Session() {
 					@Override
@@ -238,6 +252,7 @@ public final class EditorWindow {
 						});
 					}
 				}, actions::autoApplyFreshRecordingAutoZooms);
+		}
 		this.timeline = new TimelineView(session.timelineDataSource(), session.timelineCommands());
 		this.timelineSubscription = session.onTimelineChange(
 				() -> Platform.runLater(timeline::refreshData));
@@ -283,8 +298,9 @@ public final class EditorWindow {
 		this.scene = new Scene(new KitRoot(shell), initialWidth, initialHeight);
 		Theme.install(scene);
 		EditorShellView.installStyles(scene);
-		this.hosted = hostStage != null;
-		this.stage = hosted ? hostStage : new Stage();
+		Stage host = hostStage;
+		this.hosted = host != null;
+		this.stage = host != null ? host : new Stage();
 		stage.setTitle(title());
 		stage.setMinWidth(1024);
 		stage.setMinHeight(700);
@@ -389,7 +405,7 @@ public final class EditorWindow {
 	}
 
 	/** Same as {@link #requestHostClose(Runnable)} with a callback for the Cancel path. */
-	public void requestHostClose(Runnable proceed, Runnable cancelled) {
+	public void requestHostClose(Runnable proceed, @Nullable Runnable cancelled) {
 		Runnable next = proceed == null ? () -> { } : proceed;
 		Runnable abort = cancelled == null ? () -> { } : cancelled;
 		if (isExportRunning()) {
@@ -495,7 +511,7 @@ public final class EditorWindow {
 		return timeline;
 	}
 
-	public Path projectPath() {
+	public @Nullable Path projectPath() {
 		return session.projectPath();
 	}
 
@@ -631,7 +647,7 @@ public final class EditorWindow {
 				Toast.Variant.SUCCESS);
 	}
 
-	private @Nullable boolean save() {
+	private boolean save() {
 		if (session.isUnsaved()) {
 			// save-project without a path: the save dialog in the Projects folder.
 			return saveAsChosen();
@@ -639,8 +655,9 @@ public final class EditorWindow {
 		try {
 			session.save();
 			refreshTitle();
-			if (services.projectUpdated() != null) {
-				services.projectUpdated().accept(session.projectPath());
+			Path saved = session.projectPath();
+			if (saved != null && services.projectUpdated() != null) {
+				services.projectUpdated().accept(saved);
 			}
 			return true;
 		} catch (IOException | RuntimeException error) {
@@ -651,7 +668,7 @@ public final class EditorWindow {
 	}
 
 	/** Save As through the chooser; returns false when cancelled or failed. */
-	private @Nullable boolean saveAsChosen() {
+	private boolean saveAsChosen() {
 		Optional<Path> chosen = choose("Save project as", true);
 		if (chosen.isEmpty()) {
 			return false;
@@ -885,12 +902,17 @@ public final class EditorWindow {
 	}
 
 	private List<ProjectBrowserDialog.Entry> browserEntries() {
-		if (services.projects() == null) {
+		ProjectManager projectManager = services.projects();
+		if (projectManager == null) {
 			return List.of();
 		}
 		try {
+			List<ProjectLibraryEntry> projectEntries = projectManager.listProjectEntries();
+			if (projectEntries == null) {
+				return List.of();
+			}
 			List<ProjectBrowserDialog.Entry> entries = new ArrayList<>();
-			for (ProjectLibraryEntry entry : services.projects().listProjectEntries()) {
+			for (ProjectLibraryEntry entry : projectEntries) {
 				entries.add(new ProjectBrowserDialog.Entry(Path.of(entry.path()), entry.name(),
 						entry.updatedAt(),
 						entry.thumbnailPath() == null ? null : Path.of(entry.thumbnailPath()),
@@ -961,8 +983,12 @@ public final class EditorWindow {
 			try {
 				List<Path> allowed = new ArrayList<>();
 				allowed.add(source);
-				if (services.projects() != null) {
-					for (ProjectLibraryEntry entry : services.projects().listProjectEntries()) {
+				ProjectManager projectManager = services.projects();
+				List<ProjectLibraryEntry> projectEntries = projectManager == null
+						? null
+						: projectManager.listProjectEntries();
+				if (projectEntries != null) {
+					for (ProjectLibraryEntry entry : projectEntries) {
 						allowed.add(Path.of(entry.path()));
 					}
 				}
@@ -1042,10 +1068,12 @@ public final class EditorWindow {
 			if (session.videoPath() == null) {
 				return new int[] {0, 0};
 			}
-			if (cachedVideoSize == null) {
-				cachedVideoSize = videoSize(Path.of(session.videoPath()));
+			int[] size = cachedVideoSize;
+			if (size == null) {
+				size = videoSize(Path.of(session.videoPath()));
+				cachedVideoSize = size;
 			}
-			return cachedVideoSize;
+			return size;
 		}
 
 		@Override
@@ -1238,15 +1266,16 @@ public final class EditorWindow {
 
 		@Override
 		public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
-			RecordingService recordings = services.recordings() == null ? null : services.recordings().get();
-			if (recordings == null) {
+			java.util.function.Supplier<@Nullable RecordingService> recordings = services.recordings();
+			RecordingService recordingService = recordings == null ? null : recordings.get();
+			if (recordingService == null) {
 				return java.util.concurrent.CompletableFuture.completedFuture(null);
 			}
-			return recordings.getRecordingThumbnail(videoPath);
+			return recordingService.getRecordingThumbnail(videoPath);
 		}
 
 		@Override
-		public void addRecordingsToTimeline(List<String> paths, Integer index,
+		public void addRecordingsToTimeline(List<String> paths, @Nullable Integer index,
 				Consumer<ClipImportResult> done) {
 			if (recordingImport == null) {
 				Platform.runLater(() -> done.accept(null));

@@ -12,6 +12,7 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -31,8 +32,6 @@ import java.util.Optional;
  * normal case inside the app). Outside the app — for tests and the platform smoke — the bridge
  * falls back to {@code XOpenDisplay(NULL)}, so the same code can find windows of a running app.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class X11Bridge implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.x11");
@@ -65,15 +64,15 @@ public final class X11Bridge implements AutoCloseable {
 	private final MemorySegment display;
 	private final boolean ownsDisplay;
 	private final long root;
-	private final @Nullable MethodHandle internAtom;
-	private final @Nullable MethodHandle queryTree;
-	private final @Nullable MethodHandle fetchName;
-	private final @Nullable MethodHandle free;
-	private final @Nullable MethodHandle sendEvent;
-	private final @Nullable MethodHandle ungrabPointer;
-	private final @Nullable MethodHandle flush;
-	private final @Nullable MethodHandle closeDisplay;
-	private final @Nullable MethodHandle shapeCombineRectangles;
+	private final MethodHandle internAtom;
+	private final MethodHandle queryTree;
+	private final MethodHandle fetchName;
+	private final MethodHandle free;
+	private final MethodHandle sendEvent;
+	private final MethodHandle ungrabPointer;
+	private final MethodHandle flush;
+	private final MethodHandle closeDisplay;
+	private final MethodHandle shapeCombineRectangles;
 
 	private X11Bridge(Linker linker, MemorySegment display, boolean ownsDisplay) throws Throwable {
 		this.display = display;
@@ -265,9 +264,11 @@ public final class X11Bridge implements AutoCloseable {
 		}
 	}
 
-	private static @Nullable MethodHandle downcall(Linker linker, SymbolLookup lookup, String name,
+	/** Resolves and binds one Xlib symbol; an unbound handle is a broken install, not a state. */
+	private static MethodHandle downcall(Linker linker, SymbolLookup lookup, String name,
 			FunctionDescriptor descriptor) {
-		return linker.downcallHandle(lookup.findOrThrow(name), descriptor);
+		return Objects.requireNonNull(linker.downcallHandle(lookup.findOrThrow(name), descriptor),
+				"X11 downcall handle for " + name);
 	}
 
 	private static @Nullable MemorySegment gdkDisplay(Linker linker) {

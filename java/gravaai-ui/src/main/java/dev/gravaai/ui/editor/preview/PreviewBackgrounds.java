@@ -22,8 +22,6 @@ import dev.gravaai.ui.editor.EditorWallpapers;
  * <p>Colours and gradients go through the media layer's {@code Background.fromWallpaper} (the same
  * parser as the export renderer); plain files are read as encoded image bytes.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PreviewBackgrounds {
 
 	private static final String PREVIEW_ROOT = "/ui/editor/wallpapers/previews/";
@@ -31,16 +29,16 @@ public final class PreviewBackgrounds {
 	private static final Map<String, java.util.Optional<java.nio.file.Path>> VIDEO_PATHS =
 			new ConcurrentHashMap<>();
 
-	@Nullable private PreviewBackgrounds() {
+	private PreviewBackgrounds() {
 	}
 
 	/** The compositor background for a project wallpaper value; never null. */
-	public static @Nullable Background of(String wallpaper) {
+	public static Background of(@Nullable String wallpaper) {
 		String key = wallpaper == null ? "" : wallpaper.trim();
 		return CACHE.computeIfAbsent(key, PreviewBackgrounds::resolve);
 	}
 
-	private static @Nullable Background resolve(String value) {
+	private static Background resolve(String value) {
 		if (value.isEmpty()) {
 			return Background.black();
 		}
@@ -49,7 +47,7 @@ public final class PreviewBackgrounds {
 			return Background.black();
 		}
 		if (EditorWallpapers.isBundledWallpaper(value)) {
-			byte[] bytes = loadPreviewImage(value);
+			byte @Nullable [] bytes = loadPreviewImage(value);
 			return bytes == null ? Background.black() : new Background.Image(bytes);
 		}
 		try {
@@ -57,12 +55,12 @@ public final class PreviewBackgrounds {
 			// media-native's API update), so the preview and export resolve wallpapers identically.
 			return Background.fromWallpaper(value);
 		} catch (IllegalArgumentException imageSource) {
-			byte[] bytes = loadFileImage(value);
+			byte @Nullable [] bytes = loadFileImage(value);
 			return bytes == null ? Background.black() : new Background.Image(bytes);
 		}
 	}
 
-	private static @Nullable byte[] loadPreviewImage(String wallpaper) {
+	private static byte @Nullable [] loadPreviewImage(String wallpaper) {
 		String name = wallpaper.substring(wallpaper.lastIndexOf('/') + 1);
 		if (EditorWallpapers.isVideoWallpaper(name)) {
 			name = name.replaceFirst("\\.[^.]+$", ".jpg");
@@ -78,15 +76,16 @@ public final class PreviewBackgrounds {
 	 * The file to decode for a video wallpaper, or null for other wallpapers. Bundled videos live
 	 * inside the application image, so they are extracted once to a temp file FFmpeg can open.
 	 */
-	public static java.nio.file.@Nullable Path videoPath(String wallpaper) {
-		if (!EditorWallpapers.isVideoWallpaper(wallpaper)) {
+	public static java.nio.file.@Nullable Path videoPath(@Nullable String wallpaper) {
+		if (wallpaper == null || !EditorWallpapers.isVideoWallpaper(wallpaper)) {
 			return null;
 		}
-		return VIDEO_PATHS.computeIfAbsent(wallpaper.trim(), PreviewBackgrounds::resolveVideo)
+		String value = wallpaper;
+		return VIDEO_PATHS.computeIfAbsent(value.trim(), PreviewBackgrounds::resolveVideo)
 				.orElse(null);
 	}
 
-	private static java.util.@Nullable Optional<java.nio.file.Path> resolveVideo(String value) {
+	private static java.util.Optional<java.nio.file.Path> resolveVideo(String value) {
 		try {
 			if (EditorWallpapers.isBundledWallpaper(value)) {
 				String name = value.substring(value.lastIndexOf('/') + 1);
@@ -114,7 +113,7 @@ public final class PreviewBackgrounds {
 	}
 
 	/** User wallpapers: an absolute path or {@code file://} URL the compositor cannot resolve. */
-	private static @Nullable byte[] loadFileImage(String value) {
+	private static byte @Nullable [] loadFileImage(String value) {
 		try {
 			java.nio.file.Path path = value.startsWith("file:")
 					? java.nio.file.Path.of(java.net.URI.create(value))

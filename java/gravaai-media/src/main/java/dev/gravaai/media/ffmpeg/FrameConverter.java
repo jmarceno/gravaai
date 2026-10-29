@@ -58,7 +58,8 @@ public final class FrameConverter implements AutoCloseable {
 	private final MemorySegment sourceDataArray;
 	private final MemorySegment sourceStrideArray;
 	private final ByteBuffer rgba;
-	private @Nullable MemorySegment swsContext;
+	/** libswscale context; {@link MemorySegment#NULL} until the first frame is converted. */
+	private MemorySegment swsContext = MemorySegment.NULL;
 	private int sourceWidth;
 	private int sourceHeight;
 	private int sourcePixelFormat;
@@ -133,7 +134,7 @@ public final class FrameConverter implements AutoCloseable {
 		if (frame.planes().isEmpty()) {
 			throw new IllegalArgumentException("frame has no planes");
 		}
-		if (swsContext == null
+		if (swsContext.address() == 0
 				|| frame.width() != sourceWidth
 				|| frame.height() != sourceHeight
 				|| frame.pixelFormat() != sourcePixelFormat) {
@@ -151,7 +152,7 @@ public final class FrameConverter implements AutoCloseable {
 	}
 
 	private void createContext(DecodedFrame frame) {
-		if (swsContext != null) {
+		if (swsContext.address() != 0) {
 			ffmpeg_h.sws_freeContext(swsContext);
 		}
 		sourceWidth = frame.width();
@@ -223,9 +224,9 @@ public final class FrameConverter implements AutoCloseable {
 		}
 		closed = true;
 		try {
-			if (swsContext != null && swsContext.address() != 0) {
+			if (swsContext.address() != 0) {
 				ffmpeg_h.sws_freeContext(swsContext);
-				swsContext = null;
+				swsContext = MemorySegment.NULL;
 			}
 		} finally {
 			arena.close();

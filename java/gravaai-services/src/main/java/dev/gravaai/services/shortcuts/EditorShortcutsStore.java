@@ -9,6 +9,7 @@ import java.nio.file.Path;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.core.storage.StorageFiles;
 import dev.gravaai.core.storage.UserData;
 import tools.jackson.databind.JsonNode;
@@ -48,11 +49,13 @@ public final class EditorShortcutsStore {
 	}
 
 	/** Port of the {@code save-shortcuts} handler. */
-	public Result<Void> write(JsonNode shortcuts) {
+	public Result<Unit> write(JsonNode shortcuts) {
 		try {
-			Files.createDirectories(filePath.toAbsolutePath().getParent());
+			Path parent = java.util.Objects.requireNonNull(filePath.toAbsolutePath().getParent(),
+					() -> "no parent directory for " + filePath);
+			Files.createDirectories(parent);
 			Json.writeFile(filePath, shortcuts);
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (IOException | RuntimeException error) {
 			return Result.err(String.valueOf(error));
 		}

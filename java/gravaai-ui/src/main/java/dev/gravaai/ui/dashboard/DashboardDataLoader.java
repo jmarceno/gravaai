@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
@@ -23,8 +25,6 @@ import dev.gravaai.ui.meeting.MeetingUiService;
  * {@link DashboardDependencies#meetings()} supplier so a service that comes up after the dashboard
  * is still found.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class DashboardDataLoader {
 
 	/** Port of the React failure the hook surfaces when the meeting list cannot be read. */
@@ -60,8 +60,9 @@ public final class DashboardDataLoader {
 		return load(includeRaw, false, null);
 	}
 
-	public DashboardSnapshot load(boolean includeRaw, Consumer<ProjectThumbnailReady> onThumbnailReady)
-			throws IOException {
+
+	public DashboardSnapshot load(boolean includeRaw,
+			@Nullable Consumer<ProjectThumbnailReady> onThumbnailReady) throws IOException {
 		return load(includeRaw, false, onThumbnailReady);
 	}
 
@@ -72,7 +73,7 @@ public final class DashboardDataLoader {
 	 *     thread itself
 	 */
 	public DashboardSnapshot load(boolean includeRaw, boolean includeMeetings,
-			Consumer<ProjectThumbnailReady> onThumbnailReady) throws IOException {
+			@Nullable Consumer<ProjectThumbnailReady> onThumbnailReady) throws IOException {
 		DashboardLibraryData libraryPreferences = preferences.load();
 		ProjectManager.ProjectLibrary library = projects.listProjectLibraryEntries(onThumbnailReady);
 		List<RecordingEntry> raw = includeRaw ? recordings.list(true) : List.of();

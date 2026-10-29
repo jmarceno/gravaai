@@ -28,7 +28,7 @@ public enum RenderHookPhase {
 	}
 
 	/** False only for the reserved {@code background} phase. */
-	public @Nullable boolean dispatched() {
+	public boolean dispatched() {
 		return dispatched;
 	}
 

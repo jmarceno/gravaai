@@ -41,8 +41,6 @@ import dev.gravaai.ui.kit.Button;
  * // wire recording-state-changed -> selector.recordingStateChanged(recording)
  * }</pre>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SourceSelectorOverlay implements SourceService.SourceSelectorUi {
 
 	/** {@code createSourceSelectorWindow}: 620x420, min 350, max 500 (windows.ts). */
@@ -84,8 +82,9 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 			return;
 		}
 		buildWindow();
-		stage.show();
-		stage.requestFocus();
+		Stage window = Objects.requireNonNull(stage, "source selector window not built");
+		window.show();
+		window.requestFocus();
 		loadSources();
 	}
 
@@ -213,7 +212,8 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 	}
 
 	private void rebuildList(List<SelectedSource> sources) {
-		list.getChildren().clear();
+		VBox sourceList = Objects.requireNonNull(list, "source selector list not built");
+		sourceList.getChildren().clear();
 		if (sources.isEmpty()) {
 			setStatus("No recording sources found.", false);
 			return;
@@ -229,29 +229,37 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 			Label heading = new Label("screen".equals(kind) ? "Screens" : "Windows");
 			heading.setStyle("-fx-text-fill: -g-muted; -fx-font-size: 12px; -fx-font-weight: 600;");
 			heading.setPadding(new Insets(8));
-			list.getChildren().add(heading);
+			sourceList.getChildren().add(heading);
 			for (SelectedSource source : entries) {
 				Button row = new Button(source.name(), Button.Variant.GHOST);
 				row.setMaxWidth(Double.MAX_VALUE);
 				row.setAlignment(Pos.CENTER_LEFT);
 				row.setStyle("-fx-padding: 8 12; -fx-alignment: center-left;");
 				row.setOnAction(event -> select(source));
-				list.getChildren().add(row);
+				sourceList.getChildren().add(row);
 			}
 		}
 	}
 
 	private void setStatus(@Nullable String text, boolean visible) {
-		statusLabel.setText(text == null ? "" : text);
-		statusLabel.setManaged(visible);
-		statusLabel.setVisible(visible);
+		Label label = statusLabel;
+		if (label == null) {
+			return;
+		}
+		label.setText(text == null ? "" : text);
+		label.setManaged(visible);
+		label.setVisible(visible);
 	}
 
 	private void showError(@Nullable String message) {
+		Label label = errorLabel;
+		if (label == null) {
+			return;
+		}
 		boolean visible = message != null && !message.isBlank();
-		errorLabel.setText(visible ? message : "");
-		errorLabel.setManaged(visible);
-		errorLabel.setVisible(visible);
+		label.setText(visible ? message : "");
+		label.setManaged(visible);
+		label.setVisible(visible);
 	}
 
 	/**
@@ -291,9 +299,15 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 	}
 
 	private void setRowsDisabled(boolean disabled) {
-		for (javafx.scene.Node node : list.getChildren()) {
-			node.setDisable(disabled);
+		VBox sourceList = list;
+		if (sourceList != null) {
+			for (javafx.scene.Node node : sourceList.getChildren()) {
+				node.setDisable(disabled);
+			}
 		}
-		refreshButton.setDisable(disabled);
+		Button refresh = refreshButton;
+		if (refresh != null) {
+			refresh.setDisable(disabled);
+		}
 	}
 }

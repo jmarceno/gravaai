@@ -58,7 +58,7 @@ public final class Tray implements AutoCloseable {
 		void RegisterStatusNotifierItem(String service);
 	}
 
-	private record State(@Nullable boolean recording, @Nullable String sourceName) {
+	private record State(boolean recording, @Nullable String sourceName) {
 		State {
 			sourceName = sourceName == null ? "" : sourceName;
 		}

@@ -52,8 +52,6 @@ import tools.jackson.databind.JsonNode;
  * {@code width/height/frameRate} from {@link Prepared} and the production
  * {@code ProjectFrameInputFactory}, reuse it (reset() between GIF passes) and close it afterwards.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectExport {
 
 	/** Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video. */
@@ -77,11 +75,16 @@ public final class ProjectExport {
 		}
 	}
 
-	/** The assembled export, exposed for tests and for the frame-provider construction. */
+	/**
+	 * The assembled export, exposed for tests and for the frame-provider construction.
+	 *
+	 * @param captionPayload the caption sidecar payload, or null when there are no captions
+	 * @param webcamPath the linked webcam track, or null when the project has none
+	 */
 	public record Prepared(ExportCoordinator.Request request, ExportAudioPlan audioPlan,
-			CaptionSidecars.Payload captionPayload, @Nullable ExportFormat format, int outputWidth,
-			int outputHeight, int frameRate, int bitrate, double durationSeconds,
-			Path videoPath, Path webcamPath, List<Path> audioInputs) {}
+			CaptionSidecars.@Nullable Payload captionPayload, @Nullable ExportFormat format,
+			int outputWidth, int outputHeight, int frameRate, int bitrate, double durationSeconds,
+			Path videoPath, @Nullable Path webcamPath, List<Path> audioInputs) {}
 
 	private ProjectExport() {}
 
@@ -182,7 +185,7 @@ public final class ProjectExport {
 		return clipsEnd > 0 ? clipsEnd : sourceDurationMs;
 	}
 
-	private static int validMp4FrameRate(@Nullable int frameRate) {
+	private static int validMp4FrameRate(int frameRate) {
 		for (int allowed : ExportPreferences.MP4_FRAME_RATES) {
 			if (allowed == frameRate) {
 				return frameRate;
@@ -277,7 +280,7 @@ public final class ProjectExport {
 		return ExportAudioSegments.buildEditedTrackSourceSegments(sourceDurationMs, trims, speeds);
 	}
 
-	private static @Nullable Map<String, ExportAudioRouting.TrackSetting> parseTrackSettings(
+	private static Map<String, ExportAudioRouting.TrackSetting> parseTrackSettings(
 			JsonNode settingsNode) {
 		Map<String, ExportAudioRouting.TrackSetting> settings = new LinkedHashMap<>();
 		if (settingsNode == null || !settingsNode.isObject()) {

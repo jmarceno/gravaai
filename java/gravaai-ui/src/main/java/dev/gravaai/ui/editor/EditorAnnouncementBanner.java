@@ -26,8 +26,6 @@ import javafx.util.Duration;
  * release, so the banner is hidden by default; the app can push a selected list via
  * {@link #show(List)}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorAnnouncementBanner extends HBox {
 
 	private final Consumer<String> onDismiss;
@@ -109,15 +107,14 @@ public final class EditorAnnouncementBanner extends HBox {
 	}
 
 	private void render() {
-		Announcements.Announcement current = current();
-		boolean visible = current != null;
-		setVisible(visible);
-		setManaged(visible);
+		Announcements.@Nullable Announcement current = current();
+		setVisible(current != null);
+		setManaged(current != null);
 		if (autoAdvance != null) {
 			autoAdvance.stop();
 			autoAdvance = null;
 		}
-		if (!visible) {
+		if (current == null) {
 			return;
 		}
 
@@ -127,8 +124,9 @@ public final class EditorAnnouncementBanner extends HBox {
 				|| !Boolean.FALSE.equals(current.controls().action()));
 		actionButton.setVisible(showAction);
 		actionButton.setManaged(showAction);
-		if (showAction) {
-			actionButton.setText(actionLabel(current.action()));
+		Announcements.@Nullable Action action = current.action();
+		if (showAction && action != null) {
+			actionButton.setText(actionLabel(action));
 		}
 		boolean showClose = current.controls() == null
 				|| !Boolean.FALSE.equals(current.controls().close());

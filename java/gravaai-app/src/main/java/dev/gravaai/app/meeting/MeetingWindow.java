@@ -60,7 +60,7 @@ public final class MeetingWindow {
 					if (onClose != null) {
 						onClose.run();
 					}
-				}, null, null));
+				}, () -> null, null));
 		double initialWidth = !ownsStage && stage.getScene() != null && stage.getWidth() > 0
 				? stage.getWidth() : 1200;
 		double initialHeight = !ownsStage && stage.getScene() != null && stage.getHeight() > 0

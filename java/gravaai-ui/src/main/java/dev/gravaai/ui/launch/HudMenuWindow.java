@@ -10,6 +10,7 @@ import dev.gravaai.ui.kit.Toggle;
 import dev.gravaai.ui.kit.AudioLevelMeter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -37,8 +38,6 @@ import javafx.stage.StageStyle;
  * button. Mic rows show a live level meter (PulseAudio via {@link MicLevelMonitor}); the webcam
  * menu shows a live camera preview ({@link WebcamPreviewView}).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudMenuWindow {
 
 	/** The HUD menus (HudMenuWindow.tsx {@code HudMenuId}) plus the monitor list. */
@@ -62,6 +61,28 @@ public final class HudMenuWindow {
 	private @Nullable ScrollPane scroll;
 	private @Nullable Menu active;
 	private @Nullable WebcamPreviewView menuPreview;
+
+	// Invariant: open() calls createStage() before any menu content method runs. These accessors
+	// make that invariant explicit once instead of scattering nullable-field guards through the UI.
+	private Stage stageWindow() {
+		return Objects.requireNonNull(stage, "HUD menu window not created");
+	}
+
+	private StackPane rootNode() {
+		return Objects.requireNonNull(root, "HUD menu root not created");
+	}
+
+	private VBox panelBox() {
+		return Objects.requireNonNull(panel, "HUD menu panel not created");
+	}
+
+	private ScrollPane scrollPane() {
+		return Objects.requireNonNull(scroll, "HUD menu scroll not created");
+	}
+
+	private VBox contentBox() {
+		return Objects.requireNonNull(content, "HUD menu content not created");
+	}
 
 	public HudMenuWindow(HudRecordingPort port) {
 		this.port = port;
@@ -96,12 +117,12 @@ public final class HudMenuWindow {
 				"menu " + menu + " contentChildren=" + (content == null ? -1 : content.getChildren().size())
 						+ " contentPref=" + (content == null ? -1 : content.prefHeight(480))
 						+ " scrollViewport=" + (scroll == null ? -1 : scroll.getPrefViewportHeight())
-						+ " panelPref=" + panel.prefHeight(520));
-		stage.show();
+						+ " panelPref=" + panelBox().prefHeight(520));
+		stageWindow().show();
 		// Re-fit once the scene has a layout pulse: ScrollPane pref sizes are only stable then.
 		javafx.application.Platform.runLater(this::fitPanelHeight);
-		stage.toFront();
-		Scene scene = root.getScene();
+		stageWindow().toFront();
+		Scene scene = rootNode().getScene();
 		if (scene != null) {
 			scene.removeEventFilter(KeyEvent.KEY_PRESSED, escape);
 			scene.addEventFilter(KeyEvent.KEY_PRESSED, escape);
@@ -112,7 +133,7 @@ public final class HudMenuWindow {
 	public void close() {
 		stopLiveViews();
 		if (stage != null) {
-			Scene scene = root.getScene();
+			Scene scene = rootNode().getScene();
 			if (scene != null) {
 				scene.removeEventFilter(KeyEvent.KEY_PRESSED, escape);
 			}
@@ -156,47 +177,51 @@ public final class HudMenuWindow {
 
 	/** Sizes the scroll area to the menu content so the panel hugs it (React max-h panel). */
 	private void fitPanelHeight() {
-		if (content == null || scroll == null) {
+		VBox contentBox = content;
+		ScrollPane scrollBox = scroll;
+		if (contentBox == null || scrollBox == null) {
 			return;
 		}
-		content.applyCss();
-		double contentHeight = Math.max(1, content.prefHeight(480));
+		contentBox.applyCss();
+		double contentHeight = Math.max(1, contentBox.prefHeight(480));
 		double limit = Math.min(HudOverlayWindow.hudScreen().getVisualBounds().getHeight() * 0.82, 720) - 60;
-		scroll.setPrefHeight(Math.min(contentHeight + 16, limit));
-		scroll.setMaxHeight(limit);
-		panel.applyCss();
+		scrollBox.setPrefHeight(Math.min(contentHeight + 16, limit));
+		scrollBox.setMaxHeight(limit);
+		panelBox().applyCss();
 		System.getLogger("gravaai.hud").log(System.Logger.Level.DEBUG,
-				"menu content height " + contentHeight + " viewport " + scroll.getPrefViewportHeight());
+				"menu content height " + contentHeight + " viewport " + scrollBox.getPrefViewportHeight());
 	}
 
 	private void applyDisplayBounds() {
 		Screen screen = HudOverlayWindow.hudScreen();
 		var bounds = screen.getVisualBounds();
-		stage.setX(bounds.getMinX());
-		stage.setY(bounds.getMinY());
-		stage.setWidth(bounds.getWidth());
-		stage.setHeight(bounds.getHeight());
+		Stage window = stageWindow();
+		window.setX(bounds.getMinX());
+		window.setY(bounds.getMinY());
+		window.setWidth(bounds.getWidth());
+		window.setHeight(bounds.getHeight());
 		// Content-height panel (React max-h panel): the scroll area caps its own height.
-		panel.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+		panelBox().setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 	}
 
 	// ── menus ─────────────────────────────────────────────────────────────
 
 	private void buildMicMenu(HudRecordingPort.State state) {
 		startPanel("Microphone");
-		content.getChildren().add(menuItem("System audio",
+		VBox contentPane = contentBox();
+		contentPane.getChildren().add(menuItem("System audio",
 				state.systemAudioEnabled() ? Icons.SpeakerHighIcon : Icons.SpeakerXIcon,
 				state.systemAudioEnabled(),
 				state.systemAudioEnabled() ? "Disable system audio" : "Enable system audio",
 				() -> port.setSystemAudioEnabled(!state.systemAudioEnabled())));
 		if (state.microphoneEnabled()) {
-			content.getChildren().add(menuItem("Turn Off Microphone", Icons.MicrophoneSlashIcon, false,
+			contentPane.getChildren().add(menuItem("Turn Off Microphone", Icons.MicrophoneSlashIcon, false,
 					"Turn off the microphone", () -> {
 						port.setMicrophoneEnabled(false);
 						close();
 					}));
 		} else {
-			content.getChildren().add(note("Select a microphone to enable"));
+			contentPane.getChildren().add(note("Select a microphone to enable"));
 		}
 		List<HudRecordingPort.MicDevice> devices = port.microphoneDevices();
 		for (HudRecordingPort.MicDevice device : devices) {
@@ -217,23 +242,24 @@ public final class HudMenuWindow {
 				port.setMicrophoneDeviceId(device.id());
 				close();
 			});
-			content.getChildren().add(item);
+			contentPane.getChildren().add(item);
 			monitors.add(MicLevelMonitor.start(device.id(), meter::setLevel));
 		}
 		if (devices.isEmpty()) {
-			content.getChildren().add(emptyNote("No microphones found"));
+			contentPane.getChildren().add(emptyNote("No microphones found"));
 		}
 	}
 
 	private void buildWebcamMenu(HudRecordingPort.State state) {
 		startPanel("Webcam");
+		VBox contentPane = contentBox();
 		if (state.webcamEnabled()) {
-			content.getChildren().add(menuItem("Turn Off Webcam", Icons.VideoCameraSlashIcon, false,
+			contentPane.getChildren().add(menuItem("Turn Off Webcam", Icons.VideoCameraSlashIcon, false,
 					"Turn off the webcam overlay", () -> {
 						port.setWebcamEnabled(false);
 						close();
 					}));
-			content.getChildren().add(menuItem(
+			contentPane.getChildren().add(menuItem(
 					state.floatingWebcamPreview() ? "Hide Floating Preview" : "Show Floating Preview",
 					state.floatingWebcamPreview() ? Icons.EyeSlashIcon : Icons.EyeIcon,
 					state.floatingWebcamPreview(),
@@ -244,18 +270,18 @@ public final class HudMenuWindow {
 			frame.getStyleClass().add("hud-menu-webcam-frame");
 			frame.setPrefSize(420, 315);
 			frame.setMaxSize(420, 315);
-			content.getChildren().add(frame);
+			contentPane.getChildren().add(frame);
 			List<HudRecordingPort.CameraDevice> cameras = port.cameraDevices();
 			if (!cameras.isEmpty()) {
 				menuPreview.start(selectCamera(state, cameras).path());
 			}
 		} else {
-			content.getChildren().add(note("Select a webcam to enable"));
+			contentPane.getChildren().add(note("Select a webcam to enable"));
 		}
 		List<HudRecordingPort.CameraDevice> cameras = port.cameraDevices();
 		for (HudRecordingPort.CameraDevice camera : cameras) {
 			boolean selected = state.webcamEnabled() && cameraMatches(state, camera);
-			content.getChildren().add(menuItem(camera.label(),
+			contentPane.getChildren().add(menuItem(camera.label(),
 					selected ? Icons.VideoCameraIcon : Icons.VideoCameraSlashIcon, selected,
 					camera.label(), () -> {
 						port.setWebcamEnabled(true);
@@ -264,7 +290,7 @@ public final class HudMenuWindow {
 					}));
 		}
 		if (cameras.isEmpty()) {
-			content.getChildren().add(emptyNote("No webcams found"));
+			contentPane.getChildren().add(emptyNote("No webcams found"));
 		}
 	}
 
@@ -274,16 +300,17 @@ public final class HudMenuWindow {
 	 */
 	private void buildScreenMenu(HudRecordingPort.State state) {
 		startPanel("Screen to record");
+		VBox contentPane = contentBox();
 		List<HudRecordingPort.ScreenDevice> screens = port.screenDevices();
 		if (screens.isEmpty()) {
 			Label empty = new Label("No screens found.");
 			empty.getStyleClass().add("hud-menu-item-empty");
-			content.getChildren().add(empty);
+			contentPane.getChildren().add(empty);
 			return;
 		}
 		for (HudRecordingPort.ScreenDevice screen : screens) {
 			boolean selected = screen.label().equals(state.sourceName());
-			content.getChildren().add(menuItem(screen.label(), Icons.MonitorIcon, selected, screen.label(),
+			contentPane.getChildren().add(menuItem(screen.label(), Icons.MonitorIcon, selected, screen.label(),
 					() -> {
 						port.selectScreen(screen.id());
 						close();
@@ -293,9 +320,10 @@ public final class HudMenuWindow {
 
 	private void buildCountdownMenu(HudRecordingPort.State state) {
 		startPanel("Countdown delay");
+		VBox contentPane = contentBox();
 		for (int delay : COUNTDOWN_OPTIONS) {
 			String label = delay == 0 ? "No delay" : delay + "s";
-			content.getChildren().add(menuItem(label, Icons.TimerIcon, state.countdownDelay() == delay, label,
+			contentPane.getChildren().add(menuItem(label, Icons.TimerIcon, state.countdownDelay() == delay, label,
 					() -> {
 						port.setCountdownDelay(delay);
 						close();
@@ -320,6 +348,7 @@ public final class HudMenuWindow {
 
 	private void startPanel(String title) {
 		stopLiveViews();
+		VBox panel = panelBox();
 		panel.getChildren().clear();
 		Label titleLabel = new Label(title);
 		titleLabel.getStyleClass().add("hud-menu-title");

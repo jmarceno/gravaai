@@ -17,8 +17,6 @@ import dev.gravaai.media.playback.PlaybackFrame;
  * frames; callers that map the snapshot must hold its monitor until the submitted input has been
  * copied by the renderer queue (see {@code EditorPreviewView.submitSnapshot}).</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class PreviewFrameSnapshot {
 
 private long frameIndex;
@@ -48,14 +46,22 @@ timelineSeconds = frame.timelineSeconds();
 sourceSeconds = frame.sourceSeconds();
 clipId = frame.clipId();
 webcamVisible = frame.webcamVisible();
-sourcePixels = copyInto(frame.sourceFrame(), sourcePixels);
-sourceFrame = frame.sourceFrame() == null ? null
-: new RgbaFrame(frame.sourceFrame().width(), frame.sourceFrame().height(),
-sourcePixels);
-webcamPixels = copyInto(frame.webcamFrame(), webcamPixels);
-webcamFrame = frame.webcamFrame() == null ? null
-: new RgbaFrame(frame.webcamFrame().width(), frame.webcamFrame().height(),
-webcamPixels);
+RgbaFrame source = frame.sourceFrame();
+if (source == null) {
+sourceFrame = null;
+sourcePixels = null;
+} else {
+sourcePixels = copyInto(source, sourcePixels);
+sourceFrame = new RgbaFrame(source.width(), source.height(), sourcePixels);
+}
+RgbaFrame webcam = frame.webcamFrame();
+if (webcam == null) {
+webcamFrame = null;
+webcamPixels = null;
+} else {
+webcamPixels = copyInto(webcam, webcamPixels);
+webcamFrame = new RgbaFrame(webcam.width(), webcam.height(), webcamPixels);
+}
 }
 
 /** The retained frame, safe to map through a new {@link PreviewFrameMapper.PreviewScene}. */
@@ -68,10 +74,7 @@ synchronized double timelineSeconds() {
 return timelineSeconds;
 }
 
-private static @Nullable ByteBuffer copyInto(@Nullable RgbaFrame frame, ByteBuffer target) {
-if (frame == null) {
-return null;
-}
+private static ByteBuffer copyInto(RgbaFrame frame, @Nullable ByteBuffer target) {
 int needed = frame.width() * frame.height() * 4;
 if (target == null || target.capacity() < needed) {
 target = ByteBuffer.allocateDirect(needed);

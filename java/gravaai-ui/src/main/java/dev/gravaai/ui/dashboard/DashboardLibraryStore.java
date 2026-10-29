@@ -34,8 +34,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Writes are atomic (temp file in the same directory + rename). The file is read once at
  * construction like a localStorage snapshot; call {@link #load()} to reread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class DashboardLibraryStore {
 
 	/** {@code localStorage} key names from the React dashboard; one key per JSON value. */
@@ -199,7 +197,9 @@ public final class DashboardLibraryStore {
 	}
 
 	private void writeAtomically(Map<String, JsonNode> store) throws IOException {
-		Path parent = file.toAbsolutePath().normalize().getParent();
+		Path parent = java.util.Objects.requireNonNull(
+				file.toAbsolutePath().normalize().getParent(),
+				"library file has no parent directory: " + file);
 		Files.createDirectories(parent);
 		Path temporary = parent.resolve("." + file.getFileName() + "." + UUID.randomUUID() + ".tmp");
 		try {

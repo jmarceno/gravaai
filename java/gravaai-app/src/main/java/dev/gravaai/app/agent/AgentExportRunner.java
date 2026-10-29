@@ -35,8 +35,6 @@ import tools.jackson.databind.node.ObjectNode;
  * publishing. It runs on a background thread, so the MCP call returns at once and the dispatcher's
  * {@code job wait} polls progress.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentExportRunner {
 
 	/** What the job reports back to the agent registry on success. */
@@ -94,7 +92,7 @@ final class AgentExportRunner {
 	}
 
 	/** Exports the current editor state to {@code destination} on the calling thread. */
-	static @Nullable ExportResult export(EditorSession session, ProjectExporter exporter,
+	static ExportResult export(EditorSession session, ProjectExporter exporter,
 			JsonNode options) throws IOException {
 		Path destination = destination(options);
 		String format = format(options);
@@ -133,7 +131,7 @@ final class AgentExportRunner {
 		}
 	}
 
-	private static @Nullable ExportPreferences preferences(ProjectExporter exporter, JsonNode options,
+	private static ExportPreferences preferences(ProjectExporter exporter, JsonNode options,
 			String format) {
 		ObjectNode raw = exporter == null ? ExportPreferences.defaults().toJson()
 				: exporter.exportPreferences().toJson();
@@ -180,7 +178,7 @@ final class AgentExportRunner {
 		}
 	}
 
-	private static void deleteRecursively(Path root) {
+	private static void deleteRecursively(@Nullable Path root) {
 		if (root == null) {
 			return;
 		}

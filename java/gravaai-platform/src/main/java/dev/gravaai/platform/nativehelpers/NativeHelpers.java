@@ -18,8 +18,6 @@ import java.util.Optional;
  * <p>The app image root is derived from the {@code jpackage.app-path} system property that the
  * jpackage launcher sets to {@code <image>/bin/gravaai}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class NativeHelpers {
 
 	public static final String NATIVE_DIR_PROPERTY = "gravaai.nativeDir";
@@ -55,8 +53,8 @@ public final class NativeHelpers {
 		return path;
 	}
 
-	/** Directory that holds the native payload for this run. */
-	public static @Nullable Path nativeDir() {
+	/** Directory that holds the native payload for this run; always present (it may not exist yet). */
+	public static Path nativeDir() {
 		String override = System.getProperty(NATIVE_DIR_PROPERTY);
 		if (override == null || override.isBlank()) {
 			override = System.getenv(NATIVE_DIR_ENV);
@@ -68,7 +66,7 @@ public final class NativeHelpers {
 		return resolveNativeDir(appImageDir(), workingDirectory);
 	}
 
-	static @Nullable Path resolveNativeDir(@Nullable Path appImageDir, Path workingDirectory) {
+	static Path resolveNativeDir(@Nullable Path appImageDir, Path workingDirectory) {
 		if (appImageDir != null) {
 			return appImageDir.resolve(LIB_NATIVE).resolve(ARCH_TAG);
 		}
@@ -84,7 +82,7 @@ public final class NativeHelpers {
 		return repoBuild;
 	}
 
-	private static @Nullable Path preferArchDirectory(Path buildDirectory) {
+	private static Path preferArchDirectory(Path buildDirectory) {
 		Path archDirectory = buildDirectory.resolve(ARCH_TAG);
 		return Files.isDirectory(archDirectory) ? archDirectory : buildDirectory;
 	}

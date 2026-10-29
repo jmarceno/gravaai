@@ -24,8 +24,6 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code src/components/video-editor/agent/ops.ts}). Error messages are byte-identical to the TS
  * ones because the agent reads them back through MCP.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentOpReader {
 
 	/** A validation failure; the planner attaches the op index. */
@@ -40,9 +38,13 @@ final class AgentOpReader {
 	/** Annotation geometry as 0-1 fractions (defaults 0.5/0.5/0.3/0.2). */
 	record Geometry(double x, double y, double w, double h) {}
 
-	/** Annotation text style input. */
-	record StyleInput(@Nullable Double fontSize, @Nullable Boolean bold, @Nullable Boolean italic, String color,
-			String backgroundColor, @Nullable String align, @Nullable String fontFamily) {}
+	/**
+	 * Annotation text style input; every component is null when the op omits that style field
+	 * ({@link AgentTextStyles} then keeps the default).
+	 */
+	record StyleInput(@Nullable Double fontSize, @Nullable Boolean bold, @Nullable Boolean italic,
+			@Nullable String color, @Nullable String backgroundColor, @Nullable String align,
+			@Nullable String fontFamily) {}
 
 	/** A validated fade-black transition request; {@code ms == null} means remove. */
 	record TransitionInput(boolean present, @Nullable Long ms) {}
@@ -135,8 +137,8 @@ final class AgentOpReader {
 		return new double[] {from, to};
 	}
 
-	/** {@code readFraction}: optional 0-1 number. */
-	static Double readFraction(JsonNode raw, String key) {
+	/** {@code readFraction}: optional 0-1 number, or null when the op omits it. */
+	static @Nullable Double readFraction(JsonNode raw, String key) {
 		Double value = optionalNumber(raw, key);
 		if (value != null && (value < 0 || value > 1)) {
 			throw new OpError("\"" + key + "\" must be between 0 and 1");
@@ -210,11 +212,21 @@ final class AgentOpReader {
 				fontFamily.isString() ? fontFamily.asString() : null);
 	}
 
-	static @Nullable ArrowDirection readArrow(JsonNode raw, boolean required) {
+	/** Required {@code arrow} for a new figure annotation. */
+	static ArrowDirection readArrow(JsonNode raw) {
+		return parseArrow(raw);
+	}
+
+	/** Optional {@code arrow}: null when the op omits it (nothing to change). */
+	static @Nullable ArrowDirection readOptionalArrow(JsonNode raw) {
 		JsonNode arrow = raw.path("arrow");
-		if (!required && (arrow.isMissingNode() || arrow.isNull())) {
+		if (arrow.isMissingNode() || arrow.isNull()) {
 			return null;
 		}
+		return parseArrow(raw);
+	}
+
+	private static ArrowDirection parseArrow(JsonNode raw) {
 		String value = string(raw, "arrow");
 		for (ArrowDirection direction : ArrowDirection.values()) {
 			if (direction.wire().equals(value)) {

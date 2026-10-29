@@ -32,8 +32,6 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  *       decoder; see {@link DecodedFrame} for the buffer lifetime contract.</li>
  * </ul>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class VideoDecoder implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(VideoDecoder.class.getName());
@@ -55,6 +53,7 @@ public final class VideoDecoder implements AutoCloseable {
 	private final long[] ptsScratch;
 	private boolean flushSent;
 	private boolean closed;
+	/** The frame buffered by {@link #seekPrecise(long)}; {@code null} when none is buffered. */
 	private @Nullable DecodedFrame pending;
 	private long lastPtsUs = Long.MIN_VALUE;
 

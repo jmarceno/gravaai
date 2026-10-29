@@ -8,24 +8,30 @@ import java.util.Map;
  * Typed view of {@code <recording>.meeting.json}. The file is a loose JSON object owned by the
  * Electron app; unknown keys survive because {@link MeetingMetaStore} edits the raw map.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record MeetingMeta(
-		String kind,
-		String createdAt,
+		@Nullable String kind,
+		@Nullable String createdAt,
 		@Nullable Boolean hasVideo,
-		String language,
+		@Nullable String language,
 		@Nullable Long durationMs,
-		String title,
-		String titleSource,
-		String transcribedAt,
-		String summarizedAt,
-		String transcriptionSource,
-		String summarizationSource,
-		LastJob lastJob) {
+		@Nullable String title,
+		@Nullable String titleSource,
+		@Nullable String transcribedAt,
+		@Nullable String summarizedAt,
+		@Nullable String transcriptionSource,
+		@Nullable String summarizationSource,
+		@Nullable LastJob lastJob) {
 
-	/** The last pipeline job recorded in the metadata (status/error/at). */
-	public record LastJob(String mode, String status, String error, String at) {
+	/**
+	 * The last pipeline job recorded in the metadata (status/error/at).
+	 *
+	 * @param mode the job mode, or null when the file recorded none
+	 * @param status the job status, or null when the file recorded none
+	 * @param error the failure message, or null when the job did not fail
+	 * @param at the timestamp, or null when the file recorded none
+	 */
+	public record LastJob(@Nullable String mode, @Nullable String status,
+			@Nullable String error, @Nullable String at) {
 	}
 
 	public static MeetingMeta fromRaw(Map<?, ?> raw) {

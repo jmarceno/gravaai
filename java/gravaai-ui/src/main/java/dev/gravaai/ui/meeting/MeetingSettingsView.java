@@ -40,8 +40,6 @@ import javafx.scene.layout.VBox;
  * notes run, language/model choices, the OpenAI-compatible API fields, automatic processing,
  * the notes prompt and the download manager.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingSettingsView extends VBox {
 
 	/** Port of {@code LANGUAGES}. */
@@ -163,7 +161,10 @@ public final class MeetingSettingsView extends VBox {
 		ChoiceGroup choice = new ChoiceGroup();
 		choice.item("local", "On this computer");
 		choice.item("api", "API");
-		choice.setValue(settings.transcriptionService().wire());
+		MeetingServiceKind transcriptionService = java.util.Objects.requireNonNull(
+				settings.transcriptionService(), "meeting settings without a transcription service");
+		choice.setValue(java.util.Objects.requireNonNull(transcriptionService.wire(),
+				"transcription service wire value"));
 		choice.onValueChange(value ->
 				save(s -> s.withTranscriptionService(
 						"api".equals(value) ? MeetingServiceKind.API : MeetingServiceKind.LOCAL)));
@@ -187,7 +188,10 @@ public final class MeetingSettingsView extends VBox {
 		ChoiceGroup choice = new ChoiceGroup();
 		choice.item("local", "On this computer");
 		choice.item("api", "API");
-		choice.setValue(settings.summarizationService().wire());
+		MeetingServiceKind summarizationService = java.util.Objects.requireNonNull(
+				settings.summarizationService(), "meeting settings without a summarization service");
+		choice.setValue(java.util.Objects.requireNonNull(summarizationService.wire(),
+				"summarization service wire value"));
 		choice.onValueChange(value ->
 				save(s -> s.withSummarizationService(
 						"api".equals(value) ? MeetingServiceKind.API : MeetingServiceKind.LOCAL)));
@@ -227,8 +231,10 @@ public final class MeetingSettingsView extends VBox {
 						value -> save(s -> s.withApiBaseUrl(value))), true));
 
 		Region keyField = buildApiKey(settings);
+		MeetingSettings.View currentView = view;
+		boolean hasSavedKey = currentView != null && currentView.hasApiKey();
 		card.getChildren().add(new SettingsRow("API key",
-				view.hasApiKey() ? "A key is saved in the system keyring."
+				hasSavedKey ? "A key is saved in the system keyring."
 						: "Stored encrypted in the system keyring. Leave empty for local servers.",
 				keyField, true));
 
@@ -247,7 +253,9 @@ public final class MeetingSettingsView extends VBox {
 
 	private Region buildApiKey(MeetingSettings settings) {
 		PasswordField key = new PasswordField();
-		key.setPromptText(view.hasApiKey() ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "sk-\u2026");
+		MeetingSettings.View currentView = view;
+		boolean hasSavedKey = currentView != null && currentView.hasApiKey();
+		key.setPromptText(hasSavedKey ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "sk-\u2026");
 		key.setPrefHeight(36);
 		styleField(key);
 		HBox.setHgrow(key, Priority.ALWAYS);
@@ -264,8 +272,8 @@ public final class MeetingSettingsView extends VBox {
 			key.clear();
 		});
 		Button remove = new Button("Remove", Button.Variant.GHOST, Button.Size.SM);
-		remove.setVisible(view.hasApiKey());
-		remove.setManaged(view.hasApiKey());
+		remove.setVisible(hasSavedKey);
+		remove.setManaged(hasSavedKey);
 		remove.setOnAction(event -> saveKeyRemoval());
 		HBox row = new HBox(8, key, save, remove);
 		row.setAlignment(Pos.CENTER_LEFT);
@@ -383,7 +391,10 @@ public final class MeetingSettingsView extends VBox {
 				return;
 			}
 			error = null;
-			view = result.orElse(view);
+			MeetingSettings.View updated = result.orNull();
+			if (updated != null) {
+				view = updated;
+			}
 			rebuild();
 			refreshAssets();
 		}, Platform::runLater);

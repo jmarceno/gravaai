@@ -1,5 +1,7 @@
 package dev.gravaai.app.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -19,8 +21,6 @@ import dev.gravaai.ui.launch.HudRecordingPort;
  * <p>Threading: the HUD calls on the FX thread; the delegate is attached from the startup thread and
  * state forwarding hops to the FX thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.lazy");
@@ -29,8 +29,9 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 	private final List<Runnable> queuedActions = new ArrayList<>();
 	private final AtomicReference<Runnable> onHudReady = new AtomicReference<>();
 	private final AtomicBoolean hudReadyCalled = new AtomicBoolean();
-	private final AtomicReference<HudRecordingPort> delegate = new AtomicReference<>();
-	private final AtomicReference<AutoCloseable> delegateSubscription = new AtomicReference<>();
+	private final AtomicReference<@Nullable HudRecordingPort> delegate = new AtomicReference<>();
+	private final AtomicReference<@Nullable AutoCloseable> delegateSubscription =
+			new AtomicReference<>();
 	private volatile State idleState = State.idle();
 
 	/** The dispatcher-ready callback, fired once the real port is attached. */

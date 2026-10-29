@@ -42,8 +42,6 @@ import tools.jackson.databind.JsonNode;
  * {@code AppContext}) and {@link EditorPlaybackPort} (playback engine, plan §5.9). The dashboard
  * teammate's timeline is mounted with {@link #setTimelineContent}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorShellView extends VBox {
 
 	private static final String STYLESHEET = "/ui/editor/editor.css";
@@ -78,8 +76,9 @@ public final class EditorShellView extends VBox {
 		this(store, actions, playback, null);
 	}
 
+	/** @param timelineContent optional pre-built timeline content; null builds the default one. */
 	public EditorShellView(EditorStore store, EditorViewActions actions,
-			EditorPlaybackPort playback, Node timelineContent) {
+			EditorPlaybackPort playback, @Nullable Node timelineContent) {
 		this.store = store;
 		this.actions = actions;
 		this.playback = playback;
@@ -146,13 +145,18 @@ public final class EditorShellView extends VBox {
 					}
 
 					@Override
-					public void discardPendingSave(ExportSessionModel.PendingExportSave pending) {
-						actions.discardPendingExportSave(pending);
+					public void discardPendingSave(
+							ExportSessionModel.@Nullable PendingExportSave pending) {
+						if (pending != null) {
+							actions.discardPendingExportSave(pending);
+						}
 					}
 				}, this::exportDimensions, this::hasCaptionsForSidecar);
 		header.setOnOpenExportMenu(exportMenu::openFromTrigger);
 
-		announcementBanner = new EditorAnnouncementBanner(actions.bundledAnnouncements(),
+		Announcements.@Nullable Feed bundledAnnouncements = actions.bundledAnnouncements();
+		announcementBanner = new EditorAnnouncementBanner(
+				bundledAnnouncements == null ? Announcements.Feed.EMPTY : bundledAnnouncements,
 				actions.remoteAnnouncements(), actions.dismissedAnnouncementIds(),
 				actions.announcementImpressionCounts(), actions.appVersion(),
 				actions::dismissAnnouncement, actions::recordAnnouncementImpression,
@@ -283,9 +287,13 @@ public final class EditorShellView extends VBox {
 	}
 
 	/** The inspector; built now when a caller needs it before the deferred startup build. */
-	public @Nullable EditorInspectorPanel inspector() {
+	public EditorInspectorPanel inspector() {
 		ensureInspector();
-		return inspector;
+		EditorInspectorPanel built = inspector;
+		if (built == null) {
+			throw new IllegalStateException("editor inspector was not built");
+		}
+		return built;
 	}
 
 	public EditorPreviewPanel preview() {
@@ -348,7 +356,7 @@ public final class EditorShellView extends VBox {
 		header.setClipsOpen(open);
 	}
 
-	private RecordingLibraryPanel.@Nullable Host clipsHost() {
+	private RecordingLibraryPanel.Host clipsHost() {
 		return new RecordingLibraryPanel.Host() {
 			@Override
 			public java.util.List<dev.gravaai.services.recording.RecordingLibrary.RecordingLibraryEntry>
@@ -357,13 +365,14 @@ public final class EditorShellView extends VBox {
 			}
 
 			@Override
-			public @Nullable boolean setRecordingsRemoved(java.util.List<String> paths, boolean removed)
+			public boolean setRecordingsRemoved(java.util.List<String> paths, boolean removed)
 					throws java.io.IOException {
 				return actions.setRecordingsRemoved(paths, removed);
 			}
 
 			@Override
-			public void addRecordingsToTimeline(java.util.List<String> paths, Integer index,
+			public void addRecordingsToTimeline(java.util.List<String> paths,
+					@Nullable Integer index,
 					java.util.function.Consumer<EditorViewActions.ClipImportResult> done) {
 				actions.addRecordingsToTimeline(paths, index, done);
 			}
@@ -374,7 +383,7 @@ public final class EditorShellView extends VBox {
 			}
 
 			@Override
-			public java.util.concurrent.@Nullable CompletableFuture<String> recordingThumbnail(String path) {
+			public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String path) {
 				return actions.recordingThumbnail(path);
 			}
 
@@ -392,9 +401,10 @@ public final class EditorShellView extends VBox {
 
 	/** Shows/hides the full-window import blocker with the panel's importing flag. */
 	private void updateImportOverlay() {
-		boolean importing = clipsPanel != null && clipsPanel.importingProperty().get();
-		if (importing && importOverlay == null) {
-			importOverlay = ClipImportOverlay.show(this, clipsPanel::cancelImport);
+		RecordingLibraryPanel panel = clipsPanel;
+		boolean importing = panel != null && panel.importingProperty().get();
+		if (importing && panel != null && importOverlay == null) {
+			importOverlay = ClipImportOverlay.show(this, panel::cancelImport);
 		} else if (!importing && importOverlay != null) {
 			importOverlay.hide();
 			importOverlay = null;

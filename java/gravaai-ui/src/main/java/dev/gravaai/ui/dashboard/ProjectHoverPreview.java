@@ -49,8 +49,6 @@ import javafx.util.Duration;
  * Java equivalent (plan §7): the preview plays for reduced-motion users too, and React's
  * thumbnail {@code <video>} fallback for failed poster images has no Java counterpart.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class ProjectHoverPreview extends StackPane {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.dashboard");
@@ -147,7 +145,9 @@ final class ProjectHoverPreview extends StackPane {
 						null));
 			} else {
 				// ProjectThumbnail effect: load the preview data (the 300 ms delay lives on the card).
-				ProjectPreview preview = projects.readProjectPreview(Path.of(projectPath));
+				ProjectManager projectStore = java.util.Objects.requireNonNull(projects,
+						"project hover preview without the project port");
+				ProjectPreview preview = projectStore.readProjectPreview(Path.of(projectPath));
 				if (finished.get()) {
 					return;
 				}

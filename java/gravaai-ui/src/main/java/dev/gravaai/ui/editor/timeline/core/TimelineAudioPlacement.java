@@ -19,7 +19,7 @@ public final class TimelineAudioPlacement {
 	public record AudioPlacement(int trackIndex, long durationMs) {
 	}
 
-	@Nullable private TimelineAudioPlacement() {
+	private TimelineAudioPlacement() {
 	}
 
 	/** {@code resolveAudioPlacement}; {@code null} when there is no usable slot. */

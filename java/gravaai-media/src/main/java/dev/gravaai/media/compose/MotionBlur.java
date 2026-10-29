@@ -293,8 +293,9 @@ public final class MotionBlur {
 	 */
 	public static Effect update(ZoomTransform.MotionBlurState state, Rect baseMask,
 			ZoomTransform.AppliedTransform transform, RenderTargetSize stageSize,
-			boolean isPlaying, double motionBlurAmount, Tuning tuning, Double frameTimeMs,
-			MotionSample motionSample, boolean motionSampleProvided) {
+			boolean isPlaying, double motionBlurAmount, Tuning tuning,
+			@Nullable Double frameTimeMs, @Nullable MotionSample motionSample,
+			boolean motionSampleProvided) {
 		if (stageSize == null || stageSize.width() <= 0 || stageSize.height() <= 0
 				|| baseMask == null || baseMask.getWidth() <= 0 || baseMask.getHeight() <= 0) {
 			resetMotionBlurState(state);

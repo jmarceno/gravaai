@@ -33,8 +33,6 @@ import tools.jackson.databind.JsonNode;
  * {@code gravaai-ctl} locator, the app path the shortcut command runs and the action sink (the
  * dispatcher). There are no static globals.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class GlobalShortcutsService implements AutoCloseable {
 
 	/** Port of {@code PARSE_ERROR_MESSAGE}. */
@@ -51,7 +49,8 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final String appPath;
 	private final Map<String, String> env;
 	private final Consumer<GlobalShortcutAction> actionSink;
-	private final Runnable showSink;
+	/** Null when a second launch cannot bring the app to the front. */
+	private final @Nullable Runnable showSink;
 	private final Object lock = new Object();
 
 	private ControlSocket.@Nullable Server controlSocket;
@@ -81,7 +80,7 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			String appPath,
 			Map<String, String> env,
 			Consumer<GlobalShortcutAction> actionSink,
-			Runnable showSink) {
+			@Nullable Runnable showSink) {
 		this.settings = settings;
 		this.bundledCtl = bundledCtl;
 		this.appPath = appPath;

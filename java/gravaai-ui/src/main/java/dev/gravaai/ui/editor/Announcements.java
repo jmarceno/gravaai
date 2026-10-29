@@ -17,8 +17,6 @@ import tools.jackson.databind.JsonNode;
  * strict parse, version comparison and audience/date/version/impression filtering plus priority
  * ordering. The bundled feed for this release is empty apart from the 4:3 aspect setting.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Announcements {
 
 	public enum Audience {
@@ -44,11 +42,12 @@ public final class Announcements {
 			this.wire = wire;
 		}
 
-		public @Nullable String wire() {
+		public String wire() {
 			return wire;
 		}
 
-		static @Nullable Presentation fromWire(String value) {
+		/** Parses the wire value; {@code null} (absent field) means "no presentation". */
+		static @Nullable Presentation fromWire(@Nullable String value) {
 			for (Presentation presentation : values()) {
 				if (presentation != POPUP && presentation.wire.equals(value)) {
 					return presentation;
@@ -67,7 +66,8 @@ public final class Announcements {
 			this.wire = wire;
 		}
 
-		static @Nullable MediaMode fromWire(String value) {
+		/** Parses the wire value; {@code null} (absent field) means "no media mode". */
+		static @Nullable MediaMode fromWire(@Nullable String value) {
 			for (MediaMode mode : values()) {
 				if (mode.wire.equals(value)) {
 					return mode;
@@ -77,25 +77,25 @@ public final class Announcements {
 		}
 	}
 
-	public @Nullable record Media(@Nullable String type, String url, @Nullable String alt, @Nullable String posterUrl) {}
+	public record Media(@Nullable String type, String url, @Nullable String alt, @Nullable String posterUrl) {}
 
 	public sealed interface Action permits UrlAction, SectionAction {}
 
-	public @Nullable record UrlAction(String label, String url) implements Action {}
+	public record UrlAction(String label, String url) implements Action {}
 
-	public @Nullable record SectionAction(String label, @Nullable String section) implements Action {}
+	public record SectionAction(String label, @Nullable String section) implements Action {}
 
-	public @Nullable record Controls(
+	public record Controls(
 			@Nullable Boolean close, @Nullable Boolean dismiss, @Nullable Boolean action, @Nullable Boolean navigation,
 			@Nullable Boolean indicators) {}
 
-	public @Nullable record Announcement(
+	public record Announcement(
 			String id, String title, String body, @Nullable Presentation presentation, Audience audience,
 			int priority, @Nullable MediaMode mediaMode, @Nullable Integer displayDurationSeconds,
 			@Nullable Integer maxImpressions, @Nullable Controls controls, @Nullable Media media, @Nullable Action action, @Nullable String startsAt,
 			@Nullable String endsAt, @Nullable String minVersion, @Nullable String maxVersion) {}
 
-	public @Nullable record Feed(@Nullable String aspectRatio, List<Announcement> announcements) {
+	public record Feed(@Nullable String aspectRatio, List<Announcement> announcements) {
 
 		public static final Feed EMPTY = new Feed(null, List.of());
 	}
@@ -107,15 +107,15 @@ public final class Announcements {
 	private static final int MAX_LABEL_LENGTH = 80;
 	private static final int MAX_URL_LENGTH = 2_048;
 
-	@Nullable private Announcements() {}
+	private Announcements() {}
 
 	/** {@code BUNDLED_ANNOUNCEMENT_FEED}. */
-	public static @Nullable Feed bundledFeed() {
+	public static Feed bundledFeed() {
 		return new Feed("4:3", List.of());
 	}
 
-	/** {@code parseAnnouncementFeed}. */
-	public static @Nullable Feed parseFeed(JsonNode value) {
+	/** {@code parseAnnouncementFeed}; {@code null} JSON means "no feed", i.e. the empty feed. */
+	public static Feed parseFeed(@Nullable JsonNode value) {
 		if (value == null || !value.isObject() || !value.path("announcements").isArray()) {
 			return Feed.EMPTY;
 		}
@@ -195,7 +195,7 @@ public final class Announcements {
 		return url != null ? new UrlAction(label, url) : new SectionAction(label, section);
 	}
 
-	private static @Nullable boolean isEditorSection(@Nullable String value) {
+	private static boolean isEditorSection(@Nullable String value) {
 		return value != null && List.of("scene", "cursor", "webcam", "captions", "settings",
 				"extensions").contains(value);
 	}
@@ -370,7 +370,7 @@ public final class Announcements {
 	}
 
 	/** Parses a feed from stored JSON ({@code null}/blank → empty feed). */
-	public static @Nullable Feed parseFeedJson(String json) {
+	public static Feed parseFeedJson(@Nullable String json) {
 		return json == null || json.isBlank() ? Feed.EMPTY
 				: parseFeed(Json.parseJsonWithByteOrderMark(json));
 	}

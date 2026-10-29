@@ -12,28 +12,30 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The reusable part of the webcam settings stored in an editor preset: the imported media
  * attachment ({@code sourcePath}, {@code visibleRanges}) is deliberately left out.
+ *
+ * <p>A preset stores a full snapshot of the reusable overlay controls, so every component is
+ * present (the only genuinely absent value is {@code cornerRadius}, which is unset by default);
+ * {@code ProjectPersistence} supplies the same defaults when a project is loaded.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record WebcamPresetSettings(
 		boolean enabled,
-		@Nullable long timeOffsetMs,
-		@Nullable boolean mirror,
-		@Nullable CropRegion cropRegion,
-		@Nullable WebcamCorner corner,
-		@Nullable WebcamPositionPreset positionPreset,
-		@Nullable double positionX,
-		@Nullable double positionY,
+		long timeOffsetMs,
+		boolean mirror,
+		CropRegion cropRegion,
+		WebcamCorner corner,
+		WebcamPositionPreset positionPreset,
+		double positionX,
+		double positionY,
 		double size,
-		@Nullable double width,
-		@Nullable double height,
-		@Nullable boolean reactToZoom,
-		@Nullable double roundness,
+		double width,
+		double height,
+		boolean reactToZoom,
+		double roundness,
 		@Nullable Double cornerRadius,
-		@Nullable double shadow,
-		@Nullable double margin) {
+		double shadow,
+		double margin) {
 
-	public static WebcamPresetSettings from(@Nullable WebcamOverlaySettings webcam) {
+	public static WebcamPresetSettings from(WebcamOverlaySettings webcam) {
 		return new WebcamPresetSettings(webcam.enabled(), webcam.timeOffsetMs(), webcam.mirror(),
 				webcam.cropRegion(), webcam.corner(), webcam.positionPreset(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),

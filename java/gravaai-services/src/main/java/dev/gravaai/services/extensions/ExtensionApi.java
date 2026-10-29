@@ -1,5 +1,7 @@
 package dev.gravaai.services.extensions;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.UnaryOperator;
 
 import org.graalvm.polyglot.HostAccess;
@@ -16,15 +18,14 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
  * registrations/queries land in the next increments (settings panels, cursor effects, assets,
  * events, drawIcon).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExtensionApi {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.extensions");
 
 	private final ExtensionManifest manifest;
 	private final ExtensionRenderHookRegistry registry;
-	private final UnaryOperator<Value> hookWrapper;
+	/** Null when hooks are registered unchanged (the default). */
+	private final @Nullable UnaryOperator<Value> hookWrapper;
 
 	ExtensionApi(ExtensionManifest manifest, ExtensionRenderHookRegistry registry) {
 		this(manifest, registry, null);
@@ -35,7 +36,7 @@ public final class ExtensionApi {
 	 *        properties (see {@link ExtensionHostInterop}); null registers hooks unchanged
 	 */
 	ExtensionApi(ExtensionManifest manifest, ExtensionRenderHookRegistry registry,
-			UnaryOperator<Value> hookWrapper) {
+			@Nullable UnaryOperator<Value> hookWrapper) {
 		this.manifest = manifest;
 		this.registry = registry;
 		this.hookWrapper = hookWrapper;

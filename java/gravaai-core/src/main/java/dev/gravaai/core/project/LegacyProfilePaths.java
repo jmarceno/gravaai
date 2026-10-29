@@ -24,24 +24,28 @@ import tools.jackson.databind.node.ObjectNode;
  * exists; the editor writes them back on the next save. The input tree is never modified, and it is
  * returned unchanged (same instance) when nothing needs remapping.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class LegacyProfilePaths {
 
 	/** A profile folder rename: {@code { legacyDir, currentDir }} in the TS source. */
-	public @Nullable record Rename(Path legacyDir, Path currentDir) {}
+	public record Rename(Path legacyDir, Path currentDir) {}
 
-	@Nullable private LegacyProfilePaths() {}
+	private LegacyProfilePaths() {}
 
 	/** Both historical profile renames, relative to an app-data directory. */
-	public static @Nullable List<Rename> profileDirRenames(@Nullable Path appDataPath) {
+	public static List<Rename> profileDirRenames(@Nullable Path appDataPath) {
+		if (appDataPath == null) {
+			// Only a filesystem root has no parent directory; without an app-data root there is
+			// no legacy profile folder to remap from.
+			return List.of();
+		}
 		return List.of(
 				new Rename(appDataPath.resolve("Grava AI"), appDataPath.resolve("Gravaai")),
 				new Rename(appDataPath.resolve("GravaAI-dev"), appDataPath.resolve("Gravaai-dev")));
 	}
 
 	/** {@code remapLegacyProfilePaths(project, renames)} with {@link Files#exists} as the probe. */
-	public static @Nullable JsonNode remapLegacyProfilePaths(JsonNode project, List<Rename> renames) {
+	public static @Nullable JsonNode remapLegacyProfilePaths(
+			@Nullable JsonNode project, List<Rename> renames) {
 		return remapLegacyProfilePaths(project, renames, Files::exists);
 	}
 
@@ -51,7 +55,7 @@ public final class LegacyProfilePaths {
 	 * @param exists existence probe for candidate paths (the TS test injects a fake filesystem)
 	 */
 	public static @Nullable JsonNode remapLegacyProfilePaths(
-			JsonNode project, List<Rename> renames, Predicate<Path> exists) {
+			@Nullable JsonNode project, List<Rename> renames, Predicate<Path> exists) {
 		if (project == null || !project.isObject() || renames.isEmpty()) {
 			return project;
 		}
@@ -139,7 +143,8 @@ public final class LegacyProfilePaths {
 		return result;
 	}
 
-	private static @Nullable String remapPath(JsonNode node, List<Rename> renames, Predicate<Path> exists) {
+	private static @Nullable String remapPath(
+			@Nullable JsonNode node, List<Rename> renames, Predicate<Path> exists) {
 		if (node == null || !node.isString()) {
 			return null;
 		}

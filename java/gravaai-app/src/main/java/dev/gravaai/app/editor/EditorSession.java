@@ -53,13 +53,12 @@ import tools.jackson.databind.JsonNode;
  * selections), the playback engine and the two timeline adapters. It is JavaFX-free so it can be
  * tested directly; {@code EditorWindow} builds the view on top.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorSession implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.editor");
 
-	private Path projectPath;
+	/** The project file; {@code null} for an unsaved recording until it is saved. */
+	private @Nullable Path projectPath;
 	private ProjectDocument document;
 	private ProjectDocument mediaSource;
 	private final EditorStore store;
@@ -254,7 +253,7 @@ public final class EditorSession implements AutoCloseable {
 	 * edits (wallpaper, blur, cursor, webcam settings, …) produce an equal list and must not reach
 	 * {@link #syncPlaybackClips()} audio reopen/update path.
 	 */
-	static boolean clipSequenceChanged(List<ClipRegion> current, List<ClipRegion> next) {
+	static boolean clipSequenceChanged(@Nullable List<ClipRegion> current, List<ClipRegion> next) {
 		return current == null || !current.equals(next);
 	}
 
@@ -306,7 +305,8 @@ public final class EditorSession implements AutoCloseable {
 	 * loads with {@code currentProjectPath = null}; the first save asks where to put the project).
 	 * The webcam track of the session is enabled with its measured offset.
 	 */
-	public static EditorSession openRecording(Path videoPath, String webcamPath, long webcamTimeOffsetMs) {
+	public static EditorSession openRecording(Path videoPath, @Nullable String webcamPath,
+			long webcamTimeOffsetMs) {
 		tools.jackson.databind.node.ObjectNode editor = dev.gravaai.core.json.Json.nodeFactory().objectNode();
 		if (webcamPath != null && !webcamPath.isBlank()) {
 			tools.jackson.databind.node.ObjectNode webcam = editor.putObject("webcam");
@@ -393,12 +393,13 @@ public final class EditorSession implements AutoCloseable {
 		return null;
 	}
 
-	/** The current document's webcam recording (export input), or {@code null}. */
-	public Path webcamPath() {
+	/** The current document's webcam recording (export input), or {@code null} when it has none. */
+	public @Nullable Path webcamPath() {
 		return resolveWebcamPath(document);
 	}
 
-	public Path projectPath() {
+	/** The project file, or {@code null} for an unsaved recording. */
+	public @Nullable Path projectPath() {
 		return projectPath;
 	}
 

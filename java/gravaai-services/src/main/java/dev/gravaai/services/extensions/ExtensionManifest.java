@@ -14,6 +14,11 @@ import tools.jackson.databind.JsonNode;
  * JSON because {@code EXTENSIONS.md} documents it as metadata only.
  *
  * @param screenshots relative paths, in manifest order (empty when absent)
+ * @param author the author text, or null when the manifest omits it
+ * @param homepage the HTTPS homepage, or null when the manifest omits it
+ * @param license the license identifier, or null when the manifest omits it
+ * @param engine the engine constraint, or null when the manifest omits it
+ * @param icon the icon path, or null when the manifest omits it
  * @param main relative entry point; validated to stay inside the extension directory
  * @param permissions the requested capabilities in manifest order, deduplicated
  */
@@ -22,11 +27,11 @@ public record ExtensionManifest(
 		String name,
 		String version,
 		String description,
-		String author,
-		String homepage,
-		String license,
-		String engine,
-		String icon,
+		@Nullable String author,
+		@Nullable String homepage,
+		@Nullable String license,
+		@Nullable String engine,
+		@Nullable String icon,
 		List<String> screenshots,
 		String main,
 		Set<ExtensionPermission> permissions,

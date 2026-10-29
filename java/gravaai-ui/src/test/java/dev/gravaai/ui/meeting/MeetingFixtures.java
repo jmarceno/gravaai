@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
@@ -176,8 +177,8 @@ final class MeetingFixtures {
 		}
 
 		@Override
-		public Result<Void> revealMeeting(Path mediaPath) {
-			return Result.ok(null);
+		public Result<Unit> revealMeeting(Path mediaPath) {
+			return Result.okUnit();
 		}
 
 		@Override
@@ -197,13 +198,13 @@ final class MeetingFixtures {
 		}
 
 		@Override
-		public Result<Void> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
+		public Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
 			if (kind == MeetingService.FileKind.TRANSCRIPT) {
 				transcripts.put(mediaPath, content);
 			} else {
 				notes.put(mediaPath, content);
 			}
-			return Result.ok(null);
+			return Result.okUnit();
 		}
 
 		@Override
@@ -245,19 +246,19 @@ final class MeetingFixtures {
 		}
 
 		@Override
-		public CompletableFuture<Result<Void>> downloadAsset(String assetId) {
+		public CompletableFuture<Result<Unit>> downloadAsset(String assetId) {
 			downloadedAssets.add(assetId);
 			assetProgress.put(assetId, 0);
 			for (Consumer<MeetingService.AssetProgress> listener : assetListeners) {
 				listener.accept(new MeetingService.AssetProgress(assetId, 40, false));
 			}
-			return CompletableFuture.completedFuture(Result.ok(null));
+			return CompletableFuture.completedFuture(Result.okUnit());
 		}
 
 		@Override
-		public Result<Void> removeAsset(String assetId) {
+		public Result<Unit> removeAsset(String assetId) {
 			removedAssets.add(assetId);
-			return Result.ok(null);
+			return Result.okUnit();
 		}
 
 		@Override

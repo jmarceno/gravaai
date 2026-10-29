@@ -59,8 +59,6 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>This class runs on the dispatcher's worker threads, never on the FX thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private static final int MAX_FRAMES = 9;
@@ -71,8 +69,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	private static final int MAX_REVERT_ENTRIES = 20;
 	private static final long REV_SEED_MASK = 1_000_000_000L;
 
-	private final Supplier<EditorSession> activeEditor;
-	private final Supplier<ProjectExporter> exporter;
+	private final Supplier<@Nullable EditorSession> activeEditor;
+	private final Supplier<@Nullable ProjectExporter> exporter;
 	private final Consumer<Path> openProject;
 	private final Runnable closeProject;
 	private final AgentJobRegistry jobs;
@@ -99,7 +97,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private record ExportJob(AtomicBoolean cancelled) {}
 
-	AgentEditorPort(Supplier<EditorSession> activeEditor, Supplier<ProjectExporter> exporter,
+	AgentEditorPort(Supplier<@Nullable EditorSession> activeEditor,
+			Supplier<@Nullable ProjectExporter> exporter,
 			Consumer<Path> openProject, Runnable closeProject, AgentJobRegistry jobs,
 			UserData userData) {
 		this.activeEditor = activeEditor;
@@ -112,7 +111,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	/** P3.2b seam: the export controller for the {@code job} export tool. */
 	@Nullable ProjectExporter exporter() {
-		return exporter == null ? null : exporter.get();
+		return exporter.get();
 	}
 
 	/** P3.2b seam: opens a project in the app's single window. */
@@ -218,9 +217,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		ProjectEditorState state = session.store().state();
 		AgentPlanner.Result result = AgentPlanner.apply(state, ops, plannerContext(session, state));
 		if (result instanceof AgentPlanner.Failure failure) {
+			String reason = failure.error();
+			if (reason == null || reason.isBlank()) {
+				reason = "the edit could not be planned";
+			}
 			throw new AgentDispatcher.AgentDispatchError(failure.opIndex() >= 0
-					? "op " + failure.opIndex() + ": " + failure.error()
-					: failure.error());
+					? "op " + failure.opIndex() + ": " + reason
+					: reason);
 		}
 		AgentPlanner.Ok ok = (AgentPlanner.Ok) result;
 		String summary = ok.summary() == null || ok.summary().isBlank()
@@ -306,8 +309,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		try {
 			for (dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils.CursorTelemetryPoint point
 					: session.cursorTelemetryPoints()) {
+				String interactionType = point.interactionType();
+				if (interactionType == null) {
+					// Position-only sample: the auto-zoom clusterer only groups click samples.
+					continue;
+				}
 				telemetry.add(new dev.gravaai.services.agent.AgentAutoZoom.Sample(
-						point.timeMs(), point.cx(), point.cy(), point.interactionType()));
+						point.timeMs(), point.cx(), point.cy(), interactionType));
 			}
 		} catch (RuntimeException error) {
 			telemetry.clear();
@@ -387,8 +395,9 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	private record FramePlan(List<Double> times, int width) {}
 
 	private static FramePlan framePlan(JsonNode args, double durationSeconds) {
-		int width = (int) Math.round(clamp(number(args, "width") == null ? DEFAULT_FRAME_WIDTH
-				: number(args, "width"), MIN_FRAME_WIDTH, MAX_FRAME_WIDTH));
+		Double requestedWidth = number(args, "width");
+		int width = (int) Math.round(clamp(requestedWidth == null ? DEFAULT_FRAME_WIDTH
+				: requestedWidth, MIN_FRAME_WIDTH, MAX_FRAME_WIDTH));
 		JsonNode at = args == null ? null : args.path("at");
 		if (at != null && at.isArray() && !at.isEmpty()) {
 			Set<Double> unique = new LinkedHashSet<>();
@@ -406,12 +415,14 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 				return new FramePlan(List.copyOf(times), width);
 			}
 		}
-		double from = clamp(number(args, "from") == null ? 0 : number(args, "from"), 0,
+		Double requestedFrom = number(args, "from");
+		double from = clamp(requestedFrom == null ? 0 : requestedFrom, 0, durationSeconds);
+		Double requestedTo = number(args, "to");
+		double to = clamp(requestedTo == null ? durationSeconds : requestedTo, from,
 				durationSeconds);
-		double to = clamp(number(args, "to") == null ? durationSeconds : number(args, "to"), from,
-				durationSeconds);
-		int count = (int) Math.round(clamp(number(args, "count") == null ? DEFAULT_FRAME_COUNT
-				: number(args, "count"), 1, MAX_FRAMES));
+		Double requestedCount = number(args, "count");
+		int count = (int) Math.round(clamp(requestedCount == null ? DEFAULT_FRAME_COUNT
+				: requestedCount, 1, MAX_FRAMES));
 		double span = to - from;
 		List<Double> times = new ArrayList<>();
 		if (count == 1) {
@@ -435,8 +446,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 				&& args.path("force").asBoolean();
 		return switch (action) {
 			case "open", "new" -> openOrCreate(session, args, action, path, force);
-			case "save" -> save(session);
-			case "save_as" -> saveAs(session, args);
+			case "save" -> save(requireSession(session));
+			case "save_as" -> saveAs(requireSession(session), args);
 			case "close" -> closeProject();
 			default -> throw new AgentDispatcher.AgentDispatchError(
 					"unknown action; use open, new, save, save_as or close");
@@ -454,8 +465,17 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		return "Closed the project. The app is back on the dashboard.";
 	}
 
-	private @Nullable String openOrCreate(EditorSession session, JsonNode args, String action, @Nullable String path,
-			boolean force) {
+	/** The open session for an action that edits it; the dispatcher rejects these without one. */
+	private static EditorSession requireSession(@Nullable EditorSession session) {
+		if (session == null) {
+			throw new AgentDispatcher.AgentDispatchError(
+					"No project is open in Gravaai. Open one with project {action:\"open\",path:\"…\"}");
+		}
+		return session;
+	}
+
+	private String openOrCreate(@Nullable EditorSession session, JsonNode args, String action,
+			@Nullable String path, boolean force) {
 		if (path == null || path.isBlank()) {
 			throw new AgentDispatcher.AgentDispatchError(
 					"project " + action + " needs \"path\" (see inspect {view:\"library\"})");
@@ -495,7 +515,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	/** Waits (off the FX thread) until the app hosts the session for {@code target}. */
-	private @Nullable EditorSession awaitSession(EditorSession previous, Path target) {
+	private @Nullable EditorSession awaitSession(@Nullable EditorSession previous, Path target) {
 		long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20);
 		while (System.nanoTime() < deadline) {
 			EditorSession current = activeEditor.get();
@@ -518,7 +538,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		return null;
 	}
 
-	private void guardUnsaved(EditorSession session, boolean force) {
+	private void guardUnsaved(@Nullable EditorSession session, boolean force) {
 		if (session == null || !session.dirty()) {
 			return;
 		}
@@ -576,9 +596,12 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		if (clean.toLowerCase(Locale.ROOT).endsWith(".gravaai")) {
 			clean = clean.substring(0, clean.length() - ".gravaai".length());
 		}
-		Path parent = session.projectPath() != null ? session.projectPath().getParent()
-				: userData != null ? userData.projectsDir()
-						: Path.of(System.getProperty("user.home"), "Gravaai Projects");
+		Path projectFile = session.projectPath();
+		Path parent = projectFile == null ? null : projectFile.getParent();
+		if (parent == null) {
+			parent = userData != null ? userData.projectsDir()
+					: Path.of(System.getProperty("user.home"), "Gravaai Projects");
+		}
 		try {
 			Files.createDirectories(parent);
 		} catch (IOException ignored) {
@@ -623,7 +646,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		try {
 			destination = AgentExportRunner.destination(options);
 		} catch (IllegalArgumentException error) {
-			throw new AgentDispatcher.AgentDispatchError(error.getMessage());
+			throw new AgentDispatcher.AgentDispatchError(messageOf(error));
 		}
 		String format = AgentExportRunner.format(options);
 		ExportJob handle = new ExportJob(new AtomicBoolean(false));
@@ -638,8 +661,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 					return;
 				}
 				jobs.update(jobId, AgentJobRegistry.Patch.progress(0, "Rendering\u2026"));
-				AgentExportRunner.ExportResult result = AgentExportRunner.export(session, exporter(),
-						options);
+				ProjectExporter exportController = exporter();
+				if (exportController == null) {
+					throw new AgentDispatcher.AgentDispatchError(
+							"export is not available in this build");
+				}
+				AgentExportRunner.ExportResult result = AgentExportRunner.export(session,
+						exportController, options);
 				if (handle.cancelled().get()) {
 					jobs.update(jobId, new AgentJobRegistry.Patch(AgentJobRegistry.Status.CANCELLED,
 							0.0, "cancelled", null, null));

@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
+import java.util.Objects;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,8 +33,6 @@ import io.github.humbleui.skija.svg.SVGDOM;
  * anchor, {@code tahoe-inverted} inverts the Tahoe set, and {@code dot}/{@code figma} build their
  * single style asset. Assets are decoded once per process and shared (raster images, read-only).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class CursorAssets {
 
 	/** One loaded cursor image: {@code LoadedCursorAsset}. */
@@ -56,7 +55,8 @@ final class CursorAssets {
 	private static final Pattern ATTRIBUTE = Pattern.compile(
 			"\\s(width|height|viewBox)\\s*=\\s*\"([^\"]*)\"");
 
-	private static volatile CursorAssets instance;
+	/** Lazily created singleton; null until the first {@link #get()} call. */
+	private static volatile @Nullable CursorAssets instance;
 
 	private final Map<CursorStyle, Map<String, Asset>> sets = new EnumMap<>(CursorStyle.class);
 	private final Map<CursorStyle, Asset> styleAssets = new EnumMap<>(CursorStyle.class);
@@ -89,7 +89,7 @@ final class CursorAssets {
 	}
 
 	/** Whether {@code style} draws per-cursor-type sprites ({@code isStatefulCursorStyle}). */
-	static @Nullable boolean isStateful(CursorStyle style) {
+	static boolean isStateful(CursorStyle style) {
 		return style == CursorStyle.MACOS || style == CursorStyle.TAHOE
 				|| style == CursorStyle.TAHOE_INVERTED || style == CursorStyle.WINDOWS11;
 	}
@@ -97,18 +97,23 @@ final class CursorAssets {
 	/**
 	 * The asset for a style and telemetry cursor type: stateful sets fall back to {@code arrow}
 	 * (the TS {@code spriteKey}), single styles use their style asset, and cursor-pack styles
-	 * without loaded packs fall back to the Tahoe set (the TS warning path).
+	 * without loaded packs fall back to the Tahoe set (the TS warning path). Every style has a
+	 * loaded asset (the constructor preloads all of them), so this never returns null.
 	 */
-	@Nullable Asset resolve(CursorStyle style, String cursorType) {
+	Asset resolve(CursorStyle style, @Nullable String cursorType) {
 		if (style.isSingleCursorStyle()) {
-			return styleAssets.get(style);
+			return Objects.requireNonNull(styleAssets.get(style),
+					"missing single-style cursor asset for " + style);
 		}
-		Map<String, Asset> set = sets.get(isStateful(style) ? style : CursorStyle.TAHOE);
+		Map<String, Asset> set = Objects.requireNonNull(
+				sets.get(isStateful(style) ? style : CursorStyle.TAHOE),
+				"missing cursor asset set for " + style);
 		String key = cursorType != null && SUPPORTED_CURSOR_KEYS.contains(cursorType)
 				? cursorType
 				: "arrow";
 		Asset asset = set.get(key);
-		return asset != null ? asset : set.get("arrow");
+		return asset != null ? asset
+				: Objects.requireNonNull(set.get("arrow"), "missing arrow cursor asset");
 	}
 
 	// ---- cursorSetAssets ------------------------------------------------------------------
@@ -172,7 +177,7 @@ final class CursorAssets {
 	// ---- createRasterizedCursorAsset ------------------------------------------------------
 
 	/** Unpremultiplied RGBA pixels of one rasterised cursor. */
-	private record Pixels(int width, int height, @Nullable byte[] rgba) {
+	private record Pixels(int width, int height, byte[] rgba) {
 	}
 
 	private static Asset rasterize(Source source) {
@@ -256,16 +261,24 @@ final class CursorAssets {
 						Float.parseFloat(clip.group(1)), Float.parseFloat(clip.group(2)),
 						Float.parseFloat(clip.group(3)), Float.parseFloat(clip.group(4))));
 			}
+			Image contentImage = Objects.requireNonNull(images.get(contentId),
+					"missing embedded cursor image " + contentId);
+			float[] contentBox = Objects.requireNonNull(bounds.get(contentId),
+					"missing embedded cursor bounds " + contentId);
 			if (maskId != null && images.containsKey(maskId)) {
+				Image maskImage = Objects.requireNonNull(images.get(maskId),
+						"missing embedded mask image " + maskId);
+				float[] maskBox = Objects.requireNonNull(bounds.get(maskId),
+						"missing embedded mask bounds " + maskId);
 				canvas.saveLayer(null, null);
-				drawEmbedded(canvas, images.get(contentId), bounds.get(contentId), null);
+				drawEmbedded(canvas, contentImage, contentBox, null);
 				try (Paint maskPaint = new Paint()) {
 					maskPaint.setBlendMode(io.github.humbleui.skija.BlendMode.DST_IN);
-					drawEmbedded(canvas, images.get(maskId), bounds.get(maskId), maskPaint);
+					drawEmbedded(canvas, maskImage, maskBox, maskPaint);
 				}
 				canvas.restore();
 			} else {
-				drawEmbedded(canvas, images.get(contentId), bounds.get(contentId), null);
+				drawEmbedded(canvas, contentImage, contentBox, null);
 			}
 			canvas.restore();
 		} finally {
@@ -273,7 +286,8 @@ final class CursorAssets {
 		}
 	}
 
-	private static void drawEmbedded(Canvas canvas, @Nullable Image image, @Nullable float[] box, @Nullable Paint paint) {
+	private static void drawEmbedded(Canvas canvas, Image image, float[] box,
+			@Nullable Paint paint) {
 		canvas.drawImageRect(image, io.github.humbleui.types.Rect.makeWH(image.getWidth(),
 				image.getHeight()), io.github.humbleui.types.Rect.makeXYWH(box[0], box[1], box[2],
 				box[3]), new io.github.humbleui.skija.FilterMipmap(
@@ -379,7 +393,7 @@ final class CursorAssets {
 		try (Bitmap bitmap = new Bitmap()) {
 			bitmap.allocPixels(unpremulInfo(width, height));
 			image.readPixels(bitmap, 0, 0);
-			rgba = bitmap.readPixels();
+			rgba = bitmapPixels(bitmap);
 		}
 		for (int index = 0; index < rgba.length; index += 4) {
 			if (rgba[index + 3] == 0) {
@@ -431,8 +445,25 @@ final class CursorAssets {
 		try (Bitmap bitmap = new Bitmap()) {
 			bitmap.allocPixels(unpremulInfo(width, height));
 			surface.readPixels(bitmap, 0, 0);
-			return new Pixels(width, height, bitmap.readPixels());
+			return new Pixels(width, height, bitmapPixels(bitmap));
 		}
+	}
+
+	/**
+	 * Copies the bitmap's unpremultiplied RGBA bytes. Skija annotates the {@code readPixels} array
+	 * as nullable (and annotates its elements), so the copy also normalises the array to a plain
+	 * {@code byte[]} for the typed model; the bitmap is always allocated before this runs.
+	 */
+	private static byte[] bitmapPixels(Bitmap bitmap) {
+		// Skija annotates the returned byte array with its element-nullable @Nullable, which the
+		// typed model cannot carry; the Object hop and cast give a plain (non-null elements) array.
+		Object raw = bitmap.readPixels();
+		if (raw == null) {
+			throw new IllegalStateException("Skija bitmap readPixels returned no pixels");
+		}
+		byte[] pixels = new byte[((byte[]) raw).length];
+		System.arraycopy(raw, 0, pixels, 0, pixels.length);
+		return pixels;
 	}
 
 	private static ImageInfo unpremulInfo(int width, int height) {

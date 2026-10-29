@@ -18,7 +18,7 @@ public record AnnotationSpec(
 		Position position,
 		Size size,
 		TextStyle style,
-		@Nullable int zIndex,
+		int zIndex,
 		@Nullable Figure figure,
 		@Nullable Double blurIntensity,
 		@Nullable String blurColor) {
@@ -41,19 +41,19 @@ public record AnnotationSpec(
 
 	/** Text style with ARGB colours ({@code backgroundColor} null/transparent for none). */
 	public record TextStyle(
-			@Nullable int color,
+			int color,
 			@Nullable Integer backgroundColor,
-			@Nullable double fontSize,
+			double fontSize,
 			@Nullable String fontFamily,
 			boolean bold,
 			boolean italic,
 			boolean underline,
 			String textAlign,
-			@Nullable double borderRadius) {
+			double borderRadius) {
 	}
 
 	/** Figure payload: arrow direction, ARGB colour and stroke width in reference pixels. */
-	public record Figure(@Nullable String direction, @Nullable int color, double strokeWidth) {
+	public record Figure(@Nullable String direction, int color, double strokeWidth) {
 	}
 
 	public AnnotationSpec {

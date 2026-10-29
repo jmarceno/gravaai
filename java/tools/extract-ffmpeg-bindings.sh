@@ -10,6 +10,13 @@
 # jextract comes from jdk.java.net/jextract (the latest build; JDK 25 based). Its output uses
 # the final java.lang.foreign API, which compiles on the pinned JDK 27 toolchain.
 #
+# jextract knows nothing about JSpecify, but the bindings live in a @NullMarked package: the raw
+# output would force null hacks at the call sites. The committed sources are therefore the raw
+# output run through tools/postprocess-ffmpeg-bindings.py, which (idempotently) makes the
+# canonical-layout constants non-null, annotates the genuinely optional reinterpret cleanup
+# callback as @Nullable, keeps traceDowncall's boxed varargs null-safe, and adds the
+# package-info.java. Do not hand-edit the gen/ sources; change that script and regenerate.
+#
 # Usage:
 #   java/native/build-ffmpeg.sh            # once, to install the headers
 #   java/tools/extract-ffmpeg-bindings.sh  # then regenerate
@@ -81,5 +88,6 @@ generated="$tmp/$(echo "$target_package" | tr '.' '/')"
 rm -rf "$gen_dir"
 mkdir -p "$gen_dir"
 cp "$generated"/*.java "$gen_dir"/
+python3 "$here/postprocess-ffmpeg-bindings.py" "$gen_dir"
 
 echo "extract-ffmpeg-bindings.sh: regenerated $(ls "$gen_dir" | wc -l) files in $gen_dir"

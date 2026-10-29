@@ -3,6 +3,7 @@ package dev.gravaai.services.recording;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,8 +41,6 @@ import tools.jackson.databind.node.ObjectNode;
  * originals are never modified. Media metadata comes from {@link MediaProbe} and ffmpeg is the
  * bundled CLI (plan §5.7).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingImportService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -55,13 +54,17 @@ public final class RecordingImportService {
 	public record VisibleRange(long startMs, long endMs) {
 	}
 
-	/** The import result ({@code RecordingImportResult}; the media URL is N/A, direct decode). */
+	/**
+	 * The import result ({@code RecordingImportResult}; the media URL is N/A, direct decode).
+	 *
+	 * @param webcam the composed webcam track, or null when neither input had a linked webcam
+	 */
 	public record ImportResult(
 			String path,
 			long sourceStartMs,
 			long durationMs,
 			long totalDurationMs,
-			RecordingWebcamSource webcam) {
+			@Nullable RecordingWebcamSource webcam) {
 	}
 
 	/** The probed media values the pipeline uses. */
@@ -292,8 +295,10 @@ public final class RecordingImportService {
 	/**
 	 * Runs one ffmpeg command; when {@code cancelled} is set (may be {@code null}) it is checked
 	 * before the spawn and a watchdog destroys the running process while waiting.
+	 *
+	 * @param cancelled the cancellation token, or null when the run cannot be cancelled
 	 */
-	private void runFfmpeg(List<String> args, BooleanSupplier cancelled) throws IOException {
+	private void runFfmpeg(List<String> args, @Nullable BooleanSupplier cancelled) throws IOException {
 		if (cancelled != null && cancelled.getAsBoolean()) {
 			throw new IOException("Import canceled");
 		}
@@ -323,10 +328,8 @@ public final class RecordingImportService {
 				}
 			});
 		}
-		byte[] stderr;
-		try (var in = process.stderr()) {
-			stderr = in.readAllBytes();
-		}
+		InputStream errorStream = process.stderr();
+		byte[] stderr = errorStream == null ? new byte[0] : errorStream.readAllBytes();
 		int code;
 		try {
 			code = process.waitFor();
@@ -421,7 +424,7 @@ public final class RecordingImportService {
 			Path work,
 			long baseDurationMs,
 			long addedDurationMs,
-			RecordingWebcamSource currentWebcam,
+			@Nullable RecordingWebcamSource currentWebcam,
 			BooleanSupplier cancelled) throws IOException {
 		RecordingWebcamSource base = currentWebcam != null ? currentWebcam : linked(current);
 		if (currentWebcam != null && currentWebcam.sourcePath() != null
@@ -502,9 +505,14 @@ public final class RecordingImportService {
 		return new RecordingWebcamSource(webcamPath, 0, List.copyOf(ranges));
 	}
 
-	/** {@code importRecording}: appends one library recording to the current video. */
+	/**
+	 * {@code importRecording}: appends one library recording to the current video.
+	 *
+	 * @param currentWebcam the webcam source linked to the current video, or null when it has none
+	 */
 	public ImportResult importRecording(
-			String currentPath, String recordingPath, RecordingWebcamSource currentWebcam) throws IOException {
+			String currentPath, String recordingPath,
+			@Nullable RecordingWebcamSource currentWebcam) throws IOException {
 		return importRecording(currentPath, recordingPath, currentWebcam, null);
 	}
 
@@ -514,9 +522,11 @@ public final class RecordingImportService {
 	 * cleaned up like any other failure.
 	 */
 	public ImportResult importRecording(
-			String currentPath, String recordingPath, RecordingWebcamSource currentWebcam,
-			BooleanSupplier cancelled) throws IOException {
-		if (cancelled != null && cancelled.getAsBoolean()) {
+			String currentPath, String recordingPath,
+			@Nullable RecordingWebcamSource currentWebcam,
+			@Nullable BooleanSupplier cancelled) throws IOException {
+		BooleanSupplier cancellation = cancelled == null ? () -> false : cancelled;
+		if (cancellation.getAsBoolean()) {
 			throw new IOException("Import canceled");
 		}
 		RecordingLibrary.RecordingLibraryEntry entry = library.listRecordings(false).stream()
@@ -543,8 +553,8 @@ public final class RecordingImportService {
 			Path normalizedBase = work.resolve("base.mkv");
 			Path normalizedNew = work.resolve("new.mkv");
 			boolean copyVideo = SequenceSource.isLibrarySequenceSource(current.toString());
-			normalize(current.toString(), normalizedBase, format, copyVideo, cancelled);
-			normalize(entry.path(), normalizedNew, format, false, cancelled);
+			normalize(current.toString(), normalizedBase, format, copyVideo, cancellation);
+			normalize(entry.path(), normalizedNew, format, false, cancellation);
 			MediaMeta baseMeta = probe(normalizedBase.toString());
 			MediaMeta newMeta = probe(normalizedNew.toString());
 			Files.writeString(work.resolve("list.txt"), "file 'base.mkv'\nfile 'new.mkv'\n",
@@ -556,7 +566,7 @@ public final class RecordingImportService {
 					"-i", work.resolve("list.txt").toString(),
 					"-map", "0",
 					"-c", "copy",
-					combined.toString()), cancelled);
+					combined.toString()), cancellation);
 			runFfmpeg(List.of(
 					"-i", combined.toString(),
 					"-filter_complex", "[0:a:0][0:a:1]amix=inputs=2:normalize=0[mix]",
@@ -572,7 +582,7 @@ public final class RecordingImportService {
 					stem + ".system.wav",
 					"-map", "0:a:1",
 					"-c:a", "pcm_s16le",
-					stem + ".mic.wav"), cancelled);
+					stem + ".mic.wav"), cancellation);
 			long sourceStartMs = Math.round(baseMeta.durationSeconds() * 1000);
 			MediaMeta entryMeta = probe(entry.path());
 			List<List<CursorTelemetryPoint>> cursorChunks = new ArrayList<>();
@@ -605,7 +615,7 @@ public final class RecordingImportService {
 					sourceStartMs,
 					Math.round(newMeta.durationSeconds() * 1000),
 					currentWebcam,
-					cancelled);
+					cancellation);
 			return new ImportResult(
 					output,
 					sourceStartMs,

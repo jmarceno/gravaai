@@ -28,8 +28,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Editor-preset normalisation and JSON encoding (port of the preset half of
  * {@code src/components/video-editor/editorPreferences.ts}).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorPresets {
 
 	private static final Pattern WHITESPACE_RUN =
@@ -37,7 +35,7 @@ public final class EditorPresets {
 	private static final DateTimeFormatter ISO_MILLIS =
 			DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 
-	@Nullable private EditorPresets() {}
+	private EditorPresets() {}
 
 	/** {@code normalizePresetName}: trim, collapse spaces, null when blank. */
 	public static @Nullable String normalizePresetName(@Nullable String value) {
@@ -49,8 +47,8 @@ public final class EditorPresets {
 		return collapsed.isEmpty() ? null : collapsed;
 	}
 
-	/** {@code new Date(parsed).toISOString()}; lenient like {@code Date.parse}. */
-	public static @Nullable String normalizePresetTimestamp(@Nullable String value, String fallback) {
+	/** {@code new Date(parsed).toISOString()}; lenient like {@code Date.parse} (falls back). */
+	public static String normalizePresetTimestamp(@Nullable String value, String fallback) {
 		Long millis = parseTimestamp(value);
 		return millis == null ? fallback
 				: ISO_MILLIS.format(Instant.ofEpochMilli(millis));
@@ -83,8 +81,8 @@ public final class EditorPresets {
 		}
 	}
 
-	/** {@code normalizeEditorPresetSnapshot}. */
-	public static EditorPresetSnapshot normalizeSnapshot(JsonNode candidate) {
+	/** {@code normalizeEditorPresetSnapshot}; {@code null} when the preset has no snapshot object. */
+	public static EditorPresetSnapshot normalizeSnapshot(@Nullable JsonNode candidate) {
 		EditorPreferences preferences = EditorPreferences.normalize(
 				candidate, EditorPreferences.defaults());
 		JsonNode raw = candidate != null && candidate.isObject()
@@ -119,7 +117,8 @@ public final class EditorPresets {
 				keystrokeOverlay);
 	}
 
-	private static @Nullable JsonNode singleField(JsonNode raw, String field) {
+	/** One-field object for the project normaliser; {@code raw} is null when nothing is stored. */
+	private static JsonNode singleField(@Nullable JsonNode raw, String field) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		if (raw != null && raw.isObject() && raw.has(field)) {
 			node.set(field, raw.get(field));
@@ -127,8 +126,8 @@ public final class EditorPresets {
 		return node;
 	}
 
-	/** {@code normalizeEditorPreset}: null when the name is missing/blank. */
-	public static @Nullable EditorPreset normalizePreset(JsonNode candidate) {
+	/** {@code normalizeEditorPreset}: null when the candidate or its name is missing/blank. */
+	public static @Nullable EditorPreset normalizePreset(@Nullable JsonNode candidate) {
 		if (candidate == null || !candidate.isObject()) {
 			return null;
 		}
@@ -154,8 +153,8 @@ public final class EditorPresets {
 				normalizeSnapshot(candidate.get("snapshot")));
 	}
 
-	/** {@code normalizeEditorPresets}: sorted newest first. */
-	public static List<EditorPreset> normalizePresets(JsonNode candidates) {
+	/** {@code normalizeEditorPresets}: sorted newest first; {@code null} = nothing stored. */
+	public static List<EditorPreset> normalizePresets(@Nullable JsonNode candidates) {
 		if (candidates == null || !candidates.isArray()) {
 			return List.of();
 		}
@@ -176,12 +175,12 @@ public final class EditorPresets {
 	}
 
 	/** {@code serializeEditorPresetSnapshot}: compact JSON of the normalised snapshot. */
-	public static String serializeSnapshot(@Nullable EditorPresetSnapshot snapshot) {
+	public static String serializeSnapshot(EditorPresetSnapshot snapshot) {
 		EditorPresetSnapshot normalized = normalizeSnapshot(snapshotToJson(snapshot));
 		return Json.MAPPER.writeValueAsString(snapshotToJson(normalized));
 	}
 
-	public static ObjectNode snapshotToJson(@Nullable EditorPresetSnapshot snapshot) {
+	public static ObjectNode snapshotToJson(EditorPresetSnapshot snapshot) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("wallpaper", snapshot.wallpaper());
 		node.put("shadowIntensity", snapshot.shadowIntensity());
@@ -245,7 +244,7 @@ public final class EditorPresets {
 		return array;
 	}
 
-	private static ObjectNode paddingToJson(@Nullable Padding padding) {
+	private static ObjectNode paddingToJson(Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -255,7 +254,7 @@ public final class EditorPresets {
 		return node;
 	}
 
-	private static ObjectNode cropRegionToJson(@Nullable CropRegion crop) {
+	private static ObjectNode cropRegionToJson(CropRegion crop) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("x", crop.x());
 		node.put("y", crop.y());
@@ -264,7 +263,7 @@ public final class EditorPresets {
 		return node;
 	}
 
-	private static ObjectNode autoCaptionSettingsToJson(@Nullable AutoCaptionSettings settings) {
+	private static ObjectNode autoCaptionSettingsToJson(AutoCaptionSettings settings) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("enabled", settings.enabled());
 		node.put("timelineQuickAdd", settings.timelineQuickAdd());

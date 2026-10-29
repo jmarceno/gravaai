@@ -1,5 +1,7 @@
 package dev.gravaai.app.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -34,8 +36,6 @@ import dev.gravaai.ui.launch.HudOverlayWindow;
  *       {@code HudRecordingPort.State.countdownActive}.</li>
  * </ul>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudWindowController implements HudController {
 
 	/** Max wait for the FX thread; a stuck FX thread must not hang the recording start. */
@@ -49,7 +49,8 @@ public final class HudWindowController implements HudController {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.window");
 
-	private volatile HudOverlayWindow hud;
+	/** The real HUD window; {@code null} until {@link #attach} runs (or when unavailable). */
+	private volatile @Nullable HudOverlayWindow hud;
 
 	/** Attaches the real HUD window; call on the JavaFX thread after it is built. */
 	public void attach(HudOverlayWindow hud) {

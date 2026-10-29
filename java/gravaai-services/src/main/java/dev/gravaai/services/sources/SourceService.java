@@ -23,8 +23,6 @@ import dev.gravaai.services.recording.RecordingPaths;
  * (plan §2), so Electron's {@code desktopCapturer} enumeration and the macOS/Windows branches are
  * not ported (plan §2.3).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SourceService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.sources");
@@ -88,12 +86,17 @@ public final class SourceService {
 		return SourceMapping.isLikelyLinuxWaylandSession(env);
 	}
 
-	/** The current in-memory selection; a fresh process starts unselected (never restored). */
-	public SelectedSource getSessionCaptureSource() {
+	/**
+	 * The current in-memory selection; a fresh process starts unselected (never restored).
+	 *
+	 * @return the selected source, or null until the user picks one
+	 */
+	public @Nullable SelectedSource getSessionCaptureSource() {
 		return selectedSource;
 	}
 
-	public SelectedSource getSelectedSource() {
+	/** @return the selected source, or null until the user picks one */
+	public @Nullable SelectedSource getSelectedSource() {
 		return selectedSource;
 	}
 
@@ -104,8 +107,12 @@ public final class SourceService {
 	}
 
 	private void broadcastSelectedSourceChange() {
+		SelectedSource current = selectedSource;
+		if (current == null) {
+			return;
+		}
 		for (Consumer<SelectedSource> listener : selectedSourceListeners) {
-			listener.accept(selectedSource);
+			listener.accept(current);
 		}
 	}
 
@@ -132,7 +139,7 @@ public final class SourceService {
 	 * {@code select-source}: validates the candidate first and never substitutes a different
 	 * source; the selection stays in memory for this app session.
 	 */
-	public SelectedSource selectSource(SelectedSource source) throws IOException {
+	public @Nullable SelectedSource selectSource(SelectedSource source) throws IOException {
 		if (cursorCaptureActive.get()) {
 			return selectedSource;
 		}

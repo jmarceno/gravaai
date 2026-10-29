@@ -15,8 +15,6 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * Compositor-backed {@link FrameAtTime} for filmstrip/thumbnail rendering: one compositor on a
  * dedicated offscreen GL thread, synchronously rendering the requested timeline time.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CompositorFrameAtTime implements FrameAtTime {
 
 	private static final Duration WAIT = Duration.ofSeconds(15);
@@ -52,7 +50,7 @@ public final class CompositorFrameAtTime implements FrameAtTime {
 	}
 
 	@Override
-	public @Nullable RgbaFrame frameAtTime(double timelineSeconds) {
+	public RgbaFrame frameAtTime(double timelineSeconds) {
 		if (!Double.isFinite(timelineSeconds)) {
 			throw new IllegalArgumentException("timelineSeconds must be finite");
 		}
@@ -85,6 +83,12 @@ public final class CompositorFrameAtTime implements FrameAtTime {
 		synchronized (lock) {
 			RgbaFrame result = pendingResult;
 			pendingResult = null;
+			if (result == null) {
+				// The latch is only counted down by readBack after it stores the pixels, so a
+				// completed wait without a result would mean the GL thread broke its contract.
+				throw new IllegalStateException("GL readback completed without pixels at "
+						+ timelineSeconds + "s");
+			}
 			return result;
 		}
 	}

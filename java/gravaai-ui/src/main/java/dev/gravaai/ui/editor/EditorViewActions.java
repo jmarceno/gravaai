@@ -199,8 +199,11 @@ public interface EditorViewActions {
 	/**
 	 * Appends library recordings to the timeline (the import pipeline); exactly one {@code done}
 	 * call is made back, on the FX thread.
+	 *
+	 * @param index target position in the clip sequence; null appends
 	 */
-	default void addRecordingsToTimeline(java.util.List<String> paths, Integer index,
+	default void addRecordingsToTimeline(java.util.List<String> paths,
+			@org.jspecify.annotations.Nullable Integer index,
 			java.util.function.Consumer<ClipImportResult> done) {}
 
 	/** Cancels the running clip import (the overlay's Cancel button). */

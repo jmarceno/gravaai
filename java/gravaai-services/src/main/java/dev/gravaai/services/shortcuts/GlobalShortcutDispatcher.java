@@ -24,7 +24,7 @@ public final class GlobalShortcutDispatcher {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.shortcuts");
 
-	private Supplier<GlobalShortcutHud> hudProvider;
+	private Supplier<@Nullable GlobalShortcutHud> hudProvider;
 	private final LongSupplier clock;
 	private final Consumer<String> log;
 
@@ -35,19 +35,20 @@ public final class GlobalShortcutDispatcher {
 	private @Nullable PendingAction pendingAction;
 	private @Nullable LastAction lastAction;
 
-	public GlobalShortcutDispatcher(Supplier<GlobalShortcutHud> hudProvider) {
+	public GlobalShortcutDispatcher(Supplier<@Nullable GlobalShortcutHud> hudProvider) {
 		this(hudProvider, System::currentTimeMillis, GlobalShortcutDispatcher::defaultLog);
 	}
 
 	public GlobalShortcutDispatcher(
-			Supplier<GlobalShortcutHud> hudProvider, LongSupplier clock, Consumer<String> log) {
+			Supplier<@Nullable GlobalShortcutHud> hudProvider, LongSupplier clock,
+			Consumer<String> log) {
 		this.hudProvider = hudProvider;
 		this.clock = clock;
 		this.log = log;
 	}
 
 	/** main.ts supplies how to recreate the HUD when a shortcut arrives without one. */
-	public synchronized void setHudProvider(Supplier<GlobalShortcutHud> hudProvider) {
+	public synchronized void setHudProvider(Supplier<@Nullable GlobalShortcutHud> hudProvider) {
 		this.hudProvider = hudProvider;
 	}
 
@@ -62,7 +63,7 @@ public final class GlobalShortcutDispatcher {
 		}
 		lastAction = new LastAction(action, now);
 
-		GlobalShortcutHud hud = hudProvider == null ? null : hudProvider.get();
+		GlobalShortcutHud hud = hudProvider.get();
 		if (hud != null && hud.isAlive() && hud.isReady()) {
 			hud.deliver(action);
 			return;
@@ -80,7 +81,7 @@ public final class GlobalShortcutDispatcher {
 		PendingAction pending = pendingAction;
 		pendingAction = null;
 		if (clock.getAsLong() - pending.at() < PENDING_MAX_AGE_MS) {
-			GlobalShortcutHud hud = hudProvider == null ? null : hudProvider.get();
+			GlobalShortcutHud hud = hudProvider.get();
 			if (hud != null) {
 				hud.deliver(pending.action());
 			}

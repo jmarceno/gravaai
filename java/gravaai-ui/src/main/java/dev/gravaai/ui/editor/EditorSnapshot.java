@@ -37,8 +37,6 @@ import javafx.util.Duration;
  * DISPLAY=:0 java -cp "<classes>:<resources>:<deps>" dev.gravaai.ui.editor.EditorSnapshot [outDir]
  * }</pre>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorSnapshot {
 
 	private static final String FIXTURE_EDITOR = """
@@ -60,7 +58,7 @@ public final class EditorSnapshot {
 					+ "\"displayDurationSeconds\":30,"
 					+ "\"controls\":{\"close\":true,\"action\":true}}]}";
 
-	@Nullable private EditorSnapshot() {}
+	private EditorSnapshot() {}
 
 	public static void main(String[] args) throws Exception {
 		AppFonts.load();

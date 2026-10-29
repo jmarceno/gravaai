@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -21,8 +23,6 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * API transcription, ported from electron/ipc/meeting/apiTranscription.ts. Upload size limits
  * rule out long meetings in one request, so audio is cut into speech-quality mono MP3 chunks.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ApiTranscription {
 
 	/**
@@ -75,7 +75,10 @@ public final class ApiTranscription {
 				pattern);
 	}
 
-	public record Result(List<TranscriptSegment> segments, String language) {
+	/**
+	 * @param language the detected language, or null when the API did not report one
+	 */
+	public record Result(List<TranscriptSegment> segments, @Nullable String language) {
 	}
 
 	/**

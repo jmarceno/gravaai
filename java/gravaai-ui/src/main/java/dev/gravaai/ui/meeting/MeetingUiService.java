@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
@@ -42,11 +43,11 @@ public interface MeetingUiService {
 
 	Result<List<Path>> deleteMeetings(List<Path> mediaPaths);
 
-	Result<Void> revealMeeting(Path mediaPath);
+	Result<Unit> revealMeeting(Path mediaPath);
 
 	Result<MeetingService.FilesView> getFiles(Path mediaPath);
 
-	Result<Void> saveFile(Path mediaPath, MeetingService.FileKind kind, String content);
+	Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content);
 
 	Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode);
 
@@ -58,9 +59,9 @@ public interface MeetingUiService {
 
 	List<MeetingService.AssetStatus> listAssets();
 
-	CompletableFuture<Result<Void>> downloadAsset(String assetId);
+	CompletableFuture<Result<Unit>> downloadAsset(String assetId);
 
-	Result<Void> removeAsset(String assetId);
+	Result<Unit> removeAsset(String assetId);
 
 	Subscription onAssetProgress(Consumer<MeetingService.AssetProgress> listener);
 

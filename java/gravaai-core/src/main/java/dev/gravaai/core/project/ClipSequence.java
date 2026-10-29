@@ -10,8 +10,6 @@ import java.util.List;
  * <p>Primary footage is a sequence: source in-points survive every ripple edit, and trim
  * positions never determine clip order.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ClipSequence {
 
 	private ClipSequence() {}

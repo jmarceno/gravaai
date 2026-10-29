@@ -18,8 +18,6 @@ import dev.gravaai.media.compose.RgbaFrame;
  * <p>Only one consumer calls {@link #frameAt} (the playback render thread); the returned
  * {@link RgbaFrame} stays valid until the next {@link #frameAt} call.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class DecoderFrameSource implements FrameSource {
 
 	/** Default ring depth (plan §5.9: 3-6 frames per source). */
@@ -104,7 +102,8 @@ public final class DecoderFrameSource implements FrameSource {
 	 * duration available to callers before the worker has opened the decoder.
 	 */
 	public static DecoderFrameSource open(
-			Supplier<VideoFrameDecoder> decoderSupplier, Double durationOverrideSeconds, int ringCapacity) {
+			Supplier<VideoFrameDecoder> decoderSupplier, @Nullable Double durationOverrideSeconds,
+			int ringCapacity) {
 		if (decoderSupplier == null) {
 			throw new IllegalArgumentException("decoderSupplier must not be null");
 		}

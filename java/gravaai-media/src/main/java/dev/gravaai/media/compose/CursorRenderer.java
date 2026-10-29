@@ -26,8 +26,6 @@ import io.github.humbleui.types.Rect;
  * <p>Cursor sprites come from {@link CursorAssets} (the committed SVG cursor sets, rasterised
  * and anchored exactly like the TS asset pipeline).</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class CursorRenderer {
 
 	/** {@code CURSOR_DIRECTIONAL_BLUR_STRENGTH}. */
@@ -230,10 +228,10 @@ final class CursorRenderer {
 	private ZoomTransform.DirectionalMotionBlur frameBlur(List<CursorSample> samples,
 			double timeMs, Rect viewport, LayoutCrop crop, double amount, double px, double py,
 			ZoomTransform.DirectionalMotionBlur none) {
-		boolean frozen = lastRenderedTimeMs == null
-				|| Math.abs(timeMs - lastRenderedTimeMs) > CURSOR_TIME_DISCONTINUITY_MS;
-		if (!frozen) {
-			double deltaMs = Math.max(1, timeMs - lastRenderedTimeMs);
+		Double lastRendered = lastRenderedTimeMs;
+		if (lastRendered != null
+				&& Math.abs(timeMs - lastRendered) <= CURSOR_TIME_DISCONTINUITY_MS) {
+			double deltaMs = Math.max(1, timeMs - lastRendered);
 			return ZoomTransform.computeDirectionalMotionBlur(px - lastPx, py - lastPy, amount,
 					deltaMs / 1000, CURSOR_DIRECTIONAL_BLUR_STRENGTH);
 		}
@@ -373,7 +371,7 @@ final class CursorRenderer {
 	}
 
 	/** {@code computeCursorSwayRotation}. */
-	static double computeSwayRotation(double dx, double dy, double deltaMs, @Nullable double sway) {
+	static double computeSwayRotation(double dx, double dy, double deltaMs, double sway) {
 		if (sway <= 0) {
 			return 0;
 		}
@@ -457,7 +455,7 @@ final class CursorRenderer {
 	 * {@code width = height * aspectRatio}); the shadow pass tints it black at
 	 * {@code CURSOR_SHADOW_ALPHA} and blurs it by {@code CURSOR_SHADOW_BLUR}.
 	 */
-	private static void drawSprite(Canvas canvas, CursorAssets.@Nullable Asset asset, double drawH,
+	private static void drawSprite(Canvas canvas, CursorAssets.Asset asset, double drawH,
 			boolean shadow) {
 		Image image = asset.image();
 		float height = (float) drawH;

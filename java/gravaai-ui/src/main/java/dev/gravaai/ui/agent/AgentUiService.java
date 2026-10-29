@@ -1,5 +1,7 @@
 package dev.gravaai.ui.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -49,11 +51,12 @@ public interface AgentUiService extends AutoCloseable {
 	 * @param claudeCodeCommand the one-line {@code claude mcp add ...} command
 	 * @param jsonConfig the MCP client JSON configuration block
 	 * @param lastSummary summary of the last agent change, or {@code null} when there is none
+	 * @param token the control token, or {@code null} before the agent service has one
 	 * @param recentActivity newest-first activity entries
 	 */
 	record Snapshot(boolean enabled, boolean listening, boolean editorReady, List<Client> clients,
-			String token, String socketPath, String mcpCommand, String claudeCodeCommand,
-			String jsonConfig, String lastSummary, List<ActivityEntry> recentActivity) {
+			@Nullable String token, String socketPath, String mcpCommand, String claudeCodeCommand,
+			String jsonConfig, @Nullable String lastSummary, List<ActivityEntry> recentActivity) {
 
 		public Snapshot {
 			clients = clients == null ? List.of() : List.copyOf(clients);

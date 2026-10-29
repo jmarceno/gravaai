@@ -23,8 +23,6 @@ import javafx.scene.layout.VBox;
  * configuration; prompt handling and models stay outside the app. The agent service is Phase 3, so
  * the page talks to {@link AgentSettingsController} (Lead decision).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentSettingsView extends VBox {
 
 	private final AgentSettingsController controller;
@@ -52,10 +50,11 @@ public final class AgentSettingsView extends VBox {
 
 	private void rebuild() {
 		rows.getChildren().clear();
-		if (state == null) {
+		AgentSettingsController.State current = state;
+		if (current == null) {
 			return;
 		}
-		Switch enabled = new Switch("", state.enabled());
+		Switch enabled = new Switch("", current.enabled());
 		enabled.setAccessibleText("AI control");
 		enabled.setDisable(busy);
 		enabled.onCheckedChange(checked -> update(() -> controller.setEnabled(checked)));
@@ -67,19 +66,19 @@ public final class AgentSettingsView extends VBox {
 
 		Button copyCommand = new Button("Copy Claude Code command", Button.Variant.SECONDARY, Button.Size.SM);
 		copyCommand.setDisable(busy);
-		copyCommand.setOnAction(event -> copy("Claude Code command", state.claudeCodeCommand()));
+		copyCommand.setOnAction(event -> copy("Claude Code command", current.claudeCodeCommand()));
 		Button copyJson = new Button("Copy JSON config", Button.Variant.SECONDARY, Button.Size.SM);
 		copyJson.setDisable(busy);
-		copyJson.setOnAction(event -> copy("MCP JSON config", state.jsonConfig()));
+		copyJson.setOnAction(event -> copy("MCP JSON config", current.jsonConfig()));
 		Button regenerate = new Button("Regenerate token", Button.Variant.GHOST, Button.Size.SM);
-		regenerate.setDisable(busy || !state.enabled());
+		regenerate.setDisable(busy || !current.enabled());
 		regenerate.setOnAction(event -> update(controller::regenerateToken));
 		FlowPane buttons = new FlowPane(8, 8, copyCommand, copyJson, regenerate);
 		buttons.setAlignment(Pos.CENTER_LEFT);
-		rows.getChildren().add(new SettingsRow("Status", statusText(), buttons, true));
+		rows.getChildren().add(new SettingsRow("Status", statusText(current), buttons, true));
 
-		if (state.jsonConfig() != null && !state.jsonConfig().isBlank()) {
-			Label config = new Label(state.jsonConfig());
+		if (current.jsonConfig() != null && !current.jsonConfig().isBlank()) {
+			Label config = new Label(current.jsonConfig());
 			config.getStyleClass().add("agent-settings__config");
 			config.setWrapText(true);
 			config.setMaxWidth(Double.MAX_VALUE);
@@ -89,14 +88,14 @@ public final class AgentSettingsView extends VBox {
 		}
 	}
 
-	private String statusText() {
-		if (!state.enabled()) {
+	private String statusText(AgentSettingsController.State current) {
+		if (!current.enabled()) {
 			return "Off";
 		}
-		if (state.clients().isEmpty()) {
+		if (current.clients().isEmpty()) {
 			return "Listening · no agent connected";
 		}
-		String names = state.clients().stream().map(AgentSettingsController.Client::client)
+		String names = current.clients().stream().map(AgentSettingsController.Client::client)
 				.reduce((left, right) -> left + ", " + right).orElse("");
 		return "Listening · connected: " + names;
 	}

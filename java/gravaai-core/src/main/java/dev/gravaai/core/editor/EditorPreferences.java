@@ -28,14 +28,12 @@ import tools.jackson.databind.node.ObjectNode;
  * settings; the Java app has a single process, so {@link EditorPreferencesStore} persists them to
  * {@code app-settings.json} only (recorded narrowing).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record EditorPreferences(
 		@Nullable String wallpaper,
-		@Nullable double shadowIntensity,
-		@Nullable double backgroundBlur,
-		@Nullable double zoomMotionBlur,
-		@Nullable ZoomMotionBlurTuning zoomMotionBlurTuning,
+		double shadowIntensity,
+		double backgroundBlur,
+		double zoomMotionBlur,
+		ZoomMotionBlurTuning zoomMotionBlurTuning,
 		boolean connectZooms,
 		double zoomInDurationMs,
 		double zoomInOverlapMs,
@@ -64,17 +62,17 @@ public record EditorPreferences(
 		double cursorClickEffectDurationMs,
 		double cursorClickBounce,
 		double cursorClickBounceDuration,
-		@Nullable double cursorSway,
-		@Nullable double borderRadius,
-		@Nullable Padding padding,
-		@Nullable WebcamOverlaySettings webcam,
-		@Nullable String aspectRatio,
-		ExportPreferences.@Nullable ExportEncodingMode exportEncodingMode,
+		double cursorSway,
+		double borderRadius,
+		Padding padding,
+		WebcamOverlaySettings webcam,
+		String aspectRatio,
+		ExportPreferences.ExportEncodingMode exportEncodingMode,
 		ExportPreferences.ExportBackendPreference exportBackendPreference,
 		ExportPreferences.ExportPipelineModel exportPipelineModel,
 		ExportPreferences.ExportQuality exportQuality,
-		@Nullable int mp4FrameRate,
-		ExportPreferences.@Nullable ExportFormat exportFormat,
+		int mp4FrameRate,
+		ExportPreferences.ExportFormat exportFormat,
 		int gifFrameRate,
 		boolean gifLoop,
 		ExportPreferences.GifSizePreset gifSizePreset,
@@ -83,7 +81,7 @@ public record EditorPreferences(
 		String borderRadiusUnit,
 		String customAspectWidth,
 		String customAspectHeight,
-		@Nullable List<String> customWallpapers,
+		List<String> customWallpapers,
 		boolean autoApplyFreshRecordingAutoZooms,
 		@Nullable String whisperExecutablePath,
 		@Nullable String whisperModelPath,
@@ -120,8 +118,11 @@ public record EditorPreferences(
 				"percent", "16", "9", List.of(), true, null, null, null);
 	}
 
-	/** {@code normalizeEditorPreferences}. */
-	public static EditorPreferences normalize(JsonNode candidate, EditorPreferences fallback) {
+	/**
+	 * {@code normalizeEditorPreferences}; {@code null} means "nothing stored", so every control
+	 * comes from {@code fallback}.
+	 */
+	public static EditorPreferences normalize(@Nullable JsonNode candidate, EditorPreferences fallback) {
 		JsonNode raw = candidate != null && candidate.isObject()
 				? candidate : Json.nodeFactory().objectNode();
 		JsonNode controlsRaw = controlsInput(raw);
@@ -265,7 +266,7 @@ public record EditorPreferences(
 		return node;
 	}
 
-	private static ObjectNode paddingToJson(@Nullable Padding padding) {
+	private static ObjectNode paddingToJson(Padding padding) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("top", padding.top());
 		node.put("bottom", padding.bottom());
@@ -275,7 +276,7 @@ public record EditorPreferences(
 		return node;
 	}
 
-	private static ObjectNode webcamToJson(@Nullable WebcamOverlaySettings webcam) {
+	private static ObjectNode webcamToJson(WebcamOverlaySettings webcam) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		if (webcam.visibleRanges() != null) {
 			var ranges = Json.nodeFactory().arrayNode();
@@ -367,11 +368,13 @@ public record EditorPreferences(
 		return node;
 	}
 
-	private static boolean normalizeBoolean(JsonNode value, boolean fallback) {
+	/** Boolean normaliser; {@code null} when the stored field is missing. */
+	private static boolean normalizeBoolean(@Nullable JsonNode value, boolean fallback) {
 		return value != null && value.isBoolean() ? value.booleanValue() : fallback;
 	}
 
-	private static String normalizePositiveIntegerString(JsonNode value, String fallback) {
+	/** Positive-integer string normaliser; {@code null} when the stored field is missing. */
+	private static String normalizePositiveIntegerString(@Nullable JsonNode value, String fallback) {
 		if (value == null || !value.isString() || value.asString().strip().isEmpty()) {
 			return fallback;
 		}
@@ -383,7 +386,7 @@ public record EditorPreferences(
 		}
 	}
 
-	private static @Nullable List<String> normalizeCustomWallpapers(@Nullable JsonNode value, @Nullable List<String> fallback) {
+	private static List<String> normalizeCustomWallpapers(@Nullable JsonNode value, List<String> fallback) {
 		if (value == null || !value.isArray()) {
 			return fallback;
 		}
@@ -396,7 +399,8 @@ public record EditorPreferences(
 		return List.copyOf(unique);
 	}
 
-	private static @Nullable String normalizeNullablePath(JsonNode value) {
+	/** Optional path normaliser: {@code null} result when the stored value is absent or blank. */
+	private static @Nullable String normalizeNullablePath(@Nullable JsonNode value) {
 		if (value == null || !value.isString()) {
 			return null;
 		}

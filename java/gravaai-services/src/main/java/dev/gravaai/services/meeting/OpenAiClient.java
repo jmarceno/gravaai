@@ -45,7 +45,7 @@ public interface OpenAiClient {
 	}
 
 	record ChatCompletionRequest(String model, List<ChatMessage> messages, @Nullable Integer maxTokens,
-			@Nullable Double temperature, Map<String, Object> extra) {
+			@Nullable Double temperature, @Nullable Map<String, Object> extra) {
 	}
 
 	record ChatMessage(String role, List<ChatContentPart> content) {

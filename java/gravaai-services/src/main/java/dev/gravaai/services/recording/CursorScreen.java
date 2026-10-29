@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -24,5 +26,6 @@ public interface CursorScreen {
 
 	Display primaryDisplay();
 
-	Display displayNearestPoint(double x, double y);
+	/** @return the display containing the point, or null when it falls outside every display */
+	@Nullable Display displayNearestPoint(double x, double y);
 }

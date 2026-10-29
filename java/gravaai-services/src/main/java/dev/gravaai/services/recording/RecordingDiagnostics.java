@@ -20,8 +20,6 @@ import tools.jackson.databind.JsonNode;
  * here is the timeout/probe parsing, the microphone-chunk timing summary and the companion-audio
  * sidecar discovery that the import pipeline and the editor read-model need on every platform.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingDiagnostics {
 
 	public static final long MIN_VALID_RECORDED_VIDEO_BYTES = 1024;
@@ -53,7 +51,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** {@code summarizeMicrophoneChunkTiming} result. */
-	public @Nullable record MicrophoneChunkTimingSummary(
+	public record MicrophoneChunkTimingSummary(
 			String status,
 			int timesliceMs,
 			int thresholdMs,
@@ -73,11 +71,11 @@ public final class RecordingDiagnostics {
 	}
 
 	/** One companion-audio layout that has usable files ({@code CompanionAudioCandidate}). */
-	public @Nullable record CompanionAudioCandidate(
+	public record CompanionAudioCandidate(
 			String platform, String systemPath, String micPath, List<String> usablePaths) {
 	}
 
-	private @Nullable record CompanionLayout(String platform, String systemSuffix, String micSuffix) {
+	private record CompanionLayout(String platform, String systemSuffix, String micSuffix) {
 	}
 
 	private static final List<CompanionLayout> COMPANION_AUDIO_LAYOUTS = List.of(
@@ -85,12 +83,12 @@ public final class RecordingDiagnostics {
 			new CompanionLayout("win", ".system.wav", ".mic.wav"),
 			new CompanionLayout("mac", ".system.webm", ".mic.webm"));
 
-	@Nullable private RecordingDiagnostics() {
+	private RecordingDiagnostics() {
 	}
 
 	/** Port of {@code getFileSizeIfPresent}. */
 	public static @Nullable Long getFileSizeIfPresent(String filePath) {
-		if (filePath == null || filePath.isBlank()) {
+		if (filePath.isBlank()) {
 			return null;
 		}
 		try {
@@ -102,9 +100,6 @@ public final class RecordingDiagnostics {
 
 	/** Parses {@code Duration: hh:mm:ss.ss} from ffmpeg's stderr. */
 	public static @Nullable Double parseFfmpegDurationSeconds(String stderr) {
-		if (stderr == null) {
-			return null;
-		}
 		java.util.regex.Matcher match = java.util.regex.Pattern
 				.compile("Duration:\\s+(\\d+):(\\d+):(\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE)
 				.matcher(stderr);
@@ -121,7 +116,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** Scales the audio mux timeout with the recording duration. */
-	public static @Nullable long getRecordingAudioMuxTimeoutMs(double durationSeconds) {
+	public static long getRecordingAudioMuxTimeoutMs(double durationSeconds) {
 		if (!Double.isFinite(durationSeconds) || durationSeconds <= 0) {
 			return RECORDING_AUDIO_MUX_MIN_TIMEOUT_MS;
 		}
@@ -145,8 +140,8 @@ public final class RecordingDiagnostics {
 		int normalizedTimesliceMs =
 				Double.isFinite(timesliceMs) && timesliceMs > 0 ? (int) Math.round(timesliceMs) : 250;
 		int thresholdMs = Math.max(600, (int) Math.round(normalizedTimesliceMs * 2.5));
-		List<MicrophoneChunkTimingEvent> events = chunkEvents == null ? List.of() : chunkEvents;
-		List<MicrophonePauseInterval> pauses = pauseIntervals == null ? List.of() : pauseIntervals;
+		List<MicrophoneChunkTimingEvent> events = chunkEvents;
+		List<MicrophonePauseInterval> pauses = pauseIntervals;
 		long pausedDurationMs = 0;
 		for (MicrophonePauseInterval interval : pauses) {
 			Double durationMs = getFiniteNonNegativeNumber(interval.durationMs());
@@ -196,7 +191,8 @@ public final class RecordingDiagnostics {
 				List.copyOf(recordedGaps.subList(0, Math.min(MAX_GAPS, recordedGaps.size()))));
 	}
 
-	private static @Nullable Double parsePositiveNumber(Object raw) {
+	/** @param raw the raw JSON value, or null when the field is absent */
+	private static @Nullable Double parsePositiveNumber(@Nullable Object raw) {
 		if (raw instanceof Number number) {
 			double value = number.doubleValue();
 			return Double.isFinite(value) && value > 0 ? value : null;
@@ -212,12 +208,14 @@ public final class RecordingDiagnostics {
 		return null;
 	}
 
-	private static @Nullable Long parsePositiveInteger(Object raw) {
+	/** @param raw the raw JSON value, or null when the field is absent */
+	private static @Nullable Long parsePositiveInteger(@Nullable Object raw) {
 		Double value = parsePositiveNumber(raw);
 		return value == null ? null : Math.round(value);
 	}
 
-	private static @Nullable Double parseFrameRate(Object raw) {
+	/** @param raw the raw JSON value, or null when the field is absent */
+	private static @Nullable Double parseFrameRate(@Nullable Object raw) {
 		if (!(raw instanceof String text) || text.isBlank()) {
 			return null;
 		}
@@ -245,10 +243,11 @@ public final class RecordingDiagnostics {
 	}
 
 	private static @Nullable JsonNode nodeValue(JsonNode node, String field) {
-		return node == null ? null : node.get(field);
+		return node.get(field);
 	}
 
-	private static @Nullable Object javaValue(JsonNode node) {
+	/** @param node the JSON value, or null when the field is absent */
+	private static @Nullable Object javaValue(@Nullable JsonNode node) {
 		if (node == null || node.isNull()) {
 			return null;
 		}
@@ -293,7 +292,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** {@code getRecordingDiagnosticsPath}: next to the video, with its extension replaced. */
-	public static @Nullable String getRecordingDiagnosticsPath(String videoPath) {
+	public static String getRecordingDiagnosticsPath(String videoPath) {
 		int slash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
 		int dot = videoPath.lastIndexOf('.');
 		String stem = dot > slash ? videoPath.substring(0, dot) : videoPath;
@@ -301,7 +300,7 @@ public final class RecordingDiagnostics {
 	}
 
 	/** The companion audio files that exist and are non-empty, in layout priority order. */
-	public static @Nullable List<CompanionAudioCandidate> getUsableCompanionAudioCandidates(String videoPath) {
+	public static List<CompanionAudioCandidate> getUsableCompanionAudioCandidates(String videoPath) {
 		int slash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
 		int dot = videoPath.lastIndexOf('.');
 		String basePath = dot > slash ? videoPath.substring(0, dot) : videoPath;
@@ -353,7 +352,7 @@ public final class RecordingDiagnostics {
 
 	/** Truncates a diagnostics process output to its last {@code maxLength} characters. */
 	public static String truncateDiagnosticsText(String value, int maxLength) {
-		if (value == null || value.length() <= maxLength) {
+		if (value.length() <= maxLength) {
 			return value;
 		}
 		return value.substring(value.length() - maxLength)

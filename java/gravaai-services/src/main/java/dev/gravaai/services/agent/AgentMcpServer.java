@@ -41,8 +41,6 @@ import tools.jackson.databind.node.ObjectNode;
  * byte-identically from {@link AgentToolSchemas}; every call is forwarded to the running app over
  * {@link AgentSocketBridge} and progress lines become MCP progress notifications.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentMcpServer implements AutoCloseable {
 
 	private final McpSyncServer server;
@@ -149,7 +147,7 @@ public final class AgentMcpServer implements AutoCloseable {
 		}
 		Object progressToken = request.meta() == null ? null
 				: request.meta().get("progressToken");
-		Consumer<AgentProgressUpdate> onProgress = progressToken == null ? null
+		Consumer<AgentProgressUpdate> onProgress = progressToken == null ? update -> {}
 				: update -> notifyProgress(exchange, progressToken, update);
 		AgentToolResult result;
 		try {

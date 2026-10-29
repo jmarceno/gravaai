@@ -41,8 +41,6 @@ import javafx.util.Duration;
  * State transitions use the motion/react values from LaunchWindow.tsx (240 ms,
  * ease [0.22, 1, 0.36, 1]) via {@link Motion#EASE_MOTION_OUT}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudBar extends HBox {
 
 	private static final String RECORD_DOT = "hud-rec-dot";
@@ -212,8 +210,9 @@ public final class HudBar extends HBox {
 		source.getStyleClass().add("hud-source-button");
 		HBox graphic = new HBox(8);
 		graphic.setAlignment(Pos.CENTER_LEFT);
+		String sourceName = next.sourceName();
 		String label = next.picking() ? "Click a screen…"
-				: (next.hasSource() ? next.sourceName() : "Pick screen");
+				: (sourceName != null && !sourceName.isBlank() ? sourceName : "Pick screen");
 		MarqueeText marquee = new MarqueeText(label);
 		marquee.setPrefWidth(120);
 		marquee.setMaxWidth(120);
@@ -318,7 +317,7 @@ public final class HudBar extends HBox {
 	// ── helpers ───────────────────────────────────────────────────────────
 
 	private Button iconButton(String iconName, String weight, double iconSize, String tooltip,
-			@Nullable String accentClass, @Nullable Runnable action) {
+			@Nullable String accentClass, Runnable action) {
 		Button button = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		button.icon(Icon.of(iconName, iconSize, weight));
 		button.setAccessibleText(tooltip);

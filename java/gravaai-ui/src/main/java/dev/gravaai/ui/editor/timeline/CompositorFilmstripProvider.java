@@ -28,8 +28,6 @@ import javafx.scene.image.WritableImage;
  * the preview/export use (source/webcam frames, layout/zoom/style/cursor/overlays/captions/fades),
  * so filmstrip, preview and export cannot disagree.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CompositorFilmstripProvider implements FilmstripProvider, AutoCloseable {
 
 	private record Key(String clipId, double timelineTimeMs, int width, int height) {
@@ -45,7 +43,7 @@ public final class CompositorFilmstripProvider implements FilmstripProvider, Aut
 	private volatile @Nullable String lastFailure;
 
 	/** Creates one compositor renderer at the requested thumbnail size. */
-	@Nullable public CompositorFilmstripProvider(int width, int height,
+	public CompositorFilmstripProvider(int width, int height,
 			FrameAtTime.FrameInputFactory inputFactory) {
 		this(new CompositorFrameAtTime(width, height, inputFactory));
 	}

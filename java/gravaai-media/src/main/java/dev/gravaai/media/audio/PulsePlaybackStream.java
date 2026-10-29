@@ -30,8 +30,6 @@ import static java.lang.foreign.ValueLayout.JAVA_LONG;
  * {@code samples written - latency}, so a blocking write is expected and the writer thread is the
  * playback/audio thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class PulsePlaybackStream implements PlaybackAudioSink {
 
 	private static final System.Logger LOG =
@@ -70,24 +68,27 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 			Path.of("/usr/lib/libpulse.so.0"),
 			Path.of("/lib/x86_64-linux-gnu/libpulse.so.0"));
 
-	private static MethodHandle paSimpleNew;
-	private static MethodHandle paSimpleWrite;
-	private static MethodHandle paSimpleGetLatency;
-	private static MethodHandle paSimpleFlush;
-	private static MethodHandle paSimpleFree;
-	private static MethodHandle paStrerror;
-	private static boolean loaded;
+	/** libpulse-simple / libpulse entry points, loaded together on first use. */
+	private record Bindings(MethodHandle paSimpleNew, MethodHandle paSimpleWrite,
+			MethodHandle paSimpleGetLatency, MethodHandle paSimpleFlush,
+			MethodHandle paSimpleFree, MethodHandle paStrerror) {}
 
+	/** The loaded entry points; {@code null} until the first {@link #open()}. */
+	private static @Nullable Bindings bindings;
+
+	private final Bindings handles;
 	private final Arena arena;
 	private final String streamName;
 	private final MemorySegment handle;
 	private final MemorySegment errorPtr;
-	private @Nullable MemorySegment scratch;
+	/** Scratch buffer for the float32 copy; {@link MemorySegment#NULL} until the first write. */
+	private MemorySegment scratch = MemorySegment.NULL;
 	private int scratchSamples;
 	private boolean closed;
 
-	private PulsePlaybackStream(Arena arena, String streamName, MemorySegment handle,
-			MemorySegment errorPtr) {
+	private PulsePlaybackStream(Bindings handles, Arena arena, String streamName,
+			MemorySegment handle, MemorySegment errorPtr) {
+		this.handles = handles;
 		this.arena = arena;
 		this.streamName = streamName;
 		this.handle = handle;
@@ -105,7 +106,7 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 	}
 
 	static PulsePlaybackStream open() {
-		ensureLoaded();
+		Bindings handles = ensureLoaded();
 		// The playback owner opens the sink on the attach thread but writes on the render thread
 		// and flushes on seek/pause from the FX thread. A confined arena rejects every one of those
 		// cross-thread calls (WrongThreadException), so use a shared arena and serialize the
@@ -127,7 +128,8 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 			MemorySegment streamName = cString(arena, "Editor preview");
 			MemorySegment handle;
 			try {
-				handle = (MemorySegment) paSimpleNew.invokeExact(MemorySegment.NULL, applicationName,
+				handle = (MemorySegment) handles.paSimpleNew().invokeExact(MemorySegment.NULL,
+						applicationName,
 						PA_STREAM_PLAYBACK, device, streamName, sampleSpec, MemorySegment.NULL,
 						bufferAttr, errorPtr);
 			} catch (Throwable failure) {
@@ -136,10 +138,10 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 			if (handle.address() == 0) {
 				int error = errorPtr.get(JAVA_INT, 0);
 				throw new IllegalStateException(
-						"cannot open PulseAudio playback stream: " + strerror(error));
+						"cannot open PulseAudio playback stream: " + strerror(handles, error));
 			}
 			LOG.log(System.Logger.Level.DEBUG, () -> "opened PulseAudio playback stream");
-			return new PulsePlaybackStream(arena, "Editor preview", handle, errorPtr);
+			return new PulsePlaybackStream(handles, arena, "Editor preview", handle, errorPtr);
 		} catch (RuntimeException failure) {
 			arena.close();
 			throw failure;
@@ -161,10 +163,11 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		MemorySegment.copy(MemorySegment.ofArray(interleavedStereo), ValueLayout.JAVA_FLOAT, 0,
 				scratch, ValueLayout.JAVA_FLOAT, 0, samples);
 		try {
-			int result = (int) paSimpleWrite.invokeExact(handle, scratch, (long) requiredBytes, errorPtr);
+			int result = (int) handles.paSimpleWrite().invokeExact(handle, scratch,
+					(long) requiredBytes, errorPtr);
 			if (result < 0) {
 				throw new IllegalStateException(
-						"pa_simple_write failed: " + strerror(errorPtr.get(JAVA_INT, 0)));
+						"pa_simple_write failed: " + strerror(handles, errorPtr.get(JAVA_INT, 0)));
 			}
 		} catch (RuntimeException failure) {
 			throw failure;
@@ -179,7 +182,7 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 			return 0;
 		}
 		try {
-			long latency = (long) paSimpleGetLatency.invokeExact(handle, errorPtr);
+			long latency = (long) handles.paSimpleGetLatency().invokeExact(handle, errorPtr);
 			return (int) Math.max(0, Math.min(Integer.MAX_VALUE, latency));
 		} catch (Throwable failure) {
 			LOG.log(System.Logger.Level.WARNING, "pa_simple_get_latency failed: " + failure);
@@ -193,10 +196,10 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 			return;
 		}
 		try {
-			int result = (int) paSimpleFlush.invokeExact(handle, errorPtr);
+			int result = (int) handles.paSimpleFlush().invokeExact(handle, errorPtr);
 			if (result < 0) {
 				LOG.log(System.Logger.Level.WARNING,
-						"pa_simple_flush failed: " + strerror(errorPtr.get(JAVA_INT, 0)));
+						"pa_simple_flush failed: " + strerror(handles, errorPtr.get(JAVA_INT, 0)));
 			}
 		} catch (Throwable failure) {
 			LOG.log(System.Logger.Level.WARNING, "pa_simple_flush failed: " + failure);
@@ -204,7 +207,7 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 	}
 
 	private void ensureScratch(int samples) {
-		if (scratch != null && scratchSamples >= samples) {
+		if (scratch.address() != 0 && scratchSamples >= samples) {
 			return;
 		}
 		scratch = arena.allocate((long) samples * Float.BYTES);
@@ -218,7 +221,7 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		}
 		closed = true;
 		try {
-			paSimpleFree.invokeExact(handle);
+			handles.paSimpleFree().invokeExact(handle);
 		} catch (Throwable failure) {
 			LOG.log(System.Logger.Level.WARNING, "pa_simple_free failed: " + failure);
 		}
@@ -233,9 +236,9 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		return segment;
 	}
 
-	private static String strerror(int error) {
+	private static String strerror(Bindings handles, int error) {
 		try {
-			MemorySegment text = (MemorySegment) paStrerror.invokeExact(error);
+			MemorySegment text = (MemorySegment) handles.paStrerror().invokeExact(error);
 			if (text.address() == 0) {
 				return "error " + error;
 			}
@@ -245,9 +248,10 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		}
 	}
 
-	private static synchronized void ensureLoaded() {
-		if (loaded) {
-			return;
+	private static synchronized Bindings ensureLoaded() {
+		Bindings current = bindings;
+		if (current != null) {
+			return current;
 		}
 		Linker linker = Linker.nativeLinker();
 		SymbolLookup simple = null;
@@ -260,21 +264,21 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		if (simple == null) {
 			throw new IllegalStateException("libpulse-simple.so.0 not found (PulseAudio is not installed)");
 		}
-		paSimpleNew = linker.downcallHandle(
+		MethodHandle paSimpleNew = linker.downcallHandle(
 				simple.find("pa_simple_new").orElseThrow(() -> new IllegalStateException(
 						"libpulse-simple lacks pa_simple_new")),
 				FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, ADDRESS,
 						ADDRESS, ADDRESS, ADDRESS, ADDRESS));
-		paSimpleWrite = linker.downcallHandle(
+		MethodHandle paSimpleWrite = linker.downcallHandle(
 				simple.find("pa_simple_write").orElseThrow(),
 				FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS));
-		paSimpleGetLatency = linker.downcallHandle(
+		MethodHandle paSimpleGetLatency = linker.downcallHandle(
 				simple.find("pa_simple_get_latency").orElseThrow(),
 				FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
-		paSimpleFlush = linker.downcallHandle(
+		MethodHandle paSimpleFlush = linker.downcallHandle(
 				simple.find("pa_simple_flush").orElseThrow(),
 				FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
-		paSimpleFree = linker.downcallHandle(
+		MethodHandle paSimpleFree = linker.downcallHandle(
 				simple.find("pa_simple_free").orElseThrow(),
 				FunctionDescriptor.ofVoid(ADDRESS));
 		SymbolLookup pulse = null;
@@ -294,7 +298,11 @@ final class PulsePlaybackStream implements PlaybackAudioSink {
 		if (strerrorSymbol == null) {
 			throw new IllegalStateException("libpulse lacks pa_strerror");
 		}
-		paStrerror = linker.downcallHandle(strerrorSymbol, FunctionDescriptor.of(ADDRESS, JAVA_INT));
-		loaded = true;
+		MethodHandle paStrerror = linker.downcallHandle(strerrorSymbol,
+				FunctionDescriptor.of(ADDRESS, JAVA_INT));
+		Bindings loaded = new Bindings(paSimpleNew, paSimpleWrite, paSimpleGetLatency,
+				paSimpleFlush, paSimpleFree, paStrerror);
+		bindings = loaded;
+		return loaded;
 	}
 }

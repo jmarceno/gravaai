@@ -31,8 +31,6 @@ import javafx.scene.shape.SVGPath;
  * sets (a primary Button sets it to {@code -g-accent-foreground}). {@link #setIconColor(Color)}
  * overrides that for icons that need a code-supplied colour.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Icon extends javafx.scene.layout.Region {
 
 	/** Default icon size: Tailwind {@code size-4} (16 px), the HeroUI desktop button icon size. */

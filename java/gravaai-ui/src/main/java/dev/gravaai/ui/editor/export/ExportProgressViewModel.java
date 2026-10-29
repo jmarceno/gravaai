@@ -12,23 +12,21 @@ import dev.gravaai.media.export.ExportStatusModel;
  * View-model of the export progress panel (port of
  * {@code src/components/video-editor/export/useExportStatusViewModel.ts}, plan §5.12).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportProgressViewModel {
 
 	private static final String PREPARING = "Preparing export...";
 	private static final String SAVING = "Opening save dialog...";
 
 	private boolean exporting;
-	private ExportProgress progress;
+	private @Nullable ExportProgress progress;
 	private ExportFormat format = ExportFormat.MP4;
 	private ExportPipelineModel pipelineModel = ExportPipelineModel.MODERN;
-	private @Nullable ExportStatusModel status = ExportStatusModel.resolve(false, null, ExportFormat.MP4,
+	private ExportStatusModel status = ExportStatusModel.resolve(false, null, ExportFormat.MP4,
 			ExportPipelineModel.MODERN);
 
 	/** Replaces the snapshot. */
-	public void update(boolean exporting, ExportProgress progress, ExportFormat format,
-			ExportPipelineModel pipelineModel) {
+	public void update(boolean exporting, @Nullable ExportProgress progress,
+			@Nullable ExportFormat format, ExportPipelineModel pipelineModel) {
 		this.exporting = exporting;
 		this.progress = progress;
 		this.format = format == null ? ExportFormat.MP4 : format;
@@ -40,7 +38,7 @@ public final class ExportProgressViewModel {
 		return exporting;
 	}
 
-	public ExportProgress progress() {
+	public @Nullable ExportProgress progress() {
 		return progress;
 	}
 
@@ -52,7 +50,7 @@ public final class ExportProgressViewModel {
 		return pipelineModel;
 	}
 
-	public @Nullable ExportStatusModel status() {
+	public ExportStatusModel status() {
 		return status;
 	}
 

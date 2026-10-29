@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  *     cancelled
  * @param media the playback host, or null until the media playback layer is wired
  */
-public record MeetingViewActions(Runnable onClose, @Nullable Supplier<Path> importFileChooser,
+public record MeetingViewActions(Runnable onClose, Supplier<@Nullable Path> importFileChooser,
 		@Nullable MeetingMediaHost media) {
 
 	public MeetingViewActions {

@@ -29,8 +29,6 @@ import java.util.concurrent.Executors;
  * replacement, so a crash cannot lose both generations. Writes to the same project are queued in
  * invocation order; calls for different projects run independently.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AtomicProjectSave {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.project");
@@ -86,7 +84,7 @@ public final class AtomicProjectSave {
 		return projectPath.toAbsolutePath().normalize();
 	}
 
-	private static Path createTemporaryPath(@Nullable Path parentDir, String label) {
+	private static Path createTemporaryPath(Path parentDir, String label) {
 		return parentDir.resolve(
 				".gravaai-" + label + "-" + ProcessHandle.current().pid() + "-" + UUID.randomUUID() + ".tmp");
 	}
@@ -122,7 +120,7 @@ public final class AtomicProjectSave {
 		}
 	}
 
-	private static void syncParentDirectory(@Nullable Path parentDir) throws IOException {
+	private static void syncParentDirectory(Path parentDir) throws IOException {
 		if (java.io.File.separatorChar == '\\') {
 			return;
 		}
@@ -169,6 +167,11 @@ public final class AtomicProjectSave {
 		try {
 			Path targetPath = projectPath.toAbsolutePath().normalize();
 			Path parentDir = targetPath.getParent();
+			if (parentDir == null) {
+				// A project file always lives in a directory; only a filesystem root has no parent.
+				throw new IllegalArgumentException(
+						"Project path has no parent directory: " + projectPath);
+			}
 			Path backupPath = getProjectBackupPath(targetPath);
 			Path temporaryPath = createTemporaryPath(parentDir, "project");
 			Path backupTemporaryPath = createTemporaryPath(parentDir, "backup");

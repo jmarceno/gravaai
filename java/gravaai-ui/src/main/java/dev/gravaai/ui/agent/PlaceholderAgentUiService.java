@@ -13,8 +13,6 @@ import java.util.function.Consumer;
  * P3.2): a deterministic demo state for the Settings page, the header chip and the timeline
  * highlights, plus the same behaviour the real adapter must provide.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PlaceholderAgentUiService implements AgentUiService {
 
 	private static final AtomicLong TOKEN_SERIAL = new AtomicLong(1);

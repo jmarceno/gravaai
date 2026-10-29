@@ -20,8 +20,6 @@ import dev.gravaai.platform.process.ProcessRunner;
  * JSON belongs to gravaai-core, plan §4.2). Recording uses libpulse-simple through FFM
  * ({@link PulseSimpleRecordStream}).</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PulseAudio {
 
 	private static final System.Logger LOG = System.getLogger(PulseAudio.class.getName());
@@ -188,7 +186,7 @@ public final class PulseAudio {
 			}
 		}
 
-		private @Nullable String readString() {
+		private String readString() {
 			expect('"');
 			StringBuilder builder = new StringBuilder();
 			while (position < text.length()) {
@@ -218,7 +216,7 @@ public final class PulseAudio {
 			throw error("unterminated string");
 		}
 
-		private @Nullable Object readNumber() {
+		private Object readNumber() {
 			int start = position;
 			while (position < text.length()) {
 				char current = text.charAt(position);
@@ -236,7 +234,7 @@ public final class PulseAudio {
 			return Double.parseDouble(number);
 		}
 
-		private Object readLiteral(String literal, @Nullable Object value) {
+		private @Nullable Object readLiteral(String literal, @Nullable Object value) {
 			if (text.startsWith(literal, position)) {
 				position += literal.length();
 				return value;

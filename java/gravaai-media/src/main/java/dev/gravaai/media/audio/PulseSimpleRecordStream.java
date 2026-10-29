@@ -22,8 +22,6 @@ import java.util.List;
  * FFmpeg, we do not bundle it). The binding is hand-written because jextract is only used for
  * FFmpeg; the surface here is three functions.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class PulseSimpleRecordStream implements PulseRecordStream {
 
 	private static final System.Logger LOG =
@@ -54,22 +52,26 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 			Path.of("/usr/lib/libpulse-simple.so.0"),
 			Path.of("/lib/x86_64-linux-gnu/libpulse-simple.so.0"));
 
-	private static MethodHandle paSimpleNew;
-	private static MethodHandle paSimpleRead;
-	private static MethodHandle paSimpleFree;
-	private static MethodHandle paStrerror;
-	private static boolean loaded;
+	/** libpulse-simple / libpulse entry points, loaded together on first use. */
+	private record Bindings(MethodHandle paSimpleNew, MethodHandle paSimpleRead,
+			MethodHandle paSimpleFree, MethodHandle paStrerror) {}
 
+	/** The loaded entry points; {@code null} until the first {@link #open(String)}. */
+	private static @Nullable Bindings bindings;
+
+	private final Bindings handles;
 	private final Arena arena;
 	private final String sourceName;
 	private final MemorySegment handle;
 	private final MemorySegment errorPtr;
-	private @Nullable MemorySegment scratch;
+	/** Scratch buffer for the float32 copy; {@link MemorySegment#NULL} until the first read. */
+	private MemorySegment scratch = MemorySegment.NULL;
 	private int scratchSamples;
 	private volatile boolean closed;
 
-	private PulseSimpleRecordStream(Arena arena, String sourceName, MemorySegment handle,
-			MemorySegment errorPtr) {
+	private PulseSimpleRecordStream(Bindings handles, Arena arena, String sourceName,
+			MemorySegment handle, MemorySegment errorPtr) {
+		this.handles = handles;
 		this.arena = arena;
 		this.sourceName = sourceName;
 		this.handle = handle;
@@ -80,7 +82,7 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		if (sourceName == null || sourceName.isBlank()) {
 			throw new IllegalArgumentException("sourceName must not be blank");
 		}
-		ensureLoaded();
+		Bindings handles = ensureLoaded();
 		// The HUD meter opens the stream on the FX thread and reads it on the level pump thread.
 		// A confined arena rejects that cross-thread access (WrongThreadException) and its close
 		// can free scratch memory another thread is using; libpulse then aborts inside
@@ -103,7 +105,7 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 			MemorySegment streamName = cString(arena, "Editor microphone meter");
 			MemorySegment handle;
 			try {
-				handle = (MemorySegment) paSimpleNew.invokeExact(MemorySegment.NULL, name,
+				handle = (MemorySegment) handles.paSimpleNew().invokeExact(MemorySegment.NULL, name,
 						PA_STREAM_RECORD, device, streamName, sampleSpec, MemorySegment.NULL,
 						bufferAttr, errorPtr);
 			} catch (Throwable failure) {
@@ -112,11 +114,11 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 			if (handle.address() == 0) {
 				int error = errorPtr.get(ValueLayout.JAVA_INT, 0);
 				throw new IllegalStateException("cannot record from PulseAudio source '"
-						+ sourceName + "': " + strerror(error));
+						+ sourceName + "': " + strerror(handles, error));
 			}
 			LOG.log(System.Logger.Level.DEBUG,
 					() -> "opened PulseAudio record stream for " + sourceName);
-			return new PulseSimpleRecordStream(arena, sourceName, handle, errorPtr);
+			return new PulseSimpleRecordStream(handles, arena, sourceName, handle, errorPtr);
 		} catch (RuntimeException failure) {
 			arena.close();
 			throw failure;
@@ -134,11 +136,11 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		int requiredBytes = mono48k.length * Float.BYTES;
 		ensureScratch(mono48k.length);
 		try {
-			int result = (int) paSimpleRead.invokeExact(handle, scratch, (long) requiredBytes,
-					errorPtr);
+			int result = (int) handles.paSimpleRead().invokeExact(handle, scratch,
+					(long) requiredBytes, errorPtr);
 			if (result < 0) {
 				throw new IllegalStateException("pa_simple_read failed for " + sourceName + ": "
-						+ strerror(errorPtr.get(ValueLayout.JAVA_INT, 0)));
+						+ strerror(handles, errorPtr.get(ValueLayout.JAVA_INT, 0)));
 			}
 		} catch (RuntimeException failure) {
 			throw failure;
@@ -151,7 +153,7 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 	}
 
 	private void ensureScratch(int samples) {
-		if (scratch != null && scratchSamples >= samples) {
+		if (scratch.address() != 0 && scratchSamples >= samples) {
 			return;
 		}
 		scratch = arena.allocate((long) samples * Float.BYTES);
@@ -171,7 +173,7 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		closed = true;
 		try {
 			// pa_simple_free takes the handle by value (not a pointer to pointer).
-			paSimpleFree.invokeExact(handle);
+			handles.paSimpleFree().invokeExact(handle);
 		} catch (Throwable failure) {
 			LOG.log(System.Logger.Level.WARNING, "pa_simple_free failed: " + failure);
 		} finally {
@@ -179,9 +181,10 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		}
 	}
 
-	private static synchronized void ensureLoaded() {
-		if (loaded) {
-			return;
+	private static synchronized Bindings ensureLoaded() {
+		Bindings current = bindings;
+		if (current != null) {
+			return current;
 		}
 		Path simpleLibrary = findLibrary("libpulse-simple.so.0");
 		Path pulseLibrary = findLibrary("libpulse.so.0");
@@ -193,20 +196,22 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		}
 		SymbolLookup lookup = SymbolLookup.loaderLookup();
 		Linker linker = Linker.nativeLinker();
-		paSimpleNew = downcall(linker, lookup, "pa_simple_new", FunctionDescriptor.of(
+		MethodHandle paSimpleNew = downcall(linker, lookup, "pa_simple_new", FunctionDescriptor.of(
 				ValueLayout.ADDRESS,
 				ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
 				ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
 				ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-		paSimpleRead = downcall(linker, lookup, "pa_simple_read", FunctionDescriptor.of(
+		MethodHandle paSimpleRead = downcall(linker, lookup, "pa_simple_read", FunctionDescriptor.of(
 				ValueLayout.JAVA_INT,
 				ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
 				ValueLayout.ADDRESS));
-		paSimpleFree = downcall(linker, lookup, "pa_simple_free",
+		MethodHandle paSimpleFree = downcall(linker, lookup, "pa_simple_free",
 				FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-		paStrerror = downcall(linker, lookup, "pa_strerror", FunctionDescriptor.of(
+		MethodHandle paStrerror = downcall(linker, lookup, "pa_strerror", FunctionDescriptor.of(
 				ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
-		loaded = true;
+		Bindings loaded = new Bindings(paSimpleNew, paSimpleRead, paSimpleFree, paStrerror);
+		bindings = loaded;
+		return loaded;
 	}
 
 	private static MethodHandle downcall(Linker linker, SymbolLookup lookup, String symbol,
@@ -216,10 +221,10 @@ final class PulseSimpleRecordStream implements PulseRecordStream {
 		return linker.downcallHandle(address, descriptor);
 	}
 
-	private static String strerror(int error) {
+	private static String strerror(Bindings handles, int error) {
 		try {
-			MemorySegment message = (MemorySegment) paStrerror.invokeExact(error);
-			if (message != null && message.address() != 0) {
+			MemorySegment message = (MemorySegment) handles.paStrerror().invokeExact(error);
+			if (message.address() != 0) {
 				return message.getString(0);
 			}
 		} catch (Throwable ignored) {

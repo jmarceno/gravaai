@@ -293,11 +293,12 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 		if (snapshot == null) {
 			return;
 		}
-		tokenValue.setText(revealed ? snapshot.token() : mask(snapshot.token()));
+		String token = revealed ? snapshot.token() : mask(snapshot.token());
+		tokenValue.setText(token == null ? "" : token);
 		revealButton.setGraphic(Icon.of(revealed ? Icons.EyeSlash : Icons.Eye, 16));
 	}
 
-	static String mask(String token) {
+	static String mask(@Nullable String token) {
 		if (token == null || token.isBlank()) {
 			return "—";
 		}

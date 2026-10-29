@@ -20,13 +20,13 @@ import dev.gravaai.services.recording.CosmicOutput;
  * macOS screen/area rules are platform code (plan §2.3); the selection-only completion helpers are
  * kept for a future X11 source list.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CapturePickerService {
 
 	/** Waits for the next click and reports the output under it. */
 	public interface OutputClickWaiter {
-		CompletableFuture<CosmicOutput> waitForCosmicOutputClick(long timeoutMs);
+		/** @return a future with the picked output, or null when nothing was picked */
+		CompletableFuture<@org.jspecify.annotations.Nullable CosmicOutput> waitForCosmicOutputClick(
+				long timeoutMs);
 	}
 
 	/** What the capture-picker overlay asks for; {@code lastArea} is always null (never reused). */
@@ -111,9 +111,12 @@ public final class CapturePickerService {
 		}
 		if ("linux".equals(platform)) {
 			// X11 keeps the existing source-list window.
-			return sourceListPicker.get().open().thenApply(result -> result.success()
-					? SourceService.PickResult.picked(result.source())
-					: SourceService.PickResult.canceledPick());
+			return sourceListPicker.get().open().thenApply(result -> {
+				SelectedSource source = result.source();
+				return result.success() && source != null
+						? SourceService.PickResult.picked(source)
+						: SourceService.PickResult.canceledPick();
+			});
 		}
 		return CompletableFuture.completedFuture(SourceService.PickResult.failed(
 				"The capture picker is not available on this platform."));
@@ -150,7 +153,7 @@ public final class CapturePickerService {
 	 * {@code complete-capture-pick}: the overlay reports a pick; the selection is forced to
 	 * selection-only and validated against the displays and windows the picker offered.
 	 */
-	public void completeCapturePick(CapturePickRequest input) {
+	public void completeCapturePick(@Nullable CapturePickRequest input) {
 		if (input != null && "area".equals(input.kind()) && !"darwin".equals(platform)) {
 			return;
 		}

@@ -30,8 +30,6 @@ import javafx.scene.shape.Rectangle;
  *
  * <p>Edits commit on gesture end (React {@code flushPendingCommit}), never per mouse-move.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class WebcamCropControl extends Region {
 
 	/** Visual size of a corner handle (React: h-3.5 w-3.5 = 14 px). */
@@ -47,7 +45,7 @@ public final class WebcamCropControl extends Region {
 	private final Handle[] handleKinds = {Handle.NW, Handle.NE, Handle.SE, Handle.SW};
 	private final Rectangle[] guides = new Rectangle[4];
 
-	private @Nullable CropRegion crop = CropRegion.DEFAULT;
+	private CropRegion crop = CropRegion.DEFAULT;
 	private boolean mirrored;
 	private Consumer<CropRegion> onCropChange = region -> { };
 	private @Nullable Handle activeHandle;
@@ -60,7 +58,7 @@ public final class WebcamCropControl extends Region {
 		final double startSceneY;
 		final CropRegion initial;
 
-		Drag(Handle handle, double startSceneX, double startSceneY, @Nullable CropRegion initial) {
+		Drag(Handle handle, double startSceneX, double startSceneY, CropRegion initial) {
 			this.handle = handle;
 			this.startSceneX = startSceneX;
 			this.startSceneY = startSceneY;
@@ -153,7 +151,7 @@ public final class WebcamCropControl extends Region {
 	}
 
 	/** Visual crop: flipped when the webcam is mirrored. */
-	@Nullable CropRegion visualCrop() {
+	CropRegion visualCrop() {
 		return mirrored ? WebcamCropMath.flipHorizontally(crop) : crop;
 	}
 

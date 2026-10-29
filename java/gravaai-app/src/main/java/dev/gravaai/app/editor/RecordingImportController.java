@@ -41,8 +41,6 @@ import javafx.application.Platform;
  * {@code applyImportBatch} command — the packed sequence makes the persistence normalizer treat
  * the sequence as unchanged, so it does not ripple a second time.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingImportController {
 
 	/** The recording service seams ({@code window.electronAPI} import calls). */
@@ -50,7 +48,8 @@ public final class RecordingImportController {
 
 		/** {@code importRecording} with the cancellation token polled between ffmpeg steps. */
 		RecordingImportService.ImportResult importRecording(String currentPath, String recordingPath,
-				RecordingWebcamSource currentWebcam, BooleanSupplier cancelled) throws IOException;
+				@Nullable RecordingWebcamSource currentWebcam, BooleanSupplier cancelled)
+				throws IOException;
 
 		/** {@code discardRecordingImport}: deletes every file one import produced. */
 		void discardRecordingImport(String output) throws IOException;
@@ -87,7 +86,7 @@ public final class RecordingImportController {
 	private final AtomicBoolean running = new AtomicBoolean();
 	private final AtomicBoolean cancelled = new AtomicBoolean();
 
-	@Nullable public RecordingImportController(Library library, Session session, BooleanSupplier autoZoomsEnabled) {
+	public RecordingImportController(Library library, Session session, BooleanSupplier autoZoomsEnabled) {
 		this.library = library;
 		this.session = session;
 		this.autoZoomsEnabled = autoZoomsEnabled;
@@ -102,7 +101,7 @@ public final class RecordingImportController {
 	 * Runs the whole import on a virtual thread and reports exactly one result through
 	 * {@code done} on the FX thread ({@code null} for React's silent returns).
 	 */
-	public void addToTimeline(List<String> paths, Integer index,
+	public void addToTimeline(List<String> paths, @Nullable Integer index,
 			Consumer<EditorViewActions.ClipImportResult> done) {
 		if (!running.compareAndSet(false, true)) {
 			// Unreachable through the panel (it guards on the FX thread); React's lock return.
@@ -124,7 +123,8 @@ public final class RecordingImportController {
 		});
 	}
 
-	private EditorViewActions.@Nullable ClipImportResult run(List<String> paths, Integer index) {
+	private EditorViewActions.@Nullable ClipImportResult run(List<String> paths,
+			@Nullable Integer index) {
 		String source = session.videoPath();
 		if (source == null || source.isBlank()) {
 			return null;
@@ -152,8 +152,9 @@ public final class RecordingImportController {
 				if (cancelled.get()) {
 					break;
 				}
-				RecordingWebcamSource webcamSource = webcam == null ? null
-						: new RecordingWebcamSource(webcam.sourcePath(), webcam.timeOffsetMs(),
+				String webcamSourcePath = webcam == null ? null : webcam.sourcePath();
+				RecordingWebcamSource webcamSource = webcamSourcePath == null ? null
+						: new RecordingWebcamSource(webcamSourcePath, webcam.timeOffsetMs(),
 								serviceRanges(webcam));
 				RecordingImportService.ImportResult imported;
 				try {
@@ -204,6 +205,10 @@ public final class RecordingImportController {
 		if (failure != null) {
 			discardAll(pending);
 			return new EditorViewActions.ClipImportResult(false, completed, failure, cancelled.get());
+		}
+		if (media == null) {
+			// Every path was cancelled before the first import committed (see above); nothing to do.
+			return null;
 		}
 
 		String selectedClipId = clipIds.get(clipIds.size() - 1);

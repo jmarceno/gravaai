@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 
@@ -26,24 +28,30 @@ public final class PlaybackMediaLoader {
 	private PlaybackMediaLoader() {
 	}
 
-	/** Loads with the real FFmpeg probe. */
+	/**
+	 * Loads with the real FFmpeg probe; {@code webcamPath}/{@code webcamVisibleRanges} are null
+	 * when the project has no webcam.
+	 */
 	public static PlaybackMedia load(
 			Path videoPath,
-			Path webcamPath,
+			@Nullable Path webcamPath,
 			long webcamTimeOffsetMs,
 			List<ClipRegion> clips,
-			List<WebcamSync.WebcamRange> webcamVisibleRanges) {
+			@Nullable List<WebcamSync.WebcamRange> webcamVisibleRanges) {
 		return load(videoPath, webcamPath, webcamTimeOffsetMs, clips, webcamVisibleRanges,
 				PlaybackMediaLoader::probeWithFfmpeg);
 	}
 
-	/** Loads with an injected duration probe (tests, future native metadata sources). */
+	/**
+	 * Loads with an injected duration probe (tests, future native metadata sources);
+	 * {@code webcamPath}/{@code webcamVisibleRanges} are null when the project has no webcam.
+	 */
 	public static PlaybackMedia load(
 			Path videoPath,
-			Path webcamPath,
+			@Nullable Path webcamPath,
 			long webcamTimeOffsetMs,
 			List<ClipRegion> clips,
-			List<WebcamSync.WebcamRange> webcamVisibleRanges,
+			@Nullable List<WebcamSync.WebcamRange> webcamVisibleRanges,
 			DurationProbe probe) {
 		if (videoPath == null) {
 			throw new IllegalArgumentException("videoPath must not be null");

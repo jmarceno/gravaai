@@ -13,14 +13,13 @@ import java.util.function.BiFunction;
  * <p>Pure geometry: clamp to the timeline, keep a minimum duration, respect row neighbours, and
  * model the primary clip row as an insertion sequence (a drag never leaves empty time there).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class TimelineDndEngine {
 
 	/** Port of the {@code hasOverlap} dependency: true when the span collides with another item. */
 	@FunctionalInterface
 	public interface OverlapCheck {
-		boolean hasOverlap(Span span, String excludeId, String rowId);
+		/** {@code rowId} is null when the check applies to every row. */
+		boolean hasOverlap(Span span, String excludeId, @Nullable String rowId);
 	}
 
 	/** Port of the {@code { totalMs, minItemDurationMs }} config slice. */
@@ -54,7 +53,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampSpanToBounds}. */
-	public static Span clampSpanToBounds(@Nullable Span span, SpanBounds config) {
+	public static Span clampSpanToBounds(Span span, SpanBounds config) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();
 		double rawDuration = Math.max(span.end() - span.start(), 0);
@@ -119,7 +118,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampResizedSpanToNeighbours}. */
-	public static @Nullable Span clampResizedSpanToNeighbours(Span span, String activeItemId,
+	public static Span clampResizedSpanToNeighbours(Span span, String activeItemId,
 			NeighbourConfig config) {
 		List<TimelineRegionSpan> siblings = getSiblingSpans(activeItemId, null,
 				config.allRegionSpans());
@@ -153,7 +152,7 @@ public final class TimelineDndEngine {
 	}
 
 	/** Port of {@code clampDraggedSpanToNeighbours}. */
-	public static @Nullable TimelineSpanResult clampDraggedSpanToNeighbours(@Nullable Span span, String activeItemId,
+	public static TimelineSpanResult clampDraggedSpanToNeighbours(Span span, String activeItemId,
 			@Nullable String rowId, NeighbourConfig config) {
 		double totalMs = config.totalMs();
 		double minItemDurationMs = config.minItemDurationMs();

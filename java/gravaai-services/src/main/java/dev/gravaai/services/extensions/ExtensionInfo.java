@@ -11,4 +11,5 @@ import java.nio.file.Path;
  * @param error null unless {@code state} is {@link ExtensionState#FAILED}
  */
 public record ExtensionInfo(
-		String id, @Nullable Path root, @Nullable ExtensionManifest manifest, ExtensionState state, String error) {}
+		String id, @Nullable Path root, @Nullable ExtensionManifest manifest, ExtensionState state,
+		@Nullable String error) {}

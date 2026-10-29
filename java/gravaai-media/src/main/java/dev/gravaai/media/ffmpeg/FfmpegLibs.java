@@ -39,8 +39,6 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * segment because FFmpeg serialises {@code av_log} internally; do not call
  * {@link #setLogLevel(int)} concurrently with decoding.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class FfmpegLibs {
 
 	private static final System.Logger LOG = System.getLogger(FfmpegLibs.class.getName());
@@ -71,9 +69,12 @@ public final class FfmpegLibs {
 	private static final int LOG_BUFFER_BYTES = 4096;
 
 	private static boolean loaded;
-	private static Path libraryDir;
-	private static String versionSummary;
-	private static MethodHandle vsnprintf;
+	/** The directory the libraries were loaded from; {@code null} until {@link #load(Path)}. */
+	private static @Nullable Path libraryDir;
+	/** Cached version line; {@code null} until the libraries are loaded. */
+	private static @Nullable String versionSummary;
+	/** Lazy libc {@code vsnprintf} handle; {@code null} until the first log message. */
+	private static @Nullable MethodHandle vsnprintf;
 	private static final Arena LOG_ARENA = Arena.ofAuto();
 	private static final MemorySegment LOG_BUFFER = LOG_ARENA.allocate(LOG_BUFFER_BYTES);
 
@@ -132,17 +133,19 @@ public final class FfmpegLibs {
 	}
 
 	/** The directory the libraries were loaded from, or {@code null} before loading. */
-	public static synchronized Path libraryDir() {
+	public static synchronized @Nullable Path libraryDir() {
 		return libraryDir;
 	}
 
 	/** The loaded FFmpeg version summary, for example {@code avutil 60.8.103, ...}. */
 	public static synchronized String versionSummary() {
 		ensureLoaded();
-		if (versionSummary == null) {
-			versionSummary = buildVersionSummary();
+		String summary = versionSummary;
+		if (summary == null) {
+			summary = buildVersionSummary();
+			versionSummary = summary;
 		}
-		return versionSummary;
+		return summary;
 	}
 
 	/**
@@ -253,7 +256,8 @@ public final class FfmpegLibs {
 	}
 
 	private static synchronized MethodHandle vsnprintfHandle() {
-		if (vsnprintf == null) {
+		MethodHandle handle = vsnprintf;
+		if (handle == null) {
 			SymbolLookup libc = Linker.nativeLinker().defaultLookup();
 			MemorySegment symbol = libc.find("vsnprintf").orElseGet(() -> {
 				SymbolLookup loaded = SymbolLookup.libraryLookup("libc.so.6", Arena.global());
@@ -266,9 +270,10 @@ public final class FfmpegLibs {
 					ValueLayout.JAVA_LONG,
 					ValueLayout.ADDRESS,
 					ValueLayout.ADDRESS);
-			vsnprintf = Linker.nativeLinker().downcallHandle(symbol, descriptor);
+			handle = Linker.nativeLinker().downcallHandle(symbol, descriptor);
+			vsnprintf = handle;
 		}
-		return vsnprintf;
+		return handle;
 	}
 
 	private static System.Logger.Level toLoggerLevel(int avLogLevel) {

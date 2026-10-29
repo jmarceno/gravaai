@@ -53,8 +53,6 @@ import tools.jackson.databind.JsonNode;
  * <p>File IO is blocking; callers on the UI thread must run these methods on a background thread
  * (plan §4.1).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectManager {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.projects");
@@ -80,19 +78,19 @@ public final class ProjectManager {
 	}
 
 	/** The projects folder for the current recordings directory (port of {@code getProjectsDir}). */
-	public @Nullable Path getProjectsDir() throws IOException {
+	public Path getProjectsDir() throws IOException {
 		Path projectsDir = StorageFiles.projectsDir(recordingsDirectory.getRecordingsDir());
 		Files.createDirectories(projectsDir);
 		return projectsDir;
 	}
 
 	/** Port of {@code getProjectThumbnailPath}: the preview lives next to the project file. */
-	public static @Nullable Path getProjectThumbnailPath(Path projectPath) {
+	public static Path getProjectThumbnailPath(Path projectPath) {
 		return StorageFiles.projectThumbnailPath(projectPath);
 	}
 
 	/** The project currently open in the editor, used for {@code isCurrent} (electron/ipc/state.ts). */
-	public void setCurrentProjectPath(Path projectPath) {
+	public void setCurrentProjectPath(@Nullable Path projectPath) {
 		this.currentProjectPath = projectPath;
 	}
 
@@ -103,9 +101,11 @@ public final class ProjectManager {
 	/**
 	 * Port of {@code buildProjectLibraryEntry}: one card. Returns {@code null} for paths that are not
 	 * project files (missing, a directory, another extension).
+	 *
+	 * @param onThumbnailReady the thumbnail callback, or null when nobody listens
 	 */
 	public @Nullable ProjectLibraryEntry buildProjectLibraryEntry(Path projectPath, Path projectsDir,
-			Consumer<ProjectThumbnailReady> onThumbnailReady) {
+			@Nullable Consumer<ProjectThumbnailReady> onThumbnailReady) {
 		try {
 			Path normalizedPath = projectPath.toAbsolutePath().normalize();
 			if (!StorageFiles.hasProjectFileExtension(normalizedPath)) {
@@ -216,10 +216,10 @@ public final class ProjectManager {
 			throw new IllegalStateException("Invalid project file format");
 		}
 		Result<ProjectMediaSources> media = resolveProjectMediaSources(project);
-		if (media.isErr()) {
+		ProjectMediaSources sources = media.orNull();
+		if (sources == null) {
 			throw new IllegalStateException(media.errorMessage());
 		}
-		ProjectMediaSources sources = media.orElse(null);
 		return new ProjectPreview(project, sources.videoPath(), sources.webcamPath());
 	}
 
@@ -227,7 +227,8 @@ public final class ProjectManager {
 	public JsonNode readProject(Path projectPath) throws IOException {
 		JsonNode project = Json.parseJsonWithByteOrderMark(
 				Files.readString(projectPath, StandardCharsets.UTF_8));
-		return adoptLegacyProfilePaths(project);
+		JsonNode remapped = adoptLegacyProfilePaths(project);
+		return remapped != null ? remapped : project;
 	}
 
 	/** Port of {@code adoptLegacyProfilePaths}: points media at the current profile folder. */
@@ -238,7 +239,7 @@ public final class ProjectManager {
 	}
 
 	/** Port of {@code isLoadableProjectData}: the minimum a project card/preview can read. */
-	public static @Nullable boolean isLoadableProjectData(JsonNode projectData) {
+	public static boolean isLoadableProjectData(JsonNode projectData) {
 		if (projectData == null || !projectData.isObject()) {
 			return false;
 		}
@@ -260,7 +261,7 @@ public final class ProjectManager {
 	 * Port of {@code resolveProjectMediaSources}: the recording files a project needs. Only the
 	 * fields the dashboard reads are touched (the full editor model belongs to P2).
 	 */
-	public static @Nullable Result<ProjectMediaSources> resolveProjectMediaSources(JsonNode project) {
+	public static Result<ProjectMediaSources> resolveProjectMediaSources(JsonNode project) {
 		if (project == null || !project.isObject()) {
 			return Result.err("Invalid project file format");
 		}
@@ -296,7 +297,7 @@ public final class ProjectManager {
 	}
 
 	/** The listed projects, without a thumbnail-ready callback (dashboard refresh). */
-	public @Nullable List<ProjectLibraryEntry> listProjectEntries() throws IOException {
+	public List<ProjectLibraryEntry> listProjectEntries() throws IOException {
 		return listProjectLibraryEntries(null).entries();
 	}
 
@@ -335,16 +336,17 @@ public final class ProjectManager {
 	}
 
 	/** Port of the trash handler's {@code resolveRecordingPaths}: the media a project references. */
-	public @Nullable List<Path> resolveProjectRecordingPaths(Path projectPath) throws IOException {
+	public List<Path> resolveProjectRecordingPaths(Path projectPath) throws IOException {
 		Result<ProjectMediaSources> media = resolveProjectMediaSources(readProject(projectPath));
-		if (media.isErr()) {
+		ProjectMediaSources sources = media.orNull();
+		if (sources == null) {
 			return List.of();
 		}
-		ProjectMediaSources sources = media.orElse(null);
 		List<Path> paths = new ArrayList<>();
 		paths.add(Path.of(sources.videoPath()));
-		if (sources.webcamPath() != null) {
-			paths.add(Path.of(sources.webcamPath()));
+		String webcamPath = sources.webcamPath();
+		if (webcamPath != null) {
+			paths.add(Path.of(webcamPath));
 		}
 		return paths;
 	}
@@ -353,7 +355,7 @@ public final class ProjectManager {
 	 * Port of {@code refreshProjectThumbnail}: decode the first frame and cache it, discarding the
 	 * result when the project changed meanwhile. Concurrent calls for the same project share one job.
 	 */
-	public @Nullable CompletableFuture<ProjectThumbnailReady> refreshProjectThumbnail(
+	public CompletableFuture<ProjectThumbnailReady> refreshProjectThumbnail(
 			Path projectPath, ProjectRevision revision) {
 		Path key = projectPath.toAbsolutePath().normalize();
 		CompletableFuture<ProjectThumbnailReady> task = thumbnailJobs.computeIfAbsent(key,
@@ -396,11 +398,12 @@ public final class ProjectManager {
 				return null;
 			}
 			Result<ProjectMediaSources> media = resolveProjectMediaSources(project);
-			if (media.isErr()) {
+			ProjectMediaSources sources = media.orNull();
+			if (sources == null) {
 				return null;
 			}
 			byte[] thumbnail = thumbnailGenerator
-					.createProjectFirstFrameThumbnail(Path.of(media.orElse(null).videoPath()));
+					.createProjectFirstFrameThumbnail(Path.of(sources.videoPath()));
 			if (thumbnail == null || thumbnail.length == 0) {
 				return null;
 			}
@@ -446,7 +449,8 @@ public final class ProjectManager {
 	 *     an empty string deletes it, like {@code undefined} / {@code null} in the TS renderer API
 	 * @return the thumbnail path, or {@code null} after a delete / when no file exists
 	 */
-	public static @Nullable Path saveProjectThumbnail(Path projectPath, String thumbnailDataUrl) throws IOException {
+	public static @Nullable Path saveProjectThumbnail(Path projectPath,
+			@Nullable String thumbnailDataUrl) throws IOException {
 		Path thumbnailPath = getProjectThumbnailPath(projectPath);
 		if (thumbnailDataUrl == null) {
 			return Files.exists(thumbnailPath) ? thumbnailPath : null;

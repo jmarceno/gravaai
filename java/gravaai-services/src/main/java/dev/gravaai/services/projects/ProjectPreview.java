@@ -1,5 +1,7 @@
 package dev.gravaai.services.projects;
 
+import org.jspecify.annotations.Nullable;
+
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -9,7 +11,7 @@ import tools.jackson.databind.JsonNode;
  *
  * @param project the parsed project JSON (after legacy profile path remapping)
  * @param videoPath the recording the preview plays
- * @param webcamPath the webcam recording, or {@code null}
+ * @param webcamPath the webcam recording, or null when the project has none
  */
-public record ProjectPreview(JsonNode project, String videoPath, String webcamPath) {
+public record ProjectPreview(JsonNode project, String videoPath, @Nullable String webcamPath) {
 }

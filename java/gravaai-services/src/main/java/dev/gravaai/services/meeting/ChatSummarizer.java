@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,14 +18,13 @@ import dev.gravaai.services.meeting.OpenAiClient.RequestOptions;
  * ({@code ChatSummarizer}): one request for a short meeting, per-part notes plus a merge pass for
  * a long one, then the title.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ChatSummarizer implements Summarizer {
 
 	/**
 	 * @param maxTranscriptChars transcript characters that fit one request next to the prompt and
 	 *     the answer
-	 * @param requestExtra extra request body fields (llama-server: turn reasoning off)
+	 * @param requestExtra extra request body fields (llama-server: turn reasoning off), or null
+	 *     when the request needs none
 	 * @param limitAnswerTokens cap answer length; only for the local model, because hosted
 	 *     reasoning models count their thinking against the cap and would return nothing
 	 */
@@ -35,7 +36,7 @@ public final class ChatSummarizer implements Summarizer {
 			long timeoutMs,
 			String summaryPrompt,
 			String titlePrompt,
-			Map<String, Object> requestExtra,
+			@Nullable Map<String, Object> requestExtra,
 			boolean limitAnswerTokens) {
 	}
 

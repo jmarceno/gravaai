@@ -25,8 +25,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Everything here is pure: unknown triggers/actions/conditions are dropped, counts are clamped
  * and unknown fields never reach this model.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Automations {
 
 	public static final int MAX_AUTOMATION_RULES = 50;
@@ -91,7 +89,7 @@ public final class Automations {
 		return ALL_ACTION_TYPES.contains(action);
 	}
 
-	public static @Nullable boolean triggerAllowsConditionsOfType(AutomationConditionType type, AutomationTrigger trigger) {
+	public static boolean triggerAllowsConditionsOfType(AutomationConditionType type, AutomationTrigger trigger) {
 		if (type == AutomationConditionType.FORMAT_IS) {
 			return trigger == AutomationTrigger.EXPORT_FINISHED;
 		}
@@ -163,7 +161,8 @@ public final class Automations {
 		return normalizeAutomationsFile(value, automationsRuleId());
 	}
 
-	public static @Nullable AutomationsFile normalizeAutomationsFile(JsonNode value, Supplier<String> createRuleId) {
+	public static AutomationsFile normalizeAutomationsFile(JsonNode value,
+			Supplier<String> createRuleId) {
 		JsonNode record = value != null && value.isObject() ? value : null;
 		JsonNode rawRules = record == null ? null : record.get("rules");
 		List<AutomationRule> rules = new ArrayList<>();
@@ -188,12 +187,12 @@ public final class Automations {
 		return new AutomationsFile(1, rules);
 	}
 
-	public static @Nullable AutomationsFile createEmptyAutomationsFile() {
+	public static AutomationsFile createEmptyAutomationsFile() {
 		return new AutomationsFile(1, List.of());
 	}
 
 	/** Port of {@code automationRuleIssues}: problems the settings UI should surface. */
-	public static @Nullable List<String> automationRuleIssues(AutomationRule rule) {
+	public static List<String> automationRuleIssues(AutomationRule rule) {
 		List<String> issues = new ArrayList<>();
 		for (AutomationAction action : rule.actions()) {
 			if (!actionAllowedForTrigger(action.type(), rule.trigger())) {
@@ -260,7 +259,7 @@ public final class Automations {
 	}
 
 	/** The stored JSON shape of a file (port of the object {@code JSON.stringify} receives). */
-	public static @Nullable ObjectNode toJson(AutomationsFile file) {
+	public static ObjectNode toJson(AutomationsFile file) {
 		JsonNodeFactory nodes = Json.nodeFactory();
 		ObjectNode root = nodes.objectNode();
 		root.put("version", file.version());
@@ -296,7 +295,7 @@ public final class Automations {
 		return root;
 	}
 
-	private static @Nullable ObjectNode actionJson(AutomationAction action, JsonNodeFactory nodes) {
+	private static ObjectNode actionJson(AutomationAction action, JsonNodeFactory nodes) {
 		ObjectNode node = nodes.objectNode();
 		node.put("type", action.type().wire());
 		if (action instanceof AutomationAction.Notify notify) {

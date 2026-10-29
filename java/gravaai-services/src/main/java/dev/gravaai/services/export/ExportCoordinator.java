@@ -31,22 +31,23 @@ import dev.gravaai.services.automations.AutomationTriggers;
  * <p>The AppContext wires this: the UI calls {@link #start}, receives progress through the
  * listener (marshalled to the FX thread by the caller) and can {@link #cancel()} the running job.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportCoordinator implements AutoCloseable {
 
-	/** All the settings of one export request. */
-	public record Request(@Nullable ExportFormat format, int width, int height, int frameRate, int bitrate,
-			@Nullable ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
+	/**
+	 * All the settings of one export request.
+	 *
+	 * @param captionSidecars the caption sidecar payload, or null when the export has no captions
+	 */
+	public record Request(ExportFormat format, int width, int height, int frameRate, int bitrate,
+			ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
 			Path destination, boolean reveal, boolean overwrite,
-			CaptionSidecars.Payload captionSidecars, ExportAudioPlan audioPlan) {
+			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {
 
 		public Request {
-			format = format == null ? ExportFormat.MP4 : format;
-			audioPlan = audioPlan == null ? ExportAudioPlan.NONE : audioPlan;
-			if (destination == null) {
-				throw new IllegalArgumentException("export destination is required");
-			}
+			Objects.requireNonNull(destination, "export destination is required");
+			Objects.requireNonNull(format, "export format is required");
+			Objects.requireNonNull(encodingMode, "export encoding mode is required");
+			Objects.requireNonNull(audioPlan, "export audio plan is required");
 		}
 
 		ExportRunner.Spec toSpec() {
@@ -73,7 +74,7 @@ public final class ExportCoordinator implements AutoCloseable {
 	private final AutomationTriggers triggers;
 	private final ExecutorService executor;
 	private final AtomicBoolean busy = new AtomicBoolean();
-	private final AtomicReference<Cancellation> active = new AtomicReference<>();
+	private final AtomicReference<@Nullable Cancellation> active = new AtomicReference<>();
 
 	/** @param publisher save/reveal policy; @param triggers automations hooks (may be null in tests) */
 	public ExportCoordinator(ExportPublisher publisher, AutomationTriggers triggers) {

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.AppFonts;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -32,11 +34,9 @@ import javafx.stage.Stage;
  * Set {@code -Dgravaai.uiKit.demo=overlays} to auto-open toasts so a non-interactive screenshot
  * captures an overlay state too.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class UiKitShowcase {
 
-	private static ScrollPane galleryScroll;
+	private static @Nullable ScrollPane galleryScroll;
 
 	private UiKitShowcase() {}
 
@@ -58,11 +58,12 @@ public final class UiKitShowcase {
 		stage.show();
 		runOverlayDemo(stage);
 		String scrollTo = System.getProperty("gravaai.uiKit.scroll", "");
-		if (!scrollTo.isEmpty() && galleryScroll != null) {
+		ScrollPane scroll = galleryScroll;
+		if (!scrollTo.isEmpty() && scroll != null) {
 			// Wait for the first layout pulse so the scrollable height is known.
 			javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(
 					javafx.util.Duration.millis(600));
-			pause.setOnFinished(event -> galleryScroll.setVvalue(
+			pause.setOnFinished(event -> scroll.setVvalue(
 					scrollTo.equals("bottom") ? 1 : Double.parseDouble(scrollTo)));
 			pause.play();
 		}

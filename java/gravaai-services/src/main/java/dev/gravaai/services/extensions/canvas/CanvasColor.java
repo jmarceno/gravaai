@@ -25,7 +25,7 @@ public final class CanvasColor {
 
 	private static final Map<String, Integer> NAMED = namedColors();
 
-	@Nullable private CanvasColor() {}
+	private CanvasColor() {}
 
 	/** Parses a CSS colour string to packed ARGB, or null when the value is not a colour. */
 	public static @Nullable Integer parse(String css) {
@@ -63,7 +63,7 @@ public final class CanvasColor {
 	}
 
 	/** Renders a packed ARGB colour as {@code rgba(r, g, b, a)}. */
-	public static @Nullable String toCss(int argb) {
+	public static String toCss(int argb) {
 		int r = (argb >>> 16) & 0xFF;
 		int g = (argb >>> 8) & 0xFF;
 		int b = argb & 0xFF;

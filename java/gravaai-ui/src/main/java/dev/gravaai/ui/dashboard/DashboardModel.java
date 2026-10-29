@@ -40,8 +40,6 @@ import javafx.collections.ObservableList;
  * JavaFX toolkit. Everything that touches the disk is blocking and must be called from a background
  * thread by the view (plan §4.1); the model itself never starts threads.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class DashboardModel {
 
 	/** Port of the message {@code useMeetingLibrary.remove} throws for skipped meetings. */
@@ -462,7 +460,7 @@ public final class DashboardModel {
 	 *
 	 * @return the new path (unchanged for raw files and meetings, whose media path is stable)
 	 */
-	public @Nullable String renameProject(String path, String name) throws IOException {
+	public String renameProject(String path, String name) throws IOException {
 		String clean = name == null ? "" : name.trim();
 		if (clean.isEmpty()) {
 			return path;
@@ -533,11 +531,21 @@ public final class DashboardModel {
 		}
 
 		TrashLibraryProjects.Dependencies trashDependencies = new TrashLibraryProjects.Dependencies(
-				() -> dependencies.projects().listProjectEntries().stream()
-						.map(entry -> Path.of(entry.path())).toList(),
+				() -> {
+					// A missing project list means "nothing to trash"; the service never returns null
+					// once its contract lands, and this guard documents the current boundary.
+					List<ProjectLibraryEntry> entries = dependencies.projects().listProjectEntries();
+					if (entries == null) {
+						return List.of();
+					}
+					return entries.stream().map(entry -> Path.of(entry.path())).toList();
+				},
 				file -> dependencies.trash().trash(file),
-				ProjectManager::getProjectThumbnailPath,
-				projectPath -> dependencies.projects().resolveProjectRecordingPaths(projectPath));
+				value -> java.util.Objects.requireNonNull(ProjectManager.getProjectThumbnailPath(value),
+						"project thumbnail path"),
+				projectPath -> java.util.Objects.requireNonNull(
+						dependencies.projects().resolveProjectRecordingPaths(projectPath),
+						"resolved recording paths"));
 		TrashLibraryProjects.TrashResult result = TrashLibraryProjects.trashLibraryProjects(paths,
 				trashDependencies, deleteRecordings);
 		if (result.deleted().isEmpty()) {

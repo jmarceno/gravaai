@@ -3,6 +3,7 @@ package dev.gravaai.media.compose;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,8 +30,6 @@ import dev.gravaai.media.gl.GlPreviewThread;
  * {@link GlPreviewThread} with this sink as the consumer, and call {@link #attach} from the FX
  * thread once the {@code ImageView} exists. Nothing here touches GL.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 
 	private static final System.Logger LOG = System.getLogger(JavaFxPreviewSink.class.getName());
@@ -40,8 +39,8 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	private final Semaphore presented = new Semaphore(1);
 	private final AtomicLong framesReceived = new AtomicLong();
 	private final AtomicLong framesDropped = new AtomicLong();
-	private volatile @Nullable PixelBuffer<ByteBuffer>[] buffers;
-	private volatile @Nullable WritableImage[] images;
+	private volatile PixelBuffer<ByteBuffer> @Nullable [] buffers;
+	private volatile WritableImage @Nullable [] images;
 	private volatile @Nullable ImageView view;
 	private volatile @Nullable Runnable presentedListener;
 	private volatile int target;
@@ -80,9 +79,11 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 
 	/**
 	 * Registers a callback run on the FX thread after each presented frame (the editor preview's
-	 * annotation overlay follows the animated camera transform). Passing null clears it.
+	 * annotation overlay follows the animated camera transform).
+	 *
+	 * @param listener the callback, or null to clear it
 	 */
-	public void setPresentedListener(Runnable listener) {
+	public void setPresentedListener(@Nullable Runnable listener) {
 		this.presentedListener = listener;
 	}
 
@@ -158,9 +159,10 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	}
 
 	/** Copies into the free buffer and schedules its presentation; the caller holds the permit. */
-	private void present(@Nullable ByteBuffer pixelsTopFirst, int bytes) {
-		PixelBuffer<ByteBuffer>[] localBuffers = buffers;
-		WritableImage[] localImages = images;
+	private void present(ByteBuffer pixelsTopFirst, int bytes) {
+		// attach() is the only writer and runs on the FX thread before any frame is presented.
+		PixelBuffer<ByteBuffer>[] localBuffers = Objects.requireNonNull(buffers, "preview sink not attached");
+		WritableImage[] localImages = Objects.requireNonNull(images, "preview sink not attached");
 		int index = target;
 		ByteBuffer destination = localBuffers[index].getBuffer();
 		ByteBuffer source = pixelsTopFirst.duplicate();
@@ -201,9 +203,12 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 		synchronized (latestLock) {
 			if (latestPending) {
 				latestPending = false;
-				// Keep the permit: the GL thread cannot write into target while we copy.
-				present(latest, latest.position());
-				return;
+				ByteBuffer parked = latest;
+				if (parked != null) {
+					// Keep the permit: the GL thread cannot write into target while we copy.
+					present(parked, parked.position());
+					return;
+				}
 			}
 			presented.release();
 		}

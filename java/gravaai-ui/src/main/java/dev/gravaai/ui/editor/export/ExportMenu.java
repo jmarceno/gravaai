@@ -35,8 +35,6 @@ import javafx.util.Duration;
  * popover stays open through the whole flow; state changes come from {@link ExportSessionModel} and
  * {@link ExportSettingsState}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportMenu {
 
 	/** Actions the app-side export controller provides (port of {@code useExportDialogActions}). */
@@ -53,8 +51,11 @@ public final class ExportMenu {
 		/** Reveals the exported file in the file manager. */
 		void revealExportedFile();
 
-		/** {@code discardExportedTemp}: deletes the staged file of a dropped pending save. */
-		void discardPendingSave(ExportSessionModel.PendingExportSave pending);
+		/**
+		 * {@code discardExportedTemp}: deletes the staged file of a dropped pending save;
+		 * {@code pending} is null when there was nothing to discard.
+		 */
+		void discardPendingSave(ExportSessionModel.@Nullable PendingExportSave pending);
 	}
 
 	private static final double WIDTH = 360;
@@ -361,7 +362,7 @@ public final class ExportMenu {
 		Toast.show(content, "Error copied");
 	}
 
-	private static String fileNameOf(String path) {
+	private static String fileNameOf(@Nullable String path) {
 		if (path == null) {
 			return "";
 		}

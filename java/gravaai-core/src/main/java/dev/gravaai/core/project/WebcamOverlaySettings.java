@@ -7,23 +7,23 @@ import java.util.List;
 /** Webcam overlay position, crop and timing. */
 public record WebcamOverlaySettings(
 		@Nullable List<TimeRange> visibleRanges,
-		@Nullable boolean enabled,
+		boolean enabled,
 		@Nullable String sourcePath,
-		@Nullable long timeOffsetMs,
-		@Nullable boolean mirror,
-		@Nullable CropRegion cropRegion,
-		@Nullable WebcamCorner corner,
-		@Nullable WebcamPositionPreset positionPreset,
-		@Nullable double positionX,
-		@Nullable double positionY,
+		long timeOffsetMs,
+		boolean mirror,
+		CropRegion cropRegion,
+		WebcamCorner corner,
+		WebcamPositionPreset positionPreset,
+		double positionX,
+		double positionY,
 		double size,
-		@Nullable double width,
-		@Nullable double height,
-		@Nullable boolean reactToZoom,
-		@Nullable double roundness,
+		double width,
+		double height,
+		boolean reactToZoom,
+		double roundness,
 		@Nullable Double cornerRadius,
-		@Nullable double shadow,
-		@Nullable double margin) {
+		double shadow,
+		double margin) {
 
 	public record TimeRange(long startMs, long endMs) {}
 

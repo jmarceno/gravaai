@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -18,8 +20,6 @@ import tools.jackson.databind.JsonNode;
  * the folder/file choosers themselves belong to the UI/platform layer, so callers pass the chosen
  * path in.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutomationService implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
@@ -96,7 +96,8 @@ public final class AutomationService implements AutoCloseable {
 	 * @param notesPath the meeting notes sidecar, when the caller knows it (the meeting pipeline
 	 *     resolves it for {@code meeting-notes-ready} rules)
 	 */
-	public Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath, String notesPath) {
+	public Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath,
+			@Nullable String notesPath) {
 		if (ruleId == null || ruleId.isBlank()) {
 			return Result.err("Unknown automation rule");
 		}
@@ -131,7 +132,8 @@ public final class AutomationService implements AutoCloseable {
 	 * Port of {@code eventForRule} in {@code electron/ipc/register/automations.ts}: the kind comes
 	 * from the trigger and exports carry their format (default mp4).
 	 */
-	static AutomationEvent eventForRule(AutomationRule rule, String filePath, String notesPath) {
+	static AutomationEvent eventForRule(AutomationRule rule, String filePath,
+			@Nullable String notesPath) {
 		boolean meeting = rule.trigger() == AutomationTrigger.MEETING_SAVED
 				|| rule.trigger() == AutomationTrigger.MEETING_NOTES_READY;
 		AutomationExportFormat format = null;

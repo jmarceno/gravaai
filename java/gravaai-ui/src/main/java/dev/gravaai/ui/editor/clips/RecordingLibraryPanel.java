@@ -56,8 +56,6 @@ import javafx.scene.layout.VBox;
  * the importing flags) and every toast; the app side answers through {@link Host} and reports the
  * import outcome through one {@code done} callback.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingLibraryPanel extends VBox {
 
 	/** Drag payload format ({@code RECORDING_DRAG_TYPE}): a JSON array of recording paths. */
@@ -72,8 +70,12 @@ public final class RecordingLibraryPanel extends VBox {
 		/** {@code setRecordingsRemoved}; {@code false} when the operation failed. */
 		boolean setRecordingsRemoved(List<String> paths, boolean removed) throws IOException;
 
-		/** {@code addToTimeline}; exactly one {@code done} call, on the FX thread. */
-		void addRecordingsToTimeline(List<String> paths, Integer index,
+		/**
+		 * {@code addToTimeline}; exactly one {@code done} call, on the FX thread.
+		 *
+		 * @param index target position in the clip sequence; null appends
+		 */
+		void addRecordingsToTimeline(List<String> paths, @Nullable Integer index,
 				Consumer<EditorViewActions.ClipImportResult> done);
 
 		/** {@code cancelRecordingImport}. */
@@ -118,7 +120,7 @@ public final class RecordingLibraryPanel extends VBox {
 	private String query = "";
 
 	/** Builds the panel; the caller mounts it and calls {@link #refresh()} when it opens. */
-	public RecordingLibraryPanel(@Nullable Host host) {
+	public RecordingLibraryPanel(Host host) {
 		this.host = host;
 		getStyleClass().addAll("editor-inspector", "clips-panel");
 		setSpacing(0);

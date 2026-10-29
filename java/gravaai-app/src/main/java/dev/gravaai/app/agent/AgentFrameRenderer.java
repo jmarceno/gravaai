@@ -40,8 +40,6 @@ import tools.jackson.databind.node.ObjectNode;
  * hooks are not installed here (the app owns the extension host); with no extensions enabled the
  * output is identical to the export frames.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentFrameRenderer {
 
 	/** One rendered frame ready for the MCP result. */
@@ -116,7 +114,7 @@ final class AgentFrameRenderer {
 		return Math.min(seconds, Math.max(0, durationSeconds));
 	}
 
-	private static @Nullable Path videoPath(EditorSession session) {
+	private static Path videoPath(EditorSession session) {
 		String path = session.videoPath();
 		if (path == null || path.isBlank()) {
 			throw new IllegalStateException("the project has no source video");
@@ -124,7 +122,7 @@ final class AgentFrameRenderer {
 		return Path.of(path);
 	}
 
-	private static @Nullable String encodePng(ByteBuffer rgba, int width, int height) throws IOException {
+	private static String encodePng(ByteBuffer rgba, int width, int height) throws IOException {
 		int[] pixels = new int[width * height];
 		ByteBuffer source = rgba.duplicate();
 		source.position(0);
@@ -168,7 +166,7 @@ final class AgentFrameRenderer {
 		}
 	}
 
-	private static void deleteRecursively(Path root) {
+	private static void deleteRecursively(@Nullable Path root) {
 		if (root == null) {
 			return;
 		}

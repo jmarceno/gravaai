@@ -19,13 +19,18 @@ public record SelectedSource(
 		@Nullable CaptureArea area,
 		@Nullable String originalName) {
 
-	/** A screen the source list offers. */
-	public static SelectedSource screen(String id, String name, String displayId) {
+	/**
+	 * A screen the source list offers.
+	 *
+	 * @param displayId the display behind the source, or null when it is unknown
+	 */
+	public static SelectedSource screen(String id, String name, @Nullable String displayId) {
 		return new SelectedSource(id, name, displayId, SourceType.SCREEN, null, null, null, null);
 	}
 
 	/** A window the source list offers. */
-	public static SelectedSource window(String id, String name, String displayId, @Nullable String appName, String windowTitle) {
+	public static SelectedSource window(String id, String name, @Nullable String displayId,
+			@Nullable String appName, String windowTitle) {
 		return new SelectedSource(id, name, displayId, SourceType.WINDOW, appName, windowTitle, null, null);
 	}
 

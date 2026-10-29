@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalDouble;
 
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
@@ -36,17 +37,15 @@ import dev.gravaai.media.playback.WebcamSync;
  * directory holding {@code wallpapers/} (the app's assets or the repo's {@code public/}); a
  * missing asset degrades to black.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFactory, AutoCloseable {
 
 	private final ProjectEditorState editor;
 	private final Path videoPath;
-	private final Path webcamPath;
+	private final @Nullable Path webcamPath;
 	private final List<CursorSample> cursorSamples;
 	private final double sourceDurationSeconds;
 	private final long webcamTimeOffsetMs;
-	private final Path wallpaperRoot;
+	private final @Nullable Path wallpaperRoot;
 	private final int frameRate;
 	private final MediaFrameReader videoFrames;
 	private final @Nullable MediaFrameReader webcamFrames;
@@ -75,14 +74,14 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	 * @param wallpaperRoot directory containing {@code wallpapers/}, or null for black fallback
 	 * @param frameRate output frame rate used for the {@link FrameInput#frameIndex()}
 	 */
-	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath, Path webcamPath,
-			List<CursorSample> cursorSamples, double sourceDurationSeconds,
-			long webcamTimeOffsetMs, Path wallpaperRoot, int frameRate) {
+	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath,
+			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
+			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
+			int frameRate) {
 		this.editor = Objects.requireNonNull(editor, "editor");
 		this.videoPath = Objects.requireNonNull(videoPath, "videoPath");
 		this.webcamPath = webcamPath;
-		List<CursorSample> samples = cursorSamples == null ? List.of() : cursorSamples;
-		this.cursorSamples = samples.stream()
+		this.cursorSamples = cursorSamples.stream()
 				.sorted(Comparator.comparingDouble(CursorSample::timeSeconds))
 				.toList();
 		this.sourceDurationSeconds = sourceDurationSeconds;
@@ -103,7 +102,8 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	}
 
 	/** Convenience: probes the media duration, empty cursor telemetry, black wallpapers, 60 fps. */
-	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath, Path webcamPath) {
+	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath,
+			@Nullable Path webcamPath) {
 		this(editor, videoPath, webcamPath, List.of(), 0, 0, null, 60);
 	}
 
@@ -116,12 +116,13 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 			throw new IllegalArgumentException("timelineSeconds must be finite");
 		}
 		long timelineMs = Math.round(timelineSeconds * 1000);
-		Double sourceSeconds = mapTimelineToSourceSeconds(timelineSeconds);
-		RgbaFrame sourceFrame = sourceSeconds == null ? null
-				: videoFrames.decodeForward(sourceSeconds);
+		OptionalDouble sourceSeconds = mapTimelineToSourceSeconds(timelineSeconds);
+		RgbaFrame sourceFrame = sourceSeconds.isPresent()
+				? videoFrames.decodeForward(sourceSeconds.getAsDouble())
+				: null;
 		// Source-time overlays (captions, keystrokes, cursor, webcam) follow the clip mapping like
 		// the TS exporter; a gap between clips reports source time 0 there as well.
-		double sourceTime = sourceSeconds == null ? 0 : sourceSeconds;
+		double sourceTime = sourceSeconds.orElse(0);
 		RgbaFrame webcamFrame = null;
 		if (webcamFrames != null && webcamSpec.enabled()
 				&& webcamSpec.isVisibleAt(sourceTime * 1000)) {
@@ -155,31 +156,35 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	 * rendered background by identity); a video wallpaper loops over its duration like
 	 * {@code syncBackgroundFrame}.
 	 */
-	private @Nullable Background backgroundAt(double timelineSeconds) {
+	private Background backgroundAt(double timelineSeconds) {
 		Path video = ProjectEditorInputs.videoWallpaperPath(editor, wallpaperRoot);
 		if (video == null) {
-			if (staticBackground == null) {
-				staticBackground = ProjectEditorInputs.background(editor, wallpaperRoot);
+			Background cached = staticBackground;
+			if (cached == null) {
+				cached = ProjectEditorInputs.background(editor, wallpaperRoot);
+				staticBackground = cached;
 			}
-			return staticBackground;
+			return cached;
 		}
-		if (wallpaperFrames == null) {
-			wallpaperFrames = new MediaFrameReader(video, 0, true);
+		MediaFrameReader frames = wallpaperFrames;
+		if (frames == null) {
+			frames = new MediaFrameReader(video, 0, true);
+			wallpaperFrames = frames;
 		}
-		double duration = wallpaperFrames.durationSeconds();
+		double duration = frames.durationSeconds();
 		double loopSeconds = duration > 0
 				? ((timelineSeconds % duration) + duration) % duration
 				: Math.max(0, timelineSeconds);
-		RgbaFrame frame = wallpaperFrames.decodeForward(loopSeconds);
+		RgbaFrame frame = frames.decodeForward(loopSeconds);
 		return frame == null ? Background.black() : new Background.VideoFrame(frame);
 	}
 
 	/** Maps a timeline time to the source timestamp through the clip sequence. */
-	private @Nullable Double mapTimelineToSourceSeconds(double timelineSeconds) {
+	private OptionalDouble mapTimelineToSourceSeconds(double timelineSeconds) {
 		List<ClipRegion> clips = editor.clipRegions() == null ? List.of()
 				: editor.clipRegions();
 		if (clips.isEmpty()) {
-			return Math.max(0, timelineSeconds);
+			return OptionalDouble.of(Math.max(0, timelineSeconds));
 		}
 		double timeMs = timelineSeconds * 1000;
 		ClipRegion clip = Clips.findClipAtTimelineTime(timeMs, clips);
@@ -189,12 +194,12 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 			if (Math.abs(timeMs - last.endMs()) < 1e-7) {
 				clip = last;
 			} else {
-				return null;
+				return OptionalDouble.empty();
 			}
 		}
 		double speed = Double.isFinite(clip.speed()) && clip.speed() > 0 ? clip.speed() : 1;
 		double sourceMs = Clips.getClipSourceStartMs(clip) + (timeMs - clip.startMs()) * speed;
-		return Math.max(0, sourceMs / 1000.0);
+		return OptionalDouble.of(Math.max(0, sourceMs / 1000.0));
 	}
 
 	@Override

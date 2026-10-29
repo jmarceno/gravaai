@@ -23,8 +23,6 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * the replacement for {@code probe-native-video-metadata}, {@code ipc/ffmpeg/metadata.ts},
  * {@code mp4box} and {@code web-demuxer}.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MediaProbe {
 
 	private static final System.Logger LOG = System.getLogger(MediaProbe.class.getName());

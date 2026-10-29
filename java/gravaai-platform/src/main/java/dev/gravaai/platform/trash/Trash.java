@@ -34,8 +34,6 @@ import java.util.List;
  *
  * <p>All operations are blocking file IO and are meant to run on a service executor.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Trash {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.trash");
@@ -247,7 +245,7 @@ public final class Trash {
 		}
 	}
 
-	private static @Nullable boolean isDirectoryQuietly(Path path) {
+	private static boolean isDirectoryQuietly(Path path) {
 		try {
 			return Files.isDirectory(path);
 		} catch (SecurityException error) {
@@ -273,7 +271,7 @@ public final class Trash {
 		return current;
 	}
 
-	static @Nullable Path topDirectoryOf(Path path) {
+	static Path topDirectoryOf(Path path) {
 		Long device = deviceId(path);
 		Path top = path.toAbsolutePath().normalize();
 		while (top.getParent() != null) {
@@ -348,7 +346,7 @@ public final class Trash {
 	}
 
 	/** URL-encodes an absolute path the way the Trash specification (and gio) writes it. */
-	static @Nullable String encodePath(Path path) {
+	static String encodePath(Path path) {
 		byte[] bytes = path.toString().getBytes(StandardCharsets.UTF_8);
 		StringBuilder encoded = new StringBuilder(bytes.length + 16);
 		for (byte value : bytes) {
@@ -364,14 +362,14 @@ public final class Trash {
 		return encoded.toString();
 	}
 
-	private static @Nullable boolean isUnreserved(int character) {
+	private static boolean isUnreserved(int character) {
 		return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z')
 				|| (character >= '0' && character <= '9') || character == '-' || character == '.'
 				|| character == '_' || character == '~' || character == '/';
 	}
 
 	/** Decodes a {@code Path=} value from a trash info file. */
-	static @Nullable Path decodePath(String encoded) {
+	static Path decodePath(String encoded) {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream(encoded.length());
 		for (int index = 0; index < encoded.length(); index++) {
 			char character = encoded.charAt(index);
@@ -420,7 +418,12 @@ public final class Trash {
 			}
 			String fileName = infoFile.getFileName().toString();
 			String name = fileName.substring(0, fileName.length() - INFO_FILE_EXTENSION.length());
-			Path trashDirectory = infoFile.getParent().getParent();
+			Path infoDirectory = infoFile.getParent();
+			Path trashDirectory = infoDirectory == null ? null : infoDirectory.getParent();
+			if (trashDirectory == null) {
+				LOG.log(System.Logger.Level.DEBUG, "ignoring trash info outside a trash directory: " + infoFile);
+				return null;
+			}
 			Path payload = trashDirectory.resolve("files").resolve(name);
 			if (!Files.exists(payload, LinkOption.NOFOLLOW_LINKS)) {
 				LOG.log(System.Logger.Level.DEBUG, "ignoring trash info with missing payload: " + infoFile);

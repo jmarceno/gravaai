@@ -37,8 +37,6 @@ import javafx.scene.layout.VBox;
  * {@code useMeeting.ts}): live job progress, the notes/transcript tabs, edit/copy, re-run stages
  * and the clickable timestamp markdown.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingNotesView extends VBox {
 
 	private enum Tab {
@@ -169,7 +167,7 @@ public final class MeetingNotesView extends VBox {
 				showError(result.errorMessage());
 			} else {
 				error(null);
-				files = result.orElse(null);
+				files = result.orNull();
 			}
 			rebuildJobStatus();
 			rebuildContent();
@@ -220,15 +218,16 @@ public final class MeetingNotesView extends VBox {
 
 	private void rebuildJobStatus() {
 		jobHost.getChildren().clear();
-		if (busy()) {
+		MeetingJob currentJob = job;
+		if (currentJob != null && currentJob.isActive()) {
 			VBox card = new VBox(6);
 			card.setPadding(new Insets(12));
 			card.setStyle("-fx-background-color: rgba(35,40,51,0.5); -fx-background-radius: 12;"
 					+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 12;");
-			Label stage = new Label(MeetingText.stageLabel(job.stage()));
+			Label stage = new Label(MeetingText.stageLabel(currentJob.stage()));
 			stage.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: "
 					+ css(Theme.FG) + ";");
-			Label message = new Label(job.message() == null ? "" : job.message());
+			Label message = new Label(currentJob.message() == null ? "" : currentJob.message());
 			message.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.MUTED) + ";");
 			Button cancel = new Button("Cancel", Button.Variant.GHOST, Button.Size.SM);
 			cancel.setOnAction(event -> cancel());
@@ -242,11 +241,11 @@ public final class MeetingNotesView extends VBox {
 			bar.setStyle("-fx-background-color: " + css(Theme.DEFAULT) + "; -fx-background-radius: 4;");
 			Region fill = new Region();
 			fill.setStyle("-fx-background-color: " + css(Theme.ACCENT) + "; -fx-background-radius: 4;");
-			if (job.progress() == null) {
+			if (currentJob.progress() == null) {
 				fill.prefWidthProperty().bind(bar.widthProperty().divide(3));
 				fill.setOpacity(0.6);
 			} else {
-				double fraction = Math.max(0, Math.min(100, job.progress())) / 100.0;
+				double fraction = Math.max(0, Math.min(100, currentJob.progress())) / 100.0;
 				fill.prefWidthProperty().bind(bar.widthProperty().multiply(fraction));
 			}
 			bar.getChildren().add(fill);
@@ -360,19 +359,20 @@ public final class MeetingNotesView extends VBox {
 			actions.getChildren().addAll(discard, save);
 			return;
 		}
-		if (hasContent) {
+		MeetingService.FilesView currentFiles = files;
+		if (hasContent && currentFiles != null) {
 			Button copy = new Button("Copy", Button.Variant.GHOST, Button.Size.SM);
 			copy.setOnAction(event -> copy());
 			Button edit = new Button("Edit", Button.Variant.GHOST, Button.Size.SM);
 			edit.setDisable(busy());
 			edit.setOnAction(event -> startEdit());
 			actions.getChildren().addAll(copy, edit);
-			if (tab == Tab.NOTES && files.transcript() != null && files.notes() != null) {
+			if (tab == Tab.NOTES && currentFiles.transcript() != null && currentFiles.notes() != null) {
 				Button rewrite = new Button("Rewrite notes", Button.Variant.GHOST, Button.Size.SM);
 				rewrite.setDisable(busy());
 				rewrite.setOnAction(event -> run(MeetingJobMode.SUMMARIZE));
 				actions.getChildren().add(rewrite);
-			} else if (tab == Tab.TRANSCRIPT && files.transcript() != null) {
+			} else if (tab == Tab.TRANSCRIPT && currentFiles.transcript() != null) {
 				Button redo = new Button("Redo transcript and notes", Button.Variant.GHOST,
 						Button.Size.SM);
 				redo.setDisable(busy());
@@ -442,7 +442,7 @@ public final class MeetingNotesView extends VBox {
 				showError(result.errorMessage());
 				return;
 			}
-			job = result.orElse(null);
+			job = result.orNull();
 			rebuildJobStatus();
 			rebuildContent();
 			rebuildActions();

@@ -29,8 +29,6 @@ import tools.jackson.databind.json.JsonMapper;
  * (transcript.md / notes.md / meeting.json next to a recording) is written by the meeting service
  * and asserted byte-for-byte in tests, so it owns this small helper.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class JsonFiles {
 
 	private static final ObjectMapper MAPPER = JsonMapper.shared();
@@ -48,7 +46,7 @@ public final class JsonFiles {
 	}
 
 	/** {@code JSON.stringify(value, null, 2)}: two-space indent, no space before the colon. */
-	public static @Nullable String pretty(Object value) {
+	public static String pretty(Object value) {
 		return PRETTY.writeValueAsString(value);
 	}
 

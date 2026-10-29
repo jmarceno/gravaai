@@ -20,6 +20,7 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingAssets.MeetingAsset;
 import dev.gravaai.services.meeting.ports.FileDownloader;
 import dev.gravaai.services.meeting.ports.MeetingApiKeyStore;
@@ -37,8 +38,6 @@ import dev.gravaai.services.meeting.ports.Trash;
  * Replaces the IPC channel group in electron/ipc/register/meeting.ts (plan §5.3, Appendix A);
  * the Lead wires the concrete ports in AppContext, the UI subscribes to the events.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingService {
 
 	/** Which file {@code meeting-save-file} rewrites. */
@@ -72,9 +71,14 @@ public final class MeetingService {
 		}
 	}
 
-	/** What the meeting view loads for one recording (meeting-get-files). */
-	public record FilesView(MeetingFiles paths, String transcript, String notes, MeetingMeta meta,
-			boolean interrupted) {
+	/**
+	 * What the meeting view loads for one recording (meeting-get-files).
+	 *
+	 * @param transcript the transcript text, or null when the meeting was never transcribed
+	 * @param notes the notes text, or null when the meeting was never summarized
+	 */
+	public record FilesView(MeetingFiles paths, @Nullable String transcript, @Nullable String notes,
+			MeetingMeta meta, boolean interrupted) {
 	}
 
 	/** One row of the download manager (meeting-list-assets). */
@@ -134,7 +138,7 @@ public final class MeetingService {
 			Trash trash,
 			Reveal reveal,
 			MeetingAudioRecorder audioRecorder,
-			Consumer<Path> onMeetingNotesReady,
+			@Nullable Consumer<Path> onMeetingNotesReady,
 			Clock clock) {
 		return create(userDataDir, settingsStore, apiKeyStore, processes, mediaTools, downloader,
 				recordings, trash, reveal, audioRecorder, onMeetingNotesReady, clock,
@@ -152,7 +156,7 @@ public final class MeetingService {
 			Trash trash,
 			Reveal reveal,
 			MeetingAudioRecorder audioRecorder,
-			Consumer<Path> onMeetingNotesReady,
+			@Nullable Consumer<Path> onMeetingNotesReady,
 			Clock clock,
 			OpenAiClient client) {
 		MeetingAssets assets = new MeetingAssets(userDataDir);
@@ -260,10 +264,10 @@ public final class MeetingService {
 		return Result.ok(List.copyOf(deleted));
 	}
 
-	public Result<Void> revealMeeting(Path mediaPath) {
+	public Result<Unit> revealMeeting(Path mediaPath) {
 		try {
 			reveal.revealInFolder(mediaPath);
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}
@@ -289,16 +293,16 @@ public final class MeetingService {
 	 * Registers a saved meeting recording (the audio-only capture that keeps per-speaker tracks) so
 	 * the library lists it; the Electron app does this from the recording-saved hook.
 	 */
-	public Result<Void> registerRecording(Path mediaPath, boolean hasVideo) {
+	public Result<Unit> registerRecording(Path mediaPath, boolean hasVideo) {
 		try {
 			library.registerMeetingRecording(mediaPath, hasVideo);
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}
 	}
 
-	public Result<Void> saveFile(Path mediaPath, FileKind kind, String content) {
+	public Result<Unit> saveFile(Path mediaPath, FileKind kind, String content) {
 		try {
 			if (kind == null) {
 				throw new IllegalStateException("Unknown file.");
@@ -309,9 +313,10 @@ public final class MeetingService {
 			MeetingFiles files = MeetingFiles.meetingFilesFor(mediaPath);
 			Path target = kind == FileKind.TRANSCRIPT ? files.transcript() : files.notes();
 			Files.writeString(target, content);
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (IOException error) {
-			return Result.err(error.getMessage());
+			return Result.err(error.getMessage() == null ? String.valueOf(error)
+					: error.getMessage());
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}
@@ -352,7 +357,7 @@ public final class MeetingService {
 	}
 
 	/** meeting-download-asset: runs off the FX thread; progress arrives via the event. */
-	public CompletableFuture<Result<Void>> downloadAsset(String assetId) {
+	public CompletableFuture<Result<Unit>> downloadAsset(String assetId) {
 		Optional<MeetingAsset> asset = assets.find(assetId);
 		if (asset.isEmpty()) {
 			return CompletableFuture.completedFuture(Result.err("Unknown download."));
@@ -361,14 +366,14 @@ public final class MeetingService {
 			try {
 				assetInstaller.ensure(asset.get(),
 						percent -> publishAsset(new AssetProgress(assetId, percent, false)));
-				return Result.<Void>ok(null);
+				return Result.okUnit();
 			} catch (RuntimeException error) {
-				return Result.<Void>err(message(error));
+				return Result.<Unit>err(message(error));
 			}
 		}, asyncExecutor);
 	}
 
-	public Result<Void> removeAsset(String assetId) {
+	public Result<Unit> removeAsset(String assetId) {
 		Optional<MeetingAsset> asset = assets.find(assetId);
 		if (asset.isEmpty()) {
 			return Result.err("Unknown download.");
@@ -376,7 +381,7 @@ public final class MeetingService {
 		try {
 			assetInstaller.remove(asset.get());
 			publishAsset(new AssetProgress(assetId, 0, true));
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}
@@ -424,10 +429,10 @@ public final class MeetingService {
 	// --- recording and lifecycle ------------------------------------------------------------
 
 	/** meeting-start-audio-recording: audio-only on Linux, keeping the per-speaker tracks. */
-	public Result<Void> startAudioRecording(MeetingRecordingOptions options) {
+	public Result<Unit> startAudioRecording(MeetingRecordingOptions options) {
 		try {
 			audioRecorder.start(options);
-			return Result.ok(null);
+			return Result.okUnit();
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}

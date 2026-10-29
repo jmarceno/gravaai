@@ -45,8 +45,6 @@ import javafx.scene.layout.VBox;
  * highlighted. Caption generation is driven through {@link TranscriptUiService} and the panel shows
  * its progress/errors and applies the generated cues through the supplied sink.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class TranscriptPanel extends VBox {
 
 	private final EditorStore store;
@@ -89,9 +87,14 @@ public final class TranscriptPanel extends VBox {
 	private boolean feedbackDanger;
 	private @Nullable Object appliedDoneStatus;
 
+	/**
+	 * @param cutController optional cut controller; null uses the store-backed one
+	 * @param captionsSink optional sink for generated cues; null writes them to the store
+	 */
 	public TranscriptPanel(EditorStore store, TranscriptUiService service,
 			DoubleSupplier timelinePlayheadMs, BooleanSupplier playing, PlaybackSeek seek,
-			TranscriptCutController cutController, Consumer<List<CaptionCue>> captionsSink) {
+			@Nullable TranscriptCutController cutController,
+			@Nullable Consumer<List<CaptionCue>> captionsSink) {
 		this.store = store;
 		this.service = service;
 		this.timelinePlayheadMs = timelinePlayheadMs == null ? () -> 0.0 : timelinePlayheadMs;

@@ -38,15 +38,13 @@ import tools.jackson.databind.JsonNode;
  * {@code gravaai.locale} plus {@code navigator.languages}) and the "wait for the first bundle"
  * gate.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class I18n {
 
 	private static final Pattern INTERPOLATION = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}");
 
 	private final LocaleSource source;
 	private final Map<String, Map<String, JsonNode>> bundles = new ConcurrentHashMap<>();
-	private volatile @Nullable String locale;
+	private volatile String locale;
 
 	public I18n(LocaleSource source) {
 		this(source, Locales.DEFAULT_LOCALE);
@@ -57,7 +55,7 @@ public final class I18n {
 		this.locale = normalizeLocale(locale);
 	}
 
-	public @Nullable String locale() {
+	public String locale() {
 		return locale;
 	}
 
@@ -66,21 +64,22 @@ public final class I18n {
 	}
 
 	/** {@code t(key)}: no variables, so {@code {{var}}} placeholders stay untouched. */
-	public @Nullable String t(String key) {
+	public String t(String key) {
 		return translateForLocale(locale, bundleOrNull(locale), key, null, null);
 	}
 
 	/** {@code t(key, fallback)}: no variables, so placeholders stay untouched. */
-	public @Nullable String t(String key, String fallback) {
+	public String t(String key, String fallback) {
 		return translateForLocale(locale, bundleOrNull(locale), key, fallback, null);
 	}
 
 	/** Plan §5.12 shorthand: {@code t("namespace:key.path", Map.of("count", 1))}. */
-	public @Nullable String t(String key, Map<String, ?> vars) {
+	public String t(String key, Map<String, ?> vars) {
 		return t(key, null, vars);
 	}
 
-	public @Nullable String t(String key, String fallback, Map<String, ?> vars) {
+	/** @param fallback returned when no bundle carries the key (may be null) */
+	public String t(String key, @Nullable String fallback, Map<String, ?> vars) {
 		return translateForLocale(locale, bundleOrNull(locale), key, fallback, vars);
 	}
 
@@ -88,13 +87,13 @@ public final class I18n {
 	 * One locale's namespace trees, loaded and cached. Missing or broken files yield an empty map;
 	 * the locale is retried on the next call.
 	 */
-	public @Nullable Map<String, JsonNode> bundle(String locale) {
+	public Map<String, JsonNode> bundle(String locale) {
 		Map<String, JsonNode> loaded = bundleOrNull(locale);
 		return loaded == null ? Map.of() : loaded;
 	}
 
 	/** Port of {@code normalizeLocale}: exact, case-insensitive, extended subtags, language-only. */
-	public static @Nullable String normalizeLocale(String locale) {
+	public static String normalizeLocale(@Nullable String locale) {
 		if (locale == null || locale.isEmpty()) {
 			return Locales.DEFAULT_LOCALE;
 		}
@@ -126,7 +125,7 @@ public final class I18n {
 		return Locales.DEFAULT_LOCALE;
 	}
 
-	private @Nullable Map<String, JsonNode> bundleOrNull(@Nullable String locale) {
+	private @Nullable Map<String, JsonNode> bundleOrNull(String locale) {
 		Map<String, JsonNode> cached = bundles.get(locale);
 		if (cached != null) {
 			return cached;
@@ -140,7 +139,7 @@ public final class I18n {
 		return existing != null ? existing : loaded;
 	}
 
-	private @Nullable Map<String, JsonNode> loadBundle(@Nullable String locale) {
+	private @Nullable Map<String, JsonNode> loadBundle(String locale) {
 		Map<String, JsonNode> namespaces = new LinkedHashMap<>();
 		for (String namespace : Locales.I18N_NAMESPACES) {
 			String json;
@@ -166,8 +165,8 @@ public final class I18n {
 		return namespaces;
 	}
 
-	private @Nullable String translateForLocale(
-			@Nullable String locale,
+	private String translateForLocale(
+			String locale,
 			@Nullable Map<String, JsonNode> loadedBundle,
 			String key,
 			@Nullable String fallback,
@@ -205,8 +204,8 @@ public final class I18n {
 	private static @Nullable String firstMessage(
 			@Nullable Map<String, JsonNode> preferred,
 			@Nullable Map<String, JsonNode> english,
-			@Nullable ParsedKey parsed,
-			@Nullable String path) {
+			ParsedKey parsed,
+			String path) {
 		String value = getMessageValue(preferred == null ? null : preferred.get(parsed.namespace()), path);
 		if (value == null) {
 			value = getMessageValue(english == null ? null : english.get(parsed.namespace()), path);
@@ -214,7 +213,7 @@ public final class I18n {
 		return value;
 	}
 
-	private static @Nullable String getMessageValue(@Nullable JsonNode namespace, @Nullable String path) {
+	private static @Nullable String getMessageValue(@Nullable JsonNode namespace, String path) {
 		if (namespace == null) {
 			return null;
 		}

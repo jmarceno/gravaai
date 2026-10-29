@@ -20,12 +20,12 @@ public enum GlobalShortcutAction {
 	}
 
 	/** The string used in files, CLI flags and the control socket. */
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
 	/** Port of {@code isGlobalShortcutAction}: null for anything that is not an action. */
-	public static @Nullable GlobalShortcutAction fromWire(String value) {
+	public static @Nullable GlobalShortcutAction fromWire(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

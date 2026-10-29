@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -14,11 +16,12 @@ import tools.jackson.databind.JsonNode;
 public final class ServiceAutomationsController implements AutomationsController {
 
 	private final AutomationService service;
-	private final Supplier<Path> folderChooser;
-	private final Supplier<Path> sampleFileChooser;
+	private final Supplier<@Nullable Path> folderChooser;
+	private final Supplier<@Nullable Path> sampleFileChooser;
 
-	public ServiceAutomationsController(AutomationService service, Supplier<Path> folderChooser,
-			Supplier<Path> sampleFileChooser) {
+	public ServiceAutomationsController(AutomationService service,
+			@Nullable Supplier<@Nullable Path> folderChooser,
+			@Nullable Supplier<@Nullable Path> sampleFileChooser) {
 		this.service = Objects.requireNonNull(service, "service");
 		this.folderChooser = folderChooser == null ? () -> null : folderChooser;
 		this.sampleFileChooser = sampleFileChooser == null ? () -> null : sampleFileChooser;
@@ -36,17 +39,17 @@ public final class ServiceAutomationsController implements AutomationsController
 
 	@Override
 	public Result<AutomationRunResult> runAutomationOnFile(
-			String ruleId, String samplePath, String notesPath) {
+			String ruleId, String samplePath, @Nullable String notesPath) {
 		return service.runAutomationOnFile(ruleId, samplePath, notesPath);
 	}
 
 	@Override
-	public Path chooseFolder(String currentFolder) {
+	public @Nullable Path chooseFolder(String currentFolder) {
 		return folderChooser.get();
 	}
 
 	@Override
-	public Path chooseSampleFile() {
+	public @Nullable Path chooseSampleFile() {
 		return sampleFileChooser.get();
 	}
 }

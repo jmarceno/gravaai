@@ -1008,7 +1008,7 @@ public final class ProjectPersistence {
 		return parsed != null ? parsed : fallback;
 	}
 
-	private static double numberOr(JsonNode value, @Nullable double fallback) {
+	private static double numberOr(JsonNode value, double fallback) {
 		return isFiniteNumber(value) ? value.doubleValue() : fallback;
 	}
 
@@ -1033,7 +1033,7 @@ public final class ProjectPersistence {
 		return value.isArray() || value.isObject() ? value.size() > 0 : true;
 	}
 
-	private static double clampSetting(JsonNode value, @Nullable double min, @Nullable double max, double fallback) {
+	private static double clampSetting(JsonNode value, double min, double max, double fallback) {
 		if (!isFiniteNumber(value)) {
 			return fallback;
 		}

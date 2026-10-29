@@ -40,8 +40,6 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * {@link #reset()} runs {@link Compositor#reset()} on the GL thread so the GIF exporter's
  * palette+output passes and reused providers start from a clean spring/motion-blur history.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CompositorExportFrameProvider implements ExportFrameProvider {
 
 	private static final System.Logger LOG =
@@ -51,13 +49,40 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 
 	/** GL-thread state, only touched on the {@code gl-export} thread. */
 	private static final class GlState {
-		GlContext context;
-		GlFramebuffer framebuffer;
-		SkiaGlSurface surface;
-		PboDoubleBuffer readback;
-		GlYuv420Converter yuv;
-		ByteBuffer rgbaStaging;
-		ByteBuffer yuvStaging;
+		final GlContext context;
+		final GlFramebuffer framebuffer;
+		final SkiaGlSurface surface;
+		final PboDoubleBuffer readback;
+		final ByteBuffer rgbaStaging;
+		/** Created lazily for MP4/YUV exports only. */
+		@Nullable GlYuv420Converter yuv;
+		/** Created together with {@link #yuv}. */
+		@Nullable ByteBuffer yuvStaging;
+
+		/**
+		 * Creates the GL resources this export needs; ownership moves to the state (the
+		 * constructor closes whatever it created when a later step fails).
+		 */
+		GlState(int width, int height) {
+			GlContext createdContext = null;
+			GlFramebuffer createdFramebuffer = null;
+			SkiaGlSurface createdSurface = null;
+			try {
+				createdContext = GlContext.create();
+				createdFramebuffer = new GlFramebuffer(width, height);
+				createdSurface = SkiaGlSurface.create(createdFramebuffer);
+				this.readback = new PboDoubleBuffer(width, height, PboFormat.RGBA);
+				this.rgbaStaging = ByteBuffer.allocateDirect(width * height * 4);
+				this.context = createdContext;
+				this.framebuffer = createdFramebuffer;
+				this.surface = createdSurface;
+			} catch (RuntimeException | Error failure) {
+				closeResource(createdSurface);
+				closeResource(createdFramebuffer);
+				closeResource(createdContext);
+				throw failure;
+			}
+		}
 	}
 
 	private final int width;
@@ -174,12 +199,16 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 			compositor.render(gl.surface, frameInput);
 			ByteBuffer staging;
 			if (yuv) {
-				if (gl.yuv == null) {
-					gl.yuv = new GlYuv420Converter(width, height);
-					gl.yuvStaging = ByteBuffer.allocateDirect(bytes);
+				GlYuv420Converter converter = gl.yuv;
+				ByteBuffer yuvStaging = gl.yuvStaging;
+				if (converter == null || yuvStaging == null) {
+					converter = new GlYuv420Converter(width, height);
+					yuvStaging = ByteBuffer.allocateDirect(bytes);
+					gl.yuv = converter;
+					gl.yuvStaging = yuvStaging;
 				}
-				gl.yuv.convert(gl.framebuffer.colorTextureId(), gl.yuvStaging);
-				staging = gl.yuvStaging;
+				converter.convert(gl.framebuffer.colorTextureId(), yuvStaging);
+				staging = yuvStaging;
 			} else {
 				gl.framebuffer.bind();
 				gl.readback.readSynchronously(gl.rgbaStaging);
@@ -282,16 +311,24 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 	}
 
 	private void run() {
-		GlState gl = new GlState();
+		GlState gl;
 		try {
-			gl.context = GlContext.create();
-			gl.framebuffer = new GlFramebuffer(width, height);
-			gl.surface = SkiaGlSurface.create(gl.framebuffer);
-			gl.readback = new PboDoubleBuffer(width, height, PboFormat.RGBA);
-			gl.rgbaStaging = ByteBuffer.allocateDirect(width * height * 4);
+			gl = new GlState(width, height);
+		} catch (Throwable failure) {
+			CompletableFuture<Void> readyFuture = ready;
+			if (readyFuture != null) {
+				readyFuture.completeExceptionally(failure);
+			}
+			LOG.log(System.Logger.Level.ERROR, "gl-export failed", failure);
+			return;
+		}
+		try {
 			LOG.log(System.Logger.Level.DEBUG, () -> "gl-export ready: " + gl.context.description()
 					+ " (" + width + "x" + height + ")");
-			ready.complete(null);
+			CompletableFuture<Void> readyFuture = ready;
+			if (readyFuture != null) {
+				readyFuture.complete(null);
+			}
 			while (!closed) {
 				Consumer<GlState> task = tasks.poll(100, TimeUnit.MILLISECONDS);
 				if (task != null) {
@@ -299,7 +336,10 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 				}
 			}
 		} catch (Throwable failure) {
-			ready.completeExceptionally(failure);
+			CompletableFuture<Void> readyFuture = ready;
+			if (readyFuture != null) {
+				readyFuture.completeExceptionally(failure);
+			}
 			LOG.log(System.Logger.Level.ERROR, "gl-export failed", failure);
 		} finally {
 			Consumer<GlState> pending;
@@ -322,16 +362,21 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.DEBUG, "compositor close: " + error);
 		}
-		for (AutoCloseable resource : new AutoCloseable[] {gl.yuv, gl.readback, gl.surface,
-				gl.framebuffer, gl.context}) {
-			if (resource == null) {
-				continue;
-			}
-			try {
-				resource.close();
-			} catch (Exception error) {
-				LOG.log(System.Logger.Level.DEBUG, "gl-export close: " + error);
-			}
+		closeResource(gl.yuv);
+		closeResource(gl.readback);
+		closeResource(gl.surface);
+		closeResource(gl.framebuffer);
+		closeResource(gl.context);
+	}
+
+	private static void closeResource(@Nullable AutoCloseable resource) {
+		if (resource == null) {
+			return;
+		}
+		try {
+			resource.close();
+		} catch (Exception error) {
+			LOG.log(System.Logger.Level.DEBUG, "gl-export close: " + error);
 		}
 	}
 

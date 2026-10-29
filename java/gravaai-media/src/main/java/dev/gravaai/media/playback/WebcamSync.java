@@ -75,7 +75,7 @@ public final class WebcamSync {
 	 * Missing ranges means an original recording; an empty list means no webcam frames.
 	 */
 	public static boolean isWebcamVisibleAtSourceTime(
-			List<WebcamRange> visibleRanges, double sourceTimeSeconds) {
+			@Nullable List<WebcamRange> visibleRanges, double sourceTimeSeconds) {
 		if (visibleRanges == null) {
 			return true;
 		}

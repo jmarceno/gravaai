@@ -18,11 +18,11 @@ public enum AutomationActionType {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	public static @Nullable AutomationActionType fromWire(String value) {
+	public static @Nullable AutomationActionType fromWire(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

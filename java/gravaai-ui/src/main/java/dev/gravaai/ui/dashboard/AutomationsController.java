@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 import dev.gravaai.core.result.Result;
@@ -24,12 +26,21 @@ public interface AutomationsController {
 	/** Port of the {@code save-automations} handler. */
 	Result<AutomationsFile> saveAutomations(JsonNode value);
 
-	/** Port of the {@code run-automation-on-file} handler: run one rule against a chosen file. */
-	Result<AutomationRunResult> runAutomationOnFile(String ruleId, String samplePath, String notesPath);
+	/**
+	 * Port of the {@code run-automation-on-file} handler: run one rule against a chosen file.
+	 *
+	 * @param notesPath optional notes sidecar for summary actions, or null for none
+	 */
+	Result<AutomationRunResult> runAutomationOnFile(
+			String ruleId, String samplePath, @Nullable String notesPath);
 
-	/** Folder chooser for copy/move actions; {@code currentFolder} is the starting value. */
-	Path chooseFolder(String currentFolder);
+	/**
+	 * Folder chooser for copy/move actions; {@code currentFolder} is the starting value.
+	 *
+	 * @return the chosen folder, or null when the user cancels
+	 */
+	@Nullable Path chooseFolder(String currentFolder);
 
-	/** File chooser for "Run now on a file..."; {@code null} when the user cancels. */
-	Path chooseSampleFile();
+	/** File chooser for "Run now on a file..."; null when the user cancels. */
+	@Nullable Path chooseSampleFile();
 }

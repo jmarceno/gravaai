@@ -67,8 +67,6 @@ import javafx.scene.text.Text;
  * {@code glassAmber} #67460f/#83570f, {@code glassRed} #652425/#802a2b, captions #b58b12/#facc15),
  * 8 px block radius, and the 85% block height inside its row.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class TimelineView extends Region {
 
 	private static final double AXIS_HEIGHT = TimelineLayout.TIMELINE_AXIS_HEIGHT_PX;
@@ -199,7 +197,7 @@ public final class TimelineView extends Region {
 	private double minItemDurationMs = 100;
 	private List<CaptionTimeline.Fragment> captionFragments = List.of();
 	private List<TimelineSourceAudioTrack> sourceAudioTracks = List.of();
-	private @Nullable FilmstripProvider filmstripProvider = FilmstripProvider.empty();
+	private FilmstripProvider filmstripProvider = FilmstripProvider.empty();
 	private static final int FILMSTRIP_THUMB_WIDTH = 160;
 	private static final int FILMSTRIP_THUMB_HEIGHT = 90;
 	private static final int FILMSTRIP_CACHE_LIMIT = 768;
@@ -424,8 +422,8 @@ public final class TimelineView extends Region {
 				project.audioRegions(), project.autoCaptions(),
 				project.sourceAudioTrackSettings(), sourceAudioTracks));
 		sourceAudioTracks = dataSource.sourceAudioTracks();
-		filmstripProvider = dataSource.filmstripProvider() == null ? FilmstripProvider.empty()
-				: dataSource.filmstripProvider();
+		FilmstripProvider provider = dataSource.filmstripProvider();
+		filmstripProvider = provider == null ? FilmstripProvider.empty() : provider;
 		filmstripProvider.setOnFrameReady(
 				() -> javafx.application.Platform.runLater(this::redraw));
 		captionFragments = CaptionTimeline.projectCaptionCues(project.autoCaptions(),
@@ -738,15 +736,18 @@ public final class TimelineView extends Region {
 		if (Math.abs(x - dragStartX) > DRAG_THRESHOLD_PX) {
 			dragged = true;
 		}
+		Span original = dragOriginalSpan;
+		if (original == null) {
+			return;
+		}
 		double deltaMs = (x - dragStartX) * msPerPixel();
 		Span proposed = switch (dragMode) {
-			case MOVE -> new Span(dragOriginalSpan.start() + deltaMs, dragOriginalSpan.end() + deltaMs);
-			case RESIZE_LEFT -> new Span(Math.min(dragOriginalSpan.end() - minItemDurationMs,
-					dragOriginalSpan.start() + deltaMs), dragOriginalSpan.end());
-			case RESIZE_RIGHT -> new Span(dragOriginalSpan.start(),
-					Math.max(dragOriginalSpan.start() + minItemDurationMs,
-							dragOriginalSpan.end() + deltaMs));
-			case NONE -> dragOriginalSpan;
+			case MOVE -> new Span(original.start() + deltaMs, original.end() + deltaMs);
+			case RESIZE_LEFT -> new Span(Math.min(original.end() - minItemDurationMs,
+					original.start() + deltaMs), original.end());
+			case RESIZE_RIGHT -> new Span(original.start(),
+					Math.max(original.start() + minItemDurationMs, original.end() + deltaMs));
+			case NONE -> original;
 		};
 		if (dragMode != DragMode.MOVE) {
 			proposed = ClipPresentation.snapRegionSpan(proposed, snapTargets(dragItemId),
@@ -792,7 +793,10 @@ public final class TimelineView extends Region {
 		if (dragMode != DragMode.NONE) {
 			if (dragged && dragLiveSpan != null && dragItemId != null) {
 				if (dragMode == DragMode.MOVE) {
-					commands.move(dragItemId, dragRowId, dragLiveSpan);
+					String rowId = dragRowId;
+					if (rowId != null) {
+						commands.move(dragItemId, rowId, dragLiveSpan);
+					}
 				} else {
 					commands.resizeEnd(dragItemId, dragLiveSpan);
 				}
@@ -1212,13 +1216,16 @@ public final class TimelineView extends Region {
 			}
 			return;
 		}
-		if (agentOverlay == null) {
-			agentOverlay = new AgentTimelineHighlights();
-			agentOverlay.setMouseTransparent(true);
-			agentOverlay.setPickOnBounds(false);
-			getChildren().add(agentOverlay);
+		AgentTimelineHighlights overlay = agentOverlay;
+		if (overlay == null) {
+			overlay = new AgentTimelineHighlights();
+			overlay.setMouseTransparent(true);
+			overlay.setPickOnBounds(false);
+			agentOverlay = overlay;
+			getChildren().add(overlay);
 		}
-		agentOverlay.timeAxis(new AgentTimelineHighlights.TimeAxis() {
+		final AgentTimelineHighlights mounted = overlay;
+		mounted.timeAxis(new AgentTimelineHighlights.TimeAxis() {
 			@Override
 			public double xForMs(double timeMs) {
 				return xForTime(timeMs);
@@ -1229,13 +1236,13 @@ public final class TimelineView extends Region {
 				return msPerPixel() <= 0 ? 0 : durationMs / msPerPixel();
 			}
 		});
-		agentOverlay.range((long) range.start(), (long) range.end());
+		mounted.range((long) range.start(), (long) range.end());
 		agentHighlightsListener = change -> {
-			agentOverlay.range((long) range.start(), (long) range.end());
-			agentOverlay.setHighlights(controller.highlights());
+			mounted.range((long) range.start(), (long) range.end());
+			mounted.setHighlights(controller.highlights());
 		};
 		controller.highlights().addListener(agentHighlightsListener);
-		agentOverlay.setHighlights(controller.highlights());
+		mounted.setHighlights(controller.highlights());
 		requestLayout();
 	}
 
@@ -1323,7 +1330,7 @@ public final class TimelineView extends Region {
 	}
 
 	/** Height of one row in view-local pixels, or -1 when the row does not exist. */
-	public @Nullable double rowHeight(String rowId) {
+	public double rowHeight(String rowId) {
 		RowLayout row = rowById(rowId);
 		return row == null ? -1 : row.height();
 	}
@@ -1973,7 +1980,7 @@ public final class TimelineView extends Region {
 		if (item.audioPath() == null) {
 			return;
 		}
-		float[] peaks = dataSource.waveforms().peaks(item.audioPath(), WAVEFORM_BARS);
+		float @Nullable [] peaks = dataSource.waveforms().peaks(item.audioPath(), WAVEFORM_BARS);
 		if (peaks == null || peaks.length == 0) {
 			return;
 		}

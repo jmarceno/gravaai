@@ -17,8 +17,6 @@ import dev.gravaai.core.project.Clips;
  * <p>The hook also seeks playback on select/add; seeking belongs to the media layer (plan §5.9),
  * so the commands only change the store state and selection (recorded narrowing).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionCommands {
 
 	public static final String SECTION_CAPTION = "caption";

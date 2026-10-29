@@ -1,7 +1,5 @@
 package dev.gravaai.media.compose;
 
-import org.jspecify.annotations.Nullable;
-
 /**
  * Crop region as fractions of the source frame (port of the {@code CropRegion} type in
  * {@code src/components/video-editor/types.ts} and {@code dev.gravaai.core.project.CropRegion}).
@@ -11,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * @param width cropped width fraction, 0-1
  * @param height cropped height fraction, 0-1
  */
-public record LayoutCrop(@Nullable double x, @Nullable double y, double width, double height) {
+public record LayoutCrop(double x, double y, double width, double height) {
 
 	/** No crop: the whole frame. */
 	public static final LayoutCrop FULL = new LayoutCrop(0, 0, 1, 1);

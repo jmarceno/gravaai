@@ -11,7 +11,7 @@ import java.util.List;
  */
 public record MeetingContext(
 		String transcript,
-		String language,
+		@Nullable String language,
 		@Nullable Long durationMs,
 		@Nullable String videoPath,
 		List<MeetingVisual> visuals) {
@@ -20,7 +20,8 @@ public record MeetingContext(
 	public record MeetingVisual(long atMs, String imagePath, String ocrText) {
 	}
 
-	public static MeetingContext text(String transcript, String language, Long durationMs) {
+	public static MeetingContext text(String transcript, @Nullable String language,
+			@Nullable Long durationMs) {
 		return new MeetingContext(transcript, language, durationMs, null, List.of());
 	}
 }

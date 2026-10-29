@@ -1,16 +1,17 @@
 package dev.gravaai.services.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.AnnotationTextStyle;
 import dev.gravaai.services.agent.AgentOpReader.StyleInput;
 
 /** Maps the agent's text-style input onto the core annotation style (defaults from EditorDefaults). */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AgentTextStyles {
 
 	private AgentTextStyles() {}
 
-	static AnnotationTextStyle apply(StyleInput input) {
+	/** {@code input} is null when the op omits the style block (the defaults apply unchanged). */
+	static AnnotationTextStyle apply(@Nullable StyleInput input) {
 		AnnotationTextStyle style = AnnotationTextStyle.defaultStyle();
 		if (input == null) {
 			return style;

@@ -85,7 +85,7 @@ public final class DashboardLibraryFilters {
 	 * @param folder the active project folder, or {@code null} for the Projects library
 	 */
 	public static List<ProjectLibraryEntry> visible(List<ProjectLibraryEntry> entries, String query,
-			Period period, Sort sort, ProjectFolder folder, long now) {
+			Period period, Sort sort, @Nullable ProjectFolder folder, long now) {
 		long cutoff = cutoffMillis(period, now);
 		String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.getDefault());
 		List<ProjectLibraryEntry> visible = new ArrayList<>();
@@ -118,7 +118,7 @@ public final class DashboardLibraryFilters {
 	}
 
 	/** Port of {@code hasActiveFilters}: a search, a time filter or a selected folder. */
-	public static @Nullable boolean hasActiveFilters(String query, Period period, List<ProjectFolder> folders,
+	public static boolean hasActiveFilters(String query, Period period, List<ProjectFolder> folders,
 			DashboardSection section) {
 		boolean folderSelected = section instanceof DashboardSection.Folder folder
 				&& folders.stream().anyMatch(candidate -> candidate.id().equals(folder.id()));

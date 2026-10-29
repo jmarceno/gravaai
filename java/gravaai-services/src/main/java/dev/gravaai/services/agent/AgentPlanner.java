@@ -54,8 +54,6 @@ import tools.jackson.databind.node.ObjectNode;
  * state untouched and names the failing op index. The app's EditorPort executes the resulting state
  * (through its core {@code EditorStore} commands).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentPlanner {
 
 	/** What the pure core cannot know: source length, cursor telemetry, id counters. */
@@ -218,20 +216,21 @@ public final class AgentPlanner {
 
 	private record Span(long startMs, long endMs) {}
 
-	private static void push(Draft draft, Highlight.Kind kind, @Nullable long startMs, @Nullable long endMs,
+	private static void push(Draft draft, Highlight.Kind kind, long startMs, long endMs,
 			String label) {
 		draft.highlights.add(new Highlight(kind, startMs, endMs, label));
 	}
 
-	private static void fail(String message) {
-		throw new OpError(message);
+	/** Builds the validation error; call sites always {@code throw} it. */
+	private static OpError fail(String message) {
+		return new OpError(message);
 	}
 
 	private static long toMs(double seconds) {
 		return Math.round(seconds * 1000);
 	}
 
-	private static double speedOf(@Nullable ClipRegion clip) {
+	private static double speedOf(ClipRegion clip) {
 		return Double.isFinite(clip.speed()) && clip.speed() > 0 ? clip.speed() : 1;
 	}
 
@@ -277,7 +276,7 @@ public final class AgentPlanner {
 		return null;
 	}
 
-	private static @Nullable long sourceToTimelineMs(long sourceMs, ClipRegion clip) {
+	private static long sourceToTimelineMs(long sourceMs, ClipRegion clip) {
 		return Math.round(clip.startMs() + (sourceMs - Clips.getClipSourceStartMs(clip))
 				/ speedOf(clip));
 	}
@@ -286,15 +285,21 @@ public final class AgentPlanner {
 			List<ClipRegion> after) {
 		ClipRegion startClip = clipForSource(startSourceMs, after, true);
 		ClipRegion endClip = clipForSource(endSourceMs, after, false);
-		if (startClip == null && endClip == null) {
-			return null;
+		if (startClip == null) {
+			if (endClip == null) {
+				return null;
+			}
+			return spanBetween(endClip.startMs(), sourceToTimelineMs(endSourceMs, endClip));
 		}
-		long startMs = startClip != null ? sourceToTimelineMs(startSourceMs, startClip)
-				: endClip.startMs();
-		long endMs = endClip != null ? sourceToTimelineMs(endSourceMs, endClip)
-				: startClip.endMs();
-		long lo = Math.min(startMs, endMs);
-		long hi = Math.max(startMs, endMs);
+		long startMs = sourceToTimelineMs(startSourceMs, startClip);
+		long endMs = endClip == null ? startClip.endMs()
+				: sourceToTimelineMs(endSourceMs, endClip);
+		return spanBetween(startMs, endMs);
+	}
+
+	private static @Nullable Span spanBetween(long firstMs, long secondMs) {
+		long lo = Math.min(firstMs, secondMs);
+		long hi = Math.max(firstMs, secondMs);
 		return hi > lo ? new Span(lo, hi) : null;
 	}
 
@@ -512,7 +517,7 @@ public final class AgentPlanner {
 		List<ClipRegion> next = TranscriptCut.removeSourceRangesFromClips(before, ranges,
 				() -> draft.ctx.createId().apply(IdKind.CLIP));
 		if (next == before) {
-			fail("nothing to cut at " + AgentIds.formatSeconds(fromMs) + "–"
+			throw fail("nothing to cut at " + AgentIds.formatSeconds(fromMs) + "–"
 					+ AgentIds.formatSeconds(toMs) + "s; the edited timeline is 0.00–"
 					+ AgentIds.formatSeconds(clipsEndMs(before)) + "s");
 		}
@@ -525,7 +530,7 @@ public final class AgentPlanner {
 	private static long restoreSourceRanges(Draft draft, List<TranscriptCut.SourceRange> ranges) {
 		List<TranscriptCut.SourceRange> merged = TranscriptCut.mergeSourceRanges(ranges);
 		if (merged.isEmpty()) {
-			fail("nothing to restore");
+			throw fail("nothing to restore");
 		}
 		List<ClipRegion> clips = new ArrayList<>(draft.state.clipRegions());
 		clips.sort(Comparator.comparingLong(ClipRegion::startMs));
@@ -549,7 +554,7 @@ public final class AgentPlanner {
 			}
 			ClipRegion target = tail != null ? tail : head;
 			if (target == null) {
-				fail("cannot restore " + AgentIds.formatSeconds(range.startMs()) + "–"
+				throw fail("cannot restore " + AgentIds.formatSeconds(range.startMs()) + "–"
 						+ AgentIds.formatSeconds(range.endMs()) + "s: no cut borders that footage");
 			}
 			long growthMs = Math.max(1,
@@ -642,7 +647,7 @@ public final class AgentPlanner {
 			}
 			if (startMs < candidate.endMs() && endMs > candidate.startMs()) {
 				String shortId = shortById.get(id);
-				fail(label + " overlaps " + (shortId == null ? "another region" : shortId) + " ("
+				throw fail(label + " overlaps " + (shortId == null ? "another region" : shortId) + " ("
 						+ AgentIds.formatSeconds(startMs) + "–"
 						+ AgentIds.formatSeconds(endMs) + "s); update it or delete it first");
 			}
@@ -654,7 +659,7 @@ public final class AgentPlanner {
 		long start = Math.max(0, Math.min(startMs, duration - 1));
 		long end = Math.max(start + 1, Math.min(endMs, duration));
 		if (startMs > duration) {
-			fail(AgentIds.formatSeconds(startMs) + "s is past the end of the edited timeline ("
+			throw fail(AgentIds.formatSeconds(startMs) + "s is past the end of the edited timeline ("
 					+ AgentIds.formatSeconds(duration) + "s)");
 		}
 		return new Span(start, end);
@@ -711,7 +716,7 @@ public final class AgentPlanner {
 			String key = draft.ids.wordKeyByShort().get(shortId.trim());
 			AgentTranscript.Word word = key == null ? null : draft.wordByKey.get(key);
 			if (word == null) {
-				fail(shortId + " is not a transcript word (" + draft.words.size() + " words)");
+				throw fail(shortId + " is not a transcript word (" + draft.words.size() + " words)");
 			}
 			words.add(word);
 		}
@@ -721,11 +726,11 @@ public final class AgentPlanner {
 	private static long applyCutWords(Draft draft, List<AgentTranscript.Word> words,
 			Set<String> keys, String label) {
 		if (keys.isEmpty()) {
-			fail(label + ": no matching words in the transcript");
+			throw fail(label + ": no matching words in the transcript");
 		}
 		List<AgentTranscript.Range> ranges = AgentTranscript.wordsToCutRanges(words, keys);
 		if (ranges.isEmpty()) {
-			fail(label + ": nothing to cut");
+			throw fail(label + ": nothing to cut");
 		}
 		List<ClipRegion> before = draft.state.clipRegions();
 		List<TranscriptCut.SourceRange> coreRanges = ranges.stream()
@@ -734,7 +739,7 @@ public final class AgentPlanner {
 		List<ClipRegion> next = TranscriptCut.removeSourceRangesFromClips(before, coreRanges,
 				() -> draft.ctx.createId().apply(IdKind.CLIP));
 		if (next == before) {
-			fail(label + ": that footage is already cut");
+			throw fail(label + ": that footage is already cut");
 		}
 		long removedMs = Math.max(0, clipsEndMs(before) - clipsEndMs(
 				ClipSequence.packClipSequence(next)));
@@ -816,22 +821,22 @@ public final class AgentPlanner {
 			case "delete_caption" -> deleteCaption(draft, raw);
 			case "captions_style" -> captionsStyle(draft, raw);
 			case "set" -> setSettings(draft, raw);
-			default -> fail("unknown op \"" + op + "\"; call inspect help for the op list");
+			default -> throw fail("unknown op \"" + op + "\"; call inspect help for the op list");
 		}
 	}
 
 	// Clip ops ------------------------------------------------------------------------------
 
-	private static @Nullable ClipRegion findClip(Draft draft, String shortId) {
+	private static ClipRegion findClip(Draft draft, String shortId) {
 		String id = draft.ids.clipIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found; clips: "
+			throw fail(shortId + " not found; clips: "
 					+ AgentIds.describeShorts(draft.ids.clipIds(), "c"));
 		}
 		ClipRegion clip = draft.state.clipRegions().stream()
 				.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
 		if (clip == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		return clip;
 	}
@@ -856,13 +861,13 @@ public final class AgentPlanner {
 					durationMs));
 		}
 		if (removeRanges.isEmpty()) {
-			fail("keep already covers the whole timeline; nothing to remove");
+			throw fail("keep already covers the whole timeline; nothing to remove");
 		}
 		List<ClipRegion> before = draft.state.clipRegions();
 		List<ClipRegion> next = TranscriptCut.removeSourceRangesFromClips(before, removeRanges,
 				() -> draft.ctx.createId().apply(IdKind.CLIP));
 		if (next == before) {
-			fail("keep would remove all footage");
+			throw fail("keep would remove all footage");
 		}
 		long removedMs = Math.max(0, clipsEndMs(before) - clipsEndMs(
 				ClipSequence.packClipSequence(next)));
@@ -877,7 +882,7 @@ public final class AgentPlanner {
 		ClipSplits.Plan plan = ClipSplits.planClipSplit(draft.state.clipRegions(), atMs,
 				() -> draft.ctx.createId().apply(IdKind.CLIP));
 		if (plan == null) {
-			fail("nothing to split at " + AgentIds.formatSeconds(atMs)
+			throw fail("nothing to split at " + AgentIds.formatSeconds(atMs)
 					+ "s; the split must fall inside a clip (0.00–"
 					+ AgentIds.formatSeconds(timelineDurationMs(draft)) + "s)");
 		}
@@ -902,7 +907,7 @@ public final class AgentPlanner {
 		String shortId = AgentOpReader.string(raw, "id");
 		ClipRegion clip = findClip(draft, shortId);
 		if (draft.state.clipRegions().size() == 1) {
-			fail("cannot delete the only clip; use cut to trim it instead");
+			throw fail("cannot delete the only clip; use cut to trim it instead");
 		}
 		commitClipSequence(draft, draft.state.clipRegions().stream()
 				.filter(candidate -> !candidate.id().equals(clip.id())).toList());
@@ -924,7 +929,7 @@ public final class AgentPlanner {
 		ClipRegion clip = findClip(draft, shortId);
 		Double speed = AgentOpReader.optionalNumber(raw, "speed");
 		if (speed != null && speed <= 0) {
-			fail("\"speed\" must be greater than 0");
+			throw fail("\"speed\" must be greater than 0");
 		}
 		Boolean muted = AgentOpReader.optionalBoolean(raw, "muted");
 		dev.gravaai.core.project.ClipCameraLayout cameraLayout = AgentOpReader
@@ -983,17 +988,17 @@ public final class AgentPlanner {
 		Double start = AgentOpReader.optionalNumber(raw, "start");
 		Double end = AgentOpReader.optionalNumber(raw, "end");
 		if (start == null && end == null) {
-			fail("trim_clip needs \"start\" and/or \"end\"");
+			throw fail("trim_clip needs \"start\" and/or \"end\"");
 		}
 		long startMs = start != null ? toMs(start) : clip.startMs();
 		long endMs = end != null ? toMs(end) : clip.endMs();
 		if (endMs <= startMs) {
-			fail("\"end\" must be after \"start\"");
+			throw fail("\"end\" must be after \"start\"");
 		}
 		ClipRegion trimmed = ClipSpanChanges.changeClipSpan(clip, startMs, endMs,
 				sourceDurationMs(draft));
 		if (trimmed.startMs() == clip.startMs() && trimmed.endMs() == clip.endMs()) {
-			fail(shortId + " already spans " + AgentIds.formatSeconds(startMs) + "–"
+			throw fail(shortId + " already spans " + AgentIds.formatSeconds(startMs) + "–"
 					+ AgentIds.formatSeconds(endMs) + "s");
 		}
 		commitClipSequence(draft, draft.state.clipRegions().stream()
@@ -1009,14 +1014,14 @@ public final class AgentPlanner {
 
 	private static void cutWords(Draft draft, ObjectNode raw) {
 		if (draft.words.isEmpty()) {
-			fail("no transcript yet; run job transcribe first");
+			throw fail("no transcript yet; run job transcribe first");
 		}
 		List<String> ids = raw.path("ids").isMissingNode() || raw.path("ids").isNull() ? null
 				: AgentOpReader.readStringArray(raw, "ids");
 		String text = AgentOpReader.optionalString(raw, "text");
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
 		if (ids == null && text == null && !Boolean.TRUE.equals(all)) {
-			fail("cut_words needs \"ids\", \"text\" or \"all\": true");
+			throw fail("cut_words needs \"ids\", \"text\" or \"all\": true");
 		}
 		Set<String> keys;
 		if (Boolean.TRUE.equals(all)) {
@@ -1025,6 +1030,9 @@ public final class AgentPlanner {
 			keys = new LinkedHashSet<>(wordsForIds(draft, ids).stream()
 					.map(AgentTranscript.Word::key).toList());
 		} else {
+			if (text == null) {
+				throw fail("cut_words needs \"ids\", \"text\" or \"all\": true");
+			}
 			keys = selectWordsByPhrase(draft.words, text);
 		}
 		long removedMs = applyCutWords(draft, draft.words, keys, "cut_words");
@@ -1050,7 +1058,7 @@ public final class AgentPlanner {
 
 	private static void cutFillers(Draft draft, ObjectNode raw) {
 		if (draft.words.isEmpty()) {
-			fail("no transcript yet; run job transcribe first");
+			throw fail("no transcript yet; run job transcribe first");
 		}
 		String lang = AgentOpReader.optionalString(raw, "lang");
 		if (lang == null) {
@@ -1069,17 +1077,17 @@ public final class AgentPlanner {
 
 	private static void cutPauses(Draft draft, ObjectNode raw) {
 		if (draft.words.size() < 2) {
-			fail("cut_pauses needs a transcript with at least two words");
+			throw fail("cut_pauses needs a transcript with at least two words");
 		}
 		Double min = AgentOpReader.optionalNumber(raw, "min");
 		Double keep = AgentOpReader.optionalNumber(raw, "keep");
 		double minSeconds = min == null ? 1 : min;
 		double keepSeconds = keep == null ? 0.25 : keep;
 		if (minSeconds <= 0) {
-			fail("\"min\" must be greater than 0");
+			throw fail("\"min\" must be greater than 0");
 		}
 		if (keepSeconds < 0 || keepSeconds >= minSeconds) {
-			fail("\"keep\" must be >= 0 and smaller than \"min\"");
+			throw fail("\"keep\" must be >= 0 and smaller than \"min\"");
 		}
 		long minMs = Math.round(minSeconds * 1000);
 		long keepMs = Math.round(keepSeconds * 1000);
@@ -1120,7 +1128,7 @@ public final class AgentPlanner {
 		List<ClipRegion> next = TranscriptCut.removeSourceRangesFromClips(before, ranges,
 				() -> draft.ctx.createId().apply(IdKind.CLIP));
 		if (next == before) {
-			fail("nothing to cut at " + AgentIds.formatSeconds(toMs(range[0])) + "–"
+			throw fail("nothing to cut at " + AgentIds.formatSeconds(toMs(range[0])) + "–"
 					+ AgentIds.formatSeconds(toMs(range[1])) + "s of the recording");
 		}
 		long removedMs = Math.max(0, clipsEndMs(before) - clipsEndMs(
@@ -1157,7 +1165,7 @@ public final class AgentPlanner {
 				: draft.state.zoomRegions().stream()
 						.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
 		if (zoom == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		Double from = AgentOpReader.optionalNumber(raw, "from");
 		Double to = AgentOpReader.optionalNumber(raw, "to");
@@ -1169,7 +1177,7 @@ public final class AgentPlanner {
 				depth == null ? zoom.depth() : depth, focus == null ? zoom.focus() : focus,
 				zoom.mode());
 		if (next.endMs() <= next.startMs()) {
-			fail("\"to\" must be after \"from\"");
+			throw fail("\"to\" must be after \"from\"");
 		}
 		assertSpanFree(draft.state.zoomRegions(),
 				new Span(next.startMs(), next.endMs()), draft.ids.zoomShortById(), "zoom",
@@ -1182,19 +1190,19 @@ public final class AgentPlanner {
 
 	private static void deleteZoom(Draft draft, ObjectNode raw) {
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
-		String shortId = AgentOpReader.optionalString(raw, "id");
-		if (!Boolean.TRUE.equals(all) && (shortId == null || shortId.isBlank())) {
-			fail("delete_zoom needs \"id\" or \"all\": true");
-		}
 		if (Boolean.TRUE.equals(all)) {
 			int count = draft.state.zoomRegions().size();
 			draft.state = draft.state.toBuilder().zoomRegions(List.of()).build();
 			draft.summary.add("deleted " + count + " zooms");
 			return;
 		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_zoom needs \"id\" or \"all\": true");
+		}
 		String id = draft.ids.zoomIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().zoomRegions(draft.state.zoomRegions().stream()
 						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
@@ -1228,7 +1236,7 @@ public final class AgentPlanner {
 								: "auto_zoom found no click clusters";
 				default -> "auto_zoom found no click clusters";
 			};
-			fail(message);
+			throw fail(message);
 		}
 		List<ClipRegion> clips = draft.state.clipRegions();
 		long fromMs = from == null ? 0 : toMs(from);
@@ -1252,9 +1260,9 @@ public final class AgentPlanner {
 		}
 		if (zooms.isEmpty()) {
 			if (Boolean.TRUE.equals(replace) && from == null && to == null) {
-				fail("auto_zoom found no click clusters");
+				throw fail("auto_zoom found no click clusters");
 			}
-			fail("auto_zoom found no clicks inside the given range");
+			throw fail("auto_zoom found no clicks inside the given range");
 		}
 		List<ZoomRegion> next = Boolean.TRUE.equals(replace) ? zooms
 				: new ArrayList<>(draft.state.zoomRegions()) {{
@@ -1286,18 +1294,18 @@ public final class AgentPlanner {
 
 	private static void deleteSpeed(Draft draft, ObjectNode raw) {
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
-		String shortId = AgentOpReader.optionalString(raw, "id");
-		if (!Boolean.TRUE.equals(all) && (shortId == null || shortId.isBlank())) {
-			fail("delete_speed needs \"id\" or \"all\": true");
-		}
 		if (Boolean.TRUE.equals(all)) {
 			draft.state = draft.state.toBuilder().speedRegions(List.of()).build();
 			draft.summary.add("deleted all speed regions");
 			return;
 		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_speed needs \"id\" or \"all\": true");
+		}
 		String id = draft.ids.speedIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().speedRegions(draft.state.speedRegions().stream()
 						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
@@ -1318,33 +1326,33 @@ public final class AgentPlanner {
 			AnnotationTextStyle resolved = AgentTextStyles.apply(style);
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.TEXT, text, text, null, annotationPosition(geometry),
-					annotationSize(geometry), resolved, zIndex, null, null, null, null);
+					annotationSize(geometry), resolved, zIndex, 0, null, null, null);
 		} else if ("image".equals(op)) {
 			String path = AgentOpReader.string(raw, "path");
 			String imageContent = raw.path("imageContent").isString()
 					? raw.path("imageContent").asString()
 					: null;
 			if (imageContent == null) {
-				fail("could not read image \"" + path
+				throw fail("could not read image \"" + path
 						+ "\" (the editor loads it before applying)");
 			}
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.IMAGE, imageContent, null, imageContent,
 					annotationPosition(geometry), annotationSize(geometry),
-					AnnotationTextStyle.defaultStyle(), zIndex, null, null, null, null);
+					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null);
 		} else if ("figure".equals(op)) {
-			ArrowDirection arrow = AgentOpReader.readArrow(raw, true);
+			ArrowDirection arrow = AgentOpReader.readArrow(raw);
 			String color = AgentOpReader.optionalString(raw, "color");
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.FIGURE, "", null, null, annotationPosition(geometry),
-					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, null,
+					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
 					new FigureData(arrow, color == null ? FigureData.DEFAULT.color() : color,
 							FigureData.DEFAULT.strokeWidth()),
 					null, null);
 		} else {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.BLUR, "", null, null, annotationPosition(geometry),
-					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, null,
+					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
 					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null);
 		}
 		List<AnnotationRegion> annotations = new ArrayList<>(draft.state.annotationRegions());
@@ -1363,29 +1371,29 @@ public final class AgentPlanner {
 				: draft.state.annotationRegions().stream()
 						.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
 		if (annotation == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		Double from = AgentOpReader.optionalNumber(raw, "from");
 		Double to = AgentOpReader.optionalNumber(raw, "to");
 		long startMs = from == null ? annotation.startMs() : toMs(from);
 		long endMs = to == null ? annotation.endMs() : toMs(to);
 		if (endMs <= startMs) {
-			fail("\"to\" must be after \"from\"");
+			throw fail("\"to\" must be after \"from\"");
 		}
 		Double x = AgentOpReader.readFraction(raw, "x");
 		Double y = AgentOpReader.readFraction(raw, "y");
 		Double w = AgentOpReader.readFraction(raw, "w");
 		Double h = AgentOpReader.readFraction(raw, "h");
-		double centreX = x == null ? (annotation.position().x()
-				+ annotation.size().width() / 2) / 100 : x;
-		double centreY = y == null ? (annotation.position().y()
-				+ annotation.size().height() / 2) / 100 : y;
-		double width = w == null ? annotation.size().width() / 100 : w;
-		double height = h == null ? annotation.size().height() / 100 : h;
+		AnnotationPosition position = annotation.position();
+		AnnotationSize size = annotation.size();
+		double centreX = x == null ? (position.x() + size.width() / 2) / 100 : x;
+		double centreY = y == null ? (position.y() + size.height() / 2) / 100 : y;
+		double width = w == null ? size.width() / 100 : w;
+		double height = h == null ? size.height() / 100 : h;
 		Geometry geometry = new Geometry(centreX, centreY, width, height);
 		String text = AgentOpReader.optionalString(raw, "text");
 		String color = AgentOpReader.optionalString(raw, "color");
-		ArrowDirection arrow = AgentOpReader.readArrow(raw, false);
+		ArrowDirection arrow = AgentOpReader.readOptionalArrow(raw);
 		AnnotationTextStyle style = annotation.style();
 		if (color != null) {
 			style = new AnnotationTextStyle(color, style.backgroundColor(), style.fontSize(),
@@ -1415,18 +1423,18 @@ public final class AgentPlanner {
 
 	private static void deleteAnnotation(Draft draft, ObjectNode raw) {
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
-		String shortId = AgentOpReader.optionalString(raw, "id");
-		if (!Boolean.TRUE.equals(all) && (shortId == null || shortId.isBlank())) {
-			fail("delete_annotation needs \"id\" or \"all\": true");
-		}
 		if (Boolean.TRUE.equals(all)) {
 			draft.state = draft.state.toBuilder().annotationRegions(List.of()).build();
 			draft.summary.add("deleted all annotations");
 			return;
 		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_annotation needs \"id\" or \"all\": true");
+		}
 		String id = draft.ids.annotationIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().annotationRegions(draft.state.annotationRegions().stream()
 						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
@@ -1437,16 +1445,16 @@ public final class AgentPlanner {
 		double at = AgentOpReader.number(raw, "at");
 		double to = AgentOpReader.number(raw, "to");
 		if (to <= at) {
-			fail("\"to\" must be greater than \"at\"");
+			throw fail("\"to\" must be greater than \"at\"");
 		}
 		Double volume = AgentOpReader.optionalNumber(raw, "volume");
 		if (volume != null && (volume < 0 || volume > 1)) {
-			fail("\"volume\" must be between 0 and 1");
+			throw fail("\"volume\" must be between 0 and 1");
 		}
 		String path = AgentOpReader.string(raw, "path");
 		String id = draft.ctx.createId().apply(IdKind.AUDIO);
 		AudioRegion region = new AudioRegion(id, toMs(at), toMs(to), path,
-				volume == null ? 1 : volume, null, null);
+				volume == null ? 1 : volume, false, 0);
 		List<AudioRegion> regions = new ArrayList<>(draft.state.audioRegions());
 		regions.add(region);
 		draft.state = draft.state.toBuilder().audioRegions(regions).build();
@@ -1462,18 +1470,18 @@ public final class AgentPlanner {
 				: draft.state.audioRegions().stream()
 						.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
 		if (region == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		Double at = AgentOpReader.optionalNumber(raw, "at");
 		Double to = AgentOpReader.optionalNumber(raw, "to");
 		Double volume = AgentOpReader.optionalNumber(raw, "volume");
 		if (volume != null && (volume < 0 || volume > 1)) {
-			fail("\"volume\" must be between 0 and 1");
+			throw fail("\"volume\" must be between 0 and 1");
 		}
 		long startMs = at == null ? region.startMs() : toMs(at);
 		long endMs = to == null ? region.endMs() : toMs(to);
 		if (endMs <= startMs) {
-			fail("\"to\" must be greater than \"at\"");
+			throw fail("\"to\" must be greater than \"at\"");
 		}
 		AudioRegion next = new AudioRegion(region.id(), startMs, endMs, region.audioPath(),
 				volume == null ? region.volume() : volume, region.normalize(),
@@ -1486,18 +1494,18 @@ public final class AgentPlanner {
 
 	private static void deleteAudio(Draft draft, ObjectNode raw) {
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
-		String shortId = AgentOpReader.optionalString(raw, "id");
-		if (!Boolean.TRUE.equals(all) && (shortId == null || shortId.isBlank())) {
-			fail("delete_audio needs \"id\" or \"all\": true");
-		}
 		if (Boolean.TRUE.equals(all)) {
 			draft.state = draft.state.toBuilder().audioRegions(List.of()).build();
 			draft.summary.add("deleted all audio regions");
 			return;
 		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_audio needs \"id\" or \"all\": true");
+		}
 		String id = draft.ids.audioIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().audioRegions(draft.state.audioRegions().stream()
 						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
@@ -1509,10 +1517,10 @@ public final class AgentPlanner {
 		Boolean muted = AgentOpReader.optionalBoolean(raw, "muted");
 		Double volume = AgentOpReader.optionalNumber(raw, "volume");
 		if (muted == null && volume == null) {
-			fail("source_audio needs \"muted\" and/or \"volume\"");
+			throw fail("source_audio needs \"muted\" and/or \"volume\"");
 		}
 		if (volume != null && (volume < 0 || volume > 2)) {
-			fail("\"volume\" must be between 0 and 2");
+			throw fail("\"volume\" must be between 0 and 2");
 		}
 		List<String> clipIds = new ArrayList<>();
 		if (clipShort != null) {
@@ -1524,7 +1532,7 @@ public final class AgentPlanner {
 			draft.state.clipRegions().forEach(clip -> clipIds.add(clip.id()));
 		}
 		if (clipIds.isEmpty()) {
-			fail(clipShort + " not found");
+			throw fail(clipShort + " not found");
 		}
 		if (muted != null) {
 			draft.state = draft.state.toBuilder().clipRegions(draft.state.clipRegions().stream()
@@ -1599,7 +1607,7 @@ public final class AgentPlanner {
 				: draft.state.autoCaptions().stream()
 						.filter(cue -> cue.id().equals(id)).findFirst().orElse(null);
 		if (existing == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		Double from = AgentOpReader.optionalNumber(raw, "from");
 		Double to = AgentOpReader.optionalNumber(raw, "to");
@@ -1630,13 +1638,13 @@ public final class AgentPlanner {
 		String shortId = AgentOpReader.string(raw, "id");
 		String id = draft.ids.cueIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		int before = draft.state.autoCaptions().size();
 		List<CaptionCue> cues = CaptionOps.splitCue(draft.state.autoCaptions(), id,
 				toMs(AgentOpReader.number(raw, "at")));
 		if (cues.size() == before) {
-			fail(shortId + " has too few words to split");
+			throw fail(shortId + " has too few words to split");
 		}
 		draft.state = draft.state.toBuilder().autoCaptions(cues).build();
 		draft.summary.add("split " + shortId);
@@ -1648,12 +1656,12 @@ public final class AgentPlanner {
 		String a = draft.ids.cueIdByShort().get(aShort.trim());
 		String b = draft.ids.cueIdByShort().get(bShort.trim());
 		if (a == null || b == null) {
-			fail((a == null ? aShort : bShort) + " not found");
+			throw fail((a == null ? aShort : bShort) + " not found");
 		}
 		int before = draft.state.autoCaptions().size();
 		List<CaptionCue> cues = CaptionOps.mergeCues(draft.state.autoCaptions(), a, b);
 		if (cues.size() == before) {
-			fail("merge_captions needs two adjacent cues");
+			throw fail("merge_captions needs two adjacent cues");
 		}
 		draft.state = draft.state.toBuilder().autoCaptions(cues).build();
 		draft.summary.add("merged " + aShort + " into " + bShort);
@@ -1661,18 +1669,18 @@ public final class AgentPlanner {
 
 	private static void deleteCaption(Draft draft, ObjectNode raw) {
 		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
-		String shortId = AgentOpReader.optionalString(raw, "id");
-		if (!Boolean.TRUE.equals(all) && (shortId == null || shortId.isBlank())) {
-			fail("delete_caption needs \"id\" or \"all\": true");
-		}
 		if (Boolean.TRUE.equals(all)) {
 			draft.state = draft.state.toBuilder().autoCaptions(List.of()).build();
 			draft.summary.add("deleted all captions");
 			return;
 		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_caption needs \"id\" or \"all\": true");
+		}
 		String id = draft.ids.cueIdByShort().get(shortId.trim());
 		if (id == null) {
-			fail(shortId + " not found");
+			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().autoCaptions(CaptionOps.deleteCue(draft.state.autoCaptions(), id)).build();
 		draft.summary.add("deleted " + shortId);

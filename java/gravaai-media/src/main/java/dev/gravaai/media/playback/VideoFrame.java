@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -11,23 +13,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * handed to the consumer once the consumer asks for the next one (the documented "valid until the
  * next decode" contract). Consumers must not mutate the pixels.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class VideoFrame {
 
 	private final int width;
 	private final int height;
 	private final long ptsUs;
 	private final ByteBuffer rgbaTopFirst;
-	private final Runnable releaseAction;
+	/** Called once when the owner recycles the buffer; null when the frame has no owner. */
+	private final @Nullable Runnable releaseAction;
 	private final AtomicBoolean released = new AtomicBoolean();
 
 	public VideoFrame(int width, int height, long ptsUs, ByteBuffer rgbaTopFirst) {
 		this(width, height, ptsUs, rgbaTopFirst, null);
 	}
 
+	/**
+	 * @param releaseAction runs once on {@link #release()} when the buffer has an owner, or null
+	 *        when the frame owns an unmanaged buffer
+	 */
 	public VideoFrame(int width, int height, long ptsUs, ByteBuffer rgbaTopFirst,
-			Runnable releaseAction) {
+			@Nullable Runnable releaseAction) {
 		if (width <= 0 || height <= 0) {
 			throw new IllegalArgumentException("invalid frame size: " + width + "x" + height);
 		}

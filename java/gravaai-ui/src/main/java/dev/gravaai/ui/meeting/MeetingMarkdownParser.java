@@ -42,7 +42,7 @@ public final class MeetingMarkdownParser {
 	public record Paragraph(String text) implements Block {
 	}
 
-	@Nullable private MeetingMarkdownParser() {
+	private MeetingMarkdownParser() {
 	}
 
 	/** Port of parseTimestampSeconds: seconds for a leading [HH:MM:SS], else null. */

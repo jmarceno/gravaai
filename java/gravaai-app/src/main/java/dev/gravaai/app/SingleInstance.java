@@ -16,16 +16,17 @@ import java.nio.file.StandardOpenOption;
  * whole life (released by the kernel even when it crashes); a later process finds the lock taken,
  * hands its request to the running app over the control socket and exits.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class SingleInstance {
 
 	/** The running app starts its control socket after the first window is up; wait that long. */
 	private static final long FORWARD_WAIT_MS = 15_000;
 	private static final long FORWARD_RETRY_MS = 250;
 
-	/** Held until the process exits; a static field keeps the lock from being collected. */
-	private static FileLock heldLock;
+	/**
+	 * Held until the process exits (a static field keeps the lock from being collected);
+	 * {@code null} when the lock was not acquired.
+	 */
+	private static @Nullable FileLock heldLock;
 
 	private SingleInstance() {
 	}
@@ -63,7 +64,7 @@ final class SingleInstance {
 	 *
 	 * @return true when the running app accepted it
 	 */
-	static boolean forward(@Nullable String line) {
+	static boolean forward(String line) {
 		Path socketPath = ControlSocket.getControlSocketPath();
 		long deadline = System.currentTimeMillis() + FORWARD_WAIT_MS;
 		while (true) {

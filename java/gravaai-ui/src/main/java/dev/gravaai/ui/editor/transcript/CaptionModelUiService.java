@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Consumer;
 
 /**
@@ -17,13 +19,14 @@ public interface CaptionModelUiService {
 	/**
 	 * One snapshot of the controller state.
 	 *
-	 * @param modelId the selected model id ({@code small}, {@code large-v3-turbo-q5_0}) or null
+	 * @param modelId the selected model id ({@code small}, {@code large-v3-turbo-q5_0}), or null
+	 *     when no model is selected
 	 * @param modelPath the model file used for generation, or null when none is available
 	 * @param downloadStatus the model download state
 	 * @param downloadProgress download percent, 0-100
 	 * @param generating whether captions are being generated
 	 */
-	record State(String modelId, String modelPath, DownloadStatus downloadStatus,
+	record State(@Nullable String modelId, @Nullable String modelPath, DownloadStatus downloadStatus,
 			int downloadProgress, boolean generating) {
 	}
 

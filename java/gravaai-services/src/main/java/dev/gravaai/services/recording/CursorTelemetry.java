@@ -207,6 +207,8 @@ public final class CursorTelemetry {
 	/**
 	 * Recursive-sampling helper: appends one sample and keeps the list bounded to
 	 * {@link #MAX_CURSOR_SAMPLES}.
+	 *
+	 * @param cursorType the current visual, or null when the helper has not reported one
 	 */
 	public static void pushSample(
 			List<CursorTelemetryPoint> samples,
@@ -214,7 +216,7 @@ public final class CursorTelemetry {
 			double cy,
 			double timeMs,
 			CursorInteractionType interactionType,
-			CursorVisualType cursorType) {
+			@Nullable CursorVisualType cursorType) {
 		samples.add(new CursorTelemetryPoint(Math.max(0, timeMs), cx, cy, interactionType, cursorType));
 		if (samples.size() > MAX_CURSOR_SAMPLES) {
 			samples.remove(0);

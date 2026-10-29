@@ -1,5 +1,7 @@
 package dev.gravaai.app.agent;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import dev.gravaai.app.editor.EditorSession;
+import dev.gravaai.app.export.ProjectExporter;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.UserData;
@@ -36,8 +39,6 @@ import tools.jackson.databind.JsonNode;
  * {@link dev.gravaai.services.agent.AgentPlanner} edit batch per intent, offscreen compositor frames,
  * project open/save, and headless export jobs reported through the shared job registry.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentWiring implements AutoCloseable {
 
 	private final AgentService service;
@@ -58,8 +59,10 @@ public final class AgentWiring implements AutoCloseable {
 	 * @param meeting the meeting service, or null until meetings are ready
 	 */
 	public static AgentWiring create(UserData userData, AppSettingsStore settings,
-			Supplier<EditorSession> activeEditor, Supplier<ProjectManager> projects,
-			Supplier<MeetingService> meeting, Supplier<dev.gravaai.app.export.ProjectExporter> exporter,
+			Supplier<@Nullable EditorSession> activeEditor,
+			Supplier<@Nullable ProjectManager> projects,
+			Supplier<@Nullable MeetingService> meeting,
+			Supplier<@Nullable ProjectExporter> exporter,
 			java.util.function.Consumer<Path> openProject, Runnable closeProject) {
 		AgentJobRegistry jobs = new AgentJobRegistry();
 		AgentEditorPort editorPort = new AgentEditorPort(activeEditor, exporter, openProject,
@@ -143,11 +146,11 @@ public final class AgentWiring implements AutoCloseable {
 	/** Library reader used by {@code inspect library} and meeting tools. */
 	private static final class AppLibraryPort implements AgentDispatcher.LibraryPort {
 		private final UserData userData;
-		private final Supplier<ProjectManager> projects;
-		private final Supplier<MeetingService> meeting;
+		private final Supplier<@Nullable ProjectManager> projects;
+		private final Supplier<@Nullable MeetingService> meeting;
 
-		AppLibraryPort(UserData userData, Supplier<ProjectManager> projects,
-				Supplier<MeetingService> meeting) {
+		AppLibraryPort(UserData userData, Supplier<@Nullable ProjectManager> projects,
+				Supplier<@Nullable MeetingService> meeting) {
 			this.userData = userData;
 			this.projects = projects;
 			this.meeting = meeting;
@@ -159,8 +162,12 @@ public final class AgentWiring implements AutoCloseable {
 			if (manager == null) {
 				return List.of();
 			}
+			List<ProjectLibraryEntry> projectEntries = manager.listProjectEntries();
+			if (projectEntries == null) {
+				return List.of();
+			}
 			List<AgentDispatcher.LibraryPort.ProjectEntry> entries = new ArrayList<>();
-			for (ProjectLibraryEntry entry : manager.listProjectEntries()) {
+			for (ProjectLibraryEntry entry : projectEntries) {
 				entries.add(new AgentDispatcher.LibraryPort.ProjectEntry(entry.name(), entry.path(),
 						entry.updatedAt(), Path.of(entry.path())
 								.equals(manager.currentProjectPath())));
@@ -228,9 +235,9 @@ public final class AgentWiring implements AutoCloseable {
 
 	/** Meeting pipeline port over the app's MeetingService. */
 	private static final class AppMeetingPort implements AgentDispatcher.MeetingPort {
-		private final Supplier<MeetingService> meeting;
+		private final Supplier<@Nullable MeetingService> meeting;
 
-		AppMeetingPort(Supplier<MeetingService> meeting) {
+		AppMeetingPort(Supplier<@Nullable MeetingService> meeting) {
 			this.meeting = meeting;
 		}
 

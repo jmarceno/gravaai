@@ -20,18 +20,22 @@ import dev.gravaai.core.project.ProjectEditorState;
  * asset root is passed in, so the app can point at its packaged assets while tests point at
  * {@code public/}. Missing wallpaper assets degrade to black instead of failing a preview frame.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectEditorInputs {
 
 	private static final System.Logger LOG =
 			System.getLogger(ProjectEditorInputs.class.getName());
 
-	@Nullable private ProjectEditorInputs() {
+	private ProjectEditorInputs() {
 	}
 
-	/** Resolves the project wallpaper to a compositor background. */
-	public static @Nullable Background background(ProjectEditorState editor, Path wallpaperRoot) {
+	/**
+	 * Resolves the project wallpaper to a compositor background; every unsupported/missing
+	 * wallpaper degrades to black.
+	 *
+	 * @param wallpaperRoot directory holding {@code wallpapers/}, or null when the caller has no
+	 *        asset root (bundled wallpapers then degrade to black)
+	 */
+	public static Background background(ProjectEditorState editor, @Nullable Path wallpaperRoot) {
 		String wallpaper = editor.wallpaper();
 		if (wallpaper == null || wallpaper.isBlank()) {
 			return Background.black();
@@ -68,9 +72,10 @@ public final class ProjectEditorInputs {
 	 * {@code wallpaperRoot}, a {@code file://} URL or an absolute path. Null for image/CSS
 	 * wallpapers or a missing file.
 	 */
-	public static @Nullable Path videoWallpaperPath(ProjectEditorState editor, Path wallpaperRoot) {
+	public static @Nullable Path videoWallpaperPath(ProjectEditorState editor,
+			@Nullable Path wallpaperRoot) {
 		String wallpaper = editor.wallpaper();
-		if (!Background.isVideoWallpaper(wallpaper)) {
+		if (wallpaper == null || !Background.isVideoWallpaper(wallpaper)) {
 			return null;
 		}
 		try {
@@ -255,20 +260,35 @@ public final class ProjectEditorInputs {
 					continue;
 				}
 				cues.add(new CaptionSpec.Cue(cue.id(), cue.startMs(), cue.endMs(), cue.text(),
-						cue.words()));
+						cue.words() == null ? List.of() : cue.words()));
 			}
 		}
 		String animationStyle = settings.animationStyle() == null
 				? "none"
 				: settings.animationStyle().wire();
-		return new CaptionSpec(true, settings.fontFamily(), settings.fontSize(),
+		String fontFamily = settings.fontFamily();
+		if (fontFamily == null || fontFamily.isBlank()) {
+			fontFamily = CaptionSpec.DEFAULT_FONT_FAMILY;
+		}
+		String textColor = settings.textColor() == null
+				? CaptionSpec.DEFAULT_TEXT_COLOR
+				: settings.textColor();
+		String inactiveTextColor = settings.inactiveTextColor() == null
+				? CaptionSpec.DEFAULT_INACTIVE_TEXT_COLOR
+				: settings.inactiveTextColor();
+		return new CaptionSpec(true, fontFamily, settings.fontSize(),
 				settings.bottomOffset(), settings.maxWidth(), settings.maxRows(), animationStyle,
-				settings.boxRadius(), settings.textColor(), settings.inactiveTextColor(),
+				settings.boxRadius(), textColor, inactiveTextColor,
 				settings.backgroundOpacity(), cues);
 	}
 
-	/** Maps the editor keystroke overlay plus its {@code .keys.json} sidecar (stage 10). */
-	public static KeystrokeSpec keystrokeSpec(ProjectEditorState editor, Path videoPath) {
+	/**
+	 * Maps the keystroke overlay plus its optional {@code .keys.json} sidecar.
+	 *
+	 * @param videoPath the source recording whose sidecar carries the presses, or null when the
+	 *        caller has no source file (then only the settings are mapped)
+	 */
+	public static KeystrokeSpec keystrokeSpec(ProjectEditorState editor, @Nullable Path videoPath) {
 		var settings = editor.keystrokeOverlay();
 		if (settings == null || !settings.enabled()) {
 			return KeystrokeSpec.DISABLED;
@@ -342,7 +362,8 @@ public final class ProjectEditorInputs {
 		return windows.isEmpty() ? FadeSpec.NONE : new FadeSpec(windows);
 	}
 
-	private static @Nullable int parseColour(@Nullable String value) {
+	/** Parses a CSS colour, falling back to the TS default blue for absent/invalid values. */
+	private static int parseColour(@Nullable String value) {
 		if (value == null || value.length() < 7) {
 			return 0xFF2563EB;
 		}

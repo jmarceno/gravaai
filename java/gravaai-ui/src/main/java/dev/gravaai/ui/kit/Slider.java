@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.DoubleFunction;
@@ -26,8 +28,6 @@ import javafx.scene.layout.VBox;
  * over 250 ms ease-out. The {@code label}/{@code output} row matches SliderControl: label on the
  * left (text-xs with the slider-control class), formatted value on the right.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Slider extends VBox {
 
 	private static final double TRACK_INSET = 12;
@@ -57,8 +57,8 @@ public final class Slider extends VBox {
 		this(null);
 	}
 
-	/** A slider with an optional label row; the output shows the formatted value on the right. */
-	public Slider(String labelText) {
+	/** A slider with an optional label row (null = no label); the output shows the formatted value. */
+	public Slider(@Nullable String labelText) {
 		getStyleClass().add("slider");
 		setSpacing(8);
 		setFillWidth(true);

@@ -33,8 +33,6 @@ import org.xml.sax.SAXException;
  * {@code matrix}). Shapes: {@code path}, {@code circle}, {@code ellipse}, {@code rect},
  * {@code line}, {@code polygon}, {@code polyline}; groups are traversed with inherited paint.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SvgIcon {
 
 	/** How a shape's fill/stroke is resolved. */
@@ -61,7 +59,7 @@ public final class SvgIcon {
 	private SvgIcon() {}
 
 	/** Parses SVG from a class-path style stream; the caller closes it. */
-	public static @Nullable Parsed parse(InputStream in) throws IOException {
+	public static Parsed parse(InputStream in) throws IOException {
 		try {
 			return parse(parseDocument(new InputSource(in)));
 		} catch (SAXException error) {
@@ -70,7 +68,7 @@ public final class SvgIcon {
 	}
 
 	/** Parses SVG from a string. */
-	public static @Nullable Parsed parse(String xml) throws IOException {
+	public static Parsed parse(String xml) throws IOException {
 		try {
 			return parse(parseDocument(new InputSource(new StringReader(xml))));
 		} catch (SAXException error) {
@@ -79,10 +77,10 @@ public final class SvgIcon {
 	}
 
 	/** One hardened factory for every icon parse; a DocumentBuilder per thread. */
-	private static final @Nullable DocumentBuilderFactory FACTORY = createFactory();
+	private static final DocumentBuilderFactory FACTORY = createFactory();
 	private static final ThreadLocal<DocumentBuilder> BUILDERS = ThreadLocal.withInitial(SvgIcon::newBuilder);
 
-	private static @Nullable DocumentBuilderFactory createFactory() {
+	private static DocumentBuilderFactory createFactory() {
 		try {
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -95,7 +93,7 @@ public final class SvgIcon {
 		}
 	}
 
-	private static @Nullable DocumentBuilder newBuilder() {
+	private static DocumentBuilder newBuilder() {
 		try {
 			return FACTORY.newDocumentBuilder();
 		} catch (ParserConfigurationException error) {
@@ -103,13 +101,13 @@ public final class SvgIcon {
 		}
 	}
 
-	private static @Nullable Document parseDocument(InputSource source) throws SAXException, IOException {
+	private static Document parseDocument(InputSource source) throws SAXException, IOException {
 		DocumentBuilder builder = BUILDERS.get();
 		builder.reset();
 		return builder.parse(source);
 	}
 
-	private static @Nullable Parsed parse(Document document) {
+	private static Parsed parse(Document document) {
 		Element root = document.getDocumentElement();
 		if (root == null || !root.getTagName().equalsIgnoreCase("svg")) {
 			throw new IllegalArgumentException("Not an SVG document: " + (root == null ? "null" : root.getTagName()));
@@ -121,7 +119,7 @@ public final class SvgIcon {
 		return new Parsed(viewBox[0], viewBox[1], viewBox[2], viewBox[3], List.copyOf(shapes));
 	}
 
-	private static @Nullable double[] parseViewBox(Element root) {
+	private static double[] parseViewBox(Element root) {
 		String viewBox = attr(root, "viewBox");
 		if (viewBox != null) {
 			String[] parts = viewBox.trim().split("[\\s,]+");
@@ -302,11 +300,16 @@ public final class SvgIcon {
 		}
 		String fillOpacity = attr(element, "fill-opacity");
 		if (fillOpacity != null && fillKind == PaintKind.COLOR) {
-			fillColor = withAlpha(fillColor, fillColor.getOpacity() * number(fillOpacity));
+			// PaintKind.COLOR always carries an explicit colour (see paintValue).
+			Color currentFill = java.util.Objects.requireNonNull(fillColor, "COLOR fill without colour");
+			fillColor = withAlpha(currentFill, currentFill.getOpacity() * number(fillOpacity));
 		}
 		String strokeOpacity = attr(element, "stroke-opacity");
 		if (strokeOpacity != null && strokeKind == PaintKind.COLOR) {
-			strokeColor = withAlpha(strokeColor, strokeColor.getOpacity() * number(strokeOpacity));
+			// PaintKind.COLOR always carries an explicit colour (see paintValue).
+			Color currentStroke = java.util.Objects.requireNonNull(strokeColor,
+					"COLOR stroke without colour");
+			strokeColor = withAlpha(currentStroke, currentStroke.getOpacity() * number(strokeOpacity));
 		}
 		return new SvgPaint(fillKind, fillColor, strokeKind, strokeColor, strokeWidth, cap, join, evenOdd,
 				opacity);
@@ -337,7 +340,7 @@ public final class SvgIcon {
 		return new PaintValue(PaintKind.COLOR, Color.BLACK);
 	}
 
-	private static Color withAlpha(@Nullable Color color, double alpha) {
+	private static Color withAlpha(Color color, double alpha) {
 		return new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, Math.min(1, alpha)));
 	}
 

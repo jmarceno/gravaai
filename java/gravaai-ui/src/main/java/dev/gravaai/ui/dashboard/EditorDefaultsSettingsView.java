@@ -1,7 +1,5 @@
 package dev.gravaai.ui.dashboard;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.function.DoubleFunction;
 
 import dev.gravaai.core.editor.EditorPreferences;
@@ -17,8 +15,6 @@ import tools.jackson.databind.node.ObjectNode;
  * ({@code gravaai.editor.preferences}, the same store the editor writes when you change a look).
  * Each control saves a one-field patch, so the next new project picks it up.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorDefaultsSettingsView extends VBox {
 
 	private final EditorPreferencesStore store;
@@ -79,7 +75,7 @@ public final class EditorDefaultsSettingsView extends VBox {
 		return new SettingsRow(title, description, control);
 	}
 
-	private SettingsRow slider(String title, String description, String key, @Nullable double value,
+	private SettingsRow slider(String title, String description, String key, double value,
 			double min, double max, double step, DoubleFunction<String> format) {
 		Slider control = new Slider().range(min, max).step(step).formatter(format);
 		control.setValue(value);

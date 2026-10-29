@@ -19,31 +19,36 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code electron/ipc/project/session.ts} (plan §5.6.6: the webcam track keeps its own time
  * offset so the editor can align it with the screen recording).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingSessionManifest {
 
-	/** What the UI/editor needs to know about a recording's linked webcam track. */
-	public @Nullable record RecordingSessionData(String videoPath, @Nullable String webcamPath, long timeOffsetMs) {
+	/**
+	 * What the UI/editor needs to know about a recording's linked webcam track.
+	 *
+	 * @param webcamPath the linked webcam file, or null when the recording has no linked webcam
+	 */
+	public record RecordingSessionData(String videoPath, @Nullable String webcamPath,
+			long timeOffsetMs) {
 	}
 
 	/** The manifest shape written by version 2. */
-	@Nullable record RecordingSessionManifestFile(int version, String videoFileName, String webcamFileName, long timeOffsetMs) {
+	record RecordingSessionManifestFile(int version, String videoFileName, String webcamFileName,
+			long timeOffsetMs) {
 	}
 
 	private static final int MANIFEST_VERSION = 2;
 
-	@Nullable private RecordingSessionManifest() {
+	private RecordingSessionManifest() {
 	}
 
-	private static @Nullable long normalizeRecordingTimeOffsetMs(@Nullable Object value) {
+	/** @param value the raw persisted offset, or null when the manifest omits it (0 then) */
+	private static long normalizeRecordingTimeOffsetMs(@Nullable Object value) {
 		return value instanceof Number number && Double.isFinite(number.doubleValue())
 				? Math.round(number.doubleValue())
 				: 0;
 	}
 
 	/** {@code getRecordingSessionManifestPath}: next to the video, with the video's stem. */
-	public static @Nullable Path getRecordingSessionManifestPath(String videoPath) {
+	public static Path getRecordingSessionManifestPath(String videoPath) {
 		Path path = Path.of(videoPath);
 		String fileName = path.getFileName().toString();
 		int extensionStart = fileName.lastIndexOf('.');
@@ -53,7 +58,8 @@ public final class RecordingSessionManifest {
 				.resolve(baseName + StorageFiles.RECORDING_SESSION_MANIFEST_SUFFIX);
 	}
 
-	private static @Nullable String normalizeVideoSourcePath(String videoPath) {
+	/** @param videoPath a path that may be absent/blank; null and blank both normalise to null */
+	private static @Nullable String normalizeVideoSourcePath(@Nullable String videoPath) {
 		if (videoPath == null) {
 			return null;
 		}

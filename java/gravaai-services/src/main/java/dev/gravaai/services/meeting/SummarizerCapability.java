@@ -16,11 +16,12 @@ public enum SummarizerCapability {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	public static @Nullable SummarizerCapability fromWire(Object value) {
+	/** @param value the raw value, or null when the setting is absent */
+	public static @Nullable SummarizerCapability fromWire(@Nullable Object value) {
 		if (!(value instanceof String text)) {
 			return null;
 		}

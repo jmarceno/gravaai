@@ -1,5 +1,7 @@
 package dev.gravaai.ui.kit;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -25,8 +27,6 @@ import javafx.scene.layout.VBox;
  * {@code .ddLabel} from LaunchWindow.module.css), separators 94% wide. Keyboard: up/down +
  * enter, escape closes (Popup).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class DropdownMenu {
 
 	private record Row(HBox node, Runnable action) {}
@@ -78,13 +78,19 @@ public final class DropdownMenu {
 		return item(label, null, null, action);
 	}
 
-	/** A menu item with a keyboard shortcut hint (Kbd). */
+	/** A menu item with a keyboard shortcut hint (Kbd); no leading icon. */
 	public DropdownMenu item(String label, String shortcut, Runnable action) {
 		return item(label, null, shortcut, action);
 	}
 
-	/** A menu item with a leading icon. */
-	public DropdownMenu item(String label, String iconName, String shortcut, Runnable action) {
+	/**
+	 * A menu item with an optional leading icon and shortcut hint.
+	 *
+	 * @param iconName Phosphor icon name, or null for a text-only row
+	 * @param shortcut keyboard hint shown on the right, or null for none
+	 */
+	public DropdownMenu item(
+			String label, @Nullable String iconName, @Nullable String shortcut, Runnable action) {
 		HBox row = new HBox();
 		row.getStyleClass().add("menu-item");
 		row.setAlignment(Pos.CENTER_LEFT);

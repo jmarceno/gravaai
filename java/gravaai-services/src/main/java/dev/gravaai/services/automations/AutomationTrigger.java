@@ -15,11 +15,11 @@ public enum AutomationTrigger {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	public static @Nullable AutomationTrigger fromWire(String value) {
+	public static @Nullable AutomationTrigger fromWire(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

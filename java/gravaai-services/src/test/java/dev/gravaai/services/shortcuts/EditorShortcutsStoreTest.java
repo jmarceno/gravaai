@@ -15,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -61,7 +62,7 @@ class EditorShortcutsStoreTest {
 	@DisplayName("write stores JSON.stringify(value, null, 2) without a trailing newline and read returns it")
 	void writesAndReadsBack() throws IOException {
 		JsonNode value = json("{\"playPause\": {\"key\": \"space\", \"ctrl\": false}, \"undo\": null}");
-		Result<Void> result = store.write(value);
+		Result<Unit> result = store.write(value);
 		assertTrue(result.isOk(), result.errorMessage());
 		String raw = Files.readString(store.filePath());
 		assertEquals(Json.stringify(value), raw);
@@ -74,7 +75,7 @@ class EditorShortcutsStoreTest {
 		Path blocker = tempDir.resolve("blocker");
 		Files.writeString(blocker, "");
 		EditorShortcutsStore broken = new EditorShortcutsStore(blocker.resolve("shortcuts.json"));
-		Result<Void> result = broken.write(json("{}"));
+		Result<Unit> result = broken.write(json("{}"));
 		assertTrue(result.isErr());
 		assertTrue(!result.errorMessage().isEmpty());
 	}

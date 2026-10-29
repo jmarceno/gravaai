@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,11 +18,15 @@ import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
  */
 public final class ExportRunner {
 
-	/** Everything one export needs. */
+	/**
+	 * Everything one export needs.
+	 *
+	 * @param captionSidecars the caption sidecar payload, or null when the export has no captions
+	 */
 	public record Spec(ExportFormat format, int width, int height, int frameRate, int bitrate,
 			ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
 			Path destination, boolean reveal, boolean overwrite,
-			CaptionSidecars.Payload captionSidecars, ExportAudioPlan audioPlan) {}
+			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {}
 
 	/** Result of a published export. */
 	public record Outcome(Path path, long bytes, int frames, double durationSeconds,

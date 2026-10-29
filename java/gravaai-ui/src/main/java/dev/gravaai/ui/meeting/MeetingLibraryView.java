@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.ui.dashboard.SettingsRow;
 import dev.gravaai.ui.kit.Button;
@@ -43,8 +44,6 @@ import javafx.scene.layout.VBox;
  * {@code MeetingThumbnail} and the library actions of {@code MeetingViewHost}): a card per meeting
  * with thumbnail, status/duration/notes badges, open, reveal, rename and delete.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingLibraryView extends VBox {
 
 	private final MeetingUiService service;
@@ -182,7 +181,7 @@ public final class MeetingLibraryView extends VBox {
 		options.setAccessibleText("Options for " + (entry.title() == null ? "meeting" : entry.title()));
 		DropdownMenu menu = new DropdownMenu(options);
 		menu.item("Show files", () -> {
-			Result<Void> result = service.revealMeeting(entry.mediaPath());
+			Result<Unit> result = service.revealMeeting(entry.mediaPath());
 			if (result.isErr()) {
 				Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
 			}

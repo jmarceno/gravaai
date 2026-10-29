@@ -16,8 +16,6 @@ import dev.gravaai.core.json.Json;
  * plan §5.16). The renderer/worker reports progress into it; {@code inspect jobs}, {@code job
  * status} and {@code job wait} read from it.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentJobRegistry {
 
 	/** {@code AgentJobKind}. */
@@ -88,7 +86,7 @@ public final class AgentJobRegistry {
 		private @Nullable Long finishedAt;
 		private @Nullable Runnable cancel;
 
-		private Job(String id, Kind kind, String label, Runnable cancel) {
+		private Job(String id, Kind kind, String label, @Nullable Runnable cancel) {
 			this.id = id;
 			this.kind = kind;
 			this.label = label;
@@ -112,20 +110,23 @@ public final class AgentJobRegistry {
 			return status;
 		}
 
-		/** 0–1, or null while the work has not reported anything yet. */
-		public Double progress() {
+		/** @return 0–1, or null while the work has not reported anything yet */
+		public @Nullable Double progress() {
 			return progress;
 		}
 
-		public String message() {
+		/** @return the latest progress line, or null while the job has not reported one */
+		public @Nullable String message() {
 			return message;
 		}
 
-		public String error() {
+		/** @return the failure message, or null while the job has not failed */
+		public @Nullable String error() {
 			return error;
 		}
 
-		public Object result() {
+		/** @return the job result object, or null until the job produced one */
+		public @Nullable Object result() {
 			return result;
 		}
 
@@ -133,7 +134,8 @@ public final class AgentJobRegistry {
 			return createdAt;
 		}
 
-		public Long finishedAt() {
+		/** @return the finish timestamp, or null while the job is not terminal */
+		public @Nullable Long finishedAt() {
 			return finishedAt;
 		}
 	}
@@ -154,8 +156,8 @@ public final class AgentJobRegistry {
 	private final Map<String, Job> jobs = new LinkedHashMap<>();
 	private long counter;
 
-	/** {@code create}. */
-	public synchronized Job create(Kind kind, String label, Runnable cancel) {
+	/** {@code create}; {@code cancel} is null when the job has no abort handle. */
+	public synchronized Job create(Kind kind, String label, @Nullable Runnable cancel) {
 		counter += 1;
 		Job job = new Job("job-" + counter, kind, label, cancel);
 		jobs.put(job.id, job);
@@ -206,8 +208,17 @@ public final class AgentJobRegistry {
 		return jobs.get(id);
 	}
 
-	/** Newest job, optionally of one kind, preferring work that is still running. */
+	/** Newest job of one kind, preferring work that is still running. */
 	public synchronized Optional<Job> latest(Kind kind) {
+		return latestMatching(kind);
+	}
+
+	public Optional<Job> latest() {
+		return latestMatching(null);
+	}
+
+	/** {@code kind} is null when any kind matches. */
+	private synchronized Optional<Job> latestMatching(@Nullable Kind kind) {
 		List<Job> matching = list();
 		if (kind != null) {
 			matching = matching.stream().filter(job -> job.kind == kind).toList();
@@ -221,10 +232,6 @@ public final class AgentJobRegistry {
 			}
 		}
 		return Optional.of(matching.get(matching.size() - 1));
-	}
-
-	public Optional<Job> latest() {
-		return latest(null);
 	}
 
 	/** {@code cancel}: runs the job's own abort handle and marks it cancelled. */

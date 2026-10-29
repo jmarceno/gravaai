@@ -1,5 +1,7 @@
 package dev.gravaai.services.recording.ports;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -11,13 +13,13 @@ import java.io.OutputStream;
 public interface SpawnedProcess {
 
 	/** The child's stdin, or null when it was not piped. */
-	OutputStream stdin();
+	@Nullable OutputStream stdin();
 
 	/** The child's stdout, or null when it was not piped. */
-	InputStream stdout();
+	@Nullable InputStream stdout();
 
 	/** The child's stderr, or null when it was not piped. */
-	InputStream stderr();
+	@Nullable InputStream stderr();
 
 	long pid();
 

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -24,31 +26,29 @@ import javafx.scene.text.TextFlow;
  * {@code MeetingMarkdown.tsx}): headings, bullets, checklists, bold, italics, inline code, and
  * clickable [HH:MM:SS] timestamps that seek the recording.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingMarkdownView extends VBox {
 
 	private static final String MONO_STYLE =
 			"-fx-font-family: 'monospace'; -fx-font-size: 11px; -fx-background-color: rgba(255,255,255,0.06);"
 					+ " -fx-background-radius: 4; -fx-padding: 0 4 0 4;";
 
-	private final Consumer<Integer> onSeek;
-	private String source;
+	private final @Nullable Consumer<Integer> onSeek;
+	private String source = "";
 
 	public MeetingMarkdownView() {
 		this(null, null);
 	}
 
-	public MeetingMarkdownView(String source, Consumer<Integer> onSeek) {
+	public MeetingMarkdownView(@Nullable String source, @Nullable Consumer<Integer> onSeek) {
 		this.onSeek = onSeek;
 		getStyleClass().add("meeting-markdown");
 		setSpacing(2);
 		refresh(source);
 	}
 
-	/** Re-renders the given Markdown source. */
-	public void refresh(String source) {
-		this.source = source;
+	/** Re-renders the given Markdown source (null renders the empty document). */
+	public void refresh(@Nullable String source) {
+		this.source = source == null ? "" : source;
 		getChildren().clear();
 		if (source == null || source.isBlank()) {
 			return;

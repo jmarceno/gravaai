@@ -31,13 +31,10 @@ import io.github.humbleui.types.Rect;
  * Known differences from the Electron reference: system fonts instead of bundled SF Pro (glyph
  * metrics differ until DM Sans/custom fonts land), and rounded boxes are drawn square.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class AnnotationRenderer {
 
 	/** Camera transform applied to annotation rects. */
-	@Nullable record Transform(double scale, double x, double y) {
-		static final Transform IDENTITY = new Transform(1, 0, 0);
+	record Transform(double scale, double x, double y) {
 	}
 
 	private static final double[][] ARROW_UP = {{50, 20, 50, 80}, {50, 20, 35, 35}, {50, 20, 65, 35}};
@@ -49,17 +46,17 @@ final class AnnotationRenderer {
 	private static final double[][] ARROW_DOWN_RIGHT = {{25, 25, 75, 75}, {75, 75, 70, 60}, {75, 75, 60, 70}};
 	private static final double[][] ARROW_DOWN_LEFT = {{75, 25, 25, 75}, {25, 75, 30, 60}, {25, 75, 40, 70}};
 
-	@Nullable private AnnotationRenderer() {
+	private AnnotationRenderer() {
 	}
 
 	static void draw(Canvas canvas, List<AnnotationSpec> annotations, long timeMs,
 			int canvasWidth, int canvasHeight, Rect coordinateRect, Transform transform,
-			double scaleFactor, Image sceneSnapshot) {
+			double scaleFactor, @Nullable Image sceneSnapshot) {
 		List<AnnotationSpec> active = AnnotationSpec.activeAt(annotations, timeMs);
 		if (active.isEmpty()) {
 			return;
 		}
-		Transform camera = transform == null ? Transform.IDENTITY : transform;
+		Transform camera = transform;
 		double effectiveScaleFactor = scaleFactor * camera.scale();
 		for (AnnotationSpec annotation : active) {
 			Rect untransformed = Rect.makeXYWH(
@@ -158,8 +155,11 @@ final class AnnotationRenderer {
 		return first.isBlank() ? null : first;
 	}
 
-	private static @Nullable List<String> wrapLines(Font font, @Nullable String content, float availableWidth) {
+	private static List<String> wrapLines(Font font, @Nullable String content, float availableWidth) {
 		List<String> lines = new ArrayList<>();
+		if (content == null) {
+			return lines;
+		}
 		for (String rawLine : content.split("\n", -1)) {
 			if (rawLine.isEmpty()) {
 				lines.add("");
@@ -186,7 +186,7 @@ final class AnnotationRenderer {
 		String source = annotation.imageData() != null && !annotation.imageData().isBlank()
 				? annotation.imageData()
 				: annotation.content();
-		byte[] encoded = decodeDataUri(source);
+		byte @Nullable [] encoded = decodeDataUri(source);
 		if (encoded == null) {
 			return;
 		}
@@ -224,7 +224,7 @@ final class AnnotationRenderer {
 		if (figure == null) {
 			return;
 		}
-		double[][] segments = arrowSegments(figure.direction());
+		double @Nullable [][] segments = arrowSegments(figure.direction());
 		if (segments == null) {
 			return;
 		}
@@ -263,7 +263,7 @@ final class AnnotationRenderer {
 	}
 
 	private static void drawBlur(Canvas canvas, AnnotationSpec annotation, Rect rect,
-			double scaleFactor, Image sceneSnapshot, int canvasWidth, int canvasHeight) {
+			double scaleFactor, @Nullable Image sceneSnapshot, int canvasWidth, int canvasHeight) {
 		if (sceneSnapshot == null) {
 			return;
 		}
@@ -299,7 +299,8 @@ final class AnnotationRenderer {
 		canvas.restore();
 	}
 
-	private static double[][] arrowSegments(@Nullable String direction) {
+	/** The polyline segments for a known arrow direction; null when absent/unknown. */
+	private static double @Nullable [][] arrowSegments(@Nullable String direction) {
 		if (direction == null) {
 			return null;
 		}
@@ -316,7 +317,7 @@ final class AnnotationRenderer {
 		};
 	}
 
-	private static @Nullable byte[] decodeDataUri(@Nullable String source) {
+	private static byte @Nullable [] decodeDataUri(@Nullable String source) {
 		if (source == null || source.isBlank()) {
 			return null;
 		}

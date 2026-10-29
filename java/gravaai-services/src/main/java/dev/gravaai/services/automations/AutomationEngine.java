@@ -20,8 +20,6 @@ import java.util.function.Supplier;
  * notes. Every dependency is injected (plan §5.3) so the service and the tests control the rule
  * store, the action runner, the duration probe, the clock and the failure feedback.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutomationEngine {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
@@ -61,7 +59,7 @@ public final class AutomationEngine {
 	}
 
 	/** Runs every enabled rule matching the event. Never throws (port of {@code runAutomations}). */
-	public static @Nullable AutomationRunResult runAutomations(AutomationEvent event, Deps deps) {
+	public static AutomationRunResult runAutomations(AutomationEvent event, Deps deps) {
 		ResultBuilder result = new ResultBuilder(event.trigger());
 		List<AutomationRule> rules;
 		try {
@@ -88,7 +86,7 @@ public final class AutomationEngine {
 	 * Runs one rule regardless of its enabled flag, for the "Run now on a file…" button (port of
 	 * {@code runAutomationRuleNow}). The duration probe is used only if the rule asks for it.
 	 */
-	public static @Nullable AutomationRunResult runAutomationRuleNow(String ruleId, AutomationEvent event, Deps deps) {
+	public static AutomationRunResult runAutomationRuleNow(String ruleId, AutomationEvent event, Deps deps) {
 		ResultBuilder result = new ResultBuilder(event.trigger());
 		List<AutomationRule> rules;
 		try {
@@ -113,7 +111,7 @@ public final class AutomationEngine {
 		return runMatchingRules(List.of(rule), event.withTrigger(rule.trigger()), deps, result);
 	}
 
-	private static @Nullable AutomationRunResult runMatchingRules(
+	private static AutomationRunResult runMatchingRules(
 			List<AutomationRule> matching, AutomationEvent event, Deps deps, ResultBuilder result) {
 		Double durationSec = resolveDurationSec(event, matching, deps);
 		AutomationContext context = new AutomationContext(
@@ -174,7 +172,7 @@ public final class AutomationEngine {
 		}
 	}
 
-	private static @Nullable boolean hasDurationCondition(AutomationRule rule) {
+	private static boolean hasDurationCondition(AutomationRule rule) {
 		for (AutomationCondition condition : rule.conditions()) {
 			if (condition.type() == AutomationConditionType.DURATION_AT_LEAST
 					|| condition.type() == AutomationConditionType.DURATION_AT_MOST) {

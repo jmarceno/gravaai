@@ -39,8 +39,6 @@ import tools.jackson.databind.JsonNode;
  * sidecars. UI work (HUD hiding, area border, cursor restore) is injected through
  * {@link HudHooks}; the app wires the JavaFX implementation.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -115,7 +113,7 @@ public final class RecordingService {
 	}
 
 	/** Wall clock of the active screen video's first frame, or null when nothing records. */
-	public Long activeScreenStartedAtMs() {
+	public @Nullable Long activeScreenStartedAtMs() {
 		return cosmic.getActiveCosmicStartedAtMs();
 	}
 
@@ -295,7 +293,8 @@ public final class RecordingService {
 
 	// ── Video/session state (Appendix A get/set-current-video-path, get/set-current-recording-session) ──
 
-	public String getCurrentVideoPath() {
+	/** @return the current video path, or null when no recording is open yet */
+	public @Nullable String getCurrentVideoPath() {
 		return currentVideoPath;
 	}
 
@@ -380,18 +379,26 @@ public final class RecordingService {
 		this.thumbnails = thumbnails;
 	}
 
-	/** {@code import-recording}: appends one library recording to the current video. */
+	/**
+	 * {@code import-recording}: appends one library recording to the current video.
+	 *
+	 * @param currentWebcam the webcam source linked to the current video, or null when it has none
+	 */
 	public RecordingImportService.ImportResult importRecording(
 			String currentPath, String recordingPath,
-			RecordingImportService.RecordingWebcamSource currentWebcam) throws IOException {
+			RecordingImportService.@Nullable RecordingWebcamSource currentWebcam) throws IOException {
 		return importRecording(currentPath, recordingPath, currentWebcam, null);
 	}
 
-	/** {@code import-recording} with a cancellation token (the Clips panel's Cancel button). */
+	/**
+	 * {@code import-recording} with a cancellation token (the Clips panel's Cancel button).
+	 *
+	 * @param cancelled the cancellation token, or null when the import cannot be cancelled
+	 */
 	public RecordingImportService.ImportResult importRecording(
 			String currentPath, String recordingPath,
-			RecordingImportService.RecordingWebcamSource currentWebcam,
-			BooleanSupplier cancelled) throws IOException {
+			RecordingImportService.@Nullable RecordingWebcamSource currentWebcam,
+			@Nullable BooleanSupplier cancelled) throws IOException {
 		if (importService == null) {
 			throw new IllegalStateException("Recording import is not wired");
 		}

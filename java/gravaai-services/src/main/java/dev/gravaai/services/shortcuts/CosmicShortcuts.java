@@ -28,8 +28,6 @@ import java.util.Set;
  * <p>Offsets are Java {@code String} indices, i.e. UTF-16 code units, exactly like the JavaScript
  * original, so the same fixture offsets hold.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CosmicShortcuts {
 
 	/** Port of {@code GRAVAAI_DESCRIPTION_PREFIX}. */
@@ -273,7 +271,7 @@ public final class CosmicShortcuts {
 	}
 
 	/** Port of {@code lineAlignedEnd}. */
-	private static @Nullable int lineAlignedEnd(String text, int offset) {
+	private static int lineAlignedEnd(String text, int offset) {
 		int i = offset;
 		while (i < text.length()
 				&& (text.charAt(i) == ' ' || text.charAt(i) == '\t' || text.charAt(i) == '\r')) {

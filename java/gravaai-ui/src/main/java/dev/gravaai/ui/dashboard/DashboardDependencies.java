@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -9,6 +11,7 @@ import dev.gravaai.services.projects.ProjectManager;
 import dev.gravaai.services.projects.RecoverableRecording;
 import dev.gravaai.services.projects.RecoverableRecordingsProvider;
 import dev.gravaai.services.projects.RecordingsReadModel;
+import dev.gravaai.ui.agent.AgentUiService;
 import dev.gravaai.ui.meeting.MeetingUiService;
 
 /**
@@ -40,8 +43,6 @@ import dev.gravaai.ui.meeting.MeetingUiService;
  *     not up. It is lazy because AppContext creates the meetings service after the dashboard in
  *     the HUD startup path; the dashboard resolves it per load, like the React IPC calls.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record DashboardDependencies(
 		UserData userData,
 		ProjectManager projects,
@@ -52,8 +53,8 @@ public record DashboardDependencies(
 		Actions actions,
 		GlobalShortcutsController globalShortcuts,
 		AgentSettingsController agent,
-		AutomationsController automations,
-		dev.gravaai.ui.agent.AgentUiService agentUiService,
+		@Nullable AutomationsController automations,
+		@Nullable AgentUiService agentUiService,
 		Supplier<MeetingUiService> meetings) {
 
 	public DashboardDependencies {
@@ -88,9 +89,9 @@ public record DashboardDependencies(
 			RecordingsReadModel recordings, RecoverableRecordingsProvider recoverableRecordings,
 			DashboardLibraryStore preferences, Trash trash, Actions actions,
 			GlobalShortcutsController globalShortcuts, AgentSettingsController agent,
-			AutomationsController automations, dev.gravaai.ui.agent.AgentUiService agentUiService) {
+			@Nullable AutomationsController automations, @Nullable AgentUiService agentUiService) {
 		this(userData, projects, recordings, recoverableRecordings, preferences, trash, actions,
-				globalShortcuts, agent, automations, agentUiService, null);
+				globalShortcuts, agent, automations, agentUiService, () -> null);
 	}
 
 	/**

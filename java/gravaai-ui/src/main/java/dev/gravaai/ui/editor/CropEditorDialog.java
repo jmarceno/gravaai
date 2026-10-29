@@ -30,8 +30,6 @@ import javafx.scene.shape.Rectangle;
  * edge drags independently and keeps at least 10% of the frame. Done commits the region, any
  * other close (backdrop, Escape, ×) restores the snapshot taken on open, like the React modal.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CropEditorDialog {
 
 	private static final double MIN_SPAN = 0.1;
@@ -110,7 +108,7 @@ public final class CropEditorDialog {
 	}
 
 	/** Pure edge drag (CropControl handlePointerMove), deltas in normalised frame units. */
-	static CropRegion drag(@Nullable CropRegion start, String edge, double deltaX, double deltaY) {
+	static CropRegion drag(CropRegion start, String edge, double deltaX, double deltaY) {
 		double x = start.x();
 		double y = start.y();
 		double width = start.width();
@@ -191,11 +189,12 @@ public final class CropEditorDialog {
 		}
 
 		private void move(MouseEvent event) {
-			if (dragging == null || getWidth() <= 0 || getHeight() <= 0) {
+			CropRegion start = startCrop;
+			if (dragging == null || start == null || getWidth() <= 0 || getHeight() <= 0) {
 				return;
 			}
 			javafx.geometry.Point2D local = sceneToLocal(event.getSceneX(), event.getSceneY());
-			crop = drag(startCrop, dragging.name().toLowerCase(java.util.Locale.ROOT),
+			crop = drag(start, dragging.name().toLowerCase(java.util.Locale.ROOT),
 					local.getX() / getWidth() - startX, local.getY() / getHeight() - startY);
 			requestLayout();
 			event.consume();

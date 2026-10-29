@@ -77,8 +77,6 @@ import tools.jackson.databind.JsonNode;
  * {@code wiring.recording().startNativeScreenRecording(source, options)}.
  * {@link #startDevRecording(String)} is the manual-gate entry point.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RecordingWiring implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording.wiring");

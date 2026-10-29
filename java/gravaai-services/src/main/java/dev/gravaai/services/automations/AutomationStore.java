@@ -26,8 +26,6 @@ import tools.jackson.databind.JsonNode;
  * commit with a temporary file plus rename. Writes to one file run in call order on a single
  * thread, so concurrent saves cannot interleave.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutomationStore implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
@@ -101,7 +99,8 @@ public final class AutomationStore implements AutoCloseable {
 
 	private void commit(String contents) throws IOException {
 		Path targetPath = filePath.toAbsolutePath();
-		Path parentDir = targetPath.getParent();
+		Path parentDir = java.util.Objects.requireNonNull(targetPath.getParent(),
+				() -> "no parent directory for " + targetPath);
 		Path temporaryPath = parentDir.resolve(
 				".gravaai-automations-" + ProcessHandle.current().pid() + "-" + UUID.randomUUID() + ".tmp");
 		Files.createDirectories(parentDir);

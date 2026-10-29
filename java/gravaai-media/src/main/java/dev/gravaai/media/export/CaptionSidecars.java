@@ -123,8 +123,8 @@ public final class CaptionSidecars {
 		return "WEBVTT\n\n" + body;
 	}
 
-	/** {@code writeCaptionSidecars}. */
-	public static void write(Path videoPath, Payload payload) throws IOException {
+	/** {@code writeCaptionSidecars}. @param payload the sidecars, or null for none */
+	public static void write(Path videoPath, @Nullable Payload payload) throws IOException {
 		if (payload == null || payload.format() == null) {
 			return;
 		}
@@ -139,8 +139,8 @@ public final class CaptionSidecars {
 		}
 	}
 
-	/** {@code writeCaptionSidecarsBestEffort}. */
-	public static WriteResult writeBestEffort(Path videoPath, Payload payload) {
+	/** {@code writeCaptionSidecarsBestEffort}. @param payload the sidecars, or null for none */
+	public static WriteResult writeBestEffort(Path videoPath, @Nullable Payload payload) {
 		if (payload == null) {
 			return new WriteResult(false, null);
 		}

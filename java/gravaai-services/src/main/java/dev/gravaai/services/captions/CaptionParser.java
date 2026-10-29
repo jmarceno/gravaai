@@ -10,8 +10,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Port of electron/ipc/captions/parser.ts: whisper JSON/SRT cue parsing. */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionParser {
 
 	private static final System.Logger LOG =
@@ -48,7 +46,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code parseWhisperJsonWords}: token stream to timed words. */
-	public static @Nullable List<CaptionWord> parseWhisperJsonWords(JsonNode tokens) {
+	public static List<CaptionWord> parseWhisperJsonWords(JsonNode tokens) {
 		if (tokens == null || !tokens.isArray()) {
 			return List.of();
 		}
@@ -113,7 +111,7 @@ public final class CaptionParser {
 	}
 
 	/** {@code parseWhisperJsonCues}: whisper.cpp {@code -ojf} transcription to cues. */
-	public static @Nullable List<CaptionCue> parseWhisperJsonCues(String content) {
+	public static List<CaptionCue> parseWhisperJsonCues(String content) {
 		try {
 			JsonNode parsed = mapper().readTree(content);
 			JsonNode transcription = parsed == null ? null : parsed.path("transcription");

@@ -3,6 +3,8 @@ package dev.gravaai.core.editor;
 import java.io.IOException;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.settings.AppSettingsStore;
 import tools.jackson.databind.JsonNode;
@@ -15,8 +17,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The Electron build writes the same values to {@code localStorage} as a mirror; the Java app has
  * one process, so the app-settings store is the single persistence target (recorded narrowing).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorPreferencesStore {
 
 	private static final System.Logger LOG =
@@ -40,8 +40,10 @@ public final class EditorPreferencesStore {
 	 * {@code saveEditorPreferences}: merge the patch over the current preferences, normalise and
 	 * persist without the dev-only motion-blur tuning. Storage failures are swallowed so the editor
 	 * controls keep working.
+	 *
+	 * @param patch partial preferences JSON; {@code null} is treated as an empty patch
 	 */
-	public void savePreferences(JsonNode patch) {
+	public void savePreferences(@Nullable JsonNode patch) {
 		try {
 			EditorPreferences current = loadPreferences();
 			ObjectNode merged = current.toJson();

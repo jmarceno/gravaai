@@ -54,8 +54,6 @@ import tools.jackson.databind.JsonNode;
  * on rotated outputs, so video comes straight from the compositor and audio from PulseAudio
  * (parec), then everything is muxed.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CosmicRecorder implements CosmicSession.CosmicMux {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -64,13 +62,17 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	public record RecordingOptions(
 			boolean capturesSystemAudio,
 			boolean capturesMicrophone,
-			String microphoneDeviceId,
-			String microphoneLabel,
+			@Nullable String microphoneDeviceId,
+			@Nullable String microphoneLabel,
 			boolean keepSpeakerTracks) {
 	}
 
-	/** {@code { success, message? }} of the start requests. */
-	public record StartResult(boolean success, String message) {
+	/**
+	 * {@code { success, message? }} of the start requests.
+	 *
+	 * @param message the failure message, or null when the request succeeded
+	 */
+	public record StartResult(boolean success, @Nullable String message) {
 
 		public static StartResult ok() {
 			return new StartResult(true, null);
@@ -84,7 +86,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	/** The stop result; {@code meeting} is set for meeting recordings (speaker tracks kept). */
 	public record StopResult(boolean success, @Nullable String path, @Nullable String error, @Nullable MeetingInfo meeting) {
 
-		public static StopResult ok(String path, MeetingInfo meeting) {
+		public static StopResult ok(String path, @Nullable MeetingInfo meeting) {
 			return new StopResult(true, path, null, meeting);
 		}
 
@@ -126,16 +128,31 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 
 	private static final class ActiveRecording {
 
-		private @Nullable VideoCapture video;
-		private List<AudioTrack> audio;
-		private Path outputPath;
-		private long startedAtMs;
-		private boolean keepSpeakerTracks;
-		private PauseState pauseState;
-		private MicNoiseReduction micNoiseReduction;
-		private long timestamp;
-		private Path manifestPath;
+		/** Null for an audio-only recording. */
+		private final @Nullable VideoCapture video;
+		private final List<AudioTrack> audio;
+		private final Path outputPath;
+		private final long startedAtMs;
+		private final boolean keepSpeakerTracks;
+		private final PauseState pauseState;
+		private final MicNoiseReduction micNoiseReduction;
+		private final long timestamp;
+		private final Path manifestPath;
 		private @Nullable ScheduledFuture<?> diskCheck;
+
+		ActiveRecording(@Nullable VideoCapture video, List<AudioTrack> audio, Path outputPath,
+				long startedAtMs, boolean keepSpeakerTracks, PauseState pauseState,
+				MicNoiseReduction micNoiseReduction, long timestamp, Path manifestPath) {
+			this.video = video;
+			this.audio = audio;
+			this.outputPath = outputPath;
+			this.startedAtMs = startedAtMs;
+			this.keepSpeakerTracks = keepSpeakerTracks;
+			this.pauseState = pauseState;
+			this.micNoiseReduction = micNoiseReduction;
+			this.timestamp = timestamp;
+			this.manifestPath = manifestPath;
+		}
 	}
 
 	private static final long MIN_FREE_BYTES_TO_START = 2L * 1024 * 1024 * 1024;
@@ -272,10 +289,8 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}
 	}
 
-	/** Sets up the manifest and disk check once {@code active} holds the recording. */
+	/** Publishes the recording as active and starts the manifest/disk bookkeeping. */
 	private void beginRecordingSession(ActiveRecording recording) {
-		recording.manifestPath = CosmicSession.sessionManifestPath(
-				recordingsDir.get(), recording.timestamp);
 		synchronized (this) {
 			active = recording;
 		}
@@ -297,8 +312,12 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		startDiskCheck(recording, recordingsDir.get());
 	}
 
-	/** The PulseAudio source whose description matches Chromium's device label. */
-	@Nullable String resolvePulseMicrophone(String label) {
+	/**
+	 * The PulseAudio source whose description matches Chromium's device label.
+	 *
+	 * @param label the device label, or null when the default source should be used
+	 */
+	String resolvePulseMicrophone(@Nullable String label) {
 		if (label == null || label.isBlank() || "default".equalsIgnoreCase(label)) {
 			return "@DEFAULT_SOURCE@";
 		}
@@ -314,8 +333,12 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}
 	}
 
-	/** The matching source name from {@code pactl -f json list sources} output, or null. */
-	static @Nullable String pickPulseMicrophone(JsonNode sources, String label) {
+	/**
+	 * The matching source name from {@code pactl -f json list sources} output, or null.
+	 *
+	 * @param sources the parsed listing, or null when the listing could not be read
+	 */
+	static @Nullable String pickPulseMicrophone(@Nullable JsonNode sources, String label) {
 		if (sources == null || !sources.isArray()) {
 			return null;
 		}
@@ -347,8 +370,12 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 
 	/** Resolves with the helper's FORMAT line, or throws with its error. */
 	private CaptureFormat readCaptureFormat(SpawnedProcess capture) throws IOException {
+		InputStream helperErrors = capture.stderr();
+		if (helperErrors == null) {
+			throw new IOException("The screen capture helper did not expose stderr.");
+		}
 		BufferedReader reader = new BufferedReader(
-				new InputStreamReader(capture.stderr(), StandardCharsets.UTF_8));
+				new InputStreamReader(helperErrors, StandardCharsets.UTF_8));
 		StringBuilder stderr = new StringBuilder();
 		String line;
 		while ((line = reader.readLine()) != null) {
@@ -447,7 +474,13 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		AudioTrack track = new AudioTrack(process, role, file, output);
 		Thread.ofPlatform().daemon().name("gravaai-audio-" + role.wire()).start(() -> {
 			byte[] buffer = new byte[8192];
-			try (InputStream in = process.stdout()) {
+			InputStream stdout = process.stdout();
+			if (stdout == null) {
+				LOG.log(System.Logger.Level.WARNING, "Audio capture has no stdout pipe");
+				track.firstData.complete(null);
+				return;
+			}
+			try (InputStream in = stdout) {
 				int read;
 				while ((read = in.read(buffer)) != -1) {
 					if (track.startedAtMs < 0) {
@@ -531,7 +564,8 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		} catch (IOException error) {
 			capture.destroy();
 			killAudioTracks(audio);
-			return StartResult.failed(error.getMessage());
+			return StartResult.failed(
+					error.getMessage() == null ? String.valueOf(error) : error.getMessage());
 		}
 		// The helper prints FORMAT right after grabbing the first frame and its
 		// frame clock starts there.
@@ -557,15 +591,11 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		drainWarnings(capture.stderr(), "[cosmic-capture] helper:");
 		Thread.ofPlatform().daemon().name("gravaai-av-copy").start(() -> copyFrames(capture, encoder));
 
-		ActiveRecording recording = new ActiveRecording();
-		recording.video = new VideoCapture(capture, encoder, videoPath, exitCode(encoder));
-		recording.audio = audio;
-		recording.outputPath = outputPath;
-		recording.startedAtMs = videoStartedAtMs;
-		recording.keepSpeakerTracks = options.keepSpeakerTracks();
-		recording.pauseState = pauseState;
-		recording.micNoiseReduction = currentMicNoiseReduction();
-		recording.timestamp = timestamp;
+		ActiveRecording recording = new ActiveRecording(
+				new VideoCapture(capture, encoder, videoPath, exitCode(encoder)),
+				audio, outputPath, videoStartedAtMs, options.keepSpeakerTracks(), pauseState,
+				currentMicNoiseReduction(), timestamp,
+				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
 		beginRecordingSession(recording);
 		LOG.log(System.Logger.Level.INFO, "Recording " + outputName + " " + format.width() + "x"
 				+ format.height() + " transform " + format.transform() + " to " + outputPath);
@@ -606,8 +636,14 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	}
 
 	private static void copyFrames(SpawnedProcess capture, SpawnedProcess encoder) {
-		try (ReadableByteChannel input = Channels.newChannel(capture.stdout());
-				WritableByteChannel output = Channels.newChannel(encoder.stdin())) {
+		InputStream captureStdout = capture.stdout();
+		OutputStream encoderStdin = encoder.stdin();
+		if (captureStdout == null || encoderStdin == null) {
+			LOG.log(System.Logger.Level.WARNING, "Frame copy has no pipe to work with");
+			return;
+		}
+		try (ReadableByteChannel input = Channels.newChannel(captureStdout);
+				WritableByteChannel output = Channels.newChannel(encoderStdin)) {
 			ByteBuffer buffer = ByteBuffer.allocateDirect(COPY_BUFFER_BYTES);
 			while (input.read(buffer) != -1) {
 				buffer.flip();
@@ -632,7 +668,8 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		});
 	}
 
-	private static void drainWarnings(InputStream stream, String prefix) {
+	/** @param stream the piped stream, or null when the process was spawned without it */
+	private static void drainWarnings(@Nullable InputStream stream, String prefix) {
 		if (stream == null) {
 			return;
 		}
@@ -675,15 +712,11 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			killAudioTracks(audio);
 			return StartResult.failed("No audio device produced any sound data.");
 		}
-		ActiveRecording recording = new ActiveRecording();
-		recording.video = null;
-		recording.audio = audio;
-		recording.outputPath = recordingsDir.resolve("recording-" + timestamp + ".m4a");
-		recording.startedAtMs = starts.stream().min(Long::compare).orElse(timestamp);
-		recording.keepSpeakerTracks = options.keepSpeakerTracks();
-		recording.pauseState = pauseState;
-		recording.micNoiseReduction = currentMicNoiseReduction();
-		recording.timestamp = timestamp;
+		ActiveRecording recording = new ActiveRecording(
+				null, audio, recordingsDir.resolve("recording-" + timestamp + ".m4a"),
+				starts.stream().min(Long::compare).orElse(timestamp), options.keepSpeakerTracks(),
+				pauseState, currentMicNoiseReduction(), timestamp,
+				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
 		beginRecordingSession(recording);
 		LOG.log(System.Logger.Level.INFO, "Recording audio only to " + recording.outputPath);
 		return StartResult.ok();
@@ -849,8 +882,12 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		command.addAll(args);
 		try {
 			SpawnedProcess process = processes.spawn(command, new SpawnOptions(false, false, true));
+			InputStream errorStream = process.stderr();
 			CompletableFuture<String> stderr = CompletableFuture.supplyAsync(() -> {
-				try (InputStream in = process.stderr()) {
+				if (errorStream == null) {
+					return "";
+				}
+				try (InputStream in = errorStream) {
 					return new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
 				} catch (IOException error) {
 					return "";
@@ -1028,7 +1065,8 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 				recording.micNoiseReduction,
 				false));
 		if (!mux.success()) {
-			return StopResult.failed(mux.error());
+			return StopResult.failed(
+					java.util.Objects.requireNonNull(mux.error(), "failed mux result has no error"));
 		}
 
 		removeCosmicTempFiles(recording);
@@ -1093,40 +1131,50 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		removeCosmicTempFiles(recording);
 	}
 
-	/** Waits for the next mouse click anywhere and resolves with the output under it. */
-	public CompletableFuture<CosmicOutput> waitForCosmicOutputClick(long timeoutMs) {
-		CompletableFuture<CosmicOutput> result = new CompletableFuture<>();
+	/**
+	 * Waits for the next mouse click anywhere and resolves with the output under it.
+	 *
+	 * @return a future with the picked output, or null when nothing was picked (timeout, no click,
+	 *     helper failure)
+	 */
+	public CompletableFuture<@Nullable CosmicOutput> waitForCosmicOutputClick(long timeoutMs) {
+		CompletableFuture<@Nullable CosmicOutput> result = new CompletableFuture<>();
 		SpawnedProcess helper;
 		try {
 			helper = processes.spawn(
 					List.of(environment.cursorHelper().toString()),
 					new SpawnOptions(true, true, false));
 		} catch (IOException error) {
-			return CompletableFuture.completedFuture(null);
+			return CompletableFuture.<@Nullable CosmicOutput>completedFuture(null);
 		}
 		AtomicBoolean settled = new AtomicBoolean(false);
-		java.util.concurrent.atomic.AtomicReference<int[]> point = new java.util.concurrent.atomic.AtomicReference<>();
+		java.util.concurrent.atomic.AtomicReference<PickPoint> point =
+				new java.util.concurrent.atomic.AtomicReference<>();
 		ScheduledFuture<?> timer = diskChecker.schedule(
 				() -> finishOutputPick(result, settled, helper, null), timeoutMs, TimeUnit.MILLISECONDS);
+		InputStream helperStdout = helper.stdout();
 		Thread.ofPlatform().daemon().name("gravaai-output-pick").start(() -> {
-			int[] picked = null;
-			try (BufferedReader reader = new BufferedReader(
-					new InputStreamReader(helper.stdout(), StandardCharsets.UTF_8))) {
-				String line;
-				while (!settled.get() && (line = reader.readLine()) != null) {
-					Matcher position = POSITION_LINE.matcher(line);
-					if (position.matches()) {
-						point.set(new int[] {
-								Integer.parseInt(position.group(1)), Integer.parseInt(position.group(2))});
-						continue;
+			PickPoint picked = null;
+			if (helperStdout != null) {
+				try (BufferedReader reader = new BufferedReader(
+						new InputStreamReader(helperStdout, StandardCharsets.UTF_8))) {
+					String line;
+					while (!settled.get() && (line = reader.readLine()) != null) {
+						Matcher position = POSITION_LINE.matcher(line);
+						if (position.matches()) {
+							point.set(new PickPoint(Integer.parseInt(position.group(1)),
+									Integer.parseInt(position.group(2))));
+							continue;
+						}
+						PickPoint current = point.get();
+						if (line.startsWith("INTERACTION:mousedown") && current != null) {
+							picked = current;
+							break;
+						}
 					}
-					if (line.startsWith("INTERACTION:mousedown") && point.get() != null) {
-						picked = point.get();
-						break;
-					}
+				} catch (IOException error) {
+					// Helper exited.
 				}
-			} catch (IOException error) {
-				// Helper exited.
 			}
 			timer.cancel(false);
 			finishOutputPick(result, settled, helper, picked);
@@ -1134,11 +1182,15 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		return result;
 	}
 
+	/** One click position in helper coordinates. */
+	private record PickPoint(int x, int y) {
+	}
+
 	private void finishOutputPick(
-			CompletableFuture<CosmicOutput> result,
+			CompletableFuture<@Nullable CosmicOutput> result,
 			AtomicBoolean settled,
 			SpawnedProcess helper,
-			@Nullable int[] picked) {
+			@Nullable PickPoint picked) {
 		if (!settled.compareAndSet(false, true)) {
 			return;
 		}
@@ -1150,7 +1202,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}
 		Thread.ofVirtual().start(() -> {
 			try {
-				result.complete(CosmicSources.outputAt(listCosmicOutputs(), picked[0], picked[1]));
+				result.complete(CosmicSources.outputAt(listCosmicOutputs(), picked.x(), picked.y()));
 			} catch (IOException | RuntimeException error) {
 				result.complete(null);
 			}
@@ -1167,15 +1219,23 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	/** Runs a command, returns stdout, throws when it exits non-zero (like {@code execFile}). */
 	private byte[] runAndCapture(List<String> command) throws IOException {
 		SpawnedProcess process = processes.spawn(command, new SpawnOptions(false, true, true));
+		InputStream stdoutPipe = process.stdout();
+		InputStream stderrPipe = process.stderr();
 		CompletableFuture<byte[]> stdout = CompletableFuture.supplyAsync(() -> {
-			try (InputStream in = process.stdout()) {
+			if (stdoutPipe == null) {
+				return new byte[0];
+			}
+			try (InputStream in = stdoutPipe) {
 				return in.readAllBytes();
 			} catch (IOException error) {
 				return new byte[0];
 			}
 		});
 		CompletableFuture<byte[]> stderr = CompletableFuture.supplyAsync(() -> {
-			try (InputStream in = process.stderr()) {
+			if (stderrPipe == null) {
+				return new byte[0];
+			}
+			try (InputStream in = stderrPipe) {
 				return in.readAllBytes();
 			} catch (IOException error) {
 				return new byte[0];

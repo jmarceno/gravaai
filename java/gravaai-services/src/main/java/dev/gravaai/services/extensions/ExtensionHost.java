@@ -26,8 +26,6 @@ import org.graalvm.polyglot.Engine;
  * <p>Threading: the host and its contexts are used from one thread at a time (the editor/render
  * thread), which is what the compositor already guarantees for its canvas.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExtensionHost implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(ExtensionHost.class.getName());

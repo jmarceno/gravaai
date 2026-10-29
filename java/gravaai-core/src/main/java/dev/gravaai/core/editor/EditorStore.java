@@ -112,7 +112,7 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
-	public void setAudioRegions(@Nullable List<AudioRegion> regions) {
+	public void setAudioRegions(List<AudioRegion> regions) {
 		ObjectNode json = editorJson();
 		json.set("audioRegions", ProjectDocument.writeAudioRegions(regions));
 		state = ProjectPersistence.normalizeProjectEditor(json);
@@ -162,7 +162,8 @@ public final class EditorStore {
 		setClipRegions(snapshot.clipRegions());
 		setSpeedRegions(snapshot.speedRegions());
 		setAnnotationRegions(snapshot.annotationRegions());
-		setAudioRegions(snapshot.audioRegions());
+		setAudioRegions(java.util.Objects.requireNonNull(snapshot.audioRegions(),
+				"snapshot audio regions"));
 		setAutoCaptions(snapshot.autoCaptions());
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();

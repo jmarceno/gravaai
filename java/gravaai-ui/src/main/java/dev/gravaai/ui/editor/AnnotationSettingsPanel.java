@@ -48,8 +48,6 @@ import javafx.scene.layout.VBox;
  * undo/redo and project saving see the same state. Image annotations keep their content from the
  * annotation tool (there is no image-picker seam in the core model yet).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AnnotationSettingsPanel extends VBox {
 
 	public record PositionPreset(String id, String label, double x, double y) {}

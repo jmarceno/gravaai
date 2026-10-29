@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
@@ -67,7 +68,7 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	}
 
 	@Override
-	public Result<Void> revealMeeting(Path mediaPath) {
+	public Result<Unit> revealMeeting(Path mediaPath) {
 		return service.revealMeeting(mediaPath);
 	}
 
@@ -77,7 +78,7 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	}
 
 	@Override
-	public Result<Void> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
+	public Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
 		return service.saveFile(mediaPath, kind, content);
 	}
 
@@ -107,12 +108,12 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	}
 
 	@Override
-	public CompletableFuture<Result<Void>> downloadAsset(String assetId) {
+	public CompletableFuture<Result<Unit>> downloadAsset(String assetId) {
 		return service.downloadAsset(assetId);
 	}
 
 	@Override
-	public Result<Void> removeAsset(String assetId) {
+	public Result<Unit> removeAsset(String assetId) {
 		return service.removeAsset(assetId);
 	}
 

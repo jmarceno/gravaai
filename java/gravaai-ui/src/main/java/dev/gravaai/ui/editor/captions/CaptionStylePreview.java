@@ -21,8 +21,6 @@ import javafx.scene.text.TextAlignment;
  * Captions section (editor shell) embeds this and calls {@link #setSettings(AutoCaptionSettings)}
  * whenever the user changes font size, width, colours, radius, offset or background opacity.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionStylePreview extends Pane {
 
 	private final Label caption = new Label();

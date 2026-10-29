@@ -20,8 +20,6 @@ import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
  * next to the video is ever written. Nothing is logged beyond event counts, and "shortcuts" mode
  * never stores plain typing.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class KeystrokeCapture {
 
 	/** App setting that stores the capture mode. */
@@ -100,9 +98,6 @@ public final class KeystrokeCapture {
 
 		@Override
 		public void handleLine(String line, long timeMs, boolean record) {
-			if (line == null) {
-				return;
-			}
 			Matcher match = KEY_LINE.matcher(line);
 			if (!match.matches()) {
 				return;
@@ -147,10 +142,11 @@ public final class KeystrokeCapture {
 	}
 
 	// The recorder lives until the recording is persisted, which happens after the interaction
-	// capture cleanup has already stopped the helper.
-	private static volatile KeystrokeRecorder activeRecorder;
+	// capture cleanup has already stopped the helper. Null until one is installed.
+	private static volatile @Nullable KeystrokeRecorder activeRecorder;
 
-	public static void setActiveKeystrokeRecorder(KeystrokeRecorder recorder) {
+	/** @param recorder the active recorder, or null when keystroke capture is off */
+	public static void setActiveKeystrokeRecorder(@Nullable KeystrokeRecorder recorder) {
 		activeRecorder = recorder;
 	}
 

@@ -15,16 +15,18 @@ import dev.gravaai.media.export.ExportProgress;
  * it like the React hook: views subscribe with {@link #onChange(Runnable)} and re-render, the
  * app-side controller mutates it on the FX thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportSessionModel {
 
 	/** The four popover states of the React export menu. */
 	public enum Screen { SETTINGS, PROGRESS, ERROR, COMPLETE }
 
-	/** A rendered export waiting to be saved (port of {@code PendingExportSave}). */
+	/**
+	 * A rendered export waiting to be saved (port of {@code PendingExportSave}).
+	 *
+	 * @param captionSidecar the caption sidecar payload, or null when the export has no captions
+	 */
 	public record PendingExportSave(String fileName, Path stagedFile,
-			CaptionSidecars.Payload captionSidecar) {}
+			CaptionSidecars.@Nullable Payload captionSidecar) {}
 
 	private boolean exporting;
 	private @Nullable ExportProgress progress;
@@ -68,7 +70,7 @@ public final class ExportSessionModel {
 		}
 	}
 
-	public ExportProgress progress() {
+	public @Nullable ExportProgress progress() {
 		return progress;
 	}
 
@@ -79,7 +81,7 @@ public final class ExportSessionModel {
 		}
 	}
 
-	public String error() {
+	public @Nullable String error() {
 		return error;
 	}
 
@@ -101,7 +103,7 @@ public final class ExportSessionModel {
 		}
 	}
 
-	public String exportedFilePath() {
+	public @Nullable String exportedFilePath() {
 		return exportedFilePath;
 	}
 

@@ -53,8 +53,6 @@ import javafx.util.Duration;
  * the same 400 ms debounce as the React page (and flushed before a run); the engine and file store
  * belong to {@code services.automations} and are reached through {@link AutomationsController}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutomationsSettingsView extends VBox {
 
 	/** Port of {@code SAVE_DEBOUNCE_MS}. */
@@ -142,7 +140,9 @@ public final class AutomationsSettingsView extends VBox {
 	private CompletableFuture<Boolean> save(AutomationsFile snapshot, boolean notify) {
 		saving = true;
 		refreshDirtyHint(false);
-		return CompletableFuture.supplyAsync(() -> controller.saveAutomations(Automations.toJson(snapshot)))
+		return CompletableFuture.supplyAsync(() -> controller.saveAutomations(
+				java.util.Objects.requireNonNull(Automations.toJson(snapshot),
+						"automations serialiser produced no document")))
 				.thenApplyAsync(result -> {
 					saving = false;
 					if (result.isOk()) {
@@ -302,8 +302,12 @@ public final class AutomationsSettingsView extends VBox {
 	}
 
 	private void removeRule(AutomationRule rule) {
+		AutomationsFile currentFile = file;
+		if (currentFile == null) {
+			return;
+		}
 		List<AutomationRule> rules = new ArrayList<>();
-		for (AutomationRule entry : file.rules()) {
+		for (AutomationRule entry : currentFile.rules()) {
 			if (!entry.id().equals(rule.id())) {
 				rules.add(entry);
 			}
@@ -386,7 +390,7 @@ public final class AutomationsSettingsView extends VBox {
 			Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
 			return;
 		}
-		AutomationRunResult run = result.orElse(null);
+		AutomationRunResult run = result.orNull();
 		if (run == null) {
 			return;
 		}
@@ -461,7 +465,9 @@ public final class AutomationsSettingsView extends VBox {
 			body.getStyleClass().add("automations-settings__rule-body");
 			body.getChildren().addAll(buildTriggerRow(), buildConditions(), buildActions(),
 					buildPlaceholders());
-			List<String> issues = Automations.automationRuleIssues(rule);
+			List<String> issues = java.util.Objects.requireNonNull(
+					Automations.automationRuleIssues(rule),
+					"automation rule issues");
 			if (!issues.isEmpty()) {
 				VBox issueList = new VBox(4);
 				issueList.getStyleClass().add("automations-settings__issues");
@@ -486,9 +492,12 @@ public final class AutomationsSettingsView extends VBox {
 			Select trigger = new Select();
 			trigger.setPrefWidth(288);
 			for (AutomationTrigger value : AutomationTrigger.values()) {
-				trigger.item(value.wire(), Automations.automationTriggerLabel(value));
+				trigger.item(java.util.Objects.requireNonNull(value.wire(), "trigger wire value"),
+						Automations.automationTriggerLabel(value));
 			}
-			trigger.value(rule.trigger().wire());
+			AutomationTrigger ruleTrigger = java.util.Objects.requireNonNull(rule.trigger(),
+					"automation rule without a trigger");
+			trigger.value(java.util.Objects.requireNonNull(ruleTrigger.wire(), "trigger wire value"));
 			trigger.onValueChange(wire -> {
 				AutomationTrigger next = AutomationTrigger.fromWire(wire);
 				if (next == null || next == rule.trigger()) {
@@ -545,7 +554,9 @@ public final class AutomationsSettingsView extends VBox {
 						&& rule.trigger() != AutomationTrigger.EXPORT_FINISHED) {
 					continue;
 				}
-				type.item(candidate.wire(), Automations.AUTOMATION_CONDITION_LABELS.get(candidate));
+				type.item(candidate.wire(), java.util.Objects.requireNonNull(
+						Automations.AUTOMATION_CONDITION_LABELS.get(candidate),
+						"missing condition label for " + candidate));
 			}
 			type.value(condition.type().wire());
 			type.onValueChange(wire -> {
@@ -564,7 +575,10 @@ public final class AutomationsSettingsView extends VBox {
 				formatSelect.setPrefWidth(112);
 				formatSelect.item("mp4", "MP4");
 				formatSelect.item("gif", "GIF");
-				formatSelect.value(format.format().wire());
+				AutomationExportFormat selectedFormat = java.util.Objects.requireNonNull(
+						format.format(), "export format condition without a format");
+				formatSelect.value(java.util.Objects.requireNonNull(selectedFormat.wire(),
+						"export format wire value"));
 				formatSelect.onValueChange(wire -> {
 					AutomationExportFormat next = AutomationExportFormat.fromWire(wire);
 					if (next == null || next == format.format()) {
@@ -643,9 +657,14 @@ public final class AutomationsSettingsView extends VBox {
 				if (!Automations.actionAllowedForTrigger(candidate, rule.trigger())) {
 					continue;
 				}
-				type.item(candidate.wire(), Automations.AUTOMATION_ACTION_LABELS.get(candidate));
+				type.item(java.util.Objects.requireNonNull(candidate.wire(), "action wire value"),
+						java.util.Objects.requireNonNull(
+								Automations.AUTOMATION_ACTION_LABELS.get(candidate),
+								"missing action label for " + candidate));
 			}
-			type.value(action.type().wire());
+			AutomationActionType actionType = java.util.Objects.requireNonNull(action.type(),
+					"automation action without a type");
+			type.value(java.util.Objects.requireNonNull(actionType.wire(), "action wire value"));
 			type.onValueChange(wire -> {
 				AutomationActionType next = AutomationActionType.fromWire(wire);
 				if (next == null || next == action.type()) {
@@ -754,7 +773,7 @@ public final class AutomationsSettingsView extends VBox {
 			return null;
 		}
 
-		private Node folderFields(HBox row, int index, String folder, String fileName,
+		private Node folderFields(HBox row, int index, String folder, @Nullable String fileName,
 				boolean copyAction) {
 			Input folderInput = new Input();
 			folderInput.setText(folder);

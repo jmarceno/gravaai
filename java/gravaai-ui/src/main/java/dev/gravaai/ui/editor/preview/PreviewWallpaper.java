@@ -14,8 +14,6 @@ import dev.gravaai.media.compose.MediaFrameReader;
  *
  * <p>Used on the decode/engine threads; the owning surface closes it exactly once on dispose.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PreviewWallpaper implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.preview");

@@ -1,5 +1,7 @@
 package dev.gravaai.app;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.platform.filemanager.FileManager;
 import dev.gravaai.platform.notification.Notifications;
 import dev.gravaai.platform.portal.Portal;
@@ -19,11 +21,17 @@ public final class AppAutomationHost implements AutomationHost {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
 
-	private final Portal portal;
-	private final FileManager fileManager;
-	private final Notifications notifications;
+	private final @Nullable Portal portal;
+	private final @Nullable FileManager fileManager;
+	private final @Nullable Notifications notifications;
 
-	public AppAutomationHost(Portal portal, FileManager fileManager, Notifications notifications) {
+	/**
+	 * @param portal the xdg-desktop-portal, or {@code null} when unavailable
+	 * @param fileManager the FileManager1 service, or {@code null} when unavailable
+	 * @param notifications the notification daemon, or {@code null} when unavailable
+	 */
+	public AppAutomationHost(@Nullable Portal portal, @Nullable FileManager fileManager,
+			@Nullable Notifications notifications) {
 		this.portal = portal;
 		this.fileManager = fileManager;
 		this.notifications = notifications;

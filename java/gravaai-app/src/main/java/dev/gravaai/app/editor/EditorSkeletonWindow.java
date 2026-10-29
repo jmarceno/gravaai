@@ -1,5 +1,7 @@
 package dev.gravaai.app.editor;
 
+import org.jspecify.annotations.Nullable;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -19,8 +21,6 @@ import javafx.stage.StageStyle;
  * <p>Deliberately tiny (one StackPane, one ImageView, one Label) so its construction stays a few
  * milliseconds; the full editor chrome arrives with the real window.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorSkeletonWindow {
 
 	private final Stage stage;
@@ -41,7 +41,7 @@ public final class EditorSkeletonWindow {
 		return show(new Stage(), projectName, null, true);
 	}
 
-	public static EditorSkeletonWindow show(String projectName, Image posterImage) {
+	public static EditorSkeletonWindow show(String projectName, @Nullable Image posterImage) {
 		// The single-window app hosts the skeleton on the primary stage; this standalone variant is
 		// kept for tools/tests that deliberately want a throwaway window.
 		return show(new Stage(StageStyle.UNDECORATED), projectName, posterImage, true);
@@ -51,12 +51,13 @@ public final class EditorSkeletonWindow {
 	 * Builds the skeleton on an already-created stage (the JavaFX primary stage), which avoids a
 	 * second native window creation on the startup budget path.
 	 */
-	public static EditorSkeletonWindow show(Stage stage, String projectName, Image posterImage) {
+	public static EditorSkeletonWindow show(Stage stage, String projectName,
+			@Nullable Image posterImage) {
 		return show(stage, projectName, posterImage, false);
 	}
 
-	private static EditorSkeletonWindow show(Stage stage, String projectName, Image posterImage,
-			boolean ownsStage) {
+	private static EditorSkeletonWindow show(Stage stage, String projectName,
+			@Nullable Image posterImage, boolean ownsStage) {
 		ImageView poster = new ImageView();
 		poster.setPreserveRatio(true);
 		poster.setSmooth(true);
@@ -81,7 +82,7 @@ public final class EditorSkeletonWindow {
 	}
 
 	/** Shows the first project frame (poster) in the preview area. */
-	public void setPoster(Image image) {
+	public void setPoster(@Nullable Image image) {
 		if (image == null || image.isError()) {
 			return;
 		}

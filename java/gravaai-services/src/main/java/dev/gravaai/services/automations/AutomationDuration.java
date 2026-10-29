@@ -23,7 +23,7 @@ public final class AutomationDuration {
 
 	private static final Map<Path, CacheEntry> DURATION_CACHE = new ConcurrentHashMap<>();
 
-	@Nullable private AutomationDuration() {}
+	private AutomationDuration() {}
 
 	public static @Nullable Double probeAutomationDurationSec(Path filePath, AutomationDurationProbe probe) {
 		String fingerprint;

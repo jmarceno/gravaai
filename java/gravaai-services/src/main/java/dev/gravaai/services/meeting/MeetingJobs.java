@@ -20,8 +20,6 @@ import java.util.function.Supplier;
  * .meeting.json so a crash shows up as "interrupted" with a retry. Ported from
  * electron/ipc/meeting/jobs.ts.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingJobs {
 
 	/** Finished jobs kept around for the UI. */
@@ -32,14 +30,20 @@ public final class MeetingJobs {
 	/** Runs one job; the queue supplies settings and a cancellation signal. */
 	public interface Pipeline {
 
+		/**
+		 * @param onStatus the stage callback, or null when the caller does not track stages
+		 */
 		void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-				CancelSignal signal, StageListener onStatus);
+				CancelSignal signal, @Nullable StageListener onStatus);
 	}
 
 	/** Maps a pipeline status callback onto the job's stage field. */
 	public interface StageListener {
 
-		void onStatus(MeetingJob.Stage stage, String message, Integer progress);
+		/**
+		 * @param progress the percentage, or null when the stage cannot estimate progress
+		 */
+		void onStatus(MeetingJob.Stage stage, String message, @Nullable Integer progress);
 	}
 
 	private static final class JobState {
@@ -87,9 +91,10 @@ public final class MeetingJobs {
 	private final Consumer<Path> onNotesReady;
 	private boolean draining;
 
+	/** @param onNotesReady the notes-ready hook, or null when automations are off */
 	public MeetingJobs(Pipeline pipeline, Supplier<MeetingSettings> settings,
 			MeetingMetaStore metaStore, Clock clock, Supplier<String> ids, Executor executor,
-			Consumer<Path> onNotesReady) {
+			@Nullable Consumer<Path> onNotesReady) {
 		this.pipeline = pipeline;
 		this.settings = settings;
 		this.metaStore = metaStore;
@@ -269,7 +274,8 @@ public final class MeetingJobs {
 		return new MeetingMetaPatch().lastJob(new MeetingMeta.LastJob(mode.wire(), status, error, at));
 	}
 
-	private void update(JobState job, MeetingJob.Stage stage, String message, Integer progress) {
+	private void update(JobState job, MeetingJob.Stage stage, String message,
+			@Nullable Integer progress) {
 		synchronized (lock) {
 			job.stage = stage;
 			job.message = message;

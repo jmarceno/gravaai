@@ -25,8 +25,6 @@ import javafx.scene.paint.Stop;
  * the thumbnails generated into {@code resources/ui/editor/wallpapers/} (a 160x120 {@code thumbs/}
  * and a 1280x720 {@code previews/} copy of each built-in image).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorWallpapers {
 
 	/** One wallpaper tile. */
@@ -99,11 +97,11 @@ public final class EditorWallpapers {
 
 	/** {@code isVideoWallpaperSource}. */
 	public static boolean isVideoWallpaper(@Nullable String value) {
-		return dev.gravaai.media.compose.Background.isVideoWallpaper(value);
+		return value != null && dev.gravaai.media.compose.Background.isVideoWallpaper(value);
 	}
 
 	/** True for an Electron wallpaper path ({@code /wallpapers/...}). */
-	public static boolean isBundledWallpaper(String value) {
+	public static boolean isBundledWallpaper(@Nullable String value) {
 		return value != null && value.startsWith("/wallpapers/");
 	}
 
@@ -132,16 +130,16 @@ public final class EditorWallpapers {
 	}
 
 	/** Thumbnail image for a wallpapers/ path; null for colours/gradients/custom files. */
-	public static @Nullable Image thumbnail(String value) {
-		if (!isBundledWallpaper(value)) {
+	public static @Nullable Image thumbnail(@Nullable String value) {
+		if (value == null || !isBundledWallpaper(value)) {
 			return null;
 		}
 		return load("/ui/editor/wallpapers/thumbs/" + fileName(value));
 	}
 
 	/** Preview-resolution image (1280x720) for the preview stage. */
-	public static @Nullable Image preview(String value) {
-		if (!isBundledWallpaper(value)) {
+	public static @Nullable Image preview(@Nullable String value) {
+		if (value == null || !isBundledWallpaper(value)) {
 			return null;
 		}
 		return load("/ui/editor/wallpapers/previews/" + fileName(value));
@@ -164,6 +162,9 @@ public final class EditorWallpapers {
 
 	/** Parses a colour or CSS gradient; falls back to the given colour for images/custom files. */
 	public static Paint paintFor(@Nullable String value, Color fallback) {
+		if (value == null) {
+			return fallback;
+		}
 		if (isHexColor(value)) {
 			return Color.web(value.trim());
 		}

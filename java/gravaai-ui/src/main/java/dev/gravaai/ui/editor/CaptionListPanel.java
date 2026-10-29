@@ -31,8 +31,6 @@ import javafx.scene.layout.VBox;
  * timecodes and split/merge/delete, all as {@link CaptionCommands} on the shared
  * {@link EditorStore}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionListPanel extends VBox {
 
 	private static final Pattern TIMECODE =
@@ -174,7 +172,7 @@ public final class CaptionListPanel extends VBox {
 	}
 
 	/** {@code formatTimecode}: {@code m:ss.mmm} with a 0 floor. */
-	public static @Nullable String formatTimecode(long ms) {
+	public static String formatTimecode(long ms) {
 		long safeMs = Math.max(0, Math.round(ms));
 		long minutes = safeMs / 60_000;
 		long seconds = (safeMs % 60_000) / 1_000;

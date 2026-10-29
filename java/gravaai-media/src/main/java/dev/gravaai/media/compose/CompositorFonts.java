@@ -43,7 +43,7 @@ final class CompositorFonts {
 	private static final Map<Face, Typeface> TYPEFACES = new EnumMap<>(Face.class);
 	private static final Map<Face, Data> DATA = new EnumMap<>(Face.class);
 
-	@Nullable private CompositorFonts() {
+	private CompositorFonts() {
 	}
 
 	/** The DM Sans typeface for a face, or null when the bundled resource is unavailable. */

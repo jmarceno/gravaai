@@ -19,7 +19,7 @@ public final class TranscriptTimeMap {
 
 	private final List<ClipRegion> clips;
 
-	@Nullable public TranscriptTimeMap(List<ClipRegion> clips) {
+	public TranscriptTimeMap(List<ClipRegion> clips) {
 		List<ClipRegion> sorted = clips == null ? List.of() : new ArrayList<>(clips);
 		sorted.sort(Comparator.comparingLong(ClipRegion::startMs));
 		this.clips = List.copyOf(sorted);

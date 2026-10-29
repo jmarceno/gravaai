@@ -18,8 +18,6 @@ import dev.gravaai.media.ffmpeg.VideoDecoder;
  * returned {@link RgbaFrame} uses one of two direct buffers in turn, so it stays valid until the
  * decode after next.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MediaFrameReader implements AutoCloseable {
 
 	private final Path path;
@@ -44,7 +42,7 @@ public final class MediaFrameReader implements AutoCloseable {
 		this.durationSeconds = durationOverrideSeconds > 0 ? durationOverrideSeconds : 0;
 	}
 
-	public @Nullable double durationSeconds() {
+	public double durationSeconds() {
 		if (durationSeconds <= 0) {
 			try {
 				MediaInfo info = MediaProbe.probe(path);
@@ -59,13 +57,14 @@ public final class MediaFrameReader implements AutoCloseable {
 		return durationSeconds > 0 ? durationSeconds : 0;
 	}
 
+	/** The frame at {@code seconds}, or null at end of file/unreadable media. */
 	public @Nullable RgbaFrame decode(double seconds) {
 		if (!Files.isReadable(path)) {
 			return null;
 		}
-		ensureOpen();
-		decoder.seekPrecise(Math.max(0, Math.round(seconds * 1_000_000)));
-		return convert(decoder.next());
+		VideoDecoder activeDecoder = ensureOpen();
+		activeDecoder.seekPrecise(Math.max(0, Math.round(seconds * 1_000_000)));
+		return convert(activeDecoder.next());
 	}
 
 	/**
@@ -81,8 +80,9 @@ public final class MediaFrameReader implements AutoCloseable {
 		if (lastFrame == null || targetUs < lastPtsUs || targetUs - lastEndUs > 1_000_000) {
 			return decode(seconds);
 		}
+		VideoDecoder activeDecoder = ensureOpen();
 		while (true) {
-			DecodedFrame frame = decoder.next();
+			DecodedFrame frame = activeDecoder.next();
 			if (frame == null) {
 				return lastFrame;
 			}
@@ -131,9 +131,11 @@ public final class MediaFrameReader implements AutoCloseable {
 		return lastFrame;
 	}
 
-	private void ensureOpen() {
-		if (decoder == null) {
-			decoder = VideoDecoder.open(path);
+	private VideoDecoder ensureOpen() {
+		VideoDecoder open = decoder;
+		if (open == null) {
+			open = VideoDecoder.open(path);
+			decoder = open;
 			if (colour == null && video) {
 				try {
 					MediaInfo info = MediaProbe.probe(path);
@@ -146,6 +148,7 @@ public final class MediaFrameReader implements AutoCloseable {
 				}
 			}
 		}
+		return open;
 	}
 
 	@Override

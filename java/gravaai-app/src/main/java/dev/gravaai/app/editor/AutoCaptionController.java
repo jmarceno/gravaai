@@ -33,8 +33,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Port of {@code useAutoCaptionController.ts}: Whisper model selection, download and delete,
  * caption generation for the open project, and applying the generated cues to the editor.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutoCaptionController implements CaptionModelUiService, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(AutoCaptionController.class.getName());
@@ -100,9 +98,12 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 			return new State(persisted == null ? null : persisted.wire(), persistedPath,
 					DownloadStatus.DOWNLOADED, 100, false);
 		}
-		if (persisted != null && models.existingPath(persisted) != null) {
-			return new State(persisted.wire(), models.existingPath(persisted).toString(),
-					DownloadStatus.DOWNLOADED, 100, false);
+		if (persisted != null) {
+			Path existing = models.existingPath(persisted);
+			if (existing != null) {
+				return new State(persisted.wire(), existing.toString(), DownloadStatus.DOWNLOADED,
+						100, false);
+			}
 		}
 		Path small = models.existingPath(WhisperModel.SMALL);
 		return small == null
@@ -147,7 +148,8 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 
 	@Override
 	public void downloadSmallModel() {
-		WhisperModel selected = WhisperModel.fromWire(state.modelId());
+		String modelId = state.modelId();
+		WhisperModel selected = modelId == null ? null : WhisperModel.fromWire(modelId);
 		download(selected == null ? WhisperModel.SMALL : selected);
 	}
 
@@ -179,12 +181,13 @@ public final class AutoCaptionController implements CaptionModelUiService, AutoC
 
 	@Override
 	public void deleteSmallModel() {
-		WhisperModel selected = WhisperModel.fromWire(state.modelId());
+		String modelId = state.modelId();
+		WhisperModel selected = modelId == null ? null : WhisperModel.fromWire(modelId);
 		try {
 			if (selected != null) {
 				models.delete(selected);
 			}
-			setState(new State(state.modelId(), null, DownloadStatus.IDLE, 0, state.generating()));
+			setState(new State(modelId, null, DownloadStatus.IDLE, 0, state.generating()));
 			persistPath(null);
 			toast("Whisper model deleted", Toast.Variant.SUCCESS);
 		} catch (IOException error) {

@@ -11,8 +11,6 @@ import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
  * Reads the rotation from a stream's display-matrix side data (plan §5.7: "rotation from
  * display matrix"). Shared by {@link MediaProbe} and {@link VideoDecoder}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class DisplayMatrix {
 
 	private DisplayMatrix() {}

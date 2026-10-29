@@ -1,5 +1,7 @@
 package dev.gravaai.services.shortcuts;
 
+import org.jspecify.annotations.Nullable;
+
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -12,7 +14,7 @@ import tools.jackson.databind.JsonNode;
 public interface GlobalShortcutSettings {
 
 	/** The stored value, or null when the setting has never been written. */
-	JsonNode read();
+	@Nullable JsonNode read();
 
 	/** Replaces the stored value. */
 	void write(JsonNode value);

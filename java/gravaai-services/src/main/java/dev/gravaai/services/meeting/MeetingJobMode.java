@@ -18,12 +18,16 @@ public enum MeetingJobMode {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	/** Null when the value is not a supported mode (the IPC handler answers 400 then). */
-	public static @Nullable MeetingJobMode fromWire(Object value) {
+	/**
+	 * Null when the value is not a supported mode (the IPC handler answers 400 then).
+	 *
+	 * @param value the raw value, or null when the setting is absent
+	 */
+	public static @Nullable MeetingJobMode fromWire(@Nullable Object value) {
 		if (!(value instanceof String text)) {
 			return null;
 		}

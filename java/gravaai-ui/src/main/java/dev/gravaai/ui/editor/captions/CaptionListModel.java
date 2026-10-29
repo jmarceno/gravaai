@@ -62,12 +62,12 @@ public final class CaptionListModel {
 	}
 
 	/** Port of {@code canMerge}: only when a later cue exists. */
-	public static @Nullable boolean canMerge(int index, int cueCount) {
+	public static boolean canMerge(int index, int cueCount) {
 		return index >= 0 && index < cueCount - 1;
 	}
 
 	/** Port of the {@code clampNumber(currentTimeMs, cue.startMs, cue.endMs)} split position. */
-	public static @Nullable double splitAt(CaptionCue cue, double currentTimeMs) {
+	public static double splitAt(CaptionCue cue, double currentTimeMs) {
 		return Math.min(cue.endMs(), Math.max(cue.startMs(), currentTimeMs));
 	}
 
@@ -87,7 +87,7 @@ public final class CaptionListModel {
 	}
 
 	/** One committed timing range in milliseconds. */
-	public @Nullable record TimingCommit(long startMs, long endMs) {
+	public record TimingCommit(long startMs, long endMs) {
 	}
 
 	/**

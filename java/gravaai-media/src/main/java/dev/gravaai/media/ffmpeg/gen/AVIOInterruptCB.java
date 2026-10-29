@@ -2,6 +2,8 @@
 
 package dev.gravaai.media.ffmpeg.gen;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.invoke.*;
 import java.lang.foreign.*;
 import java.nio.ByteOrder;
@@ -213,16 +215,20 @@ public class AVIOInterruptCB {
     /**
      * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
      * The returned segment has size {@code layout().byteSize()}
+     * @param cleanup the cleanup action to run when the arena closes,
+     *        or {@code null} for none
      */
-    public static MemorySegment reinterpret(MemorySegment addr, Arena arena, Consumer<MemorySegment> cleanup) {
+    public static MemorySegment reinterpret(MemorySegment addr, Arena arena, @Nullable Consumer<MemorySegment> cleanup) {
         return reinterpret(addr, 1, arena, cleanup);
     }
 
     /**
      * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
      * The returned segment has size {@code elementCount * layout().byteSize()}
+     * @param cleanup the cleanup action to run when the arena closes,
+     *        or {@code null} for none
      */
-    public static MemorySegment reinterpret(MemorySegment addr, long elementCount, Arena arena, Consumer<MemorySegment> cleanup) {
+    public static MemorySegment reinterpret(MemorySegment addr, long elementCount, Arena arena, @Nullable Consumer<MemorySegment> cleanup) {
         return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
     }
 }

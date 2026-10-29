@@ -32,8 +32,6 @@ import javafx.scene.layout.VBox;
  * commands. The panel follows the store selection, so selecting a caption on the timeline or in
  * the caption list shows the same editor.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionListPanel extends VBox {
 
 	private final EditorStore store;
@@ -185,10 +183,9 @@ public final class CaptionListPanel extends VBox {
 	/** Rebuilds the editor from the store selection. */
 	public void refresh() {
 		CaptionCue cue = selectedCue();
-		boolean visible = cue != null;
-		setVisible(visible);
-		setManaged(visible);
-		if (!visible) {
+		setVisible(cue != null);
+		setManaged(cue != null);
+		if (cue == null) {
 			editedCueId = null;
 			return;
 		}

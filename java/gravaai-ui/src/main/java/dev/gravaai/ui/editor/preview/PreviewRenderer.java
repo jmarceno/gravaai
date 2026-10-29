@@ -27,8 +27,6 @@ import javafx.scene.image.ImageView;
  * engine lock). The 60 Hz GL loop draws the latest queued copy and only re-uploads when a new frame
  * arrived; older copies are coalesced away.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PreviewRenderer implements AutoCloseable {
 
 	private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
@@ -38,7 +36,7 @@ public final class PreviewRenderer implements AutoCloseable {
 	private final int height;
 	private final JavaFxPreviewSink sink;
 	private final PreviewFrameQueue queue = new PreviewFrameQueue();
-	private final AtomicReference<Compositor> compositor = new AtomicReference<>();
+	private final AtomicReference<@Nullable Compositor> compositor = new AtomicReference<>();
 	/** GL thread only: whether the tick with this parity drew a new frame. */
 	private final boolean[] drewAtTick = new boolean[2];
 	private final AtomicLong shutdownSerial = new AtomicLong();
@@ -140,8 +138,10 @@ public final class PreviewRenderer implements AutoCloseable {
 	/**
 	 * Registers the FX-thread callback that runs after each presented frame (annotation overlay
 	 * geometry refresh). Safe to call before the sink is attached.
+	 *
+	 * @param listener null clears the callback
 	 */
-	public void setPresentedListener(Runnable listener) {
+	public void setPresentedListener(@Nullable Runnable listener) {
 		sink.setPresentedListener(listener);
 	}
 

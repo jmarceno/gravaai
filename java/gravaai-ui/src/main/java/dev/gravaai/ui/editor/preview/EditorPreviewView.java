@@ -30,8 +30,6 @@ import javafx.scene.layout.Region;
  * (the GL context and compositor are size-bound). While no renderer is ready the control shows the
  * previous image (or nothing), and the first compositor frame replaces it.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorPreviewView extends Region {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui.preview");
@@ -40,7 +38,7 @@ public final class EditorPreviewView extends Region {
 	private static final int MAX_HEIGHT = 720;
 
 	private final ImageView imageView = new ImageView();
-	private final AtomicReference<PreviewFrameMapper.PreviewScene> scene =
+	private final AtomicReference<PreviewFrameMapper.@Nullable PreviewScene> scene =
 			new AtomicReference<>(null);
 	private final ReadOnlyBooleanWrapper ready = new ReadOnlyBooleanWrapper(false);
 	private final PreviewVideoReadiness readiness = new PreviewVideoReadiness(this::publishReady);
@@ -168,9 +166,11 @@ public final class EditorPreviewView extends Region {
 	 * draw or the renderer cannot accept it. This path never touches the playback controller: an
 	 * appearance repaint must not seek, because {@code PlaybackEngine.seek} flushes/restarts the
 	 * audio track and audibly cracks while playing.
+	 *
+	 * @param current the scene to composite with; null skips the submit (no scene yet)
 	 */
 	private boolean submitSnapshot(@Nullable PreviewFrameSnapshot snapshot, @Nullable PreviewRenderer target,
-			PreviewFrameMapper.PreviewScene current, boolean updateReadiness) {
+			PreviewFrameMapper.@Nullable PreviewScene current, boolean updateReadiness) {
 		if (snapshot == null || target == null || current == null) {
 			return false;
 		}
@@ -328,7 +328,8 @@ public final class EditorPreviewView extends Region {
 					return;
 				}
 				renderer = created;
-				created.setPresentedListener(framePresentedListener);
+				Runnable presentedListener = framePresentedListener;
+				created.setPresentedListener(presentedListener);
 				created.setOverlayHooks(overlayHooks);
 				try {
 					created.attach(imageView);

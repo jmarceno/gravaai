@@ -50,8 +50,6 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code safeStorage}; the Java build has no libsecret backend yet, so reading a plain string kept
  * by the Electron app works, while writing reports the gap instead of persisting plaintext.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class MeetingIntegration implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.app.meeting");
@@ -64,8 +62,8 @@ public final class MeetingIntegration implements AutoCloseable {
 	}
 
 	public static MeetingIntegration create(UserData userData, AppSettingsStore settingsStore,
-			dev.gravaai.app.recording.RecordingWiring recordingWiring, FileManager fileManager,
-			AutomationService automationService) {
+			dev.gravaai.app.recording.RecordingWiring recordingWiring,
+			@Nullable FileManager fileManager, @Nullable AutomationService automationService) {
 		MeetingService service = MeetingService.create(
 				userData.dir(),
 				settingsAdapter(settingsStore),
@@ -77,8 +75,12 @@ public final class MeetingIntegration implements AutoCloseable {
 				trashAdapter(),
 				revealAdapter(fileManager),
 				audioRecorder(recordingWiring),
-				mediaPath -> automationService.fireMeetingNotesReady(mediaPath.toString(),
-						MeetingFiles.meetingFilesFor(mediaPath).notes().toString()),
+				mediaPath -> {
+					if (automationService != null) {
+						automationService.fireMeetingNotesReady(mediaPath.toString(),
+								MeetingFiles.meetingFilesFor(mediaPath).notes().toString());
+					}
+				},
 				Clock.systemUTC());
 		LOG.log(System.Logger.Level.INFO, "meeting service ready");
 		return new MeetingIntegration(service);
@@ -207,7 +209,7 @@ public final class MeetingIntegration implements AutoCloseable {
 		};
 	}
 
-	private static Reveal revealAdapter(FileManager fileManager) {
+	private static Reveal revealAdapter(@Nullable FileManager fileManager) {
 		return path -> {
 			if (fileManager != null) {
 				fileManager.reveal(path);

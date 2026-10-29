@@ -19,9 +19,11 @@ import dev.gravaai.media.compose.WebcamSpec;
 import dev.gravaai.media.compose.ZoomFocus;
 import dev.gravaai.media.compose.ZoomMode;
 import dev.gravaai.media.compose.ZoomRegionSpec;
+import dev.gravaai.media.compose.KeystrokeSpec;
 import dev.gravaai.media.compose.LayoutCrop;
 import dev.gravaai.media.compose.LayoutPadding;
 import dev.gravaai.media.compose.LayoutSpec;
+import dev.gravaai.media.compose.SceneSpec;
 import dev.gravaai.media.compose.ZoomSpec;
 import dev.gravaai.media.playback.PlaybackFrame;
 
@@ -31,12 +33,10 @@ import dev.gravaai.media.playback.PlaybackFrame;
  * GL context; the preview panel owns one immutable {@link PreviewScene} snapshot so the decode
  * thread never reads a mutable editor store.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PreviewFrameMapper {
 
 	/** The parts of the editor state that do not depend on the frame. */
-	public record PreviewScene(@Nullable Background background, double backgroundBlur, LayoutSpec layout,
+	public record PreviewScene(Background background, double backgroundBlur, LayoutSpec layout,
 			FrameStyle style, ZoomSpec zoom, CursorTrack cursor, CursorSpec cursorSpec,
 			WebcamSpec webcam, java.nio.file.@Nullable Path videoWallpaper,
 			List<dev.gravaai.media.compose.AnnotationSpec> annotations,
@@ -47,9 +47,9 @@ public final class PreviewFrameMapper {
 		/**
 		 * The scene with one annotation's box moved/resized (percent of the recording rect) while
 		 * the overlay gesture is live, so the composited annotation follows the box before the
-		 * edit is committed to the store.
+		 * edit is committed to the store. {@code id} null leaves the scene untouched.
 		 */
-		public PreviewScene withAnnotationBox(String id, double x, double y, double width,
+		public PreviewScene withAnnotationBox(@Nullable String id, double x, double y, double width,
 				double height) {
 			if (annotations == null || id == null) {
 				return this;
@@ -129,7 +129,7 @@ public final class PreviewFrameMapper {
 	 * export renders.
 	 */
 	public static PreviewScene sceneFor(ProjectEditorState state, CursorTrack cursor,
-			java.nio.file.Path videoPath) {
+			java.nio.file.@Nullable Path videoPath) {
 		return new PreviewScene(PreviewBackgrounds.of(state.wallpaper()),
 				Math.max(0, state.backgroundBlur()), layoutFor(state), styleFor(state), zoomSpecFor(state),
 				cursor == null ? CursorTrack.NONE : cursor, cursorSpecFor(state), webcamSpecFor(state),
@@ -287,15 +287,16 @@ public final class PreviewFrameMapper {
 				: scene.editor() == null ? frame.timelineSeconds()
 				: dev.gravaai.core.project.Clips.mapTimelineTimeToSourceTime(
 						frame.timelineSeconds() * 1000, scene.editor().clipRegions()) / 1000.0;
+		KeystrokeSpec keystrokes = scene.keystrokes() == null
+				? KeystrokeSpec.DISABLED : scene.keystrokes();
+		SceneSpec sceneSpec = scene.editor() == null ? SceneSpec.FULL
+				: ProjectEditorInputs.sceneSpec(scene.editor(),
+						frame.timelineSeconds() * 1000);
 		return new FrameInput(frame.frameIndex(), frame.timelineSeconds(), frame.sourceFrame(),
 				frame.webcamFrame(), scene.cursor().around(sourceSeconds), background,
 				scene.backgroundBlur(), scene.layout(), scene.zoom(), scene.style(),
 				scene.cursorSpec(), scene.webcam(), scene.annotations(), scene.captions(),
-				scene.keystrokes(), scene.fade(),
-				scene.editor() == null ? null
-						: ProjectEditorInputs.sceneSpec(scene.editor(),
-								frame.timelineSeconds() * 1000),
-				sourceSeconds);
+				keystrokes, scene.fade(), sceneSpec, sourceSeconds);
 	}
 
 	/** A background-only frame (idle preview, gap over the timeline start). */

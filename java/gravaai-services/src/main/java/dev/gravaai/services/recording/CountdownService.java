@@ -16,8 +16,6 @@ import java.util.function.Consumer;
  * countdown window finished loading. The UI supplies {@link CountdownWindow} and receives ticks
  * through it plus {@code onRemaining} for the HUD.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CountdownService {
 
 	/** The TS result shape {@code { success, cancelled?, error? }}. */
@@ -153,7 +151,7 @@ public final class CountdownService {
 	}
 
 	/** Remaining seconds of the active countdown, or null when none is running. */
-	public Integer getActiveCountdown() {
+	public @Nullable Integer getActiveCountdown() {
 		synchronized (lock) {
 			return activeRemaining;
 		}
@@ -248,7 +246,11 @@ public final class CountdownService {
 				activeRemaining = remaining;
 			}
 			notifyRemaining(remaining);
-			window.sendTick(remaining);
+			CountdownWindow activeWindow = window;
+			if (activeWindow == null) {
+				return;
+			}
+			activeWindow.sendTick(remaining);
 		}
 
 		void open() {

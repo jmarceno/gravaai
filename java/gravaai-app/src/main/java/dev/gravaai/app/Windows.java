@@ -17,8 +17,6 @@ import javafx.stage.Stage;
  * so the shortcut dispatcher can address it), the primary stage hosts the dashboard, and the tray
  * callbacks drive both.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Windows {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
@@ -50,7 +48,7 @@ public final class Windows {
 	}
 
 	/** The HUD for the global-shortcut dispatcher; null until it is built. */
-	public GlobalShortcutHud hud() {
+	public @Nullable GlobalShortcutHud hud() {
 		return hud;
 	}
 

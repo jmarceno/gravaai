@@ -42,8 +42,6 @@ import io.github.humbleui.types.Rect;
  * Skija {@link Canvas} belongs to the caller (a raster surface in tests, the compositor's GPU
  * surface in preview/export); this object only draws into it and closes its own path builder.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Canvas2D implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger(Canvas2D.class.getName());
@@ -614,7 +612,7 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	@HostAccess.Export
-	public @Nullable double getCanvasHeight() {
+	public double getCanvasHeight() {
 		return height;
 	}
 
@@ -785,7 +783,7 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private @Nullable Snapshot snapshot() {
+	private Snapshot snapshot() {
 		return new Snapshot(
 				fillColor, fillGradient, strokeColor, strokeGradient, lineWidth, globalAlpha, composite,
 				shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, font, textAlign, textBaseline,
@@ -872,13 +870,13 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private @Nullable record Style(int color, @Nullable CanvasGradient gradient) {}
+	private record Style(int color, @Nullable CanvasGradient gradient) {}
 
-	private @Nullable record Snapshot(
+	private record Snapshot(
 			int fillColor,
-			CanvasGradient fillGradient,
+			@Nullable CanvasGradient fillGradient,
 			int strokeColor,
-			CanvasGradient strokeGradient,
+			@Nullable CanvasGradient strokeGradient,
 			double lineWidth,
 			double globalAlpha,
 			BlendMode composite,
@@ -894,7 +892,7 @@ public final class Canvas2D implements AutoCloseable {
 			double miterLimit) {}
 
 	/** A parsed CSS {@code font} shorthand: family, size and the bold/italic bits. */
-	private @Nullable record FontSpec(String family, double size, boolean bold, boolean italic, String css) {
+	private record FontSpec(String family, double size, boolean bold, boolean italic, String css) {
 
 		static final FontSpec DEFAULT = new FontSpec("sans-serif", 10, false, false, DEFAULT_FONT);
 

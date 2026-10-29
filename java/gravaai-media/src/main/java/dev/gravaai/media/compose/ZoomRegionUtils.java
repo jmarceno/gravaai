@@ -138,7 +138,7 @@ public final class ZoomRegionUtils {
 	private static @Nullable DominantRegionResult getActiveRegion(List<ZoomRegionSpec> regions,
 			double timeMs, List<ConnectedRegionPair> connectedPairs,
 			DominantRegionOptions options) {
-		@Nullable record ActiveRegion(ZoomRegionSpec region, double strength) {
+		record ActiveRegion(ZoomRegionSpec region, double strength) {
 		}
 		List<ActiveRegion> activeRegions = new ArrayList<>();
 		for (ZoomRegionSpec region : regions) {

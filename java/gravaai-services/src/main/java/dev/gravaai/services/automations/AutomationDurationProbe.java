@@ -1,5 +1,7 @@
 package dev.gravaai.services.automations;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 
 /**
@@ -13,5 +15,6 @@ import java.nio.file.Path;
 @FunctionalInterface
 public interface AutomationDurationProbe {
 
-	Double probeDurationSec(Path filePath) throws Exception;
+	/** @return the duration in seconds, or null when it is unknown */
+	@Nullable Double probeDurationSec(Path filePath) throws Exception;
 }

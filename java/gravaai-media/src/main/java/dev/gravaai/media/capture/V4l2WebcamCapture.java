@@ -19,8 +19,6 @@ import dev.gravaai.media.ffmpeg.gen.AVStream;
 import dev.gravaai.media.ffmpeg.gen.ffmpeg_h;
 
 /** libavdevice v4l2 implementation of {@link WebcamCapture} (plan §5.6.6). */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 final class V4l2WebcamCapture implements WebcamCapture {
 
 	private static final System.Logger LOG = System.getLogger(V4l2WebcamCapture.class.getName());
@@ -45,16 +43,18 @@ final class V4l2WebcamCapture implements WebcamCapture {
 	private final MemorySegment sourceStrideArray;
 	private final MemorySegment convertBuffer;
 	private final int videoStreamIndex;
-	private @Nullable MemorySegment swsContext;
+	/** libswscale context; {@link MemorySegment#NULL} until the first frame is converted. */
+	private MemorySegment swsContext = MemorySegment.NULL;
 	private MemorySegment convertDataArray;
-	private @Nullable WebcamFormat format;
+	private final WebcamFormat format;
 	private long frameCount;
 	private boolean closed;
 
 	private V4l2WebcamCapture(Arena arena, String devicePath, int targetWidth, int targetHeight,
 			MemorySegment formatContextPtr, MemorySegment formatContext,
 			MemorySegment codecContextPtr, MemorySegment codecContext, MemorySegment framePtr,
-			MemorySegment frame, MemorySegment packetPtr, MemorySegment packet, int videoStreamIndex) {
+			MemorySegment frame, MemorySegment packetPtr, MemorySegment packet, WebcamFormat format,
+			int videoStreamIndex) {
 		this.arena = arena;
 		this.devicePath = devicePath;
 		this.targetWidth = targetWidth;
@@ -67,6 +67,7 @@ final class V4l2WebcamCapture implements WebcamCapture {
 		this.frame = frame;
 		this.packetPtr = packetPtr;
 		this.packet = packet;
+		this.format = format;
 		this.videoStreamIndex = videoStreamIndex;
 		this.convertBuffer = arena.allocate((long) targetWidth * targetHeight * 4);
 		this.convertDataArray = arena.allocate(8L * ValueLayout.ADDRESS.byteSize());
@@ -156,10 +157,11 @@ final class V4l2WebcamCapture implements WebcamCapture {
 			double frameRate = requestedFps > 0 ? requestedFps
 					: rational(AVStream.avg_frame_rate(stream));
 			String pixelFormatName = pixelFormatName(AVCodecParameters.format(codecParameters));
+			WebcamFormat negotiated = new WebcamFormat(outputWidth, outputHeight, frameRate,
+					pixelFormatName);
 			V4l2WebcamCapture capture = new V4l2WebcamCapture(arena, devicePath, outputWidth,
 					outputHeight, formatContextPtr, formatContext, codecContextPtr, codecContext,
-					framePtr, frame, packetPtr, packet, streamIndex);
-			capture.format = new WebcamFormat(outputWidth, outputHeight, frameRate, pixelFormatName);
+					framePtr, frame, packetPtr, packet, negotiated, streamIndex);
 			LOG.log(System.Logger.Level.DEBUG, () -> "opened " + devicePath + ": "
 					+ capture.format);
 			return capture;
@@ -192,6 +194,9 @@ final class V4l2WebcamCapture implements WebcamCapture {
 		}
 	}
 
+	/**
+	 * @param inputFormatName the libavdevice input format to force, or {@code null} for the default
+	 */
 	private static OpenResult attemptOpen(Arena arena, MemorySegment inputFormat, String devicePath,
 			int width, int height, int fps, @Nullable String inputFormatName) {
 		MemorySegment optionsPtr = arena.allocate(ValueLayout.ADDRESS);
@@ -238,7 +243,7 @@ final class V4l2WebcamCapture implements WebcamCapture {
 	}
 
 	@Override
-	public @Nullable WebcamFormat format() {
+	public WebcamFormat format() {
 		return format;
 	}
 
@@ -296,7 +301,7 @@ final class V4l2WebcamCapture implements WebcamCapture {
 		int frameWidth = AVFrame.width(frame);
 		int frameHeight = AVFrame.height(frame);
 		int frameFormat = AVFrame.format(frame);
-		if (swsContext == null) {
+		if (swsContext.address() == 0) {
 			swsContext = ffmpeg_h.sws_getContext(frameWidth, frameHeight, frameFormat,
 					targetWidth, targetHeight, ffmpeg_h.AV_PIX_FMT_RGBA(),
 					ffmpeg_h.SWS_FAST_BILINEAR(),
@@ -346,9 +351,9 @@ final class V4l2WebcamCapture implements WebcamCapture {
 		}
 		closed = true;
 		try {
-			if (swsContext != null && swsContext.address() != 0) {
+			if (swsContext.address() != 0) {
 				ffmpeg_h.sws_freeContext(swsContext);
-				swsContext = null;
+				swsContext = MemorySegment.NULL;
 			}
 			ffmpeg_h.av_frame_free(framePtr);
 			ffmpeg_h.av_packet_free(packetPtr);

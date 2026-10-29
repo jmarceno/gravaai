@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.result.Result;
+import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
@@ -142,7 +143,7 @@ final class DashboardMeetingFixtures {
 		}
 
 		@Override
-		public Result<Void> revealMeeting(Path mediaPath) {
+		public Result<Unit> revealMeeting(Path mediaPath) {
 			throw new UnsupportedOperationException("revealMeeting not used by the dashboard");
 		}
 
@@ -152,7 +153,7 @@ final class DashboardMeetingFixtures {
 		}
 
 		@Override
-		public Result<Void> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
+		public Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
 			throw new UnsupportedOperationException("saveFile not used by the dashboard");
 		}
 
@@ -177,12 +178,12 @@ final class DashboardMeetingFixtures {
 		}
 
 		@Override
-		public CompletableFuture<Result<Void>> downloadAsset(String assetId) {
+		public CompletableFuture<Result<Unit>> downloadAsset(String assetId) {
 			throw new UnsupportedOperationException("downloadAsset not used by the dashboard");
 		}
 
 		@Override
-		public Result<Void> removeAsset(String assetId) {
+		public Result<Unit> removeAsset(String assetId) {
 			throw new UnsupportedOperationException("removeAsset not used by the dashboard");
 		}
 

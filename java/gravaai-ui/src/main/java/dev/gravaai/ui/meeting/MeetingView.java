@@ -266,7 +266,7 @@ public final class MeetingView extends Region {
 				Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
 				return;
 			}
-			MeetingService.FilesView files = result.orElse(null);
+			MeetingService.FilesView files = result.orNull();
 			meta = files == null ? null : files.meta();
 			updateTitle();
 		}, Platform::runLater);
@@ -394,7 +394,7 @@ public final class MeetingView extends Region {
 				|| lower.endsWith(".mkv");
 	}
 
-	private static @Nullable String formatDateTime(String iso) {
+	private static @Nullable String formatDateTime(@Nullable String iso) {
 		if (iso == null || iso.isBlank()) {
 			return null;
 		}

@@ -13,11 +13,11 @@ public enum AutomationMediaKind {
 		this.wire = wire;
 	}
 
-	public @Nullable String wire() {
+	public String wire() {
 		return wire;
 	}
 
-	public static @Nullable AutomationMediaKind fromWire(String value) {
+	public static @Nullable AutomationMediaKind fromWire(@Nullable String value) {
 		if (value == null) {
 			return null;
 		}

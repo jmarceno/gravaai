@@ -13,8 +13,6 @@ import java.util.function.ToDoubleFunction;
  * here it is a {@link ToDoubleFunction} so the port stays UI-free (the compositor supplies the Skija
  * text measurement later, plan §5.8).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptionLayout {
 
 	public enum WordState {
@@ -57,7 +55,7 @@ public final class CaptionLayout {
 			int activeWordIndex,
 			double activeWordProgress,
 			CaptionEditing.EditTarget editTarget,
-			@Nullable int visiblePageIndex,
+			int visiblePageIndex,
 			double opacity,
 			double translateY,
 			double scale) {}
@@ -158,9 +156,10 @@ public final class CaptionLayout {
 				return false;
 			}
 			CaptionCue next = index + 1 < sorted.size() ? sorted.get(index + 1) : null;
-			boolean bridgesGap = next != null
-					&& next.startMs() - cue.endMs() < CAPTION_BLOCK_GAP_BREAK_MS;
-			double effectiveEndMs = bridgesGap ? Math.max(cue.endMs(), next.startMs()) : cue.endMs();
+			double effectiveEndMs = cue.endMs();
+			if (next != null && next.startMs() - cue.endMs() < CAPTION_BLOCK_GAP_BREAK_MS) {
+				effectiveEndMs = Math.max(effectiveEndMs, next.startMs());
+			}
 			if (timeMs <= effectiveEndMs) {
 				return true;
 			}
@@ -180,8 +179,11 @@ public final class CaptionLayout {
 
 			boolean cueHasRealWordTimings = true;
 			for (SourceWord word : sourceWords) {
-				if (!isFiniteNumber(word.startMs()) || !isFiniteNumber(word.endMs())
-						|| word.endMs() <= word.startMs()) {
+				Double wordStartMs = word.startMs();
+				Double wordEndMs = word.endMs();
+				if (wordStartMs == null || wordEndMs == null
+						|| !isFiniteNumber(wordStartMs) || !isFiniteNumber(wordEndMs)
+						|| wordEndMs <= wordStartMs) {
 					cueHasRealWordTimings = false;
 					break;
 				}
@@ -201,14 +203,21 @@ public final class CaptionLayout {
 				boolean leadingSpace = wordIndex == 0
 						? !flattened.isEmpty() && startsMergedCue
 						: word.leadingSpace() == null || word.leadingSpace();
+				// A cue only counts as word-timed when every word has finite start/end timings,
+				// so these null fallbacks are unreachable for such cues; they keep the layout
+				// well-formed when a stray word is missing timings (see the guard above).
+				double wordStartMs = word.startMs() != null ? word.startMs() : fallbackStartMs;
+				double wordEndMs = word.endMs() != null
+						? word.endMs()
+						: Math.max(wordStartMs + 1, fallbackEndMs);
 
 				flattened.add(new FlatWord(
 						cue.id(), word.cueWordIndex(), word.text(),
 						word.forcedBreakBefore() || (wordIndex == 0 && shouldForceCueBreak),
 						leadingSpace,
-						cueHasRealWordTimings ? word.startMs() : fallbackStartMs,
+						cueHasRealWordTimings ? wordStartMs : fallbackStartMs,
 						cueHasRealWordTimings
-								? word.endMs()
+								? wordEndMs
 								: Math.max(fallbackStartMs + 1, fallbackEndMs),
 						cueHasRealWordTimings));
 			}

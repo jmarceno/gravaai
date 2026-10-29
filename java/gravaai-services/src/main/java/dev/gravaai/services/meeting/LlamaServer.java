@@ -25,8 +25,6 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * never holds memory between meetings and never runs at the same time as whisper (the pipeline
  * transcribes first, then starts this only for the summarisation stage).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class LlamaServer implements AutoCloseable {
 
 	/** Context window for local runs. ~1 h of talk; longer meetings are chunked. */
@@ -101,10 +99,12 @@ public final class LlamaServer implements AutoCloseable {
 		command.add(binary.toString());
 		command.addAll(llamaServerArgs(model.path().toString(), port));
 		ProcessRunnerPort.RunningProcess process;
+		Path binaryDirectory = binary.getParent();
+		Map<String, String> environment = binaryDirectory == null ? Map.of()
+				: Map.of("LD_LIBRARY_PATH", binaryDirectory.toString());
 		try {
-			process = processes.spawn(command,
-					Map.of("LD_LIBRARY_PATH", binary.getParent().toString()), line -> {
-					});
+			process = processes.spawn(command, environment, line -> {
+			});
 		} catch (IOException error) {
 			throw new UncheckedIOException(error);
 		}

@@ -1,7 +1,5 @@
 package dev.gravaai.media.compose;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,14 +50,14 @@ public final class WebcamOverlay {
 	}
 
 	/** {@code scaleWebcamOverlayPixels}. */
-	public static double scalePixels(@Nullable double value, double containerWidth) {
+	public static double scalePixels(double value, double containerWidth) {
 		double safeValue = Double.isFinite(value) ? Math.max(0, value) : 0;
 		double safeWidth = Double.isFinite(containerWidth) ? Math.max(0, containerWidth) : 0;
 		return safeValue * (safeWidth / REFERENCE_VIEWPORT_WIDTH);
 	}
 
 	/** {@code getWebcamCornerRadiusPx}: roundness percent to a squircle corner radius. */
-	public static double cornerRadiusPx(@Nullable double roundnessPercent, double width, double height) {
+	public static double cornerRadiusPx(double roundnessPercent, double width, double height) {
 		double safeRoundness = Double.isFinite(roundnessPercent)
 				? clamp(roundnessPercent, 0, 100)
 				: 0;
@@ -124,8 +122,8 @@ public final class WebcamOverlay {
 
 	/** {@code getWebcamOverlayPosition}. */
 	public static Position position(double containerWidth, double containerHeight, double width,
-			double height, double margin, String positionPreset, @Nullable double positionX,
-			@Nullable double positionY, String legacyCorner) {
+			double height, double margin, String positionPreset, double positionX,
+			double positionY, String legacyCorner) {
 		double safeMargin = Math.max(0, margin);
 		double overlayWidth = Math.max(0, width);
 		double overlayHeight = Math.max(0, height);

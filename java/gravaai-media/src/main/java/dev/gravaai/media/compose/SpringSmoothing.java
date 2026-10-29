@@ -11,8 +11,6 @@ import org.jspecify.annotations.Nullable;
  * damped and overdamped regimes, the overshoot guard for ζ ≥ 1, the forward-difference
  * analytical velocity and both configuration curves.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class SpringSmoothing {
 
 	private static final double CURSOR_SMOOTHING_MIN = 0;
@@ -77,8 +75,11 @@ public final class SpringSmoothing {
 		resetSpringState(state, null);
 	}
 
-	/** {@code resetSpringState(state, initialValue)}. */
-	public static void resetSpringState(SpringState state, Double initialValue) {
+	/**
+	 * {@code resetSpringState(state, initialValue)}: resets velocity/initialized, and the value
+	 * only when {@code initialValue} is non-null.
+	 */
+	public static void resetSpringState(SpringState state, @Nullable Double initialValue) {
 		if (initialValue != null) {
 			state.value = initialValue;
 		}

@@ -21,8 +21,6 @@ import java.util.function.Consumer;
  * raw accessors then throw and the captured text is available in {@link ProcessResult}. In
  * {@link ProcessRunner#rawStdout() raw} mode the caller owns the stream and must consume it.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class RunningProcess implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.platform.process");
@@ -31,7 +29,8 @@ public final class RunningProcess implements AutoCloseable {
 
 	private final List<String> command;
 	private final Process process;
-	private final Duration timeout;
+	/** Optional wall-clock limit; {@code null} means wait indefinitely. */
+	private final @Nullable Duration timeout;
 	private final boolean rawStdout;
 	private final boolean rawStderr;
 	private final @Nullable StreamCollector stdoutCollector;
@@ -48,8 +47,10 @@ public final class RunningProcess implements AutoCloseable {
 		this.rawStdout = rawStdout;
 		this.rawStderr = rawStderr;
 		this.startedAtNanos = System.nanoTime();
-		this.stdoutCollector = rawStdout ? null : new StreamCollector("stdout", process.getInputStream(), stdoutLine);
-		this.stderrCollector = rawStderr ? null : new StreamCollector("stderr", process.getErrorStream(), stderrLine);
+		this.stdoutCollector = rawStdout ? null
+				: new StreamCollector("stdout", process.getInputStream(), orNoOp(stdoutLine));
+		this.stderrCollector = rawStderr ? null
+				: new StreamCollector("stderr", process.getErrorStream(), orNoOp(stderrLine));
 		if (stdoutCollector != null) {
 			stdoutCollector.start();
 		}
@@ -143,6 +144,10 @@ public final class RunningProcess implements AutoCloseable {
 		}
 	}
 
+	private static Consumer<String> orNoOp(@Nullable Consumer<String> callback) {
+		return callback == null ? line -> {} : callback;
+	}
+
 	private static String capitalize(String value) {
 		return Character.toUpperCase(value.charAt(0)) + value.substring(1);
 	}
@@ -203,7 +208,7 @@ public final class RunningProcess implements AutoCloseable {
 		StreamCollector(String name, InputStream input, Consumer<String> lineCallback) {
 			this.name = name;
 			this.input = input;
-			this.lineCallback = lineCallback == null ? line -> {} : lineCallback;
+			this.lineCallback = lineCallback;
 		}
 
 		void start() {

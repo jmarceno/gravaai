@@ -15,8 +15,6 @@ import dev.gravaai.services.meeting.CancelSignal;
  * src/components/video-editor/captions/useAutoCaptionController.ts): idle -> extracting ->
  * transcribing -> parsing -> done/error/cancelled. The editor/AppContext subscribes and drives it.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AutoCaptionService implements AutoCloseable {
 
 	public enum State {

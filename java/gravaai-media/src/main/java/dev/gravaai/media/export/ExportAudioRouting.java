@@ -15,8 +15,6 @@ import dev.gravaai.core.project.AudioRegion;
  * {@code audioProcessorShared.ts}, plan §5.10). These are pure decisions shared by the export audio
  * graph builder.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ExportAudioRouting {
 
 	/** {@code SOURCE_AUDIO_NORMALIZE_GAIN}. */
@@ -59,8 +57,8 @@ public final class ExportAudioRouting {
 		public static final TrackSetting DEFAULT = new TrackSetting(1, false);
 	}
 
-	/** {@code ResolvedAudioTrack}. */
-	public record ResolvedTrack(String id, TrackKind kind, @Nullable String path, double gain,
+	/** {@code ResolvedAudioTrack}; every resolved track has an audio file. */
+	public record ResolvedTrack(String id, TrackKind kind, String path, double gain,
 			double timelineStartMs, double timelineEndMs) {}
 
 	/** {@code ResolvedAudioPlan}. */
@@ -79,8 +77,8 @@ public final class ExportAudioRouting {
 
 	private ExportAudioRouting() {}
 
-	/** {@code resolveSourceAudioFallbackPaths}. */
-	public static @Nullable FallbackPaths resolveSourceAudioFallbackPaths(String videoSource,
+	/** {@code resolveSourceAudioFallbackPaths}; never {@code null}. */
+	public static FallbackPaths resolveSourceAudioFallbackPaths(String videoSource,
 			List<String> sourceAudioFallbackPaths) {
 		List<String[]> normalized = new ArrayList<>();
 		if (sourceAudioFallbackPaths != null) {
@@ -105,7 +103,11 @@ public final class ExportAudioRouting {
 		return new FallbackPaths(hasEmbeddedSourceAudio, List.copyOf(externalAudioPaths));
 	}
 
-	/** {@code normalizeSourceAudioFallbackPath}. */
+	/**
+	 * {@code normalizeSourceAudioFallbackPath}.
+	 *
+	 * @return the normalized path, or {@code null} when the input has no usable path (blank)
+	 */
 	public static @Nullable String normalizeFallbackPath(String resourceOrPath) {
 		if (resourceOrPath == null) {
 			return null;
@@ -197,7 +199,7 @@ public final class ExportAudioRouting {
 	}
 
 	/** {@code clampGain}. */
-	public static double clampGain(Double value, double max) {
+	public static double clampGain(@Nullable Double value, double max) {
 		if (value == null || !Double.isFinite(value)) {
 			return 1;
 		}
@@ -208,10 +210,15 @@ public final class ExportAudioRouting {
 		return Math.max(0, Math.min(max, value));
 	}
 
-	/** {@code buildResolvedAudioPlan}. */
+	/**
+	 * {@code buildResolvedAudioPlan}.
+	 *
+	 * @param embeddedGain the explicit embedded-audio gain, or null to use the track setting
+	 * @param masterGain the explicit master gain, or null to use the default
+	 */
 	public static ResolvedPlan buildResolvedPlan(String videoPath, List<String> sourceAudioFallbackPaths,
 			List<AudioRegion> audioRegions, Map<String, TrackSetting> sourceAudioTrackSettings,
-			Double embeddedGain, Double masterGain) {
+			@Nullable Double embeddedGain, @Nullable Double masterGain) {
 		FallbackPaths fallback = resolveSourceAudioFallbackPaths(videoPath, sourceAudioFallbackPaths);
 		Map<String, String> pathsByTrack = new LinkedHashMap<>();
 		for (String path : fallback.externalAudioPaths()) {

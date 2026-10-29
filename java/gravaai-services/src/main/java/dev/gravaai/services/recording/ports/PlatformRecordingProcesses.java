@@ -18,8 +18,6 @@ import dev.gravaai.platform.process.RunningProcess;
  * (ffmpeg mux runs, parec) the pipe is closed immediately so the child gets EOF, the same end
  * result as Electron's {@code stdio: ["ignore", ...]}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class PlatformRecordingProcesses implements RecordingProcesses {
 
 	@Override

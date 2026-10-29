@@ -12,8 +12,6 @@ import java.util.function.Predicate;
  * (electron/ipc/meeting/settings.ts). The API key itself never lives here; it is kept behind
  * {@code MeetingApiKeyStore}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record MeetingSettings(
 		MeetingServiceKind transcriptionService,
 		String whisperModel,
@@ -163,20 +161,26 @@ public record MeetingSettings(
 		return raw;
 	}
 
-	/** Keeps only known keys with valid values, so a bad file never breaks a job. */
-	public static MeetingSettings normalize(Object raw, MeetingAssets assets) {
+	/**
+	 * Keeps only known keys with valid values, so a bad file never breaks a job.
+	 *
+	 * @param raw the stored JSON value, or null when the setting was never written
+	 */
+	public static MeetingSettings normalize(@Nullable Object raw, MeetingAssets assets) {
 		Map<?, ?> input = raw instanceof Map<?, ?> map ? map : Map.of();
-		MeetingServiceKind transcriptionService = MeetingServiceKind.fromWire(
-				pick(input, "transcriptionService", MeetingSettings::isService,
-						DEFAULT.transcriptionService().wire()));
+		MeetingServiceKind transcriptionService = java.util.Objects.requireNonNull(
+				MeetingServiceKind.fromWire(pick(input, "transcriptionService",
+						MeetingSettings::isService, DEFAULT.transcriptionService().wire())),
+				"normalised transcription service");
 		String whisperModel = (String) pick(input, "whisperModel",
 				value -> value instanceof String id && assets.whisperModels().containsKey(id),
 				DEFAULT.whisperModel());
 		String language = (String) pick(input, "language", value -> isNonEmpty(value),
 				DEFAULT.language());
-		MeetingServiceKind summarizationService = MeetingServiceKind.fromWire(
-				pick(input, "summarizationService", MeetingSettings::isService,
-						DEFAULT.summarizationService().wire()));
+		MeetingServiceKind summarizationService = java.util.Objects.requireNonNull(
+				MeetingServiceKind.fromWire(pick(input, "summarizationService",
+						MeetingSettings::isService, DEFAULT.summarizationService().wire())),
+				"normalised summarization service");
 		String localModel = (String) pick(input, "localModel",
 				value -> value instanceof String id && assets.localLlmModels().containsKey(id),
 				DEFAULT.localModel());
@@ -188,9 +192,10 @@ public record MeetingSettings(
 		String apiChatModel = (String) pick(input, "apiChatModel",
 				MeetingSettings::isNonEmpty, DEFAULT.apiChatModel());
 		Object rawCapabilities = input.get("apiChatCapabilities");
-		List<SummarizerCapability> apiChatCapabilities = isCapabilities(rawCapabilities)
-				? capabilities(rawCapabilities)
-				: DEFAULT.apiChatCapabilities();
+		List<SummarizerCapability> apiChatCapabilities = DEFAULT.apiChatCapabilities();
+		if (rawCapabilities instanceof List<?> rawList && isCapabilities(rawList)) {
+			apiChatCapabilities = capabilities(rawList);
+		}
 		int apiTimeoutMinutes = ((Number) pick(input, "apiTimeoutMinutes",
 				value -> value instanceof Number number && number.doubleValue() >= 1
 						&& number.doubleValue() <= 60,
@@ -220,10 +225,11 @@ public record MeetingSettings(
 				autoTitle);
 	}
 
-	private static @Nullable Object pick(Map<?, ?> input, String key, Predicate<Object> valid,
+	/** @return the valid stored value, or the (non-null) fallback when it is absent/invalid */
+	private static Object pick(Map<?, ?> input, String key, Predicate<Object> valid,
 			Object fallback) {
 		Object value = input.get(key);
-		return valid.test(value) ? value : fallback;
+		return value != null && valid.test(value) ? value : fallback;
 	}
 
 	private static boolean isService(Object value) {
@@ -249,11 +255,15 @@ public record MeetingSettings(
 		return true;
 	}
 
-	private static List<SummarizerCapability> capabilities(@Nullable Object value) {
+	/** @param value the already-validated capabilities list */
+	private static List<SummarizerCapability> capabilities(List<?> value) {
 		List<SummarizerCapability> capabilities = new ArrayList<>();
-		for (Object entry : (List<?>) value) {
-			capabilities.add(SummarizerCapability.fromWire(entry));
+		for (Object entry : value) {
+			SummarizerCapability capability = SummarizerCapability.fromWire(entry);
+			if (capability != null) {
+				capabilities.add(capability);
+			}
 		}
-		return capabilities;
+		return List.copyOf(capabilities);
 	}
 }

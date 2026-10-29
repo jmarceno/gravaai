@@ -17,8 +17,6 @@ import dev.gravaai.media.ffmpeg.VideoDecoder;
  * (plan §5.7/§5.9, software decode only). The converter's reusable swscale buffer is copied into a
  * per-frame direct buffer because the decode-ahead ring keeps frames alive.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 
 	private static final System.Logger LOG =
@@ -56,17 +54,17 @@ public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 
 	@Override
 	public void seek(double seconds) {
-		ensureOpen();
+		VideoDecoder activeDecoder = ensureOpen();
 		long timeUs = Math.max(0, Math.round((Double.isFinite(seconds) ? seconds : 0) * 1_000_000));
-		decoder.seekPrecise(timeUs);
+		activeDecoder.seekPrecise(timeUs);
 	}
 
 	@Override
 	public @Nullable VideoFrame next() {
-		ensureOpen();
+		VideoDecoder activeDecoder = ensureOpen();
 		DecodedFrame frame;
 		do {
-			frame = decoder.next();
+			frame = activeDecoder.next();
 			if (frame == null) {
 				return null;
 			}
@@ -133,13 +131,16 @@ public final class FfmpegVideoFrameDecoder implements VideoFrameDecoder {
 	 * Opens the FFmpeg decoder on the calling (decode worker) thread. Opening in the constructor
 	 * would bind the decoder's confined arena to the FX thread that calls setMedia.
 	 */
-	private void ensureOpen() {
+	private VideoDecoder ensureOpen() {
 		if (closed) {
 			throw new IllegalStateException("decoder is closed: " + path);
 		}
-		if (decoder == null) {
-			decoder = VideoDecoder.open(path);
+		VideoDecoder open = decoder;
+		if (open == null) {
+			open = VideoDecoder.open(path);
+			decoder = open;
 		}
+		return open;
 	}
 
 	@Override

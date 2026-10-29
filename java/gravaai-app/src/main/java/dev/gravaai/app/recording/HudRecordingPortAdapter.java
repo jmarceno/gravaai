@@ -53,8 +53,6 @@ import tools.jackson.databind.JsonNode;
  * <p>Threading: the HUD calls on the FX thread; service listeners are hopped to the FX thread.
  * Long operations (countdown wait, recording start/stop, preference writes) run on virtual threads.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudRecordingPortAdapter implements HudRecordingPort, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.recording");
@@ -285,40 +283,43 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Built on the first webcam recording, never on the startup path. */
-	private @Nullable WebcamRecordingService webcamService() {
+	private WebcamRecordingService webcamService() {
 		WebcamRecordingService service = webcamService;
-		if (service == null) {
-			synchronized (this) {
-				service = webcamService;
-				if (service == null) {
-					service = new WebcamRecordingService(
-							wiring.recordingsDir(),
-							webcamProcesses,
-							webcamEnvironment,
-							WebcamRecordingService.ffmpegCliEncoder(webcamProcesses, webcamEnvironment),
-							WebcamDevices::list);
-					webcamService = service;
-				}
-			}
+		if (service != null) {
+			return service;
 		}
-		return service;
+		synchronized (this) {
+			service = webcamService;
+			if (service == null) {
+				service = new WebcamRecordingService(
+						wiring.recordingsDir(),
+						webcamProcesses,
+						webcamEnvironment,
+						WebcamRecordingService.ffmpegCliEncoder(webcamProcesses, webcamEnvironment),
+						WebcamDevices::list);
+				webcamService = service;
+			}
+			return service;
+		}
 	}
 
 	/** Opens the camera and waits for its first frame; null when the webcam is unavailable. */
-	private WebcamRecordingService.@Nullable WebcamRecording prepareWebcamRecording(String devicePath) {
+	private WebcamRecordingService.@Nullable WebcamRecording prepareWebcamRecording(
+			@Nullable String devicePath) {
 		try {
 			WebcamRecordingService.StartResult result =
 					webcamService().prepare(System.currentTimeMillis(), devicePath, null);
-			if (!result.success()) {
+			WebcamRecordingService.WebcamRecording recording = result.recording();
+			if (!result.success() || recording == null) {
 				LOG.log(System.Logger.Level.WARNING, "webcam recording unavailable: " + result.message());
 				return null;
 			}
-			if (!result.recording().awaitFirstFrame(WEBCAM_WARMUP_TIMEOUT_MS)) {
+			if (!recording.awaitFirstFrame(WEBCAM_WARMUP_TIMEOUT_MS)) {
 				LOG.log(System.Logger.Level.WARNING, "webcam delivered no frame within "
 						+ WEBCAM_WARMUP_TIMEOUT_MS + " ms; recording it anyway");
 			}
-			LOG.log(System.Logger.Level.INFO, "webcam recording ready: " + result.recording().path());
-			return result.recording();
+			LOG.log(System.Logger.Level.INFO, "webcam recording ready: " + recording.path());
+			return recording;
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "webcam recording failed: " + error);
 			return null;
@@ -664,7 +665,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/** Enumerates devices on first use (HUD menu) and caches them briefly. */
-	private @Nullable CachedDevices devices() {
+	private CachedDevices devices() {
 		CachedDevices cached = cachedDevices;
 		long now = System.currentTimeMillis();
 		if (cached != null && now - cached.atMs() < DEVICE_CACHE_TTL_MS) {
@@ -749,7 +750,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		}
 	}
 
-	private @Nullable String microphoneLabel(String deviceId) {
+	private @Nullable String microphoneLabel(@Nullable String deviceId) {
 		if (deviceId == null || deviceId.isBlank()) {
 			return null;
 		}

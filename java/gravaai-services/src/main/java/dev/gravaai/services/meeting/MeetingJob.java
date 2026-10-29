@@ -13,12 +13,12 @@ public record MeetingJob(
 		Path mediaPath,
 		MeetingJobMode mode,
 		Status status,
-		Stage stage,
+		@Nullable Stage stage,
 		String message,
 		@Nullable Integer progress,
-		String error,
+		@Nullable String error,
 		String createdAt,
-		String finishedAt) {
+		@Nullable String finishedAt) {
 
 	/** Job lifecycle; {@code wire()} is the string the renderer sees. */
 	public enum Status {

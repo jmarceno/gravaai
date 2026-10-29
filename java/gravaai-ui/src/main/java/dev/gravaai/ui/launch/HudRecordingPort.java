@@ -1,5 +1,7 @@
 package dev.gravaai.ui.launch;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -12,8 +14,6 @@ import java.util.function.Consumer;
  * the FX application thread. Implementations hop with {@code Platform.runLater} where the service
  * publishes from another thread.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public interface HudRecordingPort {
 
 	/** HUD state machine (record button, timer, pause, finalizing copy). */
@@ -21,16 +21,20 @@ public interface HudRecordingPort {
 
 	/**
 	 * Everything the HUD renders. Blank device ids mean "system default".
+	 *
+	 * @param sourceName the selected recording source's label, or null before one is picked
+	 * @param microphoneDeviceId the chosen microphone, or null for the system default
+	 * @param webcamDeviceId the chosen camera, or null for the system default
 	 */
 	record State(
 			Phase phase,
 			boolean countdownActive,
-			String sourceName,
+			@Nullable String sourceName,
 			boolean microphoneEnabled,
 			boolean systemAudioEnabled,
 			boolean webcamEnabled,
-			String microphoneDeviceId,
-			String webcamDeviceId,
+			@Nullable String microphoneDeviceId,
+			@Nullable String webcamDeviceId,
 			int countdownDelay,
 			boolean meetingMode,
 			boolean recordScreen,

@@ -36,8 +36,6 @@ import dev.gravaai.services.recording.ports.SpawnedProcess;
  * {@code ffmpeg} CLI (software libx264) behind {@link WebcamVideoEncoder}; swapping in the
  * in-process encoder means providing another {@link EncoderFactory} (reported to the Lead).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class WebcamRecordingService {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -174,11 +172,11 @@ public final class WebcamRecordingService {
 			}
 		}
 
-		void start(FrameListener preview) {
+		void start(@Nullable FrameListener preview) {
 			thread = Thread.ofPlatform().daemon().name("gravaai-webcam").start(() -> captureLoop(preview));
 		}
 
-		private void captureLoop(FrameListener preview) {
+		private void captureLoop(@Nullable FrameListener preview) {
 			try {
 				while (running.get()) {
 					buffer.clear();
@@ -401,15 +399,18 @@ public final class WebcamRecordingService {
 	 *
 	 * @param timestamp the recording timestamp used in the file name
 	 * @param recordingStartedAtMs wall-clock start of the screen recording, the alignment reference
+	 * @param devicePath the camera device path, or null to use the first camera
+	 * @param preview the HUD preview listener, or null when no preview is shown
 	 */
 	public StartResult start(
 			long timestamp,
 			long recordingStartedAtMs,
-			String devicePath,
-			FrameListener preview) {
+			@Nullable String devicePath,
+			@Nullable FrameListener preview) {
 		StartResult result = prepare(timestamp, devicePath, preview);
-		if (result.success()) {
-			result.recording().begin(recordingStartedAtMs);
+		WebcamRecording recording = result.recording();
+		if (result.success() && recording != null) {
+			recording.begin(recordingStartedAtMs);
 		}
 		return result;
 	}
@@ -419,7 +420,8 @@ public final class WebcamRecordingService {
 	 * can take hundreds of milliseconds) before the screen recording starts. Call
 	 * {@link WebcamRecording#begin} with the screen video's start once it is known.
 	 */
-	public StartResult prepare(long timestamp, String devicePath, FrameListener preview) {
+	public StartResult prepare(long timestamp, @Nullable String devicePath,
+			@Nullable FrameListener preview) {
 		List<WebcamDevice> available = devices.get();
 		WebcamDevice device = null;
 		if (devicePath != null && !devicePath.isBlank()) {
@@ -460,6 +462,7 @@ public final class WebcamRecordingService {
 		return new StartResult(true, null, recording);
 	}
 
+	/** Null until a webcam recording is prepared. */
 	private @Nullable WebcamRecording lastRecording;
 
 	/** Always 0: webcam tracks are anchored to the screen video's first frame. */
@@ -474,8 +477,8 @@ public final class WebcamRecordingService {
 				videoPath, recording == null ? null : recording.path().toString(), timeOffsetMs());
 	}
 
-	/** Last started recording, for the app's stop path. */
-	public WebcamRecording lastRecording() {
+	/** @return the last started recording, or null when no webcam recording is running */
+	public @Nullable WebcamRecording lastRecording() {
 		return lastRecording;
 	}
 
@@ -483,7 +486,8 @@ public final class WebcamRecordingService {
 	private static final class FfmpegCliWebcamEncoder implements WebcamVideoEncoder {
 
 		private final SpawnedProcess process;
-		private final OutputStream stdin;
+		/** Null only when the process was spawned without a stdin pipe (it is piped here). */
+		private final @Nullable OutputStream stdin;
 		private boolean finished;
 
 		FfmpegCliWebcamEncoder(
@@ -502,7 +506,8 @@ public final class WebcamRecordingService {
 			drain(process.stderr());
 		}
 
-		private static void drain(InputStream stream) {
+		/** @param stream the piped stream, or null when the process was spawned without it */
+		private static void drain(@Nullable InputStream stream) {
 			if (stream == null) {
 				return;
 			}
@@ -521,11 +526,15 @@ public final class WebcamRecordingService {
 
 		@Override
 		public void writeFrame(ByteBuffer rgbaTopFirst) throws IOException {
+			OutputStream sink = stdin;
+			if (sink == null) {
+				throw new IOException("The webcam encoder has no stdin pipe");
+			}
 			byte[] chunk = new byte[Math.min(rgbaTopFirst.remaining(), 1 << 20)];
 			while (rgbaTopFirst.hasRemaining()) {
 				int length = Math.min(rgbaTopFirst.remaining(), chunk.length);
 				rgbaTopFirst.get(chunk, 0, length);
-				stdin.write(chunk, 0, length);
+				sink.write(chunk, 0, length);
 			}
 		}
 
@@ -535,7 +544,10 @@ public final class WebcamRecordingService {
 				return;
 			}
 			finished = true;
-			stdin.close();
+			OutputStream sink = stdin;
+			if (sink != null) {
+				sink.close();
+			}
 			int code;
 			try {
 				code = process.waitFor();

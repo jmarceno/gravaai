@@ -60,6 +60,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -78,14 +79,13 @@ import tools.jackson.databind.JsonNode;
  * global-shortcut service drive the HUD, and the recording services come from
  * {@link RecordingWiring} (plan P1.6/P1.8/P1.9).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AppContext {
 
 	private static final System.Logger LOG = System.getLogger("gravaai");
 
 	private final UserData userData;
-	private final GlobalShortcutAction pendingAction;
+	/** The shortcut that started this process, or {@code null} for a plain launch. */
+	private final @Nullable GlobalShortcutAction pendingAction;
 	private final AppIcons icons;
 
 	private @Nullable Stage primaryStage;
@@ -126,14 +126,24 @@ public final class AppContext {
 	private boolean backgroundServicesStarted;
 	private boolean shutdown;
 
-	private AppContext(UserData userData, GlobalShortcutAction pendingAction) {
+	private AppContext(UserData userData, @Nullable GlobalShortcutAction pendingAction) {
 		this.userData = userData;
 		this.pendingAction = pendingAction;
 		this.icons = new AppIcons(userData);
 	}
 
-	public static @Nullable AppContext create(GlobalShortcutAction pendingAction) {
+	public static AppContext create(@Nullable GlobalShortcutAction pendingAction) {
 		return new AppContext(UserData.resolve(), pendingAction);
+	}
+
+	/** The app-settings store: created on first use, then shared by every service. */
+	private AppSettingsStore appSettings() {
+		AppSettingsStore current = appSettings;
+		if (current == null) {
+			current = new AppSettingsStore(userData.appSettingsFile());
+			appSettings = current;
+		}
+		return current;
 	}
 
 	public void start(Stage primaryStage) {
@@ -143,8 +153,9 @@ public final class AppContext {
 		// meeting view. Gravaai lives in the tray, so closing the main window hides it; only the
 		// tray Quit action (or an explicit application shutdown) may exit the process.
 		installCloseToTray(primaryStage);
-		windows = new Windows(primaryStage, Boolean.getBoolean("gravaai.uiKit"));
-		windows.setEditorLauncher(this::openProjectInEditor);
+		Windows mainWindows = new Windows(primaryStage, Boolean.getBoolean("gravaai.uiKit"));
+		windows = mainWindows;
+		mainWindows.setEditorLauncher(this::openProjectInEditor);
 		// P2.11 fast path: when a project is requested at launch, the editor is the startup
 		// window. Skip the HUD and the heavy services on the critical path; they start after
 		// the editor window is visible.
@@ -217,7 +228,7 @@ public final class AppContext {
 		// The recording services (and the HUD that talks to them) are on the startup path only as
 		// far as the HUD needs them: creation is cheap, device enumeration and the D-Bus/automation
 		// services run after the window is visible (startup budget, plan §5.1).
-		startHudWindow();
+		startHudWindow(mainWindows);
 		boolean dashboardMode = Boolean.getBoolean("gravaai.dashboard");
 		boolean uiKitMode = Boolean.getBoolean("gravaai.uiKit");
 		if (dashboardMode || uiKitMode) {
@@ -230,7 +241,7 @@ public final class AppContext {
 		if (dashboardMode) {
 			openDashboard();
 		} else if (uiKitMode) {
-			windows.showMainWindow();
+			mainWindows.showMainWindow();
 		} else {
 			showHud();
 		}
@@ -329,7 +340,7 @@ public final class AppContext {
 	 * Nothing is shown here and no capture starts: the HUD/shortcut/tray flows drive the recording
 	 * service once {@link #initializeRecordingServices()} attaches the real port.
 	 */
-	private void startHudWindow() {
+	private void startHudWindow(Windows mainWindows) {
 		hudController = new HudWindowController();
 		lazyHudPort = new LazyHudRecordingPort();
 		lazyHudPort.setOnHudReady(() -> {
@@ -340,7 +351,7 @@ public final class AppContext {
 		try {
 			hudWindow = new HudOverlayWindow(lazyHudPort);
 			hudController.attach(hudWindow);
-			windows.setHud(hudWindow);
+			mainWindows.setHud(hudWindow);
 			LOG.log(System.Logger.Level.INFO, "HUD window constructed (recording services pending)");
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "HUD window unavailable: " + error);
@@ -363,13 +374,14 @@ public final class AppContext {
 		// The dispatcher must exist before the real port is attached: the HUD's ready callback
 		// drains the global-shortcut queue through it.
 		createShortcuts();
+		AppSettingsStore settings = appSettings();
 		try {
-			recordingWiring = RecordingWiring.create(userData, appSettings, hudController);
+			recordingWiring = RecordingWiring.create(userData, settings, hudController);
 			recordingWiring.onRecordingSaved(this::onRecordingSaved);
 			hudPort = HudRecordingPortAdapter.create(
 					recordingWiring,
 					userData,
-					appSettings,
+					settings,
 					new HudRecordingPortAdapter.Navigation() {
 						@Override
 						public void openDashboard() {
@@ -411,11 +423,11 @@ public final class AppContext {
 	 * later on the service's own executor.
 	 */
 	private void initializeMeetings() {
-		if (meeting != null || recordingWiring == null || appSettings == null) {
+		if (meeting != null || recordingWiring == null) {
 			return;
 		}
 		try {
-			meeting = MeetingIntegration.create(userData, appSettings, recordingWiring, fileManager,
+			meeting = MeetingIntegration.create(userData, appSettings(), recordingWiring, fileManager,
 					automationService);
 			meeting.service().onOpenRequested(() -> Platform.runLater(this::openMeetingWindow));
 			LOG.log(System.Logger.Level.INFO, "meeting services ready");
@@ -437,11 +449,11 @@ public final class AppContext {
 	}
 
 	private void initializeAgent() {
-		if (agentWiring != null || appSettings == null) {
+		if (agentWiring != null) {
 			return;
 		}
 		try {
-			AgentWiring wiring = AgentWiring.create(userData, appSettings,
+			AgentWiring wiring = AgentWiring.create(userData, appSettings(),
 					this::activeEditorSession, () -> projects,
 					() -> meeting == null ? null : meeting.service(),
 					this::exporter, path -> openProjectInEditor(path),
@@ -464,8 +476,7 @@ public final class AppContext {
 		}
 		ExportPublisher publisher = new ExportPublisher(fileManager != null ? fileManager::reveal : null);
 		exportCoordinator = new ExportCoordinator(publisher, automationService.triggers());
-		EditorPreferencesStore preferencesStore = appSettings == null ? null
-				: new EditorPreferencesStore(appSettings);
+		EditorPreferencesStore preferencesStore = new EditorPreferencesStore(appSettings());
 		exporter = new ProjectExporter(exportCoordinator, publisher, preferencesStore);
 		exporter.setExtensionHost(extensionHost());
 	}
@@ -480,8 +491,12 @@ public final class AppContext {
 
 	/** The process-wide extension host, created (and activated) on first use. */
 	private synchronized ExtensionHost extensionHost() {
-		if (extensionHost != null || shutdown) {
-			return extensionHost;
+		ExtensionHost current = extensionHost;
+		if (current != null) {
+			return current;
+		}
+		if (shutdown) {
+			throw new IllegalStateException("the application is shutting down");
 		}
 		ExtensionHost host = new ExtensionHost(userData.extensionsDir());
 		try {
@@ -494,7 +509,7 @@ public final class AppContext {
 					"extensions unavailable (" + host.extensionsDir() + "): " + error);
 		}
 		extensionHost = host;
-		return extensionHost;
+		return host;
 	}
 
 	/**
@@ -506,7 +521,7 @@ public final class AppContext {
 				() -> session.timelineDataSource().totalDurationMs());
 	}
 
-	private ProjectExporter exporter() {
+	private @Nullable ProjectExporter exporter() {
 		return exporter;
 	}
 
@@ -530,6 +545,10 @@ public final class AppContext {
 			long started = System.currentTimeMillis();
 			try {
 				var outcome = current.runTo(session, format, destination);
+				if (outcome == null) {
+					Startup.log("export finished without a result");
+					return;
+				}
 				Startup.log("export done: " + outcome.path() + " bytes=" + outcome.bytes()
 						+ " frames=" + outcome.frames() + " in "
 						+ (System.currentTimeMillis() - started) + " ms");
@@ -572,7 +591,7 @@ public final class AppContext {
 					Path.of(System.getProperty("java.io.tmpdir"), "gravaai-captions"));
 			window.setCaptionController(new dev.gravaai.app.editor.AutoCaptionController(
 					session.store(), session::videoPath, session::webcamPath,
-					new dev.gravaai.core.editor.EditorPreferencesStore(appSettings),
+					new dev.gravaai.core.editor.EditorPreferencesStore(appSettings()),
 					new dev.gravaai.services.captions.WhisperModels(userData,
 							new dev.gravaai.services.meeting.HttpFileDownloader()),
 					dev.gravaai.services.captions.AutoCaptionService.withDaemonThread(generator),
@@ -607,7 +626,7 @@ public final class AppContext {
 	}
 
 	/** The meetings service (null until {@link #initializeMeetings()} ran, e.g. before the HUD is up). */
-	public MeetingIntegration meetingIntegration() {
+	public @Nullable MeetingIntegration meetingIntegration() {
 		return meeting;
 	}
 
@@ -616,7 +635,7 @@ public final class AppContext {
 		openMeetingWindow(null);
 	}
 
-	private void openMeetingWindow(Path mediaPath) {
+	private void openMeetingWindow(@Nullable Path mediaPath) {
 		EditorWindow editor = activeEditor;
 		if (editor != null) {
 			switchingViews = true;
@@ -633,14 +652,15 @@ public final class AppContext {
 	}
 
 	/** Hosts the meeting view in the main window (single-window app; plan §5.1). */
-	private void showMeetingInMainWindow(Path mediaPath) {
+	private void showMeetingInMainWindow(@Nullable Path mediaPath) {
 		MeetingIntegration integration = meeting;
-		if (shutdown || integration == null) {
+		Stage stage = primaryStage;
+		if (shutdown || integration == null || stage == null) {
 			return;
 		}
 		try {
 			if (meetingWindow == null) {
-				meetingWindow = MeetingWindow.createIn(primaryStage, integration.service(),
+				meetingWindow = MeetingWindow.createIn(stage, integration.service(),
 						this::closeMeetingWindow);
 			}
 			meetingWindow.open(mediaPath);
@@ -801,7 +821,7 @@ public final class AppContext {
 	}
 
 	public Windows windows() {
-		return windows;
+		return Objects.requireNonNull(windows, "the main windows exist once AppContext.start() ran");
 	}
 
 	// ── HUD ────────────────────────────────────────────────────────────────
@@ -810,7 +830,7 @@ public final class AppContext {
 	private void showHud() {
 		HudOverlayWindow hud = hudWindow;
 		if (hud == null) {
-			windows.showMainWindow();
+			windows().showMainWindow();
 			return;
 		}
 		LOG.log(System.Logger.Level.INFO, "HUD shown");
@@ -1054,7 +1074,7 @@ public final class AppContext {
 				}
 
 				@Override
-				public java.util.concurrent.@Nullable CompletableFuture<String> recordingThumbnail(String videoPath) {
+				public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
 					RecordingWiring wiring = recordingWiring;
 					if (wiring == null) {
 						return java.util.concurrent.CompletableFuture.completedFuture(null);
@@ -1112,7 +1132,7 @@ public final class AppContext {
 			};
 			DashboardDependencies dependencies = new DashboardDependencies(
 					userData, projects, recordings, recoverable, preferences, Trash.defaultTrash(), actions,
-					new ServiceGlobalShortcutsController(shortcutsService),
+					new ServiceGlobalShortcutsController(requireShortcutsService()),
 					new PlaceholderAgentSettingsController(appPath()),
 					automationService == null ? null : new ServiceAutomationsController(automationService, portal),
 					agentWiring == null ? null : agentWiring.ui(),
@@ -1145,7 +1165,10 @@ public final class AppContext {
 			LOG.log(System.Logger.Level.INFO, "dashboard shown");
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "dashboard unavailable, falling back to the main window: " + error);
-			windows.showMainWindow();
+			Windows mainWindows = windows;
+			if (mainWindows != null) {
+				mainWindows.showMainWindow();
+			}
 		}
 	}
 
@@ -1210,8 +1233,13 @@ public final class AppContext {
 	 * scene stays alive and is restored by {@link #showDashboardScene()}.
 	 */
 	private void openEditorInMainWindow(Path path, boolean startup) {
+		Stage stage = primaryStage;
+		if (stage == null) {
+			LOG.log(System.Logger.Level.WARNING, "main window not ready; cannot open the editor");
+			return;
+		}
 		try {
-			EditorWindow window = EditorWindow.createIn(primaryStage, path, editorServices());
+			EditorWindow window = EditorWindow.createIn(stage, path, editorServices());
 			hostEditor(window, path, startup);
 		} catch (IOException | RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "could not open project in editor: " + error);
@@ -1221,13 +1249,18 @@ public final class AppContext {
 
 	/** A recording as a new, unsaved project (React switchToEditor after stop). */
 	private void openRecordingInMainWindow(Path videoPath) {
+		Stage stage = primaryStage;
+		if (stage == null) {
+			LOG.log(System.Logger.Level.WARNING, "main window not ready; cannot open the recording");
+			return;
+		}
 		try {
 			dev.gravaai.services.recording.RecordingSessionManifest.RecordingSessionData linked =
 					dev.gravaai.services.recording.RecordingSessionManifest
 							.resolveRecordingSession(videoPath.toString());
 			String webcam = linked == null ? null : linked.webcamPath();
 			long offset = linked == null ? 0 : linked.timeOffsetMs();
-			EditorWindow window = EditorWindow.createForRecordingIn(primaryStage, videoPath, webcam,
+			EditorWindow window = EditorWindow.createForRecordingIn(stage, videoPath, webcam,
 					offset, editorServices());
 			hostEditor(window, null, false);
 			LOG.log(System.Logger.Level.INFO, "recording opened in the editor: " + videoPath
@@ -1238,7 +1271,7 @@ public final class AppContext {
 		}
 	}
 
-	private EditorWindow.@Nullable Services editorServices() {
+	private EditorWindow.Services editorServices() {
 		if (appSettings == null) {
 			appSettings = new AppSettingsStore(userData.appSettingsFile());
 		}
@@ -1301,6 +1334,9 @@ public final class AppContext {
 		try {
 			Path thumbnail = dev.gravaai.services.projects.ProjectManager
 					.getProjectThumbnailPath(projectPath);
+			if (thumbnail == null) {
+				return null;
+			}
 			if (java.nio.file.Files.isRegularFile(thumbnail)) {
 				return new javafx.scene.image.Image(thumbnail.toUri().toString());
 			}
@@ -1371,23 +1407,27 @@ public final class AppContext {
 			return;
 		}
 		try {
-			appSettings = new AppSettingsStore(userData.appSettingsFile());
+			AppSettingsStore settings = appSettings();
 			GlobalShortcutSettings settingsPort = new GlobalShortcutSettings() {
 				@Override
 				public @Nullable JsonNode read() {
-					return appSettings.readSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING);
+					return settings.readSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING);
 				}
 
 				@Override
 				public void write(JsonNode value) {
 					try {
-						appSettings.writeSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING, value);
+						settings.writeSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING, value);
 					} catch (IOException error) {
 						throw new UncheckedIOException("Could not save the global shortcuts setting", error);
 					}
 				}
 			};
-			dispatcher = new GlobalShortcutDispatcher(windows::hud);
+			Windows mainWindows = windows;
+			if (mainWindows == null) {
+				throw new IllegalStateException("main window not built; cannot create shortcuts");
+			}
+			dispatcher = new GlobalShortcutDispatcher(mainWindows::hud);
 			shortcutsService = new GlobalShortcutsService(
 					settingsPort,
 					() -> NativeHelpers.path("gravaai-ctl"),
@@ -1399,6 +1439,16 @@ public final class AppContext {
 		} catch (Exception error) {
 			LOG.log(System.Logger.Level.WARNING, "global shortcuts unavailable: " + error);
 		}
+	}
+
+	/** The dashboard needs the shortcut service; a build without it falls back to the bare window. */
+	private GlobalShortcutsService requireShortcutsService() {
+		GlobalShortcutsService current = shortcutsService;
+		if (current == null) {
+			throw new IllegalStateException(
+					"global shortcuts are unavailable; the dashboard cannot be built");
+		}
+		return current;
 	}
 
 	private void startShortcuts() {

@@ -23,7 +23,7 @@ public final class AppIcons {
 
 	private final Path directory;
 
-	@Nullable public AppIcons(UserData userData) {
+	public AppIcons(UserData userData) {
 		this.directory = userData.dir().resolve("icons");
 	}
 

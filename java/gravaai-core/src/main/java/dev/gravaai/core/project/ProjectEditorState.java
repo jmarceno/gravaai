@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
+import dev.gravaai.core.json.Json;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -15,8 +16,6 @@ import tools.jackson.databind.node.ObjectNode;
  * raw JSON objects because the TS normaliser passes them through untouched (they are per-source
  * maps whose inner shape belongs to the audio layer).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public record ProjectEditorState(
 		@Nullable String wallpaper,
 		double shadowIntensity,
@@ -53,10 +52,10 @@ public record ProjectEditorState(
 		double cursorMotionBlur,
 		double cursorClickBounce,
 		double cursorClickBounceDuration,
-		@Nullable double cursorSway,
-		@Nullable double borderRadius,
-		@Nullable Padding padding,
-		@Nullable CropRegion cropRegion,
+		double cursorSway,
+		double borderRadius,
+		Padding padding,
+		CropRegion cropRegion,
 		List<ZoomRegion> zoomRegions,
 		List<TrimRegion> trimRegions,
 		List<ClipRegion> clipRegions,
@@ -69,8 +68,8 @@ public record ProjectEditorState(
 		AutoCaptionSettings autoCaptionSettings,
 		KeystrokeOverlaySettings keystrokeOverlay,
 		WebcamOverlaySettings webcam,
-		@Nullable String aspectRatio,
-		@Nullable ObjectNode sourceAudioTrackSettingsByClip,
+		String aspectRatio,
+		ObjectNode sourceAudioTrackSettingsByClip,
 		ObjectNode defaultSourceAudioTrackSettings) {
 
 	/**
@@ -96,8 +95,15 @@ public record ProjectEditorState(
 				defaultSourceAudioTrackSettings);
 	}
 
-	/** Copy with a new raw source-audio settings map (unknown keys preserved). */
-	public ProjectEditorState withSourceAudioTrackSettingsByClip(tools.jackson.databind.node.@Nullable ObjectNode nextSourceAudioTrackSettings) {		return new ProjectEditorState(wallpaper, shadowIntensity, backgroundBlur, zoomMotionBlur,
+	/**
+	 * Copy with a new raw source-audio settings map (unknown keys preserved). Absence is modelled as
+	 * an empty object, matching {@code ProjectPersistence.objectOrEmpty}.
+	 */
+	public ProjectEditorState withSourceAudioTrackSettingsByClip(
+			@Nullable ObjectNode nextSourceAudioTrackSettings) {
+		ObjectNode normalized = nextSourceAudioTrackSettings != null
+				? nextSourceAudioTrackSettings : Json.nodeFactory().objectNode();
+		return new ProjectEditorState(wallpaper, shadowIntensity, backgroundBlur, zoomMotionBlur,
 				zoomMotionBlurTuning, connectZooms, zoomInDurationMs, zoomInOverlapMs,
 				zoomOutDurationMs, connectedZoomGapMs, connectedZoomDurationMs, zoomInEasing,
 				zoomOutEasing, connectedZoomEasing, showCursor, loopCursor, cursorStyle,
@@ -110,7 +116,7 @@ public record ProjectEditorState(
 				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
-				keystrokeOverlay, webcam, aspectRatio, nextSourceAudioTrackSettings,
+				keystrokeOverlay, webcam, aspectRatio, normalized,
 				defaultSourceAudioTrackSettings);
 	}
 
@@ -167,10 +173,10 @@ public record ProjectEditorState(
 		private double cursorMotionBlur;
 		private double cursorClickBounce;
 		private double cursorClickBounceDuration;
-		private @Nullable double cursorSway;
-		private @Nullable double borderRadius;
-		private @Nullable Padding padding;
-		private @Nullable CropRegion cropRegion;
+		private double cursorSway;
+		private double borderRadius;
+		private Padding padding;
+		private CropRegion cropRegion;
 		private List<ZoomRegion> zoomRegions;
 		private List<TrimRegion> trimRegions;
 		private List<ClipRegion> clipRegions;
@@ -183,8 +189,8 @@ public record ProjectEditorState(
 		private AutoCaptionSettings autoCaptionSettings;
 		private KeystrokeOverlaySettings keystrokeOverlay;
 		private WebcamOverlaySettings webcam;
-		private @Nullable String aspectRatio;
-		private @Nullable ObjectNode sourceAudioTrackSettingsByClip;
+		private String aspectRatio;
+		private ObjectNode sourceAudioTrackSettingsByClip;
 		private ObjectNode defaultSourceAudioTrackSettings;
 
 		private Builder(ProjectEditorState state) {

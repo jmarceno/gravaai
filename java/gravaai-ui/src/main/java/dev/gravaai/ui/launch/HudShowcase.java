@@ -19,8 +19,6 @@ import javafx.stage.Stage;
  * java -Dgravaai.hud.demo=menu HUDShowcase      # opens the microphone menu
  * }</pre>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class HudShowcase extends Application {
 
 	@Override
@@ -72,8 +70,12 @@ public final class HudShowcase extends Application {
 		hud.stage().setOnHidden(event -> Platform.exit());
 		if (System.getProperty("gravaai.hud.debug") != null) {
 			Platform.runLater(() -> {
-				System.out.println("bar pref=" + hud.bar().prefWidth(-1) + "x" + hud.bar().prefHeight(-1));
-				for (javafx.scene.Node node : hud.bar().getChildrenUnmodifiable()) {
+				HudBar bar = hud.bar();
+				if (bar == null) {
+					return;
+				}
+				System.out.println("bar pref=" + bar.prefWidth(-1) + "x" + bar.prefHeight(-1));
+				for (javafx.scene.Node node : bar.getChildrenUnmodifiable()) {
 					System.out.println(" child " + node.getClass().getSimpleName() + " pref="
 							+ node.prefWidth(-1) + " style=" + node.getStyleClass());
 				}

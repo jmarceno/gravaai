@@ -66,7 +66,7 @@ public final class MeetingLibrary {
 		return "Meeting " + day + " " + time;
 	}
 
-	public @Nullable List<MeetingLibraryEntry> listMeetings() {
+	public List<MeetingLibraryEntry> listMeetings() {
 		Path directory = directories.recordingsDirectory();
 		List<String> names;
 		try (var files = Files.list(directory)) {
@@ -117,6 +117,8 @@ public final class MeetingLibrary {
 				? meta.title().strip()
 				: defaultMeetingTitle(createdAt);
 		boolean failed = meta.lastJob() != null && "failed".equals(meta.lastJob().status());
+		MeetingMeta.LastJob lastJob = meta.lastJob();
+		String error = failed && lastJob != null ? lastJob.error() : null;
 		return new MeetingLibraryEntry(
 				mediaPath,
 				title,
@@ -126,7 +128,7 @@ public final class MeetingLibrary {
 				Files.isRegularFile(files.transcript()),
 				Files.isRegularFile(files.notes()),
 				status,
-				failed ? meta.lastJob().error() : null);
+				error);
 	}
 
 	private static long parseMillis(String createdAt, Path mediaPath) {

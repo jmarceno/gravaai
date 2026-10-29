@@ -45,7 +45,7 @@ public final class ClipSpeedChanges {
 		return label + "x";
 	}
 
-	private static @Nullable boolean spansOverlap(long leftStart, long leftEnd, long rightStart, long rightEnd) {
+	private static boolean spansOverlap(long leftStart, long leftEnd, long rightStart, long rightEnd) {
 		return leftStart < rightEnd && leftEnd > rightStart;
 	}
 

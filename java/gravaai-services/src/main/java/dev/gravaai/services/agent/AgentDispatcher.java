@@ -40,8 +40,6 @@ import tools.jackson.databind.node.ObjectNode;
  * implement them over {@code EditorStore}, the project manager, the compositor and the meeting
  * service; this class contains no Electron/UI dependency.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentDispatcher implements AutoCloseable {
 
 	/** Thrown for validation/routing failures; the MCP bridge turns it into an error result. */
@@ -67,7 +65,7 @@ public final class AgentDispatcher implements AutoCloseable {
 	public interface LibraryPort {
 		record ProjectEntry(String name, String path, long updatedAt, boolean isCurrent) {}
 
-		record RecordingEntry(String name, String path, long bytes, @Nullable Long createdAt) {}
+		record RecordingEntry(String name, String path, long bytes, long createdAt) {}
 
 		record MeetingEntry(String title, String mediaPath, long createdAt) {}
 
@@ -83,7 +81,11 @@ public final class AgentDispatcher implements AutoCloseable {
 	/** Help text provider (the op reference lives in the UI layer in TS). */
 	@FunctionalInterface
 	public interface HelpPort {
-		String help(String topic);
+		/**
+		 * @param topic the requested topic, or null when the call did not name one (the index)
+		 * @return the help text for the topic (or the index when topic is null)
+		 */
+		String help(@Nullable String topic);
 	}
 
 	/** A validated frame-capture request (the UI-independent half of the frames tool). */
@@ -126,8 +128,8 @@ public final class AgentDispatcher implements AutoCloseable {
 			}
 		}
 
-		record MeetingJob(String id, String status, @Nullable Double progress, String stage, String message,
-				String error) {}
+		record MeetingJob(String id, String status, @Nullable Double progress,
+				@Nullable String stage, String message, @Nullable String error) {}
 
 		record MeetingFiles(String transcript, String notes, String meta) {}
 
@@ -163,7 +165,8 @@ public final class AgentDispatcher implements AutoCloseable {
 	private final EditorPort editor;
 	private final LibraryPort library;
 	private final HelpPort help;
-	private final FramesPort framesPort;
+	/** Null when the app has no dedicated frames port and the editor renders frames instead. */
+	private final @Nullable FramesPort framesPort;
 	private final MeetingPort meetings;
 	private final AgentJobRegistry jobs;
 	private final Config config;
@@ -182,7 +185,8 @@ public final class AgentDispatcher implements AutoCloseable {
 
 	/** Full constructor: frames port is optional (falls back to EditorPort.requestEditor). */
 	public AgentDispatcher(EditorPort editor, LibraryPort library, HelpPort help,
-			MeetingPort meetings, AgentJobRegistry jobs, Config config, FramesPort framesPort) {
+			MeetingPort meetings, AgentJobRegistry jobs, Config config,
+			@Nullable FramesPort framesPort) {
 		this.editor = editor;
 		this.library = library;
 		this.help = help;
@@ -308,7 +312,7 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private AgentToolResult startJob(JsonNode args) {
-		Kind kind = readJobKind(args.path("kind"), true);
+		Kind kind = requireJobKind(args.path("kind"));
 		JsonNode options = args.path("options").isObject() ? args.path("options")
 				: Json.nodeFactory().objectNode();
 		if (kind == Kind.MEETING) {
@@ -415,10 +419,11 @@ public final class AgentDispatcher implements AutoCloseable {
 				boolean finished = "done".equals(current.status())
 						|| "failed".equals(current.status())
 						|| "cancelled".equals(current.status());
+				Double progress = current.progress();
 				if (!finished) {
 					jobs.update(jobId, new Patch(
 							"queued".equals(current.status()) ? Status.QUEUED : Status.RUNNING,
-							current.progress() == null ? null : current.progress() / 100.0,
+							progress == null ? null : progress / 100.0,
 							current.message() != null && !current.message().isEmpty()
 									? current.message()
 									: current.stage(),
@@ -434,13 +439,17 @@ public final class AgentDispatcher implements AutoCloseable {
 					result.put("notesPath", files.notes());
 				}
 				result.put("transcriptPath", files.transcript());
-				jobs.update(jobId, new Patch(
-						"done".equals(current.status()) ? Status.DONE
-								: "cancelled".equals(current.status()) ? Status.CANCELLED
-										: Status.FAILED,
-						"done".equals(current.status()) ? 1.0
-								: current.progress() == null ? null : current.progress() / 100.0,
-						current.message(), current.error(), result));
+				Status finalStatus = "done".equals(current.status()) ? Status.DONE
+						: "cancelled".equals(current.status()) ? Status.CANCELLED
+								: Status.FAILED;
+				Double finalProgress;
+				if ("done".equals(current.status())) {
+					finalProgress = 1.0;
+				} else {
+					finalProgress = progress == null ? null : progress / 100.0;
+				}
+				jobs.update(jobId, new Patch(finalStatus, finalProgress, current.message(),
+						current.error(), result));
 			} catch (RuntimeException error) {
 				LOG.log(System.Logger.Level.DEBUG,
 						"meeting job mirror failed: " + error);
@@ -483,13 +492,13 @@ public final class AgentDispatcher implements AutoCloseable {
 			if (AgentJobRegistry.isTerminalJobStatus(job.status())) {
 				return job;
 			}
-			String signature = job.status().wire() + ":" + job.progress() + ":" + job.message();
+			Double progress = job.progress();
+			String message = job.message();
+			String signature = job.status().wire() + ":" + progress + ":" + message;
 			if (!signature.equals(lastSignature)) {
 				lastSignature = signature;
-				context.progress(new AgentProgressUpdate(job.progress() == null ? 0
-						: job.progress(), null,
-						job.message() == null ? job.kind().wire() + " " + job.status().wire()
-								: job.message()));
+				context.progress(new AgentProgressUpdate(progress == null ? 0 : progress, null,
+						message == null ? job.kind().wire() + " " + job.status().wire() : message));
 			}
 			if (System.nanoTime() >= deadline) {
 				return job;
@@ -502,7 +511,7 @@ public final class AgentDispatcher implements AutoCloseable {
 		String id = args.path("id").isString() && !args.path("id").asString().trim().isEmpty()
 				? args.path("id").asString().trim()
 				: null;
-		Kind kind = readJobKind(args.path("kind"), false);
+		Kind kind = optionalJobKind(args.path("kind"));
 		if (id != null) {
 			Job job = jobs.get(id);
 			if (job == null) {
@@ -514,7 +523,7 @@ public final class AgentDispatcher implements AutoCloseable {
 			}
 			return job;
 		}
-		Optional<Job> latest = jobs.latest(kind);
+		Optional<Job> latest = kind == null ? jobs.latest() : jobs.latest(kind);
 		if (latest.isEmpty()) {
 			return failure(kind != null
 					? "no " + kind.wire() + " job yet; start one with job {action:\"start\", kind:\""
@@ -524,11 +533,18 @@ public final class AgentDispatcher implements AutoCloseable {
 		return latest.get();
 	}
 
-	private static @Nullable Kind readJobKind(JsonNode value, boolean required) {
+	/** The required {@code kind} of a job start (throws a dispatch error when absent/invalid). */
+	private static Kind requireJobKind(JsonNode value) {
+		Kind kind = optionalJobKind(value);
+		if (kind == null) {
+			return failure("job needs \"kind\": transcribe, export or meeting");
+		}
+		return kind;
+	}
+
+	/** The optional {@code kind} filter; null when the call did not restrict the kind. */
+	private static @Nullable Kind optionalJobKind(JsonNode value) {
 		if (value == null || value.isMissingNode() || value.isNull()) {
-			if (required) {
-				return failure("job needs \"kind\": transcribe, export or meeting");
-			}
 			return null;
 		}
 		String wire = value.isString() ? value.asString() : value.toString();
@@ -540,8 +556,9 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private String describeJob(Job job) {
-		double seconds = ((job.finishedAt() == null ? System.currentTimeMillis()
-				: job.finishedAt()) - job.createdAt()) / 1000.0;
+		Long finishedAt = job.finishedAt();
+		double seconds = ((finishedAt == null ? System.currentTimeMillis() : finishedAt)
+				- job.createdAt()) / 1000.0;
 		StringBuilder builder = new StringBuilder();
 		builder.append(job.id()).append(' ').append(job.kind().wire()).append(' ')
 				.append(job.status().wire());
@@ -582,9 +599,8 @@ public final class AgentDispatcher implements AutoCloseable {
 		}
 		try {
 			List<LibraryPort.RecordingEntry> recordings = new ArrayList<>(library.listRecordings());
-			recordings.sort(Comparator.comparingLong(
-					(LibraryPort.RecordingEntry entry) -> entry.createdAt() == null ? 0
-							: entry.createdAt()).reversed());
+			recordings.sort(Comparator.comparingLong(LibraryPort.RecordingEntry::createdAt)
+					.reversed());
 			lines.add("recordings (" + recordings.size() + "):");
 			for (int index = 0; index < Math.min(30, recordings.size()); index++) {
 				LibraryPort.RecordingEntry recording = recordings.get(index);
@@ -695,9 +711,8 @@ public final class AgentDispatcher implements AutoCloseable {
 		if (from != null && to != null && to <= from) {
 			return failure("\"to\" must be after \"from\"");
 		}
-		int width = Math.round((float) (clamp(args.path("width"), FRAME_WIDTH_MIN,
-				FRAME_WIDTH_MAX) == null ? FRAME_WIDTH_DEFAULT
-						: clamp(args.path("width"), FRAME_WIDTH_MIN, FRAME_WIDTH_MAX)));
+		Double clampedWidth = clamp(args.path("width"), FRAME_WIDTH_MIN, FRAME_WIDTH_MAX);
+		int width = Math.round((float) (clampedWidth == null ? FRAME_WIDTH_DEFAULT : clampedWidth));
 		ObjectNode normalized = Json.nodeFactory().objectNode();
 		if (!at.isEmpty()) {
 			ArrayNode atArray = normalized.putArray("at");
@@ -789,7 +804,7 @@ public final class AgentDispatcher implements AutoCloseable {
 		return clamped == null ? null : (int) Math.round(clamped);
 	}
 
-	private static String isoMinute(@Nullable long epochMillis) {
+	private static String isoMinute(long epochMillis) {
 		String iso = Instant.ofEpochMilli(epochMillis).toString();
 		return iso.substring(0, 16).replace('T', ' ');
 	}

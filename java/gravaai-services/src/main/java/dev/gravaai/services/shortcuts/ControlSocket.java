@@ -33,8 +33,6 @@ import java.util.function.Consumer;
  * {@code $TMPDIR/gravaai-<uid>/control.sock} (must match gravaai-ctl). The same socket gives
  * single-instance forwarding (plan §5.1): a second launch sends its action and exits.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ControlSocket {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.shortcuts");
@@ -87,7 +85,7 @@ public final class ControlSocket {
 	 * {@code onShow} is set (a second plain launch asks the running app to come to the front).
 	 */
 	public static String handleControlLine(
-			String line, Consumer<GlobalShortcutAction> onAction, Runnable onShow) {
+			String line, Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow) {
 		String action = line == null ? "" : line.trim();
 		if (onShow != null && SHOW_LINE.equals(action)) {
 			onShow.run();
@@ -112,7 +110,8 @@ public final class ControlSocket {
 	}
 
 	/** Starts a server that also answers {@link #SHOW_LINE} through {@code onShow}. */
-	public static Server start(Consumer<GlobalShortcutAction> onAction, Runnable onShow, Path socketPath)
+	public static Server start(Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow,
+			Path socketPath)
 			throws IOException {
 		Path directory = socketPath.getParent();
 		Files.createDirectories(directory);
@@ -194,12 +193,12 @@ public final class ControlSocket {
 		private final Path socketPath;
 		private final ServerSocketChannel channel;
 		private final Consumer<GlobalShortcutAction> onAction;
-		private final Runnable onShow;
+		private final @Nullable Runnable onShow;
 		private volatile boolean running = true;
 		private @Nullable Thread acceptThread;
 
-		private Server(Path socketPath, ServerSocketChannel channel, Consumer<GlobalShortcutAction> onAction,
-				Runnable onShow) {
+		private Server(Path socketPath, ServerSocketChannel channel,
+				Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow) {
 			this.socketPath = socketPath;
 			this.channel = channel;
 			this.onAction = onAction;
@@ -344,7 +343,7 @@ public final class ControlSocket {
 		}
 	}
 
-	private static @Nullable long currentUid() {
+	private static long currentUid() {
 		try {
 			Object uid = Files.getAttribute(Path.of("/proc/self"), "unix:uid");
 			return uid instanceof Number number ? number.longValue() : 0L;

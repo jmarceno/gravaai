@@ -13,8 +13,6 @@ import java.util.Map;
  * actions with their defaults, the fixed (non-configurable) shortcuts, conflict detection, platform
  * matching and display formatting.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Shortcuts {
 
 	/** {@code SHORTCUT_ACTIONS}. */
@@ -182,8 +180,11 @@ public final class Shortcuts {
 				&& altKey == binding.alt();
 	}
 
-	/** {@code formatBinding}: Ctrl/⌘, Shift/⇧, Alt/⌥ plus the key label. */
+	/** {@code formatBinding}: Ctrl/⌘, Shift/⇧, Alt/⌥ plus the key label; empty for no binding. */
 	public static String formatBinding(@Nullable Binding binding, boolean isMac) {
+		if (binding == null) {
+			return "";
+		}
 		List<String> parts = new ArrayList<>();
 		if (binding.ctrl()) {
 			parts.add(isMac ? "⌘" : "Ctrl");

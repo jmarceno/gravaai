@@ -49,8 +49,6 @@ import javafx.scene.shape.Rectangle;
  * and global shortcuts use for scrubbing. The panel itself never decodes or composites: that is
  * the playback engine plus {@code dev.gravaai.ui.editor.preview}.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class EditorPreviewPanel extends VBox {
 
 	private static final String PREVIEW_STYLESHEET = "/ui/editor/preview.css";
@@ -445,7 +443,7 @@ public final class EditorPreviewPanel extends VBox {
 		loadingSkeleton.resizeRelocate(x, y, width, height);
 	}
 
-	private static boolean isDefaultCrop(@Nullable CropRegion crop) {
+	private static boolean isDefaultCrop(CropRegion crop) {
 		return crop.x() <= 0 && crop.y() <= 0 && crop.width() >= 1 && crop.height() >= 1;
 	}
 

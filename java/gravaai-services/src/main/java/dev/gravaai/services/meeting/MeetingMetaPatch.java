@@ -1,5 +1,7 @@
 package dev.gravaai.services.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -37,8 +39,8 @@ public final class MeetingMetaPatch {
 		return put("language", REMOVE);
 	}
 
-	/** Null when the duration could not be probed; stored as JSON null, like Electron. */
-	public MeetingMetaPatch durationMs(Long durationMs) {
+	/** @param durationMs the probed duration, or null when it could not be probed (stored as JSON null) */
+	public MeetingMetaPatch durationMs(@Nullable Long durationMs) {
 		return put("durationMs", durationMs);
 	}
 
@@ -87,7 +89,7 @@ public final class MeetingMetaPatch {
 		return next;
 	}
 
-	private MeetingMetaPatch put(String key, Object value) {
+	private MeetingMetaPatch put(String key, @Nullable Object value) {
 		changes.put(key, value);
 		return this;
 	}

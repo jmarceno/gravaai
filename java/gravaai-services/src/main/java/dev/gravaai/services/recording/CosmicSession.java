@@ -31,8 +31,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The temp files survive a crash (the Matroska video can be read unfinalised, raw PCM has no
  * header), so only the in-memory metadata is lost: this manifest keeps it on disk while recording.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CosmicSession {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
@@ -113,11 +111,11 @@ public final class CosmicSession {
 	/** Muxes the temp files into the final recording; the recorder supplies the ffmpeg pipeline. */
 	@FunctionalInterface
 	public interface CosmicMux {
-		@Nullable CosmicMuxResult mux(CosmicMuxInput input) throws Exception;
+		CosmicMuxResult mux(CosmicMuxInput input) throws Exception;
 	}
 
 	/** One recording offered to the recoverable-recordings banner. */
-	public @Nullable record RecoverableRecording(
+	public record RecoverableRecording(
 			String id,
 			Path manifestPath,
 			String createdAt,
@@ -130,25 +128,32 @@ public final class CosmicSession {
 	public sealed interface RecoveryMuxInputResult
 			permits RecoveryMuxInputResult.Ready, RecoveryMuxInputResult.Failed {
 
-		@Nullable record Ready(CosmicMuxInput input) implements RecoveryMuxInputResult {
+		record Ready(CosmicMuxInput input) implements RecoveryMuxInputResult {
 		}
 
-		@Nullable record Failed(String error) implements RecoveryMuxInputResult {
+		record Failed(String error) implements RecoveryMuxInputResult {
 		}
 	}
 
 	/** Meeting recordings keep per-speaker tracks; the caller registers them. */
-	public @Nullable record MeetingInfo(boolean hasVideo) {
+	public record MeetingInfo(boolean hasVideo) {
 	}
 
-	/** Result of a recovery. */
-	public @Nullable record RecoverResult(boolean success, @Nullable String path, @Nullable MeetingInfo meeting, @Nullable String error) {
+	/**
+	 * Result of a recovery.
+	 *
+	 * @param path the recovered video path, or null when the recovery failed
+	 * @param meeting the meeting registration, or null when the recording is not a meeting
+	 * @param error the failure message, or null when the recovery succeeded
+	 */
+	public record RecoverResult(boolean success, @Nullable String path, @Nullable MeetingInfo meeting,
+			@Nullable String error) {
 
-		static @Nullable RecoverResult ok(String path, MeetingInfo meeting) {
+		static RecoverResult ok(String path, @Nullable MeetingInfo meeting) {
 			return new RecoverResult(true, path, meeting, null);
 		}
 
-		static @Nullable RecoverResult err(String error) {
+		static RecoverResult err(String error) {
 			return new RecoverResult(false, null, null, error);
 		}
 	}
@@ -162,10 +167,10 @@ public final class CosmicSession {
 	/** {@code JSON.stringify(manifest, null, "\t")}, the indentation the TS writer uses. */
 	private static final PrettyPrinter TAB_FORMAT = tabFormat();
 
-	@Nullable private CosmicSession() {
+	private CosmicSession() {
 	}
 
-	public static @Nullable Path sessionManifestPath(Path recordingsDir, long timestamp) {
+	public static Path sessionManifestPath(Path recordingsDir, long timestamp) {
 		return recordingsDir.resolve(".recording-" + timestamp + ".session.json");
 	}
 
@@ -210,7 +215,7 @@ public final class CosmicSession {
 		}
 	}
 
-	private static @Nullable PrettyPrinter tabFormat() {
+	private static PrettyPrinter tabFormat() {
 		Separators separators = Separators.createDefaultInstance()
 				.withObjectNameValueSpacing(Separators.Spacing.AFTER)
 				.withObjectEmptySeparator("")
@@ -222,7 +227,7 @@ public final class CosmicSession {
 	}
 
 	/** True when the file sits directly in the recordings dir and belongs to this recording. */
-	private static @Nullable boolean isOwnTempFile(JsonNode file, Path recordingsDir, long timestamp) {
+	private static boolean isOwnTempFile(JsonNode file, Path recordingsDir, long timestamp) {
 		if (file == null || !file.isString()) {
 			return false;
 		}
@@ -233,7 +238,7 @@ public final class CosmicSession {
 				&& path.getFileName().toString().startsWith(".recording-" + timestamp + ".");
 	}
 
-	private static @Nullable boolean isFiniteNumber(JsonNode node) {
+	private static boolean isFiniteNumber(@Nullable JsonNode node) {
 		return node != null && node.isNumber() && Double.isFinite(node.asDouble());
 	}
 
@@ -301,7 +306,11 @@ public final class CosmicSession {
 				return null;
 			}
 			JsonNode roleNode = track.get("role");
-			if (roleNode == null || !roleNode.isString() || CosmicAudioRole.fromWire(roleNode.asString()) == null) {
+			if (roleNode == null || !roleNode.isString()) {
+				return null;
+			}
+			CosmicAudioRole role = CosmicAudioRole.fromWire(roleNode.asString());
+			if (role == null) {
 				return null;
 			}
 			JsonNode trackPathNode = track.get("path");
@@ -315,8 +324,7 @@ public final class CosmicSession {
 			Long trackStartedAtMs = trackStartedNode.isNull()
 					? null
 					: Long.valueOf(Math.round(trackStartedNode.asDouble()));
-			audio.add(new CosmicAudioTrack(
-					CosmicAudioRole.fromWire(roleNode.asString()), trackPathNode.asString(), trackStartedAtMs));
+			audio.add(new CosmicAudioTrack(role, trackPathNode.asString(), trackStartedAtMs));
 		}
 		JsonNode micNode = value.get("micNoiseReduction");
 		Object micValue = micNode != null && micNode.isString() ? micNode.asString() : null;
@@ -364,8 +372,13 @@ public final class CosmicSession {
 		return files;
 	}
 
-	/** Removes the manifest's temp files and the manifest itself. */
-	private static void removeSession(Path manifestPath, CosmicSessionManifest manifest) {
+	/**
+	 * Removes the manifest's temp files and the manifest itself.
+	 *
+	 * @param manifest the parsed manifest, or null when it is unreadable (only the manifest is
+	 *     deleted then)
+	 */
+	private static void removeSession(Path manifestPath, @Nullable CosmicSessionManifest manifest) {
 		List<Path> files = manifest == null ? List.of() : manifestFiles(manifest);
 		for (Path file : files) {
 			deleteQuietly(file);
@@ -382,8 +395,11 @@ public final class CosmicSession {
 		}
 	}
 
+	/**
+	 * @param activeTimestamp the timestamp of the recording in progress, or null when none is
+	 */
 	public static List<RecoverableRecording> listRecoverableCosmicRecordings(
-			Path recordingsDir, Long activeTimestamp) {
+			Path recordingsDir, @Nullable Long activeTimestamp) {
 		List<String> names;
 		try (Stream<Path> entries = Files.list(recordingsDir)) {
 			names = entries.map(path -> path.getFileName().toString()).sorted().toList();

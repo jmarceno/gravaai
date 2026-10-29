@@ -28,8 +28,12 @@ public interface TranscriptUiService {
 		CANCELLED
 	}
 
-	/** One immutable status snapshot (progress 0-100, the generated cues on DONE). */
-	record Status(State state, int progress, String message, List<CaptionCue> cues, String error) {
+	/**
+	 * One immutable status snapshot (progress 0-100, the generated cues on DONE); {@code error} is
+	 * null unless the generation failed.
+	 */
+	record Status(State state, int progress, String message, List<CaptionCue> cues,
+			@Nullable String error) {
 
 		public Status {
 			cues = cues == null ? List.of() : List.copyOf(cues);

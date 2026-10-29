@@ -13,20 +13,18 @@ import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.FigureData;
 
 /** The {@code useAnnotationRegionCommands} operations, one class per command. */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AnnotationCommands {
 
 	/** Partial style update: only non-null components are merged into the region style. */
 	public record StylePatch(
-			String color,
-			String backgroundColor,
+			@Nullable String color,
+			@Nullable String backgroundColor,
 			@Nullable Double fontSize,
-			String fontFamily,
-			AnnotationTextStyle.FontWeight fontWeight,
-			AnnotationTextStyle.FontStyle fontStyle,
-			AnnotationTextStyle.TextDecoration textDecoration,
-			AnnotationTextStyle.TextAlign textAlign,
+			@Nullable String fontFamily,
+			AnnotationTextStyle.@Nullable FontWeight fontWeight,
+			AnnotationTextStyle.@Nullable FontStyle fontStyle,
+			AnnotationTextStyle.@Nullable TextDecoration textDecoration,
+			AnnotationTextStyle.@Nullable TextAlign textAlign,
 			@Nullable Double borderRadius) {}
 
 	private AnnotationCommands() {}
@@ -36,13 +34,13 @@ public final class AnnotationCommands {
 	}
 
 	private static AnnotationRegion withRegion(AnnotationRegion region, long startMs, long endMs,
-			@Nullable Integer trackIndex, @Nullable String content, @Nullable String textContent, @Nullable String imageContent,
-			@Nullable AnnotationPosition position, @Nullable AnnotationSize size, @Nullable AnnotationTextStyle style,
+			@Nullable Integer trackIndex, String content, @Nullable String textContent, @Nullable String imageContent,
+			AnnotationPosition position, AnnotationSize size, AnnotationTextStyle style,
 			@Nullable FigureData figureData, @Nullable Double blurIntensity, @Nullable String blurColor) {
 		return new AnnotationRegion(region.id(), startMs, endMs, region.type(), content,
 				textContent, imageContent, position, size, style, region.zIndex(),
-				trackIndex != null ? trackIndex : region.trackIndex(), figureData,
-				blurIntensity != null ? blurIntensity : region.blurIntensity(), blurColor);
+				trackIndex != null ? trackIndex : region.trackIndex(), figureData, blurIntensity,
+				blurColor);
 	}
 
 	/** Selects an annotation region (the hook's {@code onSelectAnnotation}). */

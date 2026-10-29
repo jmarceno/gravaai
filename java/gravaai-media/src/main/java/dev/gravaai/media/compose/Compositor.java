@@ -2,6 +2,8 @@ package dev.gravaai.media.compose;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ColorAlphaType;
 import io.github.humbleui.skija.ColorSpace;
@@ -59,8 +61,6 @@ import dev.gravaai.media.gl.SkiaGlSurface;
  * that context's thread. The caller flushes the surface after {@link #render}; this class
  * flushes as well so the PBO readback sees the frame and raster images can be released.</p>
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class Compositor implements AutoCloseable {
 	/**
 	 * The webcam is drawn several times smaller than its source, so it samples the mipmapped
@@ -182,21 +182,25 @@ public final class Compositor implements AutoCloseable {
 		}
 		currentTarget = target;
 		Canvas canvas = target.canvas();
-		// Stage 1: background colour/gradient/image plus the proportional blur.
-		renderBackground(canvas, input.background(), input.backgroundBlur());
+		// Stage 1: background colour/gradient/image plus the proportional blur. FrameInput's
+		// constructor rejects a null background, so its presence is an invariant of this pipeline.
+		Background background = Objects.requireNonNull(input.background(),
+				"FrameInput.background (rejected by its constructor)");
+		renderBackground(canvas, background, input.backgroundBlur());
 		lastAppliedTransform = new ZoomTransform.AppliedTransform(1, 0, 0);
 		SceneSpec scene = input.scene();
 		double screenOpacity = clamp01(scene.screenOpacity());
 		// Stage 2 + 3 + 4 (partial): padded/cropped and zoom-transformed video layer without the
 		// squircle mask/shadow yet. The per-clip camera layout can fade the screen layer.
-		if (input.sourceFrame() != null && screenOpacity > 0) {
+		RgbaFrame sourceFrame = input.sourceFrame();
+		if (sourceFrame != null && screenOpacity > 0) {
 			if (screenOpacity < 1) {
 				canvas.saveLayerAlpha(Rect.makeWH(width, height),
 						(int) Math.round(screenOpacity * 255));
-				renderSourceVideo(canvas, input);
+				renderSourceVideo(canvas, input, sourceFrame);
 				canvas.restore();
 			} else {
-				renderSourceVideo(canvas, input);
+				renderSourceVideo(canvas, input, sourceFrame);
 			}
 		} else {
 			// Extension hooks still dispatch on background-only frames (idle/poster frames); with no
@@ -205,10 +209,11 @@ public final class Compositor implements AutoCloseable {
 		}
 		// Stage 7: webcam overlay. It is a sibling of the camera container in the TS scene graph
 		// (overlayContainer), so it is drawn outside the camera transform, after the cursor.
-		if (input.sourceFrame() != null && input.webcamFrame() != null
+		RgbaFrame webcamFrame = input.webcamFrame();
+		if (sourceFrame != null && webcamFrame != null
 				&& input.webcam().isVisibleAt(input.sourceTimeSeconds() * 1000)
 				&& scene.cameraOpacity() > 0) {
-			renderWebcam(canvas, input);
+			renderWebcam(canvas, input, webcamFrame);
 		}
 		// Extension hook: post-webcam runs after the built-in transform is restored.
 		dispatchHook(canvas, FrameOverlayHooks.Phase.POST_WEBCAM, input);
@@ -247,7 +252,7 @@ public final class Compositor implements AutoCloseable {
 
 	// ---- stage 1: background -------------------------------------------------------------
 
-	private void renderBackground(Canvas canvas, @Nullable Background background, double backgroundBlur) {
+	private void renderBackground(Canvas canvas, Background background, double backgroundBlur) {
 		Image image = backgroundImage(background, backgroundBlur);
 		canvas.drawImageRect(image,
 				Rect.makeXYWH(0, 0, width, height),
@@ -431,9 +436,8 @@ public final class Compositor implements AutoCloseable {
 	 * camera layout: {@code cameraFill} lerps the box to the full frame (camera-only) and
 	 * {@code cameraOpacity} fades the whole overlay.
 	 */
-	private void renderWebcam(Canvas canvas, FrameInput input) {
+	private void renderWebcam(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		WebcamSpec spec = input.webcam();
-		RgbaFrame frame = input.webcamFrame();
 		double zoomScale = lastAppliedTransform.scale();
 		double margin = WebcamOverlay.scalePixels(spec.margin(), width);
 		double widthPercent = spec.width() > 0 ? spec.width() : spec.size();
@@ -466,8 +470,9 @@ public final class Compositor implements AutoCloseable {
 			canvas.saveLayerAlpha(Rect.makeWH(width, height),
 					(int) Math.round(opacity * 255));
 		}
+		SkiaGlSurface target = currentTarget();
 		try {
-			try (Image image = frameTextures.image(currentTarget,
+			try (Image image = frameTextures.image(target,
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
 				drawWebcamShadowLayers(canvas, box, radius, spec.shadow() * (1 - fill),
 						Math.min(box.getWidth(), box.getHeight()));
@@ -574,8 +579,7 @@ public final class Compositor implements AutoCloseable {
 
 	// ---- stage 2 + 4 (partial): video layer ----------------------------------------------
 
-	private void renderSourceVideo(Canvas canvas, FrameInput input) {
-		RgbaFrame frame = input.sourceFrame();
+	private void renderSourceVideo(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		LayoutSpec spec = input.layout();
 		PaddedLayout layout = LayoutUtils.computePaddedLayout(width, height, spec.padding(),
 				null, spec.crop(), frame.width(), frame.height());
@@ -596,7 +600,8 @@ public final class Compositor implements AutoCloseable {
 				style.borderRadiusPercent());
 		MotionBlur.Effect motionBlur = resolveMotionBlur(input, baseMask, transform);
 		lastMotionBlurEffect = motionBlur;
-		try (Image image = frameTextures.image(currentTarget, GpuFrameTextures.Slot.SOURCE, frame,
+		SkiaGlSurface target = currentTarget();
+		try (Image image = frameTextures.image(target, GpuFrameTextures.Slot.SOURCE, frame,
 				colorSpace)) {
 			if (motionBlur.path() == MotionBlur.Path.NONE) {
 				drawVideoScene(canvas, image, source, baseMask, maskRadius, style, transform);
@@ -669,11 +674,11 @@ public final class Compositor implements AutoCloseable {
 		// Stage 5: the pixi filters run on the whole camera container, so capture the
 		// video layer (shadow stack + squircle-masked video) offscreen and blit the blurred
 		// result over the background.
-		ensureBlurSurface();
-		Canvas blurCanvas = blurSurface.getCanvas();
+		Surface blurTarget = ensureBlurSurface();
+		Canvas blurCanvas = blurTarget.getCanvas();
 		blurCanvas.clear(0);
 		drawVideoScene(blurCanvas, image, source, baseMask, maskRadius, style, transform);
-		Image blurredLayer = blurSurface.makeImageSnapshot();
+		Image blurredLayer = blurTarget.makeImageSnapshot();
 		try {
 			Shader shader = motionBlur.path() == MotionBlur.Path.DIRECTIONAL
 					? MotionBlurShaders.directional(blurredLayer, motionBlur, width, height)
@@ -718,11 +723,24 @@ public final class Compositor implements AutoCloseable {
 				input.timeSeconds() * 1000, null, false);
 	}
 
-	private void ensureBlurSurface() {
-		if (blurSurface == null) {
+	private Surface ensureBlurSurface() {
+		Surface current = blurSurface;
+		if (current == null) {
 			// A GPU offscreen surface: the motion-blur capture used to be drawn in software.
-			blurSurface = currentTarget.makeOffscreen(width, height);
+			Surface created = currentTarget().makeOffscreen(width, height);
+			if (created == null) {
+				throw new IllegalStateException(
+						"motion blur requires a GPU offscreen surface, but Skia returned none");
+			}
+			blurSurface = created;
+			return created;
 		}
+		return current;
+	}
+
+	/** The render target of the frame in flight; render() sets it before any drawing stage. */
+	private SkiaGlSurface currentTarget() {
+		return Objects.requireNonNull(currentTarget, "render target (render() not in progress)");
 	}
 
 	private void resetMotionBlur() {

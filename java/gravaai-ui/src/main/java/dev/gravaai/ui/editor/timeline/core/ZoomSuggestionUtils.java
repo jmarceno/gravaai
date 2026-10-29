@@ -25,9 +25,12 @@ public final class ZoomSuggestionUtils {
 	/** Padding added before the first click and after the last click in a cluster. */
 	public static final double CLICK_CLUSTER_PAD_MS = 500;
 
-	/** Port of {@code CursorTelemetryPoint} (interaction/cursorType are nullable). */
-	public record CursorTelemetryPoint(double timeMs, double cx, double cy, String interactionType,
-			String cursorType) {
+	/**
+	 * Port of {@code CursorTelemetryPoint}; {@code interactionType} and {@code cursorType} are null
+	 * for position-only samples (the media {@code CursorSample} documents the same absence).
+	 */
+	public record CursorTelemetryPoint(double timeMs, double cx, double cy,
+			@Nullable String interactionType, @Nullable String cursorType) {
 	}
 
 	/** Port of {@code ZoomDwellCandidate}. */
@@ -104,8 +107,8 @@ public final class ZoomSuggestionUtils {
 		return ((double) sourceWidth / sourceHeight) >= MIN_FRESH_RECORDING_AUTO_ZOOM_SOURCE_ASPECT_RATIO;
 	}
 
-	/** Port of {@code isExplicitClickType}. */
-	public static boolean isExplicitClickType(String interactionType) {
+	/** Port of {@code isExplicitClickType}; {@code null} (position-only sample) is never a click. */
+	public static boolean isExplicitClickType(@Nullable String interactionType) {
 		return interactionType != null && EXPLICIT_CLICK_TYPES.contains(interactionType);
 	}
 

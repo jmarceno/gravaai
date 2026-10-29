@@ -9,21 +9,32 @@ import java.util.function.Function;
  *
  * @param <T> the success value type
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public sealed interface Result<T> permits Result.Ok, Result.Err {
+
+	/** The unit value: the success payload of an operation whose only result is its effect. */
+	enum Unit { UNIT }
 
 	/** The operation succeeded. */
 	record Ok<T>(T value) implements Result<T> {}
 
 	/** The operation failed with a human-readable message. */
-	record Err<T>(@Nullable String error) implements Result<T> {}
+	record Err<T>(String error) implements Result<T> {}
 
 	static <T> Result<T> ok(T value) {
 		return new Ok<>(value);
 	}
 
-	static <T> Result<T> err(@Nullable String error) {
+	/**
+	 * Success without a payload, for operations whose only result is their side effect.
+	 *
+	 * <p>{@code Void} cannot be used: it has no value, so a {@code Result<Void>} success could only
+	 * be modelled by a null {@link Ok#value()} — {@link Unit} keeps the success payload non-null.
+	 */
+	static Result<Unit> okUnit() {
+		return new Ok<>(Unit.UNIT);
+	}
+
+	static <T> Result<T> err(String error) {
 		return new Err<>(error);
 	}
 
@@ -31,12 +42,22 @@ public sealed interface Result<T> permits Result.Ok, Result.Err {
 		return this instanceof Ok<?>;
 	}
 
-	default @Nullable boolean isErr() {
+	default boolean isErr() {
 		return this instanceof Err<?>;
 	}
 
-	default T orElse(@Nullable T fallback) {
+	/**
+	 * The success value, or the caller-supplied non-null fallback for a failure.
+	 *
+	 * @see #orNull() for the "no value" case
+	 */
+	default T orElse(T fallback) {
 		return this instanceof Ok<T> ok ? ok.value() : fallback;
+	}
+
+	/** The success value, or null when this is an error. */
+	default @Nullable T orNull() {
+		return this instanceof Ok<T> ok ? ok.value() : null;
 	}
 
 	default <R> Result<R> map(Function<? super T, ? extends R> mapper) {

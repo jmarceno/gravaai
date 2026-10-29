@@ -20,8 +20,6 @@ import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
  * Local transcription with the bundled whisper-cli, ported from
  * electron/ipc/meeting/transcript.ts ({@code transcribeWithWhisper}, {@code probeDurationMs}).
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class WhisperTranscriber {
 
 	private static final Pattern PROGRESS = Pattern.compile("progress\\s*=\\s*(\\d+)%");
@@ -32,14 +30,14 @@ public final class WhisperTranscriber {
 	private final MediaTools tools;
 	private final Path tempDirectory;
 
-	@Nullable public WhisperTranscriber(ProcessRunnerPort processes, MediaTools tools, Path tempDirectory) {
+	public WhisperTranscriber(ProcessRunnerPort processes, MediaTools tools, Path tempDirectory) {
 		this.processes = processes;
 		this.tools = tools;
 		this.tempDirectory = tempDirectory;
 	}
 
 	/** Runs whisper on the recording's audio (or its two speaker tracks) and parses its JSON. */
-	public Transcript.@Nullable ParsedTranscript transcribe(MeetingAudioInputs inputs, String modelPath,
+	public Transcript.ParsedTranscript transcribe(MeetingAudioInputs inputs, String modelPath,
 			String vadModelPath, String language, MeetingStatusCallback onStatus,
 			CancelSignal signal) {
 		MeetingStatusCallback status = onStatus == null

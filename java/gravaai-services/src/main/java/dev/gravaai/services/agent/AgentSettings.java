@@ -20,8 +20,6 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code src/components/video-editor/agent/settings.ts}, plan §5.16): dotted-path writes validated
  * through the project normaliser, plus the {@code captions_style} shorthand.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class AgentSettings {
 
 	private static final Set<String> ARRAY_SETTINGS = Set.of("zoomRegions", "trimRegions",
@@ -129,7 +127,7 @@ public final class AgentSettings {
 				+ "\"; use a built-in one, a #RRGGBB colour or a linear-gradient(...)");
 	}
 
-	private static @Nullable List<String> splitPath(String path) {
+	private static List<String> splitPath(String path) {
 		List<String> segments = new ArrayList<>();
 		for (String segment : path.split("\\.")) {
 			if (!segment.isBlank()) {
@@ -142,6 +140,7 @@ public final class AgentSettings {
 		return segments;
 	}
 
+	/** @return the stored node, or null when the dotted path is absent from the stored JSON */
 	private static @Nullable JsonNode readStoredPath(JsonNode value, List<String> segments) {
 		JsonNode cursor = value;
 		for (String segment : segments) {
@@ -171,7 +170,11 @@ public final class AgentSettings {
 		writePath(child, segments.subList(1, segments.size()), value);
 	}
 
-	private static @Nullable String findBlockedChange(JsonNode value, JsonNode stored) {
+	/**
+	 * @param stored the stored node for the same path, or null when it is absent
+	 * @return the blocked nested key, or null when the change is allowed
+	 */
+	private static @Nullable String findBlockedChange(JsonNode value, @Nullable JsonNode stored) {
 		if (value == null || !value.isObject()) {
 			return null;
 		}
@@ -191,7 +194,10 @@ public final class AgentSettings {
 		return null;
 	}
 
-	private static boolean deepEqual(JsonNode left, JsonNode right) {
+	/**
+	 * JSON deep equality; a null node means "absent" (a missing key or a missing array element).
+	 */
+	private static boolean deepEqual(@Nullable JsonNode left, @Nullable JsonNode right) {
 		if (left == null || left.isNull() || left.isMissingNode()) {
 			return right == null || right.isNull() || right.isMissingNode();
 		}
@@ -226,7 +232,7 @@ public final class AgentSettings {
 		return left.equals(right);
 	}
 
-	private static String compact(JsonNode node) {
+	private static String compact(@Nullable JsonNode node) {
 		return node == null ? "undefined" : Json.MAPPER.writeValueAsString(node);
 	}
 }

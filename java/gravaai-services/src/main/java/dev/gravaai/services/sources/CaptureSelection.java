@@ -17,25 +17,23 @@ import dev.gravaai.services.recording.CosmicSources;
  * that the Java app does not have (plan §2.3). The rule that matters is preserved: identity and
  * geometry are revalidated, and a vanished source is never substituted with a broader one.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class CaptureSelection {
 
 	/** Lists the outputs of the COSMIC screen-capture helper. */
 	public interface CosmicOutputs {
-		@Nullable List<CosmicOutput> list() throws Exception;
+		List<CosmicOutput> list() throws Exception;
 	}
 
 	private final CosmicOutputs cosmicOutputs;
 	private final Map<String, String> env;
 
-	@Nullable public CaptureSelection(CosmicOutputs cosmicOutputs, Map<String, String> env) {
+	public CaptureSelection(CosmicOutputs cosmicOutputs, Map<String, String> env) {
 		this.cosmicOutputs = cosmicOutputs;
 		this.env = env;
 	}
 
 	/** True on a Linux Wayland session, where direct COSMIC capture is used. */
-	public @Nullable boolean isWaylandSession() {
+	public boolean isWaylandSession() {
 		return SourceMapping.isLikelyLinuxWaylandSession(env);
 	}
 

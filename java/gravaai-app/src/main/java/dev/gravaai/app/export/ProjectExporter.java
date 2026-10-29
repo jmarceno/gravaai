@@ -44,15 +44,14 @@ import javafx.stage.Window;
  * {@link #runTo} path is unchanged. Extension render hooks (plan §5.18) run in every exported
  * frame through the compositor, with the same phase order as the editor preview.
  */
-// Null-safety burn-down: NullAway still reports this type. Fix it and drop the annotation.
-@org.jspecify.annotations.NullUnmarked
 public final class ProjectExporter {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.export");
 
 	private final ExportCoordinator coordinator;
 	private final ExportPublisher publisher;
-	private final EditorPreferencesStore preferencesStore;
+	/** The editor preferences (export defaults), or {@code null} for the built-in defaults. */
+	private final @Nullable EditorPreferencesStore preferencesStore;
 	/** Extension render hooks (plan §5.18); null until the app wires the extension host. */
 	private @Nullable ExtensionHost extensionHost;
 
@@ -114,10 +113,10 @@ public final class ProjectExporter {
 		model.setProgress(null);
 		model.setError(null);
 		model.setExportedFilePath(null);
-		model.setPendingExportSave(null);
+		model.clearPendingExportSave();
 		discardStagingDir();
 		try {
-			@Nullable Path stagingDir = Files.createTempDirectory("gravaai-export-");
+			Path stagingDir = Files.createTempDirectory("gravaai-export-");
 			try {
 				Files.setPosixFilePermissions(stagingDir,
 						java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
@@ -250,7 +249,7 @@ public final class ProjectExporter {
 			publisher.publish(stagedFile,
 					new ExportPublisher.Destination(destination, false), true);
 			moveSidecars(stagedFile, destination);
-			model.setPendingExportSave(null);
+			model.clearPendingExportSave();
 			model.setError(null);
 			model.setExportedFilePath(destination.toString());
 			model.setExporting(false);
@@ -266,7 +265,7 @@ public final class ProjectExporter {
 			}
 			if (stagedFile == null || !Files.isRegularFile(stagedFile)) {
 				// The staged file is gone; nothing to retry.
-				model.setPendingExportSave(null);
+				model.clearPendingExportSave();
 				model.setExporting(false);
 				deleteRecursively(stagingDir);
 			}
@@ -311,7 +310,8 @@ public final class ProjectExporter {
 		discardPendingExportSave(model.clearPendingExportSave());
 	}
 
-	private Path stagingDir;
+	/** The temp directory of the export currently being rendered; {@code null} when idle. */
+	private @Nullable Path stagingDir;
 
 	private void discardStagingDir() {
 		Path dir = stagingDir;
@@ -340,7 +340,7 @@ public final class ProjectExporter {
 		}
 	}
 
-	private static @Nullable String errorMessage(Throwable error) {
+	private static String errorMessage(Throwable error) {
 		String message = error.getMessage();
 		return message == null || message.isBlank() ? error.toString() : message;
 	}

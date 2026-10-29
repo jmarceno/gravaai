@@ -337,7 +337,7 @@ public final class Compositor implements AutoCloseable {
 	}
 
 	private void drawBackgroundImage(Canvas canvas, Background.Image background) {
-		Image image = Image.makeFromEncoded(background.encodedImage());
+		Image image = Image.makeDeferredFromEncodedBytes(background.encodedImage());
 		if (image == null) {
 			LOG.log(System.Logger.Level.WARNING,
 					"cannot decode background wallpaper; painting black");

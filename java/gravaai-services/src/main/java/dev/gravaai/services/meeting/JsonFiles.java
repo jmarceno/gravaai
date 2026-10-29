@@ -10,6 +10,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.core.util.DefaultIndenter;
 import tools.jackson.core.util.DefaultPrettyPrinter;
 import tools.jackson.core.util.Separators;
@@ -64,14 +65,13 @@ public final class JsonFiles {
 	}
 
 	/** The JSON object in a file as a map that keeps the file's key order; empty when unreadable. */
-	@SuppressWarnings("unchecked")
 	public static Map<String, Object> readObjectOrEmpty(Path file) {
 		JsonNode node = readTreeOrNull(file);
 		if (node == null || !node.isObject()) {
 			return new LinkedHashMap<>();
 		}
-		Map<String, Object> parsed = MAPPER.convertValue(node, Map.class);
-		return new LinkedHashMap<>(parsed);
+		return MAPPER.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {
+		});
 	}
 
 	/** Writes through a temporary file and a rename, like Electron's atomicSave. */

@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -218,13 +217,11 @@ public final class MeetingJobs {
 			broadcast(job.snapshot());
 		}
 		try {
-			metaStore.update(job.mediaPath, Map.of("lastJob",
-					lastJob(job.mode, "running", null, Times.isoNow(clock))));
+			metaStore.update(job.mediaPath, lastJob(job.mode, "running", null, Times.isoNow(clock)));
 			pipeline.run(job.mediaPath, job.mode, settings.get(), controller,
 					(stage, message, progress) -> update(job, stage, message, progress));
 			// Meta first, so anyone reacting to "done" reads the finished state.
-			metaStore.update(job.mediaPath, Map.of("lastJob",
-					lastJob(job.mode, "done", null, Times.isoNow(clock))));
+			metaStore.update(job.mediaPath, lastJob(job.mode, "done", null, Times.isoNow(clock)));
 			synchronized (lock) {
 				job.status = MeetingJob.Status.DONE;
 				job.message = "Done";
@@ -243,9 +240,9 @@ public final class MeetingJobs {
 			LOG.log(System.Logger.Level.ERROR,
 					"Meeting job " + job.mode.wire() + " for " + job.mediaPath + " failed", error);
 			try {
-				metaStore.update(job.mediaPath, Map.of("lastJob", lastJob(job.mode,
+				metaStore.update(job.mediaPath, lastJob(job.mode,
 						cancelled ? "cancelled" : "failed", cancelled ? null : message,
-						Times.isoNow(clock))));
+						Times.isoNow(clock)));
 			} catch (RuntimeException ignored) {
 				// The metadata write must not hide the job failure.
 			}
@@ -263,16 +260,9 @@ public final class MeetingJobs {
 		}
 	}
 
-	private Map<String, Object> lastJob(MeetingJobMode mode, String status, String error,
+	private static MeetingMetaPatch lastJob(MeetingJobMode mode, String status, String error,
 			String at) {
-		Map<String, Object> lastJob = new LinkedHashMap<>();
-		lastJob.put("mode", mode.wire());
-		lastJob.put("status", status);
-		if (error != null) {
-			lastJob.put("error", error);
-		}
-		lastJob.put("at", at);
-		return lastJob;
+		return new MeetingMetaPatch().lastJob(new MeetingMeta.LastJob(mode.wire(), status, error, at));
 	}
 
 	private void update(JobState job, MeetingJob.Stage stage, String message, Integer progress) {

@@ -58,11 +58,11 @@ final class AgentExportRunner {
 	 */
 	static Path destination(JsonNode options) {
 		JsonNode pathNode = options == null ? null : options.path("path");
-		if (pathNode == null || !pathNode.isString() || pathNode.asText().isBlank()) {
+		if (pathNode == null || !pathNode.isString() || pathNode.asString().isBlank()) {
 			throw new IllegalArgumentException(
 					"export needs options.path: an absolute destination file");
 		}
-		Path destination = Path.of(pathNode.asText());
+		Path destination = Path.of(pathNode.asString());
 		if (!destination.isAbsolute()) {
 			throw new IllegalArgumentException("export \"path\" must be an absolute path");
 		}
@@ -80,7 +80,7 @@ final class AgentExportRunner {
 	/** {@code mp4} (default) or {@code gif}. */
 	static String format(JsonNode options) {
 		JsonNode value = options == null ? null : options.path("format");
-		String format = value != null && value.isString() ? value.asText().toLowerCase(
+		String format = value != null && value.isString() ? value.asString().toLowerCase(
 				java.util.Locale.ROOT) : "mp4";
 		if (!"mp4".equals(format) && !"gif".equals(format)) {
 			throw new IllegalArgumentException("unknown export format \"" + format
@@ -136,7 +136,7 @@ final class AgentExportRunner {
 		raw.put("exportFormat", format);
 		JsonNode quality = options == null ? null : options.path("quality");
 		if (quality != null && quality.isString()) {
-			raw.put("exportQuality", quality.asText().toLowerCase(java.util.Locale.ROOT));
+			raw.put("exportQuality", quality.asString().toLowerCase(java.util.Locale.ROOT));
 		}
 		JsonNode fps = options == null ? null : options.path("fps");
 		if (fps != null && fps.isNumber()) {

@@ -57,7 +57,7 @@ final class AgentOpReader {
 		if (!op.isString()) {
 			throw new OpError("op " + index + " needs an \"op\" name");
 		}
-		return op.asText();
+		return op.asString();
 	}
 
 	static double number(JsonNode raw, String key) {
@@ -82,10 +82,10 @@ final class AgentOpReader {
 
 	static String string(JsonNode raw, String key) {
 		JsonNode value = raw.path(key);
-		if (!value.isString() || value.asText().trim().isEmpty()) {
+		if (!value.isString() || value.asString().trim().isEmpty()) {
 			throw new OpError("\"" + key + "\" must be a non-empty string");
 		}
-		return value.asText();
+		return value.asString();
 	}
 
 	static String optionalString(JsonNode raw, String key) {
@@ -191,10 +191,10 @@ final class AgentOpReader {
 		JsonNode alignNode = style.path("align");
 		if (!alignNode.isMissingNode() && !alignNode.isNull()) {
 			if (!alignNode.isString() || !List.of("left", "center", "right")
-					.contains(alignNode.asText())) {
+					.contains(alignNode.asString())) {
 				throw new OpError("\"style.align\" must be left, center or right");
 			}
-			align = alignNode.asText();
+			align = alignNode.asString();
 		}
 		Double fontSize = optionalNumber(style, "fontSize");
 		if (fontSize != null && (fontSize < 8 || fontSize > 200)) {
@@ -203,7 +203,7 @@ final class AgentOpReader {
 		return new StyleInput(fontSize, optionalBoolean(style, "bold"),
 				optionalBoolean(style, "italic"), optionalString(style, "color"),
 				optionalString(style, "backgroundColor"), align,
-				fontFamily.isString() ? fontFamily.asText() : null);
+				fontFamily.isString() ? fontFamily.asString() : null);
 	}
 
 	static ArrowDirection readArrow(JsonNode raw, boolean required) {
@@ -251,7 +251,7 @@ final class AgentOpReader {
 		}
 		JsonNode kind = transition.path("kind");
 		if (!kind.isMissingNode() && !kind.isNull()
-				&& !"fade-black".equals(kind.isString() ? kind.asText() : null)) {
+				&& !"fade-black".equals(kind.isString() ? kind.asString() : null)) {
 			throw new OpError("\"transition.kind\" must be \"fade-black\"");
 		}
 		return new TransitionInput(true, Math.round(ms));
@@ -335,10 +335,10 @@ final class AgentOpReader {
 		}
 		List<String> strings = new ArrayList<>();
 		for (JsonNode entry : value) {
-			if (!entry.isString() || entry.asText().trim().isEmpty()) {
+			if (!entry.isString() || entry.asString().trim().isEmpty()) {
 				throw new OpError("\"" + key + "\" must contain strings");
 			}
-			strings.add(entry.asText().trim());
+			strings.add(entry.asString().trim());
 		}
 		return List.copyOf(strings);
 	}
@@ -359,8 +359,8 @@ final class AgentOpReader {
 		if (node == null || node.isNull() || node.isMissingNode()) {
 			return null;
 		}
-		if (node.isTextual()) {
-			return node.asText();
+		if (node.isString()) {
+			return node.asString();
 		}
 		if (node.isBoolean()) {
 			return node.asBoolean();

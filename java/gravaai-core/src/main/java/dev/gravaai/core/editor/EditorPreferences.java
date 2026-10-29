@@ -131,8 +131,8 @@ public record EditorPreferences(
 		String whisperModelPath = normalizeNullablePath(raw.get("whisperModelPath"));
 		WhisperModel whisperModel = null;
 		JsonNode rawWhisperModel = raw.get("whisperModel");
-		if (rawWhisperModel != null && rawWhisperModel.isTextual()) {
-			whisperModel = WhisperModel.fromWire(rawWhisperModel.asText());
+		if (rawWhisperModel != null && rawWhisperModel.isString()) {
+			whisperModel = WhisperModel.fromWire(rawWhisperModel.asString());
 		}
 
 		return new EditorPreferences(
@@ -171,7 +171,7 @@ public record EditorPreferences(
 	/** Border-radius migration: pixels are converted once, then marked as percent. */
 	private static JsonNode controlsInput(JsonNode raw) {
 		JsonNode unit = raw.get("borderRadiusUnit");
-		boolean unitIsPercent = unit != null && unit.isTextual() && "percent".equals(unit.asText());
+		boolean unitIsPercent = unit != null && unit.isString() && "percent".equals(unit.asString());
 		JsonNode radius = raw.get("borderRadius");
 		boolean radiusIsNumber = radius != null && radius.isNumber();
 		if (unitIsPercent || !radiusIsNumber) {
@@ -368,11 +368,11 @@ public record EditorPreferences(
 	}
 
 	private static String normalizePositiveIntegerString(JsonNode value, String fallback) {
-		if (value == null || !value.isTextual() || value.asText().strip().isEmpty()) {
+		if (value == null || !value.isString() || value.asString().strip().isEmpty()) {
 			return fallback;
 		}
 		try {
-			long parsed = Long.parseLong(value.asText().strip());
+			long parsed = Long.parseLong(value.asString().strip());
 			return parsed > 0 ? Long.toString(parsed) : fallback;
 		} catch (NumberFormatException error) {
 			return fallback;
@@ -385,18 +385,18 @@ public record EditorPreferences(
 		}
 		Set<String> unique = new LinkedHashSet<>();
 		for (JsonNode item : value) {
-			if (item != null && item.isTextual() && !item.asText().isEmpty()) {
-				unique.add(item.asText());
+			if (item != null && item.isString() && !item.asString().isEmpty()) {
+				unique.add(item.asString());
 			}
 		}
 		return List.copyOf(unique);
 	}
 
 	private static String normalizeNullablePath(JsonNode value) {
-		if (value == null || !value.isTextual()) {
+		if (value == null || !value.isString()) {
 			return null;
 		}
-		String trimmed = value.asText().strip();
+		String trimmed = value.asString().strip();
 		return trimmed.isEmpty() ? null : trimmed;
 	}
 }

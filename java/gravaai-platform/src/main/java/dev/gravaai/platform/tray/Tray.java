@@ -311,6 +311,8 @@ public final class Tray implements AutoCloseable {
 			return values;
 		}
 
+		// dbus-java declares a generic <A> A Get(...); the bus only ever sees a Variant.
+		@SuppressWarnings("unchecked")
 		@Override
 		public Variant<?> Get(String interfaceName, String propertyName) {
 			if (!SNI_INTERFACE.equals(interfaceName)) {

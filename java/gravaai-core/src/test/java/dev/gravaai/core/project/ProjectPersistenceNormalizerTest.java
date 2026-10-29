@@ -218,7 +218,7 @@ class ProjectPersistenceNormalizerTest {
 		assertFalse(data.get("editor").has("mp4FrameRate"));
 		assertFalse(data.get("editor").has("publishDestination"));
 		assertFalse(data.get("editor").has("whisperModelPath"));
-		assertEquals("high", rawEditor.get("exportQuality").asText());
+		assertEquals("high", rawEditor.get("exportQuality").asString());
 	}
 
 	@Test

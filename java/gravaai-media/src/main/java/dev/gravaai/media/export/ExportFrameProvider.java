@@ -62,7 +62,7 @@ public interface ExportFrameProvider extends AutoCloseable {
 	}
 
 	@Override
-	default void close() throws Exception {
+	default void close() {
 		// Nothing to release by default.
 	}
 }

@@ -213,14 +213,14 @@ public final class Announcements {
 	}
 
 	private static String text(JsonNode value) {
-		return value != null && value.isTextual() ? value.asText() : null;
+		return value != null && value.isString() ? value.asString() : null;
 	}
 
 	private static String readTrimmedString(JsonNode value, int maxLength) {
-		if (value == null || !value.isTextual()) {
+		if (value == null || !value.isString()) {
 			return null;
 		}
-		String trimmed = value.asText().strip();
+		String trimmed = value.asString().strip();
 		return !trimmed.isEmpty() && trimmed.length() <= maxLength ? trimmed : null;
 	}
 

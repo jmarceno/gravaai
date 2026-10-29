@@ -186,7 +186,7 @@ final class AnnotationRenderer {
 		if (encoded == null) {
 			return;
 		}
-		Image image = Image.makeFromEncoded(encoded);
+		Image image = Image.makeDeferredFromEncodedBytes(encoded);
 		if (image == null) {
 			return;
 		}

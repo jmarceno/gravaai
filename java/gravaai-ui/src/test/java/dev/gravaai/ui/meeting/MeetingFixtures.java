@@ -1,6 +1,7 @@
 package dev.gravaai.ui.meeting;
 
 import java.nio.file.Path;
+import java.util.function.UnaryOperator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,7 +73,7 @@ final class MeetingFixtures {
 		private final Map<Path, String> transcripts = new LinkedHashMap<>();
 		private final Map<Path, String> notes = new LinkedHashMap<>();
 		private final Map<String, Integer> assetProgress = new LinkedHashMap<>();
-		private final List<Map<String, Object>> savedSettings = new ArrayList<>();
+		private MeetingSettings.View settings = new MeetingSettings.View(MeetingSettings.DEFAULT, true);
 		private final List<String> downloadedAssets = new ArrayList<>();
 		private final List<String> removedAssets = new ArrayList<>();
 		private MeetingJob activeJob;
@@ -93,10 +94,6 @@ final class MeetingFixtures {
 
 		MeetingJob activeJob() {
 			return activeJob;
-		}
-
-		List<Map<String, Object>> savedSettings() {
-			return savedSettings;
 		}
 
 		List<String> downloadedAssets() {
@@ -123,13 +120,25 @@ final class MeetingFixtures {
 
 		@Override
 		public MeetingSettings.View settings() {
-			return new MeetingSettings.View(MeetingSettings.DEFAULT, true);
+			return settings;
 		}
 
 		@Override
-		public Result<MeetingSettings.View> setSettings(Map<String, Object> patch) {
-			savedSettings.add(patch);
-			return Result.ok(settings());
+		public Result<MeetingSettings.View> updateSettings(UnaryOperator<MeetingSettings> edit) {
+			settings = new MeetingSettings.View(edit.apply(settings.settings()), settings.hasApiKey());
+			return Result.ok(settings);
+		}
+
+		@Override
+		public Result<MeetingSettings.View> setApiKey(String apiKey) {
+			settings = new MeetingSettings.View(settings.settings(), !apiKey.isBlank());
+			return Result.ok(settings);
+		}
+
+		@Override
+		public Result<MeetingSettings.View> clearApiKey() {
+			settings = new MeetingSettings.View(settings.settings(), false);
+			return Result.ok(settings);
 		}
 
 		@Override

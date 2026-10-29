@@ -408,7 +408,7 @@ public final class ExportMenu {
 				{
 					setCycleDuration(Duration.seconds(1.5));
 					setCycleCount(Animation.INDEFINITE);
-					setInterpolator(javafx.animation.Interpolator.SPLINE(0.65, 0, 0.35, 1));
+					setInterpolator(javafx.animation.Interpolator.ofSpline(0.65, 0, 0.35, 1));
 				}
 
 				@Override

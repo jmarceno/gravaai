@@ -267,7 +267,7 @@ public final class AgentControlServer implements AutoCloseable {
 			return;
 		}
 		long id = message.path("id").isNumber() ? message.path("id").asLong() : -1;
-		String tool = message.path("tool").isString() ? message.path("tool").asText() : null;
+		String tool = message.path("tool").isString() ? message.path("tool").asString() : null;
 		if (id < 0 || tool == null || tool.isEmpty()) {
 			ObjectNode error = Json.nodeFactory().objectNode();
 			error.put("id", id);
@@ -325,14 +325,14 @@ public final class AgentControlServer implements AutoCloseable {
 			return;
 		}
 		JsonNode token = message.path("token");
-		if (!AgentToken.tokensMatch(expected, token.isString() ? token.asText() : null)) {
+		if (!AgentToken.tokensMatch(expected, token.isString() ? token.asString() : null)) {
 			writeLine(output, writeLock, errorNode(
 					"unauthorized: restart Gravaai or regenerate the token in Settings → AI control"));
 			closeQuietly(channel);
 			return;
 		}
 		String client = message.path("client").isString()
-				? message.path("client").asText().trim()
+				? message.path("client").asString().trim()
 				: "";
 		if (client.isEmpty()) {
 			client = "MCP client";

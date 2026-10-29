@@ -1,7 +1,6 @@
 package dev.gravaai.services.meeting;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.function.UnaryOperator;
 
 import dev.gravaai.services.meeting.ports.MeetingApiKeyStore;
 import dev.gravaai.services.meeting.ports.SettingsStore;
@@ -32,27 +31,11 @@ public final class MeetingSettingsService {
 	}
 
 	/**
-	 * Merges a partial settings object (and an optional plain "apiKey" entry) into the stored
-	 * settings and returns the normalised result.
+	 * Applies an edit to the stored settings and returns the normalised result. The edit runs on
+	 * the current stored value, so two quick edits from the UI never undo each other.
 	 */
-	public MeetingSettings write(Map<String, Object> patch) {
-		Map<String, Object> settingsPatch = new LinkedHashMap<>();
-		if (patch != null) {
-			settingsPatch.putAll(patch);
-		}
-		if (settingsPatch.containsKey("apiKey")) {
-			Object apiKey = settingsPatch.remove("apiKey");
-			writeApiKey(apiKey);
-		}
-		Map<String, Object> merged = new LinkedHashMap<>();
-		Object raw = store.get(SETTINGS_KEY);
-		if (raw instanceof Map<?, ?> rawMap) {
-			for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
-				merged.put(String.valueOf(entry.getKey()), entry.getValue());
-			}
-		}
-		merged.putAll(settingsPatch);
-		MeetingSettings next = MeetingSettings.normalize(merged, assets);
+	public synchronized MeetingSettings update(UnaryOperator<MeetingSettings> edit) {
+		MeetingSettings next = edit.apply(read()).normalized(assets);
 		store.set(SETTINGS_KEY, next.toRaw());
 		store.save();
 		return next;
@@ -63,12 +46,17 @@ public final class MeetingSettingsService {
 		return apiKeys.read().orElse(null);
 	}
 
-	public void writeApiKey(Object apiKey) {
-		String trimmed = apiKey instanceof String text ? text.strip() : null;
-		if (trimmed == null || trimmed.isEmpty()) {
+	/** Stores the key; a blank key clears it. */
+	public void writeApiKey(String apiKey) {
+		String trimmed = apiKey == null ? "" : apiKey.strip();
+		if (trimmed.isEmpty()) {
 			apiKeys.clear();
 			return;
 		}
 		apiKeys.write(trimmed);
+	}
+
+	public void clearApiKey() {
+		apiKeys.clear();
 	}
 }

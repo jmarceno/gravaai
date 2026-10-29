@@ -46,7 +46,6 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	private ByteBuffer latest;
 	private boolean latestPending;
 
-	@SuppressWarnings("unchecked")
 	public JavaFxPreviewSink(int width, int height) {
 		if (width <= 0 || height <= 0) {
 			throw new IllegalArgumentException("invalid preview size: " + width + "x" + height);
@@ -88,7 +87,8 @@ public final class JavaFxPreviewSink implements GlPreviewThread.FrameConsumer {
 	 *
 	 * @param imageView the preview control
 	 */
-	@SuppressWarnings("unchecked")
+	// Java has no generic array creation; the array never leaves this class.
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	public void attach(ImageView imageView) {
 		if (imageView == null) {
 			throw new IllegalArgumentException("imageView must not be null");

@@ -159,10 +159,10 @@ public final class MeetingLibrary {
 
 	/** Marks a fresh recording as a meeting and, when enabled, starts processing it. */
 	public void registerMeetingRecording(Path mediaPath, boolean hasVideo) {
-		metaStore.update(mediaPath, Map.of(
-				"kind", "meeting",
-				"createdAt", Times.isoNow(clock),
-				"hasVideo", hasVideo));
+		metaStore.update(mediaPath, new MeetingMetaPatch()
+				.kind("meeting")
+				.createdAt(Times.isoNow(clock))
+				.hasVideo(hasVideo));
 		if (settings.read().autoProcess()) {
 			jobs.enqueue(mediaPath, MeetingJobMode.FULL);
 		}
@@ -190,11 +190,11 @@ public final class MeetingLibrary {
 		}
 		boolean hasVideo = VIDEO_EXTENSIONS.contains(extension);
 		String title = dot >= 0 ? fileName.substring(0, dot) : fileName;
-		metaStore.update(target, Map.of(
-				"kind", "meeting",
-				"createdAt", Times.isoNow(clock),
-				"hasVideo", hasVideo,
-				"title", title));
+		metaStore.update(target, new MeetingMetaPatch()
+				.kind("meeting")
+				.createdAt(Times.isoNow(clock))
+				.hasVideo(hasVideo)
+				.title(title));
 		if (settings.read().autoProcess()) {
 			jobs.enqueue(target, MeetingJobMode.FULL);
 		}
@@ -207,7 +207,7 @@ public final class MeetingLibrary {
 			throw new IllegalStateException("The title cannot be empty.");
 		}
 		String stored = trimmed.length() <= 120 ? trimmed : trimmed.substring(0, 120);
-		metaStore.update(mediaPath, Map.of("title", stored, "titleSource", "user"));
+		metaStore.update(mediaPath, new MeetingMetaPatch().title(stored, "user"));
 		return trimmed;
 	}
 

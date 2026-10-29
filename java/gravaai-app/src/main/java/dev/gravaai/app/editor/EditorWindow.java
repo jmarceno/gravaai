@@ -1323,8 +1323,8 @@ public final class EditorWindow {
 			java.util.Map<Shortcuts.Action, Shortcuts.Binding> shortcuts = Shortcuts.defaults();
 			for (Shortcuts.Action action : Shortcuts.Action.values()) {
 				JsonNode value = stored.get(action.wire());
-				if (value != null && value.isObject() && value.path("key").isTextual()) {
-					shortcuts.put(action, new Shortcuts.Binding(value.get("key").asText(),
+				if (value != null && value.isObject() && value.path("key").isString()) {
+					shortcuts.put(action, new Shortcuts.Binding(value.get("key").asString(),
 							value.path("ctrl").asBoolean(false),
 							value.path("shift").asBoolean(false),
 							value.path("alt").asBoolean(false)));

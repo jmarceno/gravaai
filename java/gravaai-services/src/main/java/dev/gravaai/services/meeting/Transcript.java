@@ -125,13 +125,13 @@ public final class Transcript {
 		JsonNode languageNode = data.path("result").path("language");
 		String language = languageNode.isMissingNode() || languageNode.isNull()
 				? null
-				: languageNode.asText();
+				: languageNode.asString();
 
 		List<TranscriptSegment> segments = new ArrayList<>();
 		JsonNode transcription = data.path("transcription");
 		if (transcription.isArray()) {
 			for (JsonNode segment : transcription) {
-				String text = segment.path("text").asText("").strip();
+				String text = segment.path("text").asString("").strip();
 				if (text.isEmpty()) {
 					continue;
 				}

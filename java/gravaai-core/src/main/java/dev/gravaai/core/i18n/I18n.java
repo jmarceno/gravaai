@@ -221,7 +221,7 @@ public final class I18n {
 			}
 			current = current.get(part);
 		}
-		return current != null && current.isTextual() ? current.asText() : null;
+		return current != null && current.isString() ? current.asString() : null;
 	}
 
 	/**

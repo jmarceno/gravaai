@@ -35,14 +35,7 @@ action, or `show` to bring the running window to the front, over the control soc
 
 Use a scratch profile for tests/screenshots: `GRAVAAI_USER_DATA=/tmp/... gravaai --ui-kit`.
 
-UI tests run on an isolated virtual display by default (`gravaai.test.display=:99`) so a test run
-never pops windows on the desktop you are using. Start the display once per session:
-
-```bash
-Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
-cd java && ./mvnw -T1 test          # UI tests use :99 transparently
-./mvnw -T1 test -Dgravaai.test.display=:0   # only when you want windows on :0
-```
+There are no UI tests: the UI is checked by hand. `./mvnw -T1 test` runs the unit and backend tests.
 
 The app is a single-window application: the dashboard, the editor and the meeting view share the
 primary stage; only the HUD overlay/menu, countdown, capture picker and area border are separate

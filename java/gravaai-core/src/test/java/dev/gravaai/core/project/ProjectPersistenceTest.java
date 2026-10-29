@@ -27,8 +27,8 @@ class ProjectPersistenceTest {
 	void createsProjectData() {
 		ObjectNode data = ProjectPersistence.createProjectData("video.mp4", editor(), "project-1");
 		assertEquals(2, data.get("version").intValue());
-		assertEquals("project-1", data.get("projectId").asText());
-		assertEquals("video.mp4", data.get("videoPath").asText());
+		assertEquals("project-1", data.get("projectId").asString());
+		assertEquals("video.mp4", data.get("videoPath").asString());
 		assertFalse(data.get("editor").has("exportQuality"));
 
 		ObjectNode withoutId = ProjectPersistence.createProjectData("video.mp4", editor(), "  ");
@@ -42,7 +42,7 @@ class ProjectPersistenceTest {
 		assertFalse(stripped.has("exportQuality"));
 		assertFalse(stripped.has("mp4FrameRate"));
 		assertFalse(stripped.has("whisperModelPath"));
-		assertEquals("#ffffff", stripped.get("wallpaper").asText());
+		assertEquals("#ffffff", stripped.get("wallpaper").asString());
 		assertTrue(stripped.has("zoomMotionBlurTuning"));
 	}
 

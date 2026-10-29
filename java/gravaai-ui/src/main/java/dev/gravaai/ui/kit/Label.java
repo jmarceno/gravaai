@@ -16,6 +16,8 @@ public class Label extends javafx.scene.control.Label {
 		this("");
 	}
 
+	// Subclassed by ContentClamp; the constructor only calls final JavaFX setters.
+	@SuppressWarnings("this-escape")
 	public Label(String text) {
 		super(text);
 		getStyleClass().add("g-label");

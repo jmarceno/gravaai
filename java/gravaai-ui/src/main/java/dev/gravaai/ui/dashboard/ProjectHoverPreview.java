@@ -278,7 +278,7 @@ final class ProjectHoverPreview extends StackPane {
 		}
 		try {
 			Path telemetry = Path.of(RecordingPaths.getTelemetryPathForVideo(
-					preview.project().get("videoPath").asText()));
+					preview.project().get("videoPath").asString()));
 			if (!Files.isRegularFile(telemetry)) {
 				return;
 			}

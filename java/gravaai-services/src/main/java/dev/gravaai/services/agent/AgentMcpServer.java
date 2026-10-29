@@ -59,10 +59,8 @@ public final class AgentMcpServer implements AutoCloseable {
 		McpJsonMapper mapper = new JacksonMcpJsonMapper(Json.MAPPER);
 		List<SyncToolSpecification> specifications = new ArrayList<>();
 		for (ToolDefinition definition : AgentToolSchemas.tools()) {
-			Tool tool = Tool.builder()
-					.name(definition.name())
+			Tool tool = Tool.builder(definition.name(), mapper, definition.inputSchemaJson())
 					.description(definition.description())
-					.inputSchema(mapper, definition.inputSchemaJson())
 					.build();
 			specifications.add(SyncToolSpecification.builder()
 					.tool(tool)

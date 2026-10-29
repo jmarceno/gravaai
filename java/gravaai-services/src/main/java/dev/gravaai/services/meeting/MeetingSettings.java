@@ -46,6 +46,95 @@ public record MeetingSettings(
 	public record View(MeetingSettings settings, boolean hasApiKey) {
 	}
 
+	public MeetingSettings withTranscriptionService(MeetingServiceKind value) {
+		return new MeetingSettings(value, whisperModel, language, summarizationService, localModel,
+				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
+				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withWhisperModel(String value) {
+		return new MeetingSettings(transcriptionService, value, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withLanguage(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, value, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withSummarizationService(MeetingServiceKind value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, value, localModel,
+				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
+				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withLocalModel(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				value, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withApiBaseUrl(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, value, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withApiTranscriptionModel(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, value, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
+				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withApiChatModel(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, value, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withApiChatCapabilities(List<SummarizerCapability> value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, List.copyOf(value),
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withApiTimeoutMinutes(int value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, value,
+				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withSummaryPrompt(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, value, titlePrompt, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withTitlePrompt(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, value, autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withAutoProcess(boolean value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, value, autoTitle);
+	}
+
+	public MeetingSettings withAutoTitle(boolean value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
+				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, value);
+	}
+
+	/** Runs these settings through the same checks a stored file gets. */
+	public MeetingSettings normalized(MeetingAssets assets) {
+		return normalize(toRaw(), assets);
+	}
+
 	/** The JSON object stored under "meetingSettings", in the Electron field order. */
 	public Map<String, Object> toRaw() {
 		java.util.LinkedHashMap<String, Object> raw = new java.util.LinkedHashMap<>();
@@ -72,7 +161,7 @@ public record MeetingSettings(
 
 	/** Keeps only known keys with valid values, so a bad file never breaks a job. */
 	public static MeetingSettings normalize(Object raw, MeetingAssets assets) {
-		Map<String, Object> input = raw instanceof Map<?, ?> map ? cast(map) : Map.of();
+		Map<?, ?> input = raw instanceof Map<?, ?> map ? map : Map.of();
 		MeetingServiceKind transcriptionService = MeetingServiceKind.fromWire(
 				pick(input, "transcriptionService", MeetingSettings::isService,
 						DEFAULT.transcriptionService().wire()));
@@ -127,7 +216,7 @@ public record MeetingSettings(
 				autoTitle);
 	}
 
-	private static Object pick(Map<String, Object> input, String key, Predicate<Object> valid,
+	private static Object pick(Map<?, ?> input, String key, Predicate<Object> valid,
 			Object fallback) {
 		Object value = input.get(key);
 		return valid.test(value) ? value : fallback;
@@ -162,10 +251,5 @@ public record MeetingSettings(
 			capabilities.add(SummarizerCapability.fromWire(entry));
 		}
 		return capabilities;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static Map<String, Object> cast(Map<?, ?> map) {
-		return (Map<String, Object>) map;
 	}
 }

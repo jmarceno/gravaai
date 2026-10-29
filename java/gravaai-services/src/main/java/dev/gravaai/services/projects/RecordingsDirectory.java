@@ -47,8 +47,8 @@ public final class RecordingsDirectory {
 			JsonNode parsed = Json.parseJsonWithByteOrderMark(
 					Files.readString(userData.recordingsSettingsFile(), StandardCharsets.UTF_8));
 			JsonNode recordingsDir = parsed.get("recordingsDir");
-			if (recordingsDir != null && recordingsDir.isTextual() && !recordingsDir.asText().isBlank()) {
-				customRecordingsDir = Path.of(recordingsDir.asText()).toAbsolutePath().normalize();
+			if (recordingsDir != null && recordingsDir.isString() && !recordingsDir.asString().isBlank()) {
+				customRecordingsDir = Path.of(recordingsDir.asString()).toAbsolutePath().normalize();
 			}
 		} catch (IOException | RuntimeException error) {
 			customRecordingsDir = null;

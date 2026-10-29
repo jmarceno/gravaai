@@ -10,7 +10,7 @@ import javafx.animation.ScaleTransition;
  * <p>The React wrapper always uses the ghost variant unless {@code variant="outline"} adds the
  * border; selected state is accent-soft. Pressed scale 0.97 over 250 ms ease-smooth.
  */
-public class Toggle extends javafx.scene.control.ToggleButton {
+public final class Toggle extends javafx.scene.control.ToggleButton {
 
 	/** Toggle variant from toggle.tsx. */
 	public enum Variant { GHOST, OUTLINE }

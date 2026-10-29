@@ -1147,7 +1147,6 @@ public final class AppContext {
 
 	// ── Editor (P2.10) ─────────────────────────────────────────────────────
 
-	/** Opens (or focuses) a project in a real editor window. */
 	/** Synchronous startup-window path (P2.11): build/show the editor before the gate log. */
 	private void openEditorStartup(Path projectPath) {
 	try {

@@ -136,13 +136,13 @@ public final class LegacyProfilePaths {
 	}
 
 	private static String remapPath(JsonNode node, List<Rename> renames, Predicate<Path> exists) {
-		if (node == null || !node.isTextual()) {
+		if (node == null || !node.isString()) {
 			return null;
 		}
 
 		Path resolved;
 		try {
-			Path filePath = Path.of(node.asText());
+			Path filePath = Path.of(node.asString());
 			if (!filePath.isAbsolute()) {
 				return null;
 			}

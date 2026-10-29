@@ -63,12 +63,12 @@ public final class SkiaGlSurface implements AutoCloseable {
 			context.close();
 			throw new IllegalStateException("BackendRenderTarget.makeGL() returned null");
 		}
-		Surface surface = Surface.makeFromBackendRenderTarget(context, target,
+		Surface surface = Surface.wrapBackendRenderTarget(context, target,
 				SurfaceOrigin.TOP_LEFT, ColorType.RGBA_8888, srgb);
 		if (surface == null) {
 			target.close();
 			context.close();
-			throw new IllegalStateException("Surface.makeFromBackendRenderTarget() returned null");
+			throw new IllegalStateException("Surface.wrapBackendRenderTarget() returned null");
 		}
 		return new SkiaGlSurface(context, target, srgb, surface, framebuffer.width(),
 				framebuffer.height());

@@ -6,7 +6,7 @@ package dev.gravaai.ui.kit;
  *
  * <p>radius-field 12 px, field background, px-3 py-2 (12/8), text-sm (14), 2 px accent focus ring.
  */
-public class Input extends javafx.scene.control.TextField {
+public final class Input extends javafx.scene.control.TextField {
 
 	public Input() {
 		this("");

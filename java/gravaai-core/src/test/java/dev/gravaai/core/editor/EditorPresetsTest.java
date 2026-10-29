@@ -114,7 +114,7 @@ class EditorPresetsTest {
 				preset("legacy", "Legacy", "2026-01-01T00:00:00.000Z", snapshot)));
 
 		JsonNode stored = EditorPresets.snapshotToJson(store.loadPresets().get(0).snapshot());
-		assertEquals(EditorPreferences.defaults().wallpaper(), stored.get("wallpaper").asText());
+		assertEquals(EditorPreferences.defaults().wallpaper(), stored.get("wallpaper").asString());
 		for (String key : List.of("exportQuality", "mp4FrameRate", "publishDestination",
 				"whisperExecutablePath", "whisperModelPath")) {
 			assertFalse(stored.has(key), key);

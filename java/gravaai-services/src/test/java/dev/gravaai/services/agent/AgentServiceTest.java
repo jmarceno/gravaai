@@ -231,9 +231,9 @@ class AgentServiceTest {
 				config.claudeCodeCommand());
 		var json = Json.parseJsonWithByteOrderMark(config.json());
 		assertEquals("/opt/Gravaai/gravaai.AppImage",
-				json.path("mcpServers").path("gravaai").path("command").asText());
+				json.path("mcpServers").path("gravaai").path("command").asString());
 		assertEquals("--mcp",
-				json.path("mcpServers").path("gravaai").path("args").get(0).asText());
+				json.path("mcpServers").path("gravaai").path("args").get(0).asString());
 		assertTrue(McpConfig.of("/tmp/my app/gravaai", List.of("--mcp")).claudeCodeCommand()
 				.contains("\"/tmp/my app/gravaai\""));
 	}

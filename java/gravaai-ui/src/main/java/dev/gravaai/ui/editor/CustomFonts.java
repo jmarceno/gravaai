@@ -182,11 +182,11 @@ public final class CustomFonts {
 			}
 			List<CustomFont> fonts = new ArrayList<>();
 			for (JsonNode item : stored) {
-				if (item.isObject() && item.path("id").isTextual() && item.path("name").isTextual()
-						&& item.path("fontFamily").isTextual()
-						&& item.path("importUrl").isTextual()) {
-					fonts.add(new CustomFont(item.get("id").asText(), item.get("name").asText(),
-							item.get("fontFamily").asText(), item.get("importUrl").asText()));
+				if (item.isObject() && item.path("id").isString() && item.path("name").isString()
+						&& item.path("fontFamily").isString()
+						&& item.path("importUrl").isString()) {
+					fonts.add(new CustomFont(item.get("id").asString(), item.get("name").asString(),
+							item.get("fontFamily").asString(), item.get("importUrl").asString()));
 				}
 			}
 			return List.copyOf(fonts);

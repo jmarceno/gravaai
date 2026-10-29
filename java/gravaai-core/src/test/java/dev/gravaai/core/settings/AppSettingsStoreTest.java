@@ -69,7 +69,7 @@ class AppSettingsStoreTest {
 		Map<String, JsonNode> storeContents = store.read();
 		assertEquals(List.of("gravaai.editor.preferences", "gravaai.theme",
 				"gravaai.recording.settings", "aiControlEnabled"), List.copyOf(storeContents.keySet()));
-		assertEquals("system", store.readSetting("gravaai.theme").asText());
+		assertEquals("system", store.readSetting("gravaai.theme").asString());
 	}
 
 	@Test
@@ -91,10 +91,10 @@ class AppSettingsStoreTest {
 		Files.writeString(file, fixture, StandardCharsets.UTF_8);
 		Map<String, JsonNode> before = store.read();
 
-		store.writeSetting("gravaai.theme", Json.nodeFactory().textNode("dark"));
+		store.writeSetting("gravaai.theme", Json.nodeFactory().stringNode("dark"));
 
 		Map<String, JsonNode> expected = new java.util.LinkedHashMap<>(before);
-		expected.put("gravaai.theme", Json.nodeFactory().textNode("dark"));
+		expected.put("gravaai.theme", Json.nodeFactory().stringNode("dark"));
 		Map<String, JsonNode> after = store.read();
 		assertEquals(expected, after);
 		assertEquals(Json.stringify(expected), Files.readString(file, StandardCharsets.UTF_8));

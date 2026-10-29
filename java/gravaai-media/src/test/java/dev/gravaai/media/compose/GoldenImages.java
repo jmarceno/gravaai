@@ -9,7 +9,7 @@ import io.github.humbleui.skija.ColorAlphaType;
 import io.github.humbleui.skija.ColorSpace;
 import io.github.humbleui.skija.ColorType;
 import io.github.humbleui.skija.Data;
-import io.github.humbleui.skija.EncodedImageFormat;
+import io.github.humbleui.skija.EncoderPNG;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageInfo;
 
@@ -21,7 +21,7 @@ final class GoldenImages {
 	/** Decodes a PNG/JPEG file into top-first straight RGBA. */
 	static RgbaFrame read(Path file) throws IOException {
 		byte[] encoded = Files.readAllBytes(file);
-		Image image = Image.makeFromEncoded(encoded);
+		Image image = Image.makeDeferredFromEncodedBytes(encoded);
 		if (image == null) {
 			throw new IllegalArgumentException("cannot decode image: " + file);
 		}
@@ -57,12 +57,12 @@ final class GoldenImages {
 				ColorAlphaType.OPAQUE, ColorSpace.getSRGB());
 		byte[] pixels = new byte[frame.height() * frame.strideBytes()];
 		frame.pixelsTopFirstRgba().duplicate().get(pixels, 0, pixels.length);
-		Image image = Image.makeRaster(info, pixels, frame.strideBytes());
+		Image image = Image.makeRasterFromBytes(info, pixels, frame.strideBytes());
 		if (image == null) {
 			throw new IllegalStateException("cannot make raster image for diff");
 		}
 		try {
-			Data data = image.encodeToData(EncodedImageFormat.PNG);
+			Data data = EncoderPNG.encode(image);
 			try {
 				return data.getBytes();
 			} finally {

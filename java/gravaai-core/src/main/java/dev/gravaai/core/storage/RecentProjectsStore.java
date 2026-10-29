@@ -43,8 +43,8 @@ public final class RecentProjectsStore {
 
 			List<String> result = new ArrayList<>();
 			for (JsonNode value : paths) {
-				if (value != null && value.isTextual() && !value.asText().isBlank()) {
-					result.add(value.asText());
+				if (value != null && value.isString() && !value.asString().isBlank()) {
+					result.add(value.asString());
 				}
 			}
 			return result;

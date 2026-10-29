@@ -88,7 +88,7 @@ class SourceAudioSettingsTest {
 		ObjectNode merged = SourceAudioSettings.merge(raw, "clip-1", settings);
 
 		assertEquals(0.5, merged.path("clip-1").path("mic").path("volume").doubleValue(), 0.001);
-		assertEquals("keep", merged.path("clip-1").path("mic").path("extra").textValue());
+		assertEquals("keep", merged.path("clip-1").path("mic").path("extra").asString());
 		assertEquals(1.5, merged.path("clip-1").path("mixed").path("volume").doubleValue(), 0.001);
 		assertFalse(merged.path("clip-1").path("mixed").path("normalize").booleanValue());
 		assertFalse(raw.path("clip-1").has("mixed"));

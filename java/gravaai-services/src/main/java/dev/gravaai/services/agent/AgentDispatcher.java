@@ -216,11 +216,11 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private AgentToolResult inspect(JsonNode args) {
-		String view = args.path("view").isString() ? args.path("view").asText() : "overview";
+		String view = args.path("view").isString() ? args.path("view").asString() : "overview";
 		switch (view) {
 			case "help":
 				return AgentToolResult.text(help.help(
-						args.path("topic").isString() ? args.path("topic").asText() : null));
+						args.path("topic").isString() ? args.path("topic").asString() : null));
 			case "library":
 				return AgentToolResult.text(formatLibrary());
 			case "jobs":
@@ -282,7 +282,7 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private AgentToolResult job(JsonNode args, AgentToolContext context) {
-		String action = args.path("action").isString() ? args.path("action").asText() : "";
+		String action = args.path("action").isString() ? args.path("action").asString() : "";
 		switch (action) {
 			case "start":
 				return startJob(args);
@@ -325,10 +325,10 @@ public final class AgentDispatcher implements AutoCloseable {
 	private AgentToolResult startRendererJob(Kind kind, JsonNode options) {
 		String label = kind == Kind.TRANSCRIBE
 				? "transcribe" + (options.path("language").isString()
-						? " (" + options.path("language").asText() + ")"
+						? " (" + options.path("language").asString() + ")"
 						: "")
 				: "export " + (options.path("format").isString()
-						? options.path("format").asText()
+						? options.path("format").asString()
 						: "mp4");
 		Job[] holder = new Job[1];
 		holder[0] = jobs.create(kind, label,
@@ -360,13 +360,13 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private AgentToolResult startMeetingJob(JsonNode options) {
-		String modeWire = options.path("mode").isString() ? options.path("mode").asText() : "full";
+		String modeWire = options.path("mode").isString() ? options.path("mode").asString() : "full";
 		MeetingPort.Mode mode = MeetingPort.Mode.fromWire(modeWire);
 		if (mode == null) {
 			return failure("unknown meeting mode \"" + modeWire
 					+ "\"; use full, transcribe or summarize");
 		}
-		String mediaPath = options.path("path").isString() ? options.path("path").asText() : null;
+		String mediaPath = options.path("path").isString() ? options.path("path").asString() : null;
 		if (mediaPath == null || mediaPath.isEmpty()) {
 			try {
 				List<LibraryPort.MeetingEntry> all = new ArrayList<>(library.listMeetings());
@@ -495,8 +495,8 @@ public final class AgentDispatcher implements AutoCloseable {
 	}
 
 	private Job resolveJob(JsonNode args) {
-		String id = args.path("id").isString() && !args.path("id").asText().trim().isEmpty()
-				? args.path("id").asText().trim()
+		String id = args.path("id").isString() && !args.path("id").asString().trim().isEmpty()
+				? args.path("id").asString().trim()
 				: null;
 		Kind kind = readJobKind(args.path("kind"), false);
 		if (id != null) {
@@ -527,7 +527,7 @@ public final class AgentDispatcher implements AutoCloseable {
 			}
 			return null;
 		}
-		String wire = value.isString() ? value.asText() : value.toString();
+		String wire = value.isString() ? value.asString() : value.toString();
 		Kind kind = Kind.fromWire(wire);
 		if (kind == null) {
 			return failure("unknown kind \"" + wire + "\"; use transcribe, export or meeting");
@@ -629,8 +629,8 @@ public final class AgentDispatcher implements AutoCloseable {
 		ArrayNode prepared = Json.nodeFactory().arrayNode();
 		for (int index = 0; index < ops.size(); index++) {
 			JsonNode op = ops.get(index);
-			if (!op.isObject() || !"image".equals(op.path("op").asText())
-					&& !"audio".equals(op.path("op").asText())) {
+			if (!op.isObject() || !"image".equals(op.path("op").asString())
+					&& !"audio".equals(op.path("op").asString())) {
 				prepared.add(op);
 				continue;
 			}
@@ -638,7 +638,7 @@ public final class AgentDispatcher implements AutoCloseable {
 				prepared.add(op);
 				continue;
 			}
-			String rawPath = op.path("path").asText();
+			String rawPath = op.path("path").asString();
 			Path path = Path.of(rawPath);
 			if (!path.isAbsolute()) {
 				return failure("op " + index + ": \"path\" must be an absolute path");
@@ -648,7 +648,7 @@ public final class AgentDispatcher implements AutoCloseable {
 						+ "\" is not a file on this machine");
 			}
 			try {
-				if ("image".equals(op.path("op").asText())
+				if ("image".equals(op.path("op").asString())
 						&& Files.size(path) > MAX_IMAGE_BYTES) {
 					return failure("op " + index + ": images must be under "
 							+ MAX_IMAGE_BYTES / (1024 * 1024) + " MB");
@@ -748,18 +748,18 @@ public final class AgentDispatcher implements AutoCloseable {
 			return AgentToolResult.text("");
 		}
 		if (value.isString()) {
-			return AgentToolResult.text(value.asText());
+			return AgentToolResult.text(value.asString());
 		}
-		String text = value.path("text").isString() ? value.path("text").asText()
+		String text = value.path("text").isString() ? value.path("text").asString()
 				: Json.MAPPER.writeValueAsString(value);
 		List<AgentImage> images = new ArrayList<>();
 		JsonNode imageNodes = value.path("images");
 		if (imageNodes.isArray()) {
 			for (JsonNode image : imageNodes) {
 				if (image.path("mimeType").isString() && image.path("data").isString()
-						&& !image.path("data").asText().isEmpty()) {
-					images.add(new AgentImage(image.path("mimeType").asText(),
-							image.path("data").asText()));
+						&& !image.path("data").asString().isEmpty()) {
+					images.add(new AgentImage(image.path("mimeType").asString(),
+							image.path("data").asString()));
 				}
 			}
 		}

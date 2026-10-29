@@ -80,10 +80,10 @@ public interface OpenAiClient {
 			JsonNode parsed = JsonMapper.shared().readTree(body);
 			JsonNode error = parsed.get("error");
 			if (error != null) {
-				if (error.isTextual()) {
-					detail = error.asText();
-				} else if (error.path("message").isTextual()) {
-					detail = error.path("message").asText();
+				if (error.isString()) {
+					detail = error.asString();
+				} else if (error.path("message").isString()) {
+					detail = error.path("message").asString();
 				}
 			}
 		} catch (RuntimeException notJson) {

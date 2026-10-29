@@ -77,6 +77,8 @@ public class Button extends javafx.scene.control.Button {
 		this(text, variant, Size.MD);
 	}
 
+	// Subclassed by ColorPicker; the constructor only calls final JavaFX setters.
+	@SuppressWarnings("this-escape")
 	public Button(String text, Variant variant, Size size) {
 		super(text);
 		this.variant = variant;

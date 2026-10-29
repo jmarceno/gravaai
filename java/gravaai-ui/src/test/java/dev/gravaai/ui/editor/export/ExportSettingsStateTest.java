@@ -106,6 +106,6 @@ class ExportSettingsStateTest {
 		state.setExportFormat(ExportFormat.GIF);
 		var json = state.preferences().toJson();
 		assertEquals(11, json.size());
-		assertEquals("gif", json.get("exportFormat").asText());
+		assertEquals("gif", json.get("exportFormat").asString());
 	}
 }

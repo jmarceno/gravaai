@@ -456,7 +456,6 @@ public final class EditorSession implements AutoCloseable {
 		dirty.set(false);
 	}
 
-	/** Late-bound timeline seek (the preview panel pauses and seeks, React behaviour). */
 	/** Late-bound timeline scrub for playhead drags (non-blocking, latest wins). */
 	public void setTimelineScrub(PlaybackSeek scrub) {
 		timelineScrub.set(scrub);

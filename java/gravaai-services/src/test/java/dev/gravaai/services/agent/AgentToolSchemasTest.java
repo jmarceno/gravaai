@@ -41,7 +41,7 @@ class AgentToolSchemasTest {
 			assertTrue(tool.description().length() > 20, tool.name() + " description too short");
 			assertTrue(tool.description().length() < 400, tool.name() + " description too long");
 			JsonNode schema = AgentToolSchemas.schemaOf(tool.name());
-			assertEquals("object", schema.path("type").asText(), tool.name() + " schema type");
+			assertEquals("object", schema.path("type").asString(), tool.name() + " schema type");
 		}
 	}
 
@@ -53,7 +53,7 @@ class AgentToolSchemasTest {
 		assertNotNull(view);
 		boolean hasHelp = false;
 		for (JsonNode value : view.path("enum")) {
-			hasHelp |= "help".equals(value.asText());
+			hasHelp |= "help".equals(value.asString());
 		}
 		assertTrue(hasHelp, "inspect view enum must contain help");
 	}

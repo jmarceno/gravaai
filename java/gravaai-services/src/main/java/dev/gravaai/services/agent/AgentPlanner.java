@@ -142,7 +142,7 @@ public final class AgentPlanner {
 		for (int index = 0; index < opsInput.size(); index++) {
 			JsonNode op = opsInput.get(index);
 			if (op != null && op.isObject() && op.path("op").isString()
-					&& HISTORY_OPS.contains(op.path("op").asText())) {
+					&& HISTORY_OPS.contains(op.path("op").asString())) {
 				historyOps.add(op);
 			}
 		}
@@ -152,7 +152,7 @@ public final class AgentPlanner {
 				return new Failure("undo/redo/revert_ai cannot be mixed with other ops;"
 						+ " send them alone", index);
 			}
-			return new Failure(historyOps.get(0).path("op").asText()
+			return new Failure(historyOps.get(0).path("op").asString()
 					+ " is applied by the editor, not by the op core", index);
 		}
 		Draft draft = new Draft(state, context);
@@ -1317,7 +1317,7 @@ public final class AgentPlanner {
 		} else if ("image".equals(op)) {
 			String path = AgentOpReader.string(raw, "path");
 			String imageContent = raw.path("imageContent").isString()
-					? raw.path("imageContent").asText()
+					? raw.path("imageContent").asString()
 					: null;
 			if (imageContent == null) {
 				fail("could not read image \"" + path
@@ -1540,7 +1540,7 @@ public final class AgentPlanner {
 		if (volume != null) {
 			ObjectNode byClip = draft.state.sourceAudioTrackSettingsByClip() == null
 					? Json.nodeFactory().objectNode()
-					: (ObjectNode) draft.state.sourceAudioTrackSettingsByClip().deepCopy();
+					: draft.state.sourceAudioTrackSettingsByClip().deepCopy();
 			for (String clipId : clipIds) {
 				ObjectNode trackSettings = byClip.path(clipId).isObject()
 						? (ObjectNode) byClip.path(clipId).deepCopy()

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
@@ -31,8 +32,18 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	}
 
 	@Override
-	public Result<MeetingSettings.View> setSettings(Map<String, Object> patch) {
-		return service.setSettings(patch);
+	public Result<MeetingSettings.View> updateSettings(UnaryOperator<MeetingSettings> edit) {
+		return service.updateSettings(edit);
+	}
+
+	@Override
+	public Result<MeetingSettings.View> setApiKey(String apiKey) {
+		return service.setApiKey(apiKey);
+	}
+
+	@Override
+	public Result<MeetingSettings.View> clearApiKey() {
+		return service.clearApiKey();
 	}
 
 	@Override

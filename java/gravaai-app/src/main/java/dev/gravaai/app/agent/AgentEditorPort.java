@@ -145,7 +145,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 			EditorSession session = activeEditor.get();
 			if (session == null) {
 				String action = args != null && args.path("action").isString()
-						? args.path("action").asText() : "";
+						? args.path("action").asString() : "";
 				if ("project".equals(tool) && ("open".equals(action) || "new".equals(action))) {
 					return CompletableFuture.completedFuture(text(project(null, args)));
 				}
@@ -171,7 +171,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	// ── inspect ─────────────────────────────────────────────────────────────────────────────
 
 	private String inspect(EditorSession session, JsonNode args) {
-		String view = args != null && args.path("view").isString() ? args.path("view").asText()
+		String view = args != null && args.path("view").isString() ? args.path("view").asString()
 				: "overview";
 		long rev = rev(session);
 		long sourceMs = sourceDurationMs(session);
@@ -185,7 +185,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 			case "transcript" -> AgentEditorViews.transcript(state, sourceMs, number(args, "from"),
 					number(args, "to"), rev);
 			case "settings" -> AgentEditorViews.settings(state,
-					args != null && args.path("topic").isString() ? args.path("topic").asText()
+					args != null && args.path("topic").isString() ? args.path("topic").asString()
 							: null,
 					rev);
 			default -> AgentEditorViews.overview(state, meta);
@@ -222,8 +222,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		String summary = ok.summary() == null || ok.summary().isBlank()
 				? ops.size() + " op" + (ops.size() == 1 ? "" : "s")
 				: ok.summary();
-		String label = args.path("label").isString() && !args.path("label").asText().isBlank()
-				? args.path("label").asText().trim()
+		String label = args.path("label").isString() && !args.path("label").asString().isBlank()
+				? args.path("label").asString().trim()
 				: summary;
 
 		if (args.path("dryRun").isBoolean() && args.path("dryRun").asBoolean()) {
@@ -245,7 +245,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	private String applyHistoryOp(EditorSession session, JsonNode op, long rev) {
-		String name = op.path("op").asText();
+		String name = op.path("op").asString();
 		int count = op.path("n").isNumber() && op.path("n").asInt() > 0 ? op.path("n").asInt() : 1;
 		if ("revert_ai".equals(name)) {
 			RevertEntry entry = revertStack.peek();
@@ -327,7 +327,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		if (op == null || !op.isObject() || !op.path("op").isString()) {
 			return false;
 		}
-		String name = op.path("op").asText();
+		String name = op.path("op").asString();
 		return "undo".equals(name) || "redo".equals(name) || "revert_ai".equals(name);
 	}
 
@@ -424,8 +424,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private String project(EditorSession session, JsonNode args) {
 		String action = args != null && args.path("action").isString()
-				? args.path("action").asText() : "";
-		String path = args != null && args.path("path").isString() ? args.path("path").asText()
+				? args.path("action").asString() : "";
+		String path = args != null && args.path("path").isString() ? args.path("path").asString()
 				: null;
 		boolean force = args != null && args.path("force").isBoolean()
 				&& args.path("force").asBoolean();
@@ -472,7 +472,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 					"could not open \"" + path + "\"; check the editor for the error");
 		}
 		String name = args != null && args.path("name").isString()
-				? args.path("name").asText().trim() : "";
+				? args.path("name").asString().trim() : "";
 		if (!name.isEmpty()) {
 			try {
 				opened.saveAs(saveTarget(opened, name));
@@ -551,7 +551,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	private String saveAs(EditorSession session, JsonNode args) {
-		String name = args != null && args.path("name").isString() ? args.path("name").asText()
+		String name = args != null && args.path("name").isString() ? args.path("name").asString()
 				: "";
 		if (name.isBlank()) {
 			throw new AgentDispatcher.AgentDispatchError(
@@ -587,10 +587,10 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private String job(EditorSession session, JsonNode args) {
 		String action = args != null && args.path("action").isString()
-				? args.path("action").asText() : "";
+				? args.path("action").asString() : "";
 		JsonNode options = args != null && args.path("options").isObject() ? args.path("options")
 				: Json.nodeFactory().objectNode();
-		String jobId = args != null && args.path("jobId").isString() ? args.path("jobId").asText()
+		String jobId = args != null && args.path("jobId").isString() ? args.path("jobId").asString()
 				: "";
 		return switch (action) {
 			case "start" -> startJob(session, args, jobId, options);
@@ -601,7 +601,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	private String startJob(EditorSession session, JsonNode args, String jobId, JsonNode options) {
-		String kind = args != null && args.path("kind").isString() ? args.path("kind").asText()
+		String kind = args != null && args.path("kind").isString() ? args.path("kind").asString()
 				: "";
 		if (jobId.isBlank()) {
 			throw new AgentDispatcher.AgentDispatchError(

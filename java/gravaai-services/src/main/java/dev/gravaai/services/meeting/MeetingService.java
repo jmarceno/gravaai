@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingAssets.MeetingAsset;
@@ -183,10 +183,29 @@ public final class MeetingService {
 		return settings.readView();
 	}
 
-	/** meeting-set-settings: a partial settings object, optionally carrying a new "apiKey". */
-	public Result<MeetingSettings.View> setSettings(Map<String, Object> patch) {
+	/** meeting-set-settings: applies one edit to the stored settings. */
+	public Result<MeetingSettings.View> updateSettings(UnaryOperator<MeetingSettings> edit) {
 		try {
-			settings.write(patch);
+			settings.update(edit);
+			return Result.ok(settings.readView());
+		} catch (RuntimeException error) {
+			return Result.err(message(error));
+		}
+	}
+
+	/** Stores a new API key; a blank key clears it. */
+	public Result<MeetingSettings.View> setApiKey(String apiKey) {
+		try {
+			settings.writeApiKey(apiKey);
+			return Result.ok(settings.readView());
+		} catch (RuntimeException error) {
+			return Result.err(message(error));
+		}
+	}
+
+	public Result<MeetingSettings.View> clearApiKey() {
+		try {
+			settings.clearApiKey();
 			return Result.ok(settings.readView());
 		} catch (RuntimeException error) {
 			return Result.err(message(error));

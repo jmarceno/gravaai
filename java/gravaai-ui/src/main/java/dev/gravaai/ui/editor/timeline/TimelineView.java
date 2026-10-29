@@ -1191,7 +1191,6 @@ public final class TimelineView extends Region {
 				&& y <= clipRow.top() + CAPTION_STRIP_TOP_OFFSET + CAPTION_STRIP_HEIGHT;
 	}
 
-	/** The add-ghost span currently drawn, or null (TestFX/snapshot inspection). */
 	/**
 	 * Mounts the transient agent-timeline overlay (P3.2) above the Canvas and follows the
 	 * controller's highlight list. Passing {@code null} unmounts it. Shell wiring:

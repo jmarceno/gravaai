@@ -85,11 +85,11 @@ public final class ProjectPersistence {
 			return false;
 		}
 		JsonNode projectId = candidate.get("projectId");
-		if (projectId != null && !projectId.isNull() && !projectId.isTextual()) {
+		if (projectId != null && !projectId.isNull() && !projectId.isString()) {
 			return false;
 		}
 		JsonNode videoPath = candidate.get("videoPath");
-		if (videoPath == null || !videoPath.isTextual() || videoPath.asText().isEmpty()) {
+		if (videoPath == null || !videoPath.isString() || videoPath.asString().isEmpty()) {
 			return false;
 		}
 		JsonNode editor = candidate.get("editor");
@@ -991,7 +991,7 @@ public final class ProjectPersistence {
 	}
 
 	private static String text(JsonNode value) {
-		return value != null && value.isTextual() ? value.asText() : null;
+		return value != null && value.isString() ? value.asString() : null;
 	}
 
 	private static Boolean bool(JsonNode value) {
@@ -1022,8 +1022,8 @@ public final class ProjectPersistence {
 		if (value.isNumber()) {
 			return value.doubleValue() != 0;
 		}
-		if (value.isTextual()) {
-			return !value.asText().isEmpty();
+		if (value.isString()) {
+			return !value.asString().isEmpty();
 		}
 		return value.isArray() || value.isObject() ? value.size() > 0 : true;
 	}

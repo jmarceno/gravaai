@@ -429,13 +429,13 @@ public final class EditorShellView extends VBox {
 			java.util.List<String> paths = new ArrayList<>();
 			if (parsed.isArray()) {
 				for (JsonNode node : parsed) {
-					if (!node.isTextual() || node.asText().isEmpty()) {
+					if (!node.isString() || node.asString().isEmpty()) {
 						return null;
 					}
-					paths.add(node.asText());
+					paths.add(node.asString());
 				}
-			} else if (parsed.isTextual()) {
-				paths.add(parsed.asText());
+			} else if (parsed.isString()) {
+				paths.add(parsed.asString());
 			} else {
 				return null;
 			}

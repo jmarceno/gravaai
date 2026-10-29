@@ -129,7 +129,7 @@ class ControlSocketTest {
 		assumeTrue(Files.isExecutable(CTL), "gravaai-ctl is not built: " + CTL);
 		Path runtime = Files.createDirectory(tempDir.resolve("runtime"));
 		List<GlobalShortcutAction> seen = new ArrayList<>();
-		try (ControlSocket.Server server = ControlSocket.start(
+		try (ControlSocket.Server _ = ControlSocket.start(
 				seen::add, ControlSocket.getControlSocketPath(Map.of("XDG_RUNTIME_DIR", runtime.toString())))) {
 			ProcessResult delivered = run(CTL, List.of("toggle-recording"), Map.of("XDG_RUNTIME_DIR", runtime.toString()));
 			assertEquals(0, delivered.exitCode(), delivered.output());

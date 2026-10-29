@@ -22,7 +22,7 @@ public final class CanvasImage implements AutoCloseable {
 		if (encoded == null || encoded.length == 0) {
 			throw new IllegalArgumentException("Empty image data");
 		}
-		Image image = Image.makeFromEncoded(encoded);
+		Image image = Image.makeDeferredFromEncodedBytes(encoded);
 		if (image == null) {
 			throw new IllegalArgumentException("Could not decode the image");
 		}

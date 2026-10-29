@@ -134,22 +134,22 @@ public final class DashboardLibraryStore {
 			JsonNode name = item.get("name");
 			JsonNode color = item.get("color");
 			JsonNode paths = item.get("paths");
-			if (id == null || !id.isTextual() || name == null || !name.isTextual()
-					|| color == null || !color.isTextual() || !HEX_COLOR.matcher(color.asText()).matches()
+			if (id == null || !id.isString() || name == null || !name.isString()
+					|| color == null || !color.isString() || !HEX_COLOR.matcher(color.asString()).matches()
 					|| paths == null || !paths.isArray()) {
 				continue;
 			}
 			List<String> folderPaths = new ArrayList<>();
 			boolean valid = true;
 			for (JsonNode path : paths) {
-				if (path == null || !path.isTextual()) {
+				if (path == null || !path.isString()) {
 					valid = false;
 					break;
 				}
-				folderPaths.add(path.asText());
+				folderPaths.add(path.asString());
 			}
 			if (valid) {
-				folders.add(new ProjectFolder(id.asText(), name.asText(), color.asText(), folderPaths));
+				folders.add(new ProjectFolder(id.asString(), name.asString(), color.asString(), folderPaths));
 			}
 		}
 		return folders;
@@ -161,8 +161,8 @@ public final class DashboardLibraryStore {
 			return values;
 		}
 		for (JsonNode item : value) {
-			if (item != null && item.isTextual()) {
-				values.add(item.asText());
+			if (item != null && item.isString()) {
+				values.add(item.asString());
 			}
 		}
 		return values;
@@ -174,8 +174,8 @@ public final class DashboardLibraryStore {
 			return values;
 		}
 		value.properties().forEach(entry -> {
-			if (entry.getValue() != null && entry.getValue().isTextual()) {
-				values.put(entry.getKey(), entry.getValue().asText());
+			if (entry.getValue() != null && entry.getValue().isString()) {
+				values.put(entry.getKey(), entry.getValue().asString());
 			}
 		});
 		return values;

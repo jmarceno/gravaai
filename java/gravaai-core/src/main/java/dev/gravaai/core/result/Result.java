@@ -32,15 +32,11 @@ public sealed interface Result<T> permits Result.Ok, Result.Err {
 	}
 
 	default T orElse(T fallback) {
-		@SuppressWarnings("unchecked")
-		T value = this instanceof Ok<?> ok ? (T) ok.value() : fallback;
-		return value;
+		return this instanceof Ok<T> ok ? ok.value() : fallback;
 	}
 
 	default <R> Result<R> map(Function<? super T, ? extends R> mapper) {
-		@SuppressWarnings("unchecked")
-		Result<R> mapped = this instanceof Ok<?> ok ? Result.ok(mapper.apply((T) ok.value())) : Result.err(errorMessage());
-		return mapped;
+		return this instanceof Ok<T> ok ? Result.ok(mapper.apply(ok.value())) : Result.err(errorMessage());
 	}
 
 	default String errorMessage() {

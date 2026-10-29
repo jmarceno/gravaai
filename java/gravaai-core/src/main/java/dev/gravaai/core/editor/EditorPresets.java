@@ -130,21 +130,21 @@ public final class EditorPresets {
 		}
 		JsonNode rawName = candidate.get("name");
 		String name = normalizePresetName(
-				rawName != null && rawName.isTextual() ? rawName.asText() : null);
+				rawName != null && rawName.isString() ? rawName.asString() : null);
 		if (name == null) {
 			return null;
 		}
 
 		JsonNode rawId = candidate.get("id");
-		String id = rawId != null && rawId.isTextual() && !rawId.asText().strip().isEmpty()
-				? rawId.asText() : UUID.randomUUID().toString();
+		String id = rawId != null && rawId.isString() && !rawId.asString().strip().isEmpty()
+				? rawId.asString() : UUID.randomUUID().toString();
 		String now = ISO_MILLIS.format(Instant.now());
 		JsonNode rawCreatedAt = candidate.get("createdAt");
 		JsonNode rawUpdatedAt = candidate.get("updatedAt");
 		String createdAt = normalizePresetTimestamp(
-				rawCreatedAt != null && rawCreatedAt.isTextual() ? rawCreatedAt.asText() : null, now);
+				rawCreatedAt != null && rawCreatedAt.isString() ? rawCreatedAt.asString() : null, now);
 		String updatedAt = normalizePresetTimestamp(
-				rawUpdatedAt != null && rawUpdatedAt.isTextual() ? rawUpdatedAt.asText() : null, now);
+				rawUpdatedAt != null && rawUpdatedAt.isString() ? rawUpdatedAt.asString() : null, now);
 
 		return new EditorPreset(id, name, createdAt, updatedAt,
 				normalizeSnapshot(candidate.get("snapshot")));

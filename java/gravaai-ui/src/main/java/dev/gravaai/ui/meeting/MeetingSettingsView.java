@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingService;
@@ -84,22 +87,20 @@ public final class MeetingSettingsView extends VBox {
 		}
 	}
 
+	private record Loaded(MeetingSettings.View settings, List<MeetingService.AssetStatus> assets) {
+		Loaded {
+			assets = List.copyOf(assets);
+		}
+	}
+
 	private void load() {
 		CompletableFuture.supplyAsync(() -> {
 			MeetingSettings.View settings = service.settings();
 			List<MeetingService.AssetStatus> statuses = service.listAssets();
-			Map<String, Object> bundle = new LinkedHashMap<>();
-			bundle.put("settings", settings);
-			bundle.put("assets", statuses);
-			return bundle;
-		}).thenAcceptAsync(bundle -> {
-			@SuppressWarnings("unchecked")
-			MeetingSettings.View loaded = (MeetingSettings.View) bundle.get("settings");
-			@SuppressWarnings("unchecked")
-			List<MeetingService.AssetStatus> statuses =
-					(List<MeetingService.AssetStatus>) bundle.get("assets");
-			view = loaded;
-			assets = statuses == null ? List.of() : statuses;
+			return new Loaded(settings, statuses);
+		}).thenAcceptAsync(loaded -> {
+			view = loaded.settings();
+			assets = loaded.assets();
 			loading = false;
 			rebuild();
 		}, Platform::runLater);
@@ -133,8 +134,7 @@ public final class MeetingSettingsView extends VBox {
 		if (settings.transcriptionService() == MeetingServiceKind.LOCAL) {
 			rows.getChildren().add(new SettingsRow("Whisper model", "The local model used to transcribe.",
 					stackedField("Whisper model", settings.whisperModel(),
-							Map.of("whisperModel", settings.whisperModel()),
-							value -> save(Map.of("whisperModel", value))), true));
+							value -> save(s -> s.withWhisperModel(value))), true));
 		}
 		rows.getChildren().add(buildLanguage(settings));
 		rows.getChildren().add(buildNotes(settings));
@@ -146,9 +146,11 @@ public final class MeetingSettingsView extends VBox {
 		}
 		rows.getChildren().add(new SettingsRow("Process meetings automatically",
 				"Transcribe and write notes as soon as a meeting recording stops.",
-				autoSwitch(settings.autoProcess(), "Process meetings automatically", "autoProcess")));
+				autoSwitch(settings.autoProcess(), "Process meetings automatically",
+						MeetingSettings::withAutoProcess)));
 		rows.getChildren().add(new SettingsRow("Name meetings from their notes", "",
-				autoSwitch(settings.autoTitle(), "Name meetings from their notes", "autoTitle")));
+				autoSwitch(settings.autoTitle(), "Name meetings from their notes",
+						MeetingSettings::withAutoTitle)));
 		rows.getChildren().add(buildPrompt(settings));
 		rows.getChildren().add(buildDownloads());
 	}
@@ -159,7 +161,8 @@ public final class MeetingSettingsView extends VBox {
 		choice.item("api", "API");
 		choice.setValue(settings.transcriptionService().wire());
 		choice.onValueChange(value ->
-				save(Map.of("transcriptionService", "api".equals(value) ? "api" : "local")));
+				save(s -> s.withTranscriptionService(
+						"api".equals(value) ? MeetingServiceKind.API : MeetingServiceKind.LOCAL)));
 		return new SettingsRow("Transcription",
 				"Runs a local whisper model, or uploads the recording to an OpenAI-compatible API.",
 				choice, true);
@@ -171,7 +174,7 @@ public final class MeetingSettingsView extends VBox {
 			choice.item(language[0], language[1]);
 		}
 		choice.setValue(settings.language());
-		choice.onValueChange(value -> save(Map.of("language", value)));
+		choice.onValueChange(value -> save(s -> s.withLanguage(value)));
 		return new SettingsRow("Spoken language",
 				"Detect tries every language; picking one is faster and more accurate.", choice, true);
 	}
@@ -182,7 +185,8 @@ public final class MeetingSettingsView extends VBox {
 		choice.item("api", "API");
 		choice.setValue(settings.summarizationService().wire());
 		choice.onValueChange(value ->
-				save(Map.of("summarizationService", "api".equals(value) ? "api" : "local")));
+				save(s -> s.withSummarizationService(
+						"api".equals(value) ? MeetingServiceKind.API : MeetingServiceKind.LOCAL)));
 		String description = settings.summarizationService() == MeetingServiceKind.LOCAL
 				? "Runs a small model on this computer, started only while it writes notes."
 				: "Sends the transcript to the API below.";
@@ -194,7 +198,7 @@ public final class MeetingSettingsView extends VBox {
 		choice.item("qwen3.5-2b", "Qwen3.5 2B (1.3 GB)");
 		choice.item("qwen3.5-4b", "Qwen3.5 4B (2.7 GB)");
 		choice.setValue(settings.localModel());
-		choice.onValueChange(value -> save(Map.of("localModel", value)));
+		choice.onValueChange(value -> save(s -> s.withLocalModel(value)));
 		return new SettingsRow("Notes model",
 				"2B fits in about 2 GB of memory; 4B writes better notes but needs about 4 GB.",
 				choice, true);
@@ -216,8 +220,7 @@ public final class MeetingSettingsView extends VBox {
 
 		card.getChildren().add(new SettingsRow("Base URL", "",
 				stackedField("API base URL", settings.apiBaseUrl(),
-						Map.of("apiBaseUrl", settings.apiBaseUrl()),
-						value -> save(Map.of("apiBaseUrl", value))), true));
+						value -> save(s -> s.withApiBaseUrl(value))), true));
 
 		Region keyField = buildApiKey(settings);
 		card.getChildren().add(new SettingsRow("API key",
@@ -228,14 +231,12 @@ public final class MeetingSettingsView extends VBox {
 		if (settings.transcriptionService() == MeetingServiceKind.API) {
 			card.getChildren().add(new SettingsRow("Transcription model", "",
 					stackedField("API transcription model", settings.apiTranscriptionModel(),
-							Map.of("apiTranscriptionModel", settings.apiTranscriptionModel()),
-							value -> save(Map.of("apiTranscriptionModel", value))), true));
+							value -> save(s -> s.withApiTranscriptionModel(value))), true));
 		}
 		if (settings.summarizationService() == MeetingServiceKind.API) {
 			card.getChildren().add(new SettingsRow("Notes model", "",
 					stackedField("API notes model", settings.apiChatModel(),
-							Map.of("apiChatModel", settings.apiChatModel()),
-							value -> save(Map.of("apiChatModel", value))), true));
+							value -> save(s -> s.withApiChatModel(value))), true));
 		}
 		return card;
 	}
@@ -255,7 +256,7 @@ public final class MeetingSettingsView extends VBox {
 			if (value.isEmpty()) {
 				return;
 			}
-			save(Map.of("apiKey", value));
+			apply(() -> service.setApiKey(value));
 			key.clear();
 		});
 		Button remove = new Button("Remove", Button.Variant.GHOST, Button.Size.SM);
@@ -280,14 +281,14 @@ public final class MeetingSettingsView extends VBox {
 				+ css(Theme.FG) + ";");
 		prompt.focusedProperty().addListener((observable, wasFocused, focused) -> {
 			if (!focused && !settings.summaryPrompt().equals(prompt.getText())) {
-				save(Map.of("summaryPrompt", prompt.getText()));
+				save(s -> s.withSummaryPrompt(prompt.getText()));
 			}
 		});
 		VBox column = new VBox(8, prompt);
 		if (settings.summaryPrompt() != null && !settings.summaryPrompt().isBlank()) {
 			Button reset = new Button("Use the built-in prompt", Button.Variant.GHOST,
 					Button.Size.SM);
-			reset.setOnAction(event -> save(Map.of("summaryPrompt", "")));
+			reset.setOnAction(event -> save(s -> s.withSummaryPrompt("")));
 			column.getChildren().add(reset);
 		}
 		return new SettingsRow("Notes prompt", "", column, true);
@@ -325,14 +326,15 @@ public final class MeetingSettingsView extends VBox {
 				"Models are downloaded the first time they are needed.", list, true);
 	}
 
-	private Region autoSwitch(boolean checked, String accessibleText, String key) {
+	private Region autoSwitch(boolean checked, String accessibleText,
+			BiFunction<MeetingSettings, Boolean, MeetingSettings> edit) {
 		Switch toggle = new Switch("", checked);
 		toggle.setAccessibleText(accessibleText);
-		toggle.onCheckedChange(value -> save(Map.of(key, value)));
+		toggle.onCheckedChange(value -> save(s -> edit.apply(s, value)));
 		return toggle;
 	}
 
-	private Region stackedField(String accessibleText, String current, Map<String, Object> patch,
+	private Region stackedField(String accessibleText, String current,
 			java.util.function.Consumer<String> onSave) {
 		Input field = new Input();
 		field.setText(current == null ? "" : current);
@@ -364,9 +366,12 @@ public final class MeetingSettingsView extends VBox {
 				+ css(Theme.MUTED) + "; -fx-padding: 0 12 0 12;");
 	}
 
-	private void save(Map<String, Object> patch) {
-		Map<String, Object> copy = new LinkedHashMap<>(patch);
-		CompletableFuture.supplyAsync(() -> service.setSettings(copy)).thenAcceptAsync(result -> {
+	private void save(UnaryOperator<MeetingSettings> edit) {
+		apply(() -> service.updateSettings(edit));
+	}
+
+	private void apply(Supplier<Result<MeetingSettings.View>> change) {
+		CompletableFuture.supplyAsync(change).thenAcceptAsync(result -> {
 			if (result.isErr()) {
 				error = result.errorMessage();
 				Toast.show(this, error).variant(Toast.Variant.DANGER);
@@ -381,9 +386,7 @@ public final class MeetingSettingsView extends VBox {
 	}
 
 	private void saveKeyRemoval() {
-		Map<String, Object> patch = new LinkedHashMap<>();
-		patch.put("apiKey", null);
-		save(patch);
+		apply(service::clearApiKey);
 	}
 
 	private void downloadAsset(MeetingService.AssetStatus asset) {

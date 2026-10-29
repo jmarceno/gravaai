@@ -43,7 +43,6 @@
 		     notice to AI coding agents (the "jqwik Anti-AI Affair"); 1.9.3 is the last clean line.
 		     Do not bump past 1.9.3 without an explicit decision. -->
 		<jqwik.version>1.9.3</jqwik.version>
-		<testfx.version>4.0.18</testfx.version>
 
 		<!-- Toolchain: plan §3. Override with -Dgravaai.jdk=... on another machine. -->
 		<gravaai.jdk>/media/jmarceno/scratch/java-toolchain/jdk-27.0.1.0.2+1</gravaai.jdk>
@@ -52,11 +51,6 @@
 		<gravaai.build.root>/media/jmarceno/scratch/java-targets</gravaai.build.root>
 		<!-- Final artifacts (app image + AppImage) land inside the project, never on another drive. -->
 		<gravaai.dist.dir>${maven.multiModuleProjectDirectory}/dist</gravaai.dist.dir>
-		<!-- Display used by the JavaFX/TestFX tests and the dashboard screenshot test. -->
-		<!-- UI tests run on an isolated virtual display so they never pop windows on the user's
-		     desktop. Start one with: Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
-		     Override with -Dgravaai.test.display=:0 when you explicitly want the live display. -->
-		<gravaai.test.display>:99</gravaai.test.display>
 	</properties>
 
 	<dependencyManagement>
@@ -195,12 +189,6 @@
 				<version>${jqwik.version}</version>
 				<scope>test</scope>
 			</dependency>
-			<dependency>
-				<groupId>org.testfx</groupId>
-				<artifactId>testfx-junit5</artifactId>
-				<version>${testfx.version}</version>
-				<scope>test</scope>
-			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -213,8 +201,15 @@
 					<artifactId>maven-compiler-plugin</artifactId>
 					<version>3.14.0</version>
 					<configuration>
+						<showWarnings>true</showWarnings>
 						<compilerArgs>
 							<arg>-parameters</arg>
+							<!-- Every lint is an error. Two are off on purpose: "restricted" flags the FFM
+							     native calls (ffmpeg, whisper, layer-shell), which are the point of those
+							     bindings; "serial" flags Serializable classes, and nothing here uses Java
+							     serialization. Any @SuppressWarnings needs a comment saying why. -->
+							<arg>-Xlint:all,-restricted,-serial</arg>
+							<arg>-Werror</arg>
 						</compilerArgs>
 					</configuration>
 				</plugin>
@@ -231,13 +226,6 @@
 							<!-- Keep jqwik's database out of the repository (plan §1.1.3). -->
 							<jqwik.database>${project.build.directory}/jqwik-database</jqwik.database>
 						</systemPropertyVariables>
-						<!-- JavaFX/TestFX tests need the session display; Maven inherits no DISPLAY from the
-						     desktop session when started from an agent shell. This machine is a COSMIC desktop. -->
-						<environmentVariables>
-							<DISPLAY>${gravaai.test.display}</DISPLAY>
-							<XDG_RUNTIME_DIR>/run/user/1000</XDG_RUNTIME_DIR>
-							<WAYLAND_DISPLAY>wayland-1</WAYLAND_DISPLAY>
-						</environmentVariables>
 					</configuration>
 				</plugin>
 				<plugin>

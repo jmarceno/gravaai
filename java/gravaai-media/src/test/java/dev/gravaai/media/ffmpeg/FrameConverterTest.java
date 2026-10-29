@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import io.github.humbleui.skija.Data;
-import io.github.humbleui.skija.EncodedImageFormat;
+import io.github.humbleui.skija.EncoderPNG;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageInfo;
 
@@ -83,9 +83,9 @@ class FrameConverterTest {
 				bgra[i + 2] = rgbaBytes[i];
 				bgra[i + 3] = rgbaBytes[i + 3];
 			}
-			Image image = Image.makeRaster(ImageInfo.makeN32Premul(640, 360), bgra, 640 * 4L);
+			Image image = Image.makeRasterFromBytes(ImageInfo.makeN32Premul(640, 360), bgra, 640 * 4L);
 			try {
-				Data png = image.encodeToData(EncodedImageFormat.PNG);
+				Data png = EncoderPNG.encode(image);
 				try {
 					assertNotNull(png);
 					byte[] encoded = png.getBytes();
@@ -94,7 +94,7 @@ class FrameConverterTest {
 					assertEquals((byte) 'P', encoded[1]);
 					assertEquals((byte) 'N', encoded[2]);
 					assertEquals((byte) 'G', encoded[3]);
-					Image decoded = Image.makeFromEncoded(encoded);
+					Image decoded = Image.makeDeferredFromEncodedBytes(encoded);
 					try {
 						assertEquals(640, decoded.getWidth());
 						assertEquals(360, decoded.getHeight());

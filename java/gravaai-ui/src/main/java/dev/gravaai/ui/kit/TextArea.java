@@ -4,7 +4,7 @@ package dev.gravaai.ui.kit;
  * HeroUI TextArea port (plan §5.12), source {@code src/components/ui/input.tsx} re-export +
  * {@code @heroui/styles/components/textarea.css}. Same field styling as {@link Input}.
  */
-public class TextArea extends javafx.scene.control.TextArea {
+public final class TextArea extends javafx.scene.control.TextArea {
 
 	public TextArea() {
 		this("");

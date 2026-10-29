@@ -13,7 +13,7 @@ import javafx.util.Duration;
  * <p>Every duration and curve is read from the React source: CSS transitions in
  * {@code @heroui/styles} and the React CSS modules, plus the one {@code motion/react} transition in
  * {@code launch/LaunchWindow.tsx} (0.24 s, ease [0.22, 1, 0.36, 1]). Cubic-bezier curves map
- * directly to {@link Interpolator#SPLINE(double, double, double, double)}.
+ * directly to {@link Interpolator#ofSpline(double, double, double, double)}.
  */
 public final class Motion {
 

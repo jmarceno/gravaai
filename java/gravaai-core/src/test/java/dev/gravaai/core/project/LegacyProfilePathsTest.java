@@ -72,7 +72,7 @@ class LegacyProfilePathsTest {
 								object("sourcePath", CURRENT.resolve("recordings/recording-1.mic.webm").toString()))));
 		assertEquals(expected, result);
 		assertEquals(LEGACY.resolve("recordings/recording-1.mp4").toString(),
-				project.get("videoPath").asText());
+				project.get("videoPath").asString());
 	}
 
 	@Test
@@ -85,7 +85,7 @@ class LegacyProfilePathsTest {
 		JsonNode result = LegacyProfilePaths.remapLegacyProfilePaths(
 				project, RENAMES, existsIn(CURRENT_DEV.resolve("recordings/a.mp4")));
 
-		assertEquals(CURRENT_DEV.resolve("recordings/a.mp4").toString(), result.get("videoPath").asText());
+		assertEquals(CURRENT_DEV.resolve("recordings/a.mp4").toString(), result.get("videoPath").asString());
 	}
 
 	@Test

@@ -1,6 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
 import java.nio.file.Path;
+import java.util.function.UnaryOperator;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -121,8 +122,18 @@ final class DashboardMeetingFixtures {
 		}
 
 		@Override
-		public Result<MeetingSettings.View> setSettings(Map<String, Object> patch) {
-			throw new UnsupportedOperationException("setSettings not used by the dashboard");
+		public Result<MeetingSettings.View> updateSettings(UnaryOperator<MeetingSettings> edit) {
+			throw new UnsupportedOperationException("updateSettings not used by the dashboard");
+		}
+
+		@Override
+		public Result<MeetingSettings.View> setApiKey(String apiKey) {
+			throw new UnsupportedOperationException("setApiKey not used by the dashboard");
+		}
+
+		@Override
+		public Result<MeetingSettings.View> clearApiKey() {
+			throw new UnsupportedOperationException("clearApiKey not used by the dashboard");
 		}
 
 		@Override

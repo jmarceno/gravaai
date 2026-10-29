@@ -206,7 +206,7 @@ class AgentDispatcherTest {
 		AgentToolResult result = dispatch("inspect", args().put("view", "overview"));
 		assertEquals("overview text", result.text());
 		assertEquals("inspect", editor.tools.get(0));
-		assertEquals("overview", editor.lastArgs().path("view").asText());
+		assertEquals("overview", editor.lastArgs().path("view").asString());
 	}
 
 	@Test
@@ -269,10 +269,10 @@ class AgentDispatcherTest {
 		AgentToolResult result = dispatch("job", start);
 		assertTrue(result.text().contains("job-1 transcribe started"));
 		JsonNode forwarded = editor.lastArgs();
-		assertEquals("start", forwarded.path("action").asText());
-		assertEquals("transcribe", forwarded.path("kind").asText());
-		assertEquals("job-1", forwarded.path("jobId").asText());
-		assertEquals("pt", forwarded.path("options").path("language").asText());
+		assertEquals("start", forwarded.path("action").asString());
+		assertEquals("transcribe", forwarded.path("kind").asString());
+		assertEquals("job-1", forwarded.path("jobId").asString());
+		assertEquals("pt", forwarded.path("options").path("language").asString());
 		assertEquals(Status.RUNNING, jobs.get("job-1").status());
 	}
 
@@ -395,7 +395,7 @@ class AgentDispatcherTest {
 		JsonNode forwardedOps = editor.lastArgs().path("ops");
 		assertNotNull(forwardedOps);
 		assertFalse(forwardedOps.get(0).has("imageContent"));
-		assertEquals(existing.toString(), forwardedOps.get(0).path("path").asText());
+		assertEquals(existing.toString(), forwardedOps.get(0).path("path").asString());
 		assertTrue(library.approved.contains(existing));
 	}
 	@Test

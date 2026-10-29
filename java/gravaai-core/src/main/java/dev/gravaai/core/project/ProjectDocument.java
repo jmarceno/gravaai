@@ -63,8 +63,8 @@ public final class ProjectDocument {
 			throw new IllegalArgumentException("Not a Gravaai project file: " + file);
 		}
 		ObjectNode raw = (ObjectNode) parsed;
-		String loadedVideoPath = raw.get("videoPath").asText();
-		String loadedProjectId = raw.hasNonNull("projectId") ? raw.get("projectId").asText() : null;
+		String loadedVideoPath = raw.get("videoPath").asString();
+		String loadedProjectId = raw.hasNonNull("projectId") ? raw.get("projectId").asString() : null;
 		ProjectEditorState normalized = ProjectPersistence.normalizeProjectEditor(raw.get("editor"));
 		return new ProjectDocument(raw, loadedVideoPath, loadedProjectId, normalized);
 	}

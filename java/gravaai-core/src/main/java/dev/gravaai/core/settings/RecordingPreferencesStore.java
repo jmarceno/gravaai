@@ -70,7 +70,7 @@ public final class RecordingPreferencesStore {
 			store.put("microphoneEnabled", Json.nodeFactory().booleanNode(patch.microphoneEnabled()));
 		}
 		if (patch.microphoneDeviceId() != null) {
-			store.put("microphoneDeviceId", Json.nodeFactory().textNode(patch.microphoneDeviceId()));
+			store.put("microphoneDeviceId", Json.nodeFactory().stringNode(patch.microphoneDeviceId()));
 		}
 		if (patch.systemAudioEnabled() != null) {
 			store.put("systemAudioEnabled", Json.nodeFactory().booleanNode(patch.systemAudioEnabled()));
@@ -79,7 +79,7 @@ public final class RecordingPreferencesStore {
 			store.put("webcamEnabled", Json.nodeFactory().booleanNode(patch.webcamEnabled()));
 		}
 		if (patch.webcamDeviceId() != null) {
-			store.put("webcamDeviceId", Json.nodeFactory().textNode(patch.webcamDeviceId()));
+			store.put("webcamDeviceId", Json.nodeFactory().stringNode(patch.webcamDeviceId()));
 		}
 	}
 }

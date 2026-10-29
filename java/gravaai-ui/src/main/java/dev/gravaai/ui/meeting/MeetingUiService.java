@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
@@ -27,7 +28,11 @@ public interface MeetingUiService {
 
 	MeetingSettings.View settings();
 
-	Result<MeetingSettings.View> setSettings(Map<String, Object> patch);
+	Result<MeetingSettings.View> updateSettings(UnaryOperator<MeetingSettings> edit);
+
+	Result<MeetingSettings.View> setApiKey(String apiKey);
+
+	Result<MeetingSettings.View> clearApiKey();
 
 	Result<List<MeetingLibraryEntry>> listMeetings();
 

@@ -26,7 +26,7 @@ import javafx.scene.layout.VBox;
  * over 250 ms ease-out. The {@code label}/{@code output} row matches SliderControl: label on the
  * left (text-xs with the slider-control class), formatted value on the right.
  */
-public class Slider extends VBox {
+public final class Slider extends VBox {
 
 	private static final double TRACK_INSET = 12;
 	private static final double TRACK_HEIGHT = 20;

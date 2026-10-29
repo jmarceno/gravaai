@@ -26,7 +26,7 @@ class UnixSocketTest {
 	void acceptsClientAndEchoesLine() throws Exception {
 		Path socket = tempDir.resolve("run/control.sock");
 
-		try (UnixSocketServer server = UnixSocketServer.open(socket, connection -> {
+		try (UnixSocketServer _ = UnixSocketServer.open(socket, connection -> {
 			String request = connection.readLine();
 			connection.writeLine("ok:" + request);
 		})) {
@@ -48,7 +48,7 @@ class UnixSocketTest {
 		Path runtimeDirectory = tempDir.resolve("runtime");
 		Path socket = runtimeDirectory.resolve("control.sock");
 
-		try (UnixSocketServer server = UnixSocketServer.open(socket, connection -> {})) {
+		try (UnixSocketServer _ = UnixSocketServer.open(socket, connection -> {})) {
 			assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(runtimeDirectory)));
 			assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(socket)));
 		}
@@ -74,7 +74,7 @@ class UnixSocketTest {
 		try (UnixSocketServer server = UnixSocketServer.open(socket, connection -> {})) {
 			assertTrue(server.isClosed() == false);
 		}
-		try (UnixSocketServer server = UnixSocketServer.open(socket, connection -> connection.writeLine("again"))) {
+		try (UnixSocketServer _ = UnixSocketServer.open(socket, connection -> connection.writeLine("again"))) {
 			try (UnixSocketConnection client = UnixSocketClient.connect(socket)) {
 				assertEquals("again", client.readLine());
 			}
@@ -102,7 +102,7 @@ class UnixSocketTest {
 	@DisplayName("readLine returns null at end of stream")
 	void readLineReturnsNullAtEof() throws Exception {
 		Path socket = tempDir.resolve("control.sock");
-		try (UnixSocketServer server = UnixSocketServer.open(socket, connection -> {
+		try (UnixSocketServer _ = UnixSocketServer.open(socket, connection -> {
 			// close immediately
 		})) {
 			try (UnixSocketConnection client = UnixSocketClient.connect(socket)) {

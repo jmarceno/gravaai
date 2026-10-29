@@ -85,13 +85,6 @@ public final class Json {
 	 * space inside empty objects/arrays, and no pretty printing of {@code {}} / {@code []}. The
 	 * {@link Separators} overrides and the explicit {@link DefaultIndenter}s fix all three.
 	 */
-	/**
-	 * {@code JSON.stringify} writes control characters as lowercase {@code \\u00xx} escapes while
-	 * Jackson writes uppercase hex. Real settings files rarely contain control characters, but captions
-	 * and transcripts can, and the format must stay byte-compatible (plan §5.2). The five short
-	 * escapes ({@code \\b}, {@code \\t}, {@code \\n}, {@code \\f}, {@code \\r}) already match; the rest
-	 * are emitted by {@link JsonStringEscapes}.
-	 */
 	private static PrettyPrinter printFormat() {
 		Separators separators = Separators.createDefaultInstance()
 				.withObjectNameValueSpacing(Separators.Spacing.AFTER)

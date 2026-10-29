@@ -159,8 +159,8 @@ class MeetingJobsTest {
 	@DisplayName("detects a job the last session left running")
 	void detectsInterruptedJobFromMetadata() throws Exception {
 		Path media = media("seven.mp4");
-		metaStore.update(media, Map.of("lastJob", Map.of(
-				"mode", "full", "status", "running", "at", Times.isoNow(MeetingTestSupport.CLOCK))));
+		metaStore.update(media, new MeetingMetaPatch().lastJob(new MeetingMeta.LastJob(
+				"full", "running", null, Times.isoNow(MeetingTestSupport.CLOCK))));
 		assertTrue(jobs.isInterrupted(media));
 		jobs.enqueue(media, MeetingJobMode.FULL);
 		assertFalse(jobs.isInterrupted(media));

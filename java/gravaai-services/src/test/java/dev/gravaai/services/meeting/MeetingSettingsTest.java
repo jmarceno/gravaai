@@ -57,6 +57,31 @@ class MeetingSettingsTest {
 	}
 
 	@Test
+	@DisplayName("keeps every field through repeated edits, the path that once crashed on capabilities")
+	void repeatedEditsRoundTrip() {
+		MeetingSettingsService service = new MeetingSettingsService(
+				new MeetingTestSupport.FakeSettingsStore(), new MeetingTestSupport.FakeApiKeyStore(), assets);
+		service.update(s -> s.withApiChatCapabilities(
+				List.of(SummarizerCapability.TEXT, SummarizerCapability.IMAGES)));
+		service.update(s -> s.withLanguage("pt"));
+		MeetingSettings settings = service.update(s -> s.withLanguage("auto"));
+		assertEquals("auto", settings.language());
+		assertEquals(List.of(SummarizerCapability.TEXT, SummarizerCapability.IMAGES),
+				settings.apiChatCapabilities());
+		assertEquals(settings, service.read());
+	}
+
+	@Test
+	@DisplayName("runs edited settings through the same checks as a stored file")
+	void editsAreNormalized() {
+		MeetingSettingsService service = new MeetingSettingsService(
+				new MeetingTestSupport.FakeSettingsStore(), new MeetingTestSupport.FakeApiKeyStore(), assets);
+		MeetingSettings settings = service.update(s -> s.withApiTimeoutMinutes(0).withLanguage(" "));
+		assertEquals(MeetingSettings.DEFAULT.apiTimeoutMinutes(), settings.apiTimeoutMinutes());
+		assertEquals(MeetingSettings.DEFAULT.language(), settings.language());
+	}
+
+	@Test
 	@DisplayName("leaves room for the prompt and the answer")
 	void transcriptCharBudgetLeavesRoom() {
 		assertEquals((16_384 - 3_500) * 3, Summarizer.transcriptCharBudget(16_384));

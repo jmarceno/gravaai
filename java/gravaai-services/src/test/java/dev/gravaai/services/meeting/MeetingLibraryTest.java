@@ -81,7 +81,7 @@ class MeetingLibraryTest {
 	@Test
 	@DisplayName("registration skips processing when auto processing is off")
 	void registrationSkipsProcessingWhenAutoProcessDisabled() throws Exception {
-		settings.write(Map.of("autoProcess", false));
+		settings.update(s -> s.withAutoProcess(false));
 		library.registerMeetingRecording(media("recording-2.mkv"), false);
 		assertTrue(processed.isEmpty());
 	}
@@ -95,8 +95,8 @@ class MeetingLibraryTest {
 		library.registerMeetingRecording(newer, true);
 		library.renameMeeting(older, "Old review");
 		library.renameMeeting(newer, "New review");
-		metaStore.update(older, Map.of("createdAt", "2026-10-26T10:00:00.000Z"));
-		metaStore.update(newer, Map.of("createdAt", "2026-10-27T10:00:00.000Z"));
+		metaStore.update(older, new MeetingMetaPatch().createdAt("2026-10-26T10:00:00.000Z"));
+		metaStore.update(newer, new MeetingMetaPatch().createdAt("2026-10-27T10:00:00.000Z"));
 		List<MeetingLibraryEntry> meetings = library.listMeetings();
 		assertEquals(List.of(newer, older),
 				meetings.stream().map(MeetingLibraryEntry::mediaPath).toList());
@@ -108,8 +108,7 @@ class MeetingLibraryTest {
 	@DisplayName("skips meeting metadata with no media file next to it")
 	void skipsOrphanMeetingMetadata() throws Exception {
 		Path orphan = recordings.resolve("gone.mp4");
-		metaStore.update(orphan, Map.of("kind", "meeting", "createdAt",
-				"2026-10-27T10:00:00.000Z"));
+		metaStore.update(orphan, new MeetingMetaPatch().kind("meeting").createdAt("2026-10-27T10:00:00.000Z"));
 		assertTrue(library.listMeetings().isEmpty());
 	}
 

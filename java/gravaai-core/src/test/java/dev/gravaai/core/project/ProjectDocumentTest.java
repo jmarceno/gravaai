@@ -76,8 +76,8 @@ class ProjectDocumentTest {
 		assertEquals(1, editor.get("futureSetting").get("nested").get(0).intValue());
 		assertFalse(editor.has("exportQuality"));
 		assertFalse(editor.has("zoomMotionBlurTuning"));
-		assertEquals("#123456", editor.get("wallpaper").asText());
-		assertEquals("/tmp/cam.mp4", editor.get("webcam").get("sourcePath").asText());
+		assertEquals("#123456", editor.get("wallpaper").asString());
+		assertEquals("/tmp/cam.mp4", editor.get("webcam").get("sourcePath").asString());
 	}
 
 	@Test
@@ -91,10 +91,10 @@ class ProjectDocumentTest {
 		ProjectDocument updated = document.withEditor(edited).withVideoPath("/tmp/other.mp4");
 		ObjectNode saved = updated.toJson();
 
-		assertEquals("#000000", saved.get("editor").get("wallpaper").asText());
-		assertEquals("9:16", saved.get("editor").get("aspectRatio").asText());
-		assertEquals("/tmp/other.mp4", saved.get("videoPath").asText());
-		assertEquals(document.projectId(), saved.get("projectId").asText());
+		assertEquals("#000000", saved.get("editor").get("wallpaper").asString());
+		assertEquals("9:16", saved.get("editor").get("aspectRatio").asString());
+		assertEquals("/tmp/other.mp4", saved.get("videoPath").asString());
+		assertEquals(document.projectId(), saved.get("projectId").asString());
 		assertEquals(2, saved.get("version").intValue());
 	}
 

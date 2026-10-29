@@ -383,7 +383,7 @@ final class AgentEditorViews {
 		if (value == null || value.isNull() || value.isMissingNode()) {
 			return "null";
 		}
-		return value.isString() ? value.asText() : value.toString();
+		return value.isString() ? value.asString() : value.toString();
 	}
 
 	private static boolean overlaps(long startMs, long endMs, long fromMs, long toMs) {

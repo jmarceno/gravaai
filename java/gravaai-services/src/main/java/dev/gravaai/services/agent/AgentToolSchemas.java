@@ -35,13 +35,13 @@ public final class AgentToolSchemas {
 			}
 			JsonNode root = Json.parseJsonWithByteOrderMark(
 					new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-			INSTRUCTIONS = root.path("instructions").asText("");
+			INSTRUCTIONS = root.path("instructions").asString("");
 			ArrayNode tools = (ArrayNode) root.path("tools");
 			List<ToolDefinition> definitions = new ArrayList<>();
 			for (JsonNode tool : tools) {
 				String schemaJson = Json.MAPPER.writeValueAsString(tool.path("inputSchema"));
-				definitions.add(new ToolDefinition(tool.path("name").asText(""),
-						tool.path("description").asText(""), schemaJson));
+				definitions.add(new ToolDefinition(tool.path("name").asString(""),
+						tool.path("description").asString(""), schemaJson));
 			}
 			TOOLS = List.copyOf(definitions);
 			TOOLS_JSON = Json.MAPPER.writeValueAsString(tools);

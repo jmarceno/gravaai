@@ -36,6 +36,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code electron/agent/bridge.ts}, plan §5.16): the tools the SDK lists must match the TS schemas
  * and every call must be forwarded through the socket bridge.
  */
+// The test harnesses close() by joining reader threads; interruption only matters to the test JVM.
+@SuppressWarnings("try")
 class AgentMcpServerTest {
 
 	@TempDir
@@ -64,7 +66,7 @@ class AgentMcpServerTest {
 					switch (request.tool()) {
 						case "inspect":
 							return CompletableFuture.completedFuture(
-									AgentToolResult.text("seen:inspect:" + args.path("view").asText()));
+									AgentToolResult.text("seen:inspect:" + args.path("view").asString()));
 						case "frames":
 							return CompletableFuture.completedFuture(new AgentToolResult(
 									"contact sheet", List.of(new AgentImage("image/jpeg", "AAAA"))));
@@ -92,8 +94,8 @@ class AgentMcpServerTest {
 
 			ObjectNode initialize = client.request("initialize", initializeParams());
 			JsonNode initialized = client.awaitResponse(initialize.path("id").asLong());
-			assertEquals("Gravaai", initialized.path("result").path("serverInfo").path("name").asText());
-			assertTrue(initialized.path("result").path("instructions").asText().length() > 20);
+			assertEquals("Gravaai", initialized.path("result").path("serverInfo").path("name").asString());
+			assertTrue(initialized.path("result").path("instructions").asString().length() > 20);
 			assertTrue(initialized.path("result").path("capabilities").has("tools"));
 			client.notify("notifications/initialized", Json.nodeFactory().objectNode());
 
@@ -105,8 +107,8 @@ class AgentMcpServerTest {
 			AgentToolSchemas.ToolDefinition expectedInspect = AgentToolSchemas.find("inspect")
 					.orElseThrow();
 			assertEquals(expectedInspect.description(),
-					tools.get(0).path("description").asText());
-			assertEquals("object", tools.get(0).path("inputSchema").path("type").asText());
+					tools.get(0).path("description").asString());
+			assertEquals("object", tools.get(0).path("inputSchema").path("type").asString());
 
 			ObjectNode callInspect = client.request("tools/call", callParams("inspect",
 					Json.nodeFactory().objectNode().put("view", "jobs")));
@@ -119,9 +121,9 @@ class AgentMcpServerTest {
 			JsonNode framesResult = client.awaitResponse(callFrames.path("id").asLong());
 			ArrayNode content = (ArrayNode) framesResult.path("result").path("content");
 			assertNotNull(content);
-			assertEquals("image", content.get(0).path("type").asText());
-			assertEquals("image/jpeg", content.get(0).path("mimeType").asText());
-			assertEquals("AAAA", content.get(0).path("data").asText());
+			assertEquals("image", content.get(0).path("type").asString());
+			assertEquals("image/jpeg", content.get(0).path("mimeType").asString());
+			assertEquals("AAAA", content.get(0).path("data").asString());
 
 			ObjectNode editArguments = Json.nodeFactory().objectNode();
 			editArguments.putArray("ops");
@@ -152,7 +154,7 @@ class AgentMcpServerTest {
 	private static List<String> names(ArrayNode tools) {
 		List<String> names = new ArrayList<>();
 		for (JsonNode tool : tools) {
-			names.add(tool.path("name").asText());
+			names.add(tool.path("name").asString());
 		}
 		return names;
 	}
@@ -162,7 +164,7 @@ class AgentMcpServerTest {
 		if (content == null || content.isEmpty()) {
 			return "";
 		}
-		return content.get(content.size() - 1).path("text").asText("");
+		return content.get(content.size() - 1).path("text").asString("");
 	}
 
 	/** A raw newline-delimited JSON-RPC client over the piped stdio streams. */

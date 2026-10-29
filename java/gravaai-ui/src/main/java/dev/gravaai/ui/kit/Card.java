@@ -12,7 +12,7 @@ import javafx.scene.layout.VBox;
  * <p>{@code bg-surface}, {@code p-4} (16), {@code gap-3} (12), radius 24 px. Compound parts mirror
  * {@code Card.Header/Title/Description/Content/Footer}.
  */
-public class Card extends VBox {
+public final class Card extends VBox {
 
 	public Card() {
 		getStyleClass().add("card");
@@ -24,7 +24,7 @@ public class Card extends VBox {
 	}
 
 	/** {@code Card.Header}: flex-col. */
-	public static class Header extends VBox {
+	public static final class Header extends VBox {
 		public Header(Node... children) {
 			super(children);
 			getStyleClass().add("card__header");
@@ -32,7 +32,7 @@ public class Card extends VBox {
 	}
 
 	/** {@code Card.Title}: text-sm leading-6 font-medium. */
-	public static class Title extends Label {
+	public static final class Title extends Label {
 		public Title(String text) {
 			super(text);
 			getStyleClass().add("card__title");
@@ -41,7 +41,7 @@ public class Card extends VBox {
 	}
 
 	/** {@code Card.Description}: text-sm leading-5 text-muted. */
-	public static class Description extends Label {
+	public static final class Description extends Label {
 		public Description(String text) {
 			super(text);
 			getStyleClass().add("card__description");
@@ -50,7 +50,7 @@ public class Card extends VBox {
 	}
 
 	/** {@code Card.Content}: flex-1 flex-col gap-1. */
-	public static class Content extends VBox {
+	public static final class Content extends VBox {
 		public Content(Node... children) {
 			super(children);
 			getStyleClass().add("card__content");
@@ -59,7 +59,7 @@ public class Card extends VBox {
 	}
 
 	/** {@code Card.Footer}: flex-row items-center. */
-	public static class Footer extends HBox {
+	public static final class Footer extends HBox {
 		public Footer(Node... children) {
 			super(children);
 			getStyleClass().add("card__footer");

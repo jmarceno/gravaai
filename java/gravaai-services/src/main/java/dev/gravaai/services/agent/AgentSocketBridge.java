@@ -91,7 +91,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 	/** {@code toolTimeoutMs}: job waits block for the requested time (max 300 s) plus slack. */
 	public static long toolTimeoutMs(String tool, JsonNode args) {
 		boolean jobWait = "job".equals(tool) && args != null && args.path("action").isString()
-				&& "wait".equals(args.path("action").asText());
+				&& "wait".equals(args.path("action").asString());
 		if (!jobWait) {
 			return TOOL_TIMEOUT_MS;
 		}
@@ -257,7 +257,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 					&& message.path("ok").asBoolean();
 			if (!ok) {
 				String error = message != null && message.path("error").isString()
-						? message.path("error").asText()
+						? message.path("error").asString()
 						: "Gravaai closed the connection; start it again and retry";
 				try {
 					channel.close();
@@ -349,7 +349,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 		if (pending != null && !ok && message.path("progress").isObject()) {
 			JsonNode update = message.path("progress");
 			Double total = update.path("total").isNumber() ? update.path("total").asDouble() : null;
-			String text = update.path("message").isString() ? update.path("message").asText() : null;
+			String text = update.path("message").isString() ? update.path("message").asString() : null;
 			if (pending.onProgress() != null) {
 				pending.onProgress().accept(new AgentProgressUpdate(
 						update.path("progress").isNumber() ? update.path("progress").asDouble() : 0,
@@ -361,21 +361,21 @@ public final class AgentSocketBridge implements AutoCloseable {
 			waiting.remove(id);
 			if (message.path("ok").isBoolean() && message.path("ok").asBoolean()) {
 				JsonNode result = message.path("result");
-				String text = result.path("text").isString() ? result.path("text").asText() : "";
+				String text = result.path("text").isString() ? result.path("text").asString() : "";
 				var images = new java.util.ArrayList<AgentImage>();
 				JsonNode imageNodes = result.path("images");
 				if (imageNodes.isArray()) {
 					for (JsonNode image : imageNodes) {
 						if (image.path("mimeType").isString() && image.path("data").isString()
-								&& !image.path("data").asText().isEmpty()) {
-							images.add(new AgentImage(image.path("mimeType").asText(),
-									image.path("data").asText()));
+								&& !image.path("data").asString().isEmpty()) {
+							images.add(new AgentImage(image.path("mimeType").asString(),
+									image.path("data").asString()));
 						}
 					}
 				}
 				pending.result().complete(new AgentToolResult(text, images));
 			} else {
-				String error = message.path("error").isString() ? message.path("error").asText()
+				String error = message.path("error").isString() ? message.path("error").asString()
 						: "the app rejected the request";
 				pending.result().completeExceptionally(new IllegalStateException(error));
 			}
@@ -384,7 +384,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 		if (message.path("ok").isBoolean() && !message.path("ok").asBoolean()
 				&& message.path("error").isString()) {
 			// Pre-request rejection (bad token, bad json).
-			settleAll(message.path("error").asText());
+			settleAll(message.path("error").asString());
 		}
 	}
 

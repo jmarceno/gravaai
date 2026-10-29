@@ -25,10 +25,10 @@ public enum Speaker {
 	 * other value means "unknown" (the TS code compares with {@code ===} against the strings).
 	 */
 	public static Speaker fromWhisperIndex(JsonNode node) {
-		if (node == null || !node.isTextual()) {
+		if (node == null || !node.isString()) {
 			return null;
 		}
-		return switch (node.asText()) {
+		return switch (node.asString()) {
 			case "0" -> ME;
 			case "1" -> REMOTE;
 			default -> null;

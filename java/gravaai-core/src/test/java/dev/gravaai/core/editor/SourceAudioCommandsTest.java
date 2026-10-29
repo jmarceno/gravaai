@@ -34,7 +34,7 @@ class SourceAudioCommandsTest {
 		assertEquals(0.5, settings.track("mic").volume(), 0.001);
 		assertEquals("keep",
 				store.state().sourceAudioTrackSettingsByClip().path("clip-1").path("mic")
-						.path("extra").asText());
+						.path("extra").asString());
 		assertEquals(1, store.state().sourceAudioTrackSettingsByClip().path("clip-1")
 				.path("unknownTrack").path("x").intValue());
 	}

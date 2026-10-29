@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -83,9 +82,8 @@ public final class MeetingPipeline {
 					null, List.of());
 			String notes = holder.summarizer().summarize(context, summarizeStatus, signal);
 			writeTextAtomic(files.notes(), notes);
-			metaStore.update(mediaPath, Map.of(
-					"summarizedAt", Times.isoNow(clock),
-					"summarizationSource", holder.source()));
+			metaStore.update(mediaPath,
+					new MeetingMetaPatch().summarized(Times.isoNow(clock), holder.source()));
 
 			if (settings.autoTitle() && !"user".equals(meta.titleSource())) {
 				signal.throwIfCancelled();
@@ -93,8 +91,7 @@ public final class MeetingPipeline {
 				try {
 					String title = holder.summarizer().title(notes, context, signal);
 					if (title != null && !title.isEmpty()) {
-						metaStore.update(mediaPath,
-								Map.of("title", title, "titleSource", "auto"));
+						metaStore.update(mediaPath, new MeetingMetaPatch().title(title, "auto"));
 					}
 				} catch (RuntimeException error) {
 					// A missing title must not fail notes that were already written.
@@ -155,11 +152,9 @@ public final class MeetingPipeline {
 				throw new java.io.UncheckedIOException(error);
 			}
 			MeetingMeta meta = metaStore.read(mediaPath);
-			Map<String, Object> patch = new LinkedHashMap<>();
-			patch.put("language", MeetingMetaStore.REMOVE);
+			MeetingMetaPatch patch = new MeetingMetaPatch().removeLanguage();
 			if ("auto".equals(meta.titleSource())) {
-				patch.put("title", MeetingMetaStore.REMOVE);
-				patch.put("titleSource", MeetingMetaStore.REMOVE);
+				patch.removeTitle();
 			}
 			metaStore.update(mediaPath, patch);
 			throw new IllegalStateException("No speech was found in this recording.");
@@ -167,12 +162,10 @@ public final class MeetingPipeline {
 
 		String transcript = Transcript.formatTranscriptMarkdown(segments);
 		writeTextAtomic(files.transcript(), transcript);
-		Map<String, Object> patch = new LinkedHashMap<>();
-		patch.put("language", language);
-		patch.put("durationMs", whisper.probeDurationMs(mediaPath));
-		patch.put("transcribedAt", Times.isoNow(clock));
-		patch.put("transcriptionSource", source);
-		metaStore.update(mediaPath, patch);
+		metaStore.update(mediaPath, new MeetingMetaPatch()
+				.language(language)
+				.durationMs(whisper.probeDurationMs(mediaPath))
+				.transcribed(Times.isoNow(clock), source));
 		return new Transcription(transcript, language);
 	}
 

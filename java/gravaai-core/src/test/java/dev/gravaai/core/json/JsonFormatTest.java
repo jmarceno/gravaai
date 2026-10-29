@@ -59,13 +59,13 @@ class JsonFormatTest {
 	void prettyPrintsShortDocumentsLikeJsonStringify() throws IOException {
 		JsonNode cases = Json.parseJsonWithByteOrderMark(fixture("json-stringify-cases.json"));
 		for (Map.Entry<String, JsonNode> entry : cases.properties()) {
-			String expected = entry.getValue().asText();
+			String expected = entry.getValue().asString();
 			JsonNode parsed = Json.parseJsonWithByteOrderMark(expected);
 			assertEquals(expected, Json.stringify(parsed), entry.getKey());
 		}
 		assertEquals("{}", Json.stringify(NODES.objectNode()));
 		assertEquals("[]", Json.stringify(NODES.arrayNode()));
-		assertEquals("\"plain\"", Json.stringify(NODES.textNode("plain")));
+		assertEquals("\"plain\"", Json.stringify(NODES.stringNode("plain")));
 	}
 
 	@Test

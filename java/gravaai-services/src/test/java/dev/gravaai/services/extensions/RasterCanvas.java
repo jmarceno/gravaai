@@ -7,7 +7,7 @@ import io.github.humbleui.skija.ColorType;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageInfo;
 import io.github.humbleui.skija.Surface;
-import io.github.humbleui.skija.EncodedImageFormat;
+import io.github.humbleui.skija.EncoderPNG;
 import io.github.humbleui.skija.Data;
 
 import dev.gravaai.services.extensions.canvas.Canvas2D;
@@ -27,7 +27,7 @@ final class RasterCanvas implements AutoCloseable {
 	RasterCanvas(int width, int height) {
 		this.width = width;
 		this.height = height;
-		this.surface = Surface.makeRasterN32Premul(width, height);
+		this.surface = Surface.makeRaster(ImageInfo.makeN32Premul(width, height));
 		this.surface.getCanvas().clear(0);
 		this.canvas = new Canvas2D(surface.getCanvas(), width, height);
 	}
@@ -89,7 +89,7 @@ final class RasterCanvas implements AutoCloseable {
 
 	/** A solid image for {@code drawImage} tests. */
 	static CanvasImage solidImage(int width, int height, int argb) {
-		try (Surface imageSurface = Surface.makeRasterN32Premul(width, height)) {
+		try (Surface imageSurface = Surface.makeRaster(ImageInfo.makeN32Premul(width, height))) {
 			imageSurface.getCanvas().clear(argb);
 			// CanvasImage takes ownership of the snapshot and closes it.
 			return CanvasImage.of(imageSurface.makeImageSnapshot());
@@ -98,10 +98,10 @@ final class RasterCanvas implements AutoCloseable {
 
 	/** PNG bytes for {@code CanvasImage.fromEncoded} tests. */
 	static byte[] pngBytes(int width, int height, int argb) {
-		try (Surface imageSurface = Surface.makeRasterN32Premul(width, height)) {
+		try (Surface imageSurface = Surface.makeRaster(ImageInfo.makeN32Premul(width, height))) {
 			imageSurface.getCanvas().clear(argb);
 			try (Image image = imageSurface.makeImageSnapshot();
-					Data data = image.encodeToData(EncodedImageFormat.PNG)) {
+					Data data = EncoderPNG.encode(image)) {
 				return data.getBytes();
 			}
 		}

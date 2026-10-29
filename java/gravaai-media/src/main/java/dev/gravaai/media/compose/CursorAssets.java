@@ -233,7 +233,7 @@ final class CursorAssets {
 		Matcher matcher = EMBEDDED_IMAGE.matcher(text);
 		while (matcher.find()) {
 			byte[] png = java.util.Base64.getMimeDecoder().decode(matcher.group(6));
-			images.put(matcher.group(1), Image.makeFromEncoded(png));
+			images.put(matcher.group(1), Image.makeDeferredFromEncodedBytes(png));
 			bounds.put(matcher.group(1), new float[] {Float.parseFloat(matcher.group(2)),
 					Float.parseFloat(matcher.group(3)), Float.parseFloat(matcher.group(4)),
 					Float.parseFloat(matcher.group(5))});

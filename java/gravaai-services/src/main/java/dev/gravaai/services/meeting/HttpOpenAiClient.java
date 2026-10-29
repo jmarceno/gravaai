@@ -75,12 +75,12 @@ public final class HttpOpenAiClient implements OpenAiClient {
 		JsonNode choices = data.path("choices");
 		JsonNode choice = choices.isArray() && !choices.isEmpty() ? choices.get(0) : null;
 		JsonNode contentNode = choice == null ? null : choice.path("message").path("content");
-		String content = contentNode != null && contentNode.isTextual()
-				? contentNode.asText()
+		String content = contentNode != null && contentNode.isString()
+				? contentNode.asString()
 				: null;
 		if (content == null || content.isBlank()) {
 			String finishReason = choice == null ? null
-					: choice.path("finish_reason").asText(null);
+					: choice.path("finish_reason").asString(null);
 			throw new IllegalStateException("length".equals(finishReason)
 					? "The model ran out of answer space before writing anything (reasoning"
 							+ " models can spend it all on thinking)."
@@ -115,11 +115,11 @@ public final class HttpOpenAiClient implements OpenAiClient {
 					OpenAiClient.describeHttpError(status, text, "Transcription"));
 		}
 		JsonNode data = MAPPER.readTree(text);
-		String transcribed = data.path("text").asText("").strip();
+		String transcribed = data.path("text").asString("").strip();
 		JsonNode languageNode = data.get("language");
 		String language = languageNode == null || languageNode.isNull()
 				? null
-				: languageNode.asText();
+				: languageNode.asString();
 		List<TranscriptionSegmentResult> segments = null;
 		JsonNode segmentsNode = data.path("segments");
 		if (segmentsNode.isArray()) {
@@ -127,7 +127,7 @@ public final class HttpOpenAiClient implements OpenAiClient {
 			for (JsonNode segment : segmentsNode) {
 				segments.add(new TranscriptionSegmentResult(
 						segment.path("start").asDouble(0.0),
-						segment.path("text").asText("").strip()));
+						segment.path("text").asString("").strip()));
 			}
 		}
 		return new TranscriptionResult(transcribed,

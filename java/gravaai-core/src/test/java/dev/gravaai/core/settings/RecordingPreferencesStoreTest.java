@@ -47,9 +47,9 @@ class RecordingPreferencesStoreTest {
 		Map<String, JsonNode> contents = store.read().join();
 		assertEquals(4, contents.size());
 		assertTrue(contents.get("microphoneEnabled").booleanValue());
-		assertEquals("preferred-mic", contents.get("microphoneDeviceId").asText());
+		assertEquals("preferred-mic", contents.get("microphoneDeviceId").asString());
 		assertTrue(contents.get("webcamEnabled").booleanValue());
-		assertEquals("preferred-camera", contents.get("webcamDeviceId").asText());
+		assertEquals("preferred-camera", contents.get("webcamDeviceId").asString());
 	}
 
 	@Test
@@ -62,7 +62,7 @@ class RecordingPreferencesStoreTest {
 		}
 		CompletableFuture.allOf(updates).join();
 
-		assertEquals("camera-5", store.read().join().get("webcamDeviceId").asText());
+		assertEquals("camera-5", store.read().join().get("webcamDeviceId").asString());
 	}
 
 	@Test

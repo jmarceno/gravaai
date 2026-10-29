@@ -8,7 +8,7 @@ import io.github.humbleui.skija.ImageInfo;
 
 /**
  * Converts decoded frames into the Skia raster images the compositor draws (plan §5.8:
- * "swscale to RGBA, then {@code Image.makeRaster(...)}, drawn on the GPU surface (Skia uploads
+ * "swscale to RGBA, then {@code Image.makeRasterFromBytes(...)}, drawn on the GPU surface (Skia uploads
  * it). Start with this.").
  *
  * <p>The pixels are copied into a byte[] because that is the allocation-free-ownership form
@@ -33,7 +33,7 @@ final class SkiaImages {
 		frame.pixelsTopFirstRgba().duplicate().get(pixels, 0, pixels.length);
 		ImageInfo info = new ImageInfo(frame.width(), frame.height(), ColorType.RGBA_8888,
 				ColorAlphaType.OPAQUE, colorSpace);
-		Image image = Image.makeRaster(info, pixels, stride);
+		Image image = Image.makeRasterFromBytes(info, pixels, stride);
 		if (image == null) {
 			throw new IllegalStateException("Image.makeRaster returned null for "
 					+ frame.width() + "x" + frame.height());

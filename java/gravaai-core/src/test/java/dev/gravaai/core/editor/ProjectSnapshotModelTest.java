@@ -23,7 +23,7 @@ class ProjectSnapshotModelTest {
 
 		var persisted = ProjectSnapshotModel.buildPersistedEditorState(state);
 
-		assertEquals("#123456", persisted.get("wallpaper").asText());
+		assertEquals("#123456", persisted.get("wallpaper").asString());
 		assertFalse(persisted.has("zoomMotionBlurTuning"));
 		assertTrue(persisted.has("zoomRegions"));
 	}

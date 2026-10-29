@@ -135,10 +135,10 @@ public final class MeetingIntegration implements AutoCloseable {
 			@Override
 			public Optional<String> read() {
 				JsonNode node = settings.readSetting(MeetingServiceKeys.API_KEY);
-				if (node == null || !node.isTextual()) {
+				if (node == null || !node.isString()) {
 					return Optional.empty();
 				}
-				String text = node.asText("").strip();
+				String text = node.asString("").strip();
 				return text.isEmpty() ? Optional.empty() : Optional.of(text);
 			}
 

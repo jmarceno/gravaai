@@ -244,10 +244,10 @@ public final class ProjectManager {
 		JsonNode editor = projectData.get("editor");
 		return version != null
 				&& version.isNumber()
-				&& (projectId == null || projectId.isTextual())
+				&& (projectId == null || projectId.isString())
 				&& videoPath != null
-				&& videoPath.isTextual()
-				&& !videoPath.asText().isBlank()
+				&& videoPath.isString()
+				&& !videoPath.asString().isBlank()
 				&& editor != null
 				&& editor.isObject();
 	}
@@ -262,10 +262,10 @@ public final class ProjectManager {
 		}
 
 		JsonNode rawVideoPath = project.get("videoPath");
-		if (rawVideoPath == null || !rawVideoPath.isTextual()) {
+		if (rawVideoPath == null || !rawVideoPath.isString()) {
 			return Result.err("Project file is missing a video path");
 		}
-		String videoPath = ProjectPaths.normalizeVideoSourcePath(rawVideoPath.asText());
+		String videoPath = ProjectPaths.normalizeVideoSourcePath(rawVideoPath.asString());
 		if (videoPath == null) {
 			return Result.err("Project file is missing a valid video path");
 		}
@@ -279,8 +279,8 @@ public final class ProjectManager {
 			JsonNode webcam = editor.get("webcam");
 			if (webcam != null && webcam.isObject()) {
 				JsonNode sourcePath = webcam.get("sourcePath");
-				if (sourcePath != null && sourcePath.isTextual()) {
-					rawWebcamPath = sourcePath.asText();
+				if (sourcePath != null && sourcePath.isString()) {
+					rawWebcamPath = sourcePath.asString();
 				}
 			}
 		}

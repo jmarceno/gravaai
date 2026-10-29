@@ -191,13 +191,13 @@ public record ExportPreferences(
 
 	/** {@code normalizeExportEncodingMode}. */
 	public static ExportEncodingMode normalizeExportEncodingMode(JsonNode value) {
-		return ExportEncodingMode.fromWire(value != null && value.isTextual() ? value.asText() : null);
+		return ExportEncodingMode.fromWire(value != null && value.isString() ? value.asString() : null);
 	}
 
 	/** {@code normalizeExportBackendPreference}. */
 	public static ExportBackendPreference normalizeExportBackendPreference(JsonNode value) {
 		return ExportBackendPreference.fromWire(
-				value != null && value.isTextual() ? value.asText() : null);
+				value != null && value.isString() ? value.asString() : null);
 	}
 
 	/** {@code normalizeExportPipelineModel}: persisted selections migrate to the modern pipeline. */
@@ -236,22 +236,22 @@ public record ExportPreferences(
 	public static ExportPreferences normalizeExportPreferences(JsonNode raw) {
 		JsonNode source = raw != null && raw.isObject() ? raw : Json.nodeFactory().objectNode();
 		JsonNode quality = source.get("exportQuality");
-		String qualityText = quality != null && quality.isTextual() ? quality.asText() : null;
+		String qualityText = quality != null && quality.isString() ? quality.asString() : null;
 		return new ExportPreferences(
 				normalizeExportEncodingMode(source.get("exportEncodingMode")),
 				normalizeExportBackendPreference(source.get("exportBackendPreference")),
 				normalizeExportPipelineModel(source.get("exportPipelineModel")),
 				ExportQuality.fromWire(qualityText),
 				normalizeExportMp4FrameRate(source.get("mp4FrameRate")),
-				ExportFormat.fromWire(source.has("exportFormat") && source.get("exportFormat").isTextual()
-						? source.get("exportFormat").asText() : null),
+				ExportFormat.fromWire(source.has("exportFormat") && source.get("exportFormat").isString()
+						? source.get("exportFormat").asString() : null),
 				normalizeGifFrameRate(source.get("gifFrameRate")),
 				booleanOr(source.get("gifLoop"), true),
-				GifSizePreset.fromWire(source.has("gifSizePreset") && source.get("gifSizePreset").isTextual()
-						? source.get("gifSizePreset").asText() : null),
+				GifSizePreset.fromWire(source.has("gifSizePreset") && source.get("gifSizePreset").isString()
+						? source.get("gifSizePreset").asString() : null),
 				PublishDestination.fromWire(source.has("publishDestination")
-						&& source.get("publishDestination").isTextual()
-								? source.get("publishDestination").asText() : null),
+						&& source.get("publishDestination").isString()
+								? source.get("publishDestination").asString() : null),
 				booleanOr(source.get("includeCaptionSidecar"), false));
 	}
 

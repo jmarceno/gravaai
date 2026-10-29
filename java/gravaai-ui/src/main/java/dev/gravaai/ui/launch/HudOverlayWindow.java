@@ -27,13 +27,14 @@ import javafx.util.Duration;
 /**
  * The persistent HUD overlay window (plan §5.4, §5.6.8, §7.1 P1.7).
  *
- * <p>Transparent frameless JavaFX stage showing the launch bar at the bottom centre of the primary
- * display, plus the floating recording webcam preview. The window is sized tightly to its content
- * (plan §5.4: no Electron mouse-passthrough toggling); it is not full-screen. The drag handle hands
+ * <p>Opaque frameless floating window showing the launch bar at the bottom centre of the primary
+ * display, plus the floating recording webcam preview. The window is sized exactly to its content;
+ * a drag moves it until it is shown again. On Wayland it cannot stay above other windows, so the
+ * screen to record is chosen from a list ({@link HudMenuWindow.Menu#SCREEN}), not by clicking it. The drag handle hands
  * the move to the window manager through {@link X11Windows#beginMove} (COSMIC reverts client-side
  * moves), falling back to a client-side move when X11 is unavailable.
  *
- * <p><b>Startup budget:</b> {@link #show()} only builds the transparent scene shell and shows the
+ * <p><b>Startup budget:</b> {@link #show()} only builds the scene shell and shows the
  * stage (the startup gate measures "window shown"); the bar, the state subscription and the
  * optional webcam preview are built on the next pulse in {@link #finishShow}. The icon SVGs are
  * pre-parsed on a virtual thread from the constructor, the webcam preview is created lazily and
@@ -55,15 +56,12 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private static final System.Logger LOG = System.getLogger("gravaai.hud");
 
 	private static final String LAUNCH_STYLESHEET = "/launch/launch.css";
-	private static final double SCREEN_MARGIN = 20;
-	/** The HUD hint bubble: instruction/feedback above the bar, auto-hides (toast.info parity). */
+		/** The HUD hint bubble: instruction/feedback above the bar, auto-hides (toast.info parity). */
 	private static final Duration HINT_TIMEOUT = Duration.seconds(7);
 	private static final double HINT_GAP = 8;
-	/**
-	 * Transparent room above the bar for the HudTooltip labels (placement top, offset 10). The
-	 * tooltips live in the window's KitRoot popover layer, so the window must be tall enough.
-	 */
-	private static final double TOOLTIP_HEADROOM = 32;
+	/** Gap between the HUD and the bottom of the primary monitor. */
+	private static final double SCREEN_GAP = 12;
+	private static final double PREVIEW_GAP = 8;
 
 	/** Icons the bar can show; pre-parsed off the FX thread so bar construction has no XML cost. */
 	private static final String[] PREWARM_ICONS = {
@@ -74,7 +72,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			Icons.EyeIcon, Icons.EyeSlashIcon, Icons.TimerIcon};
 
 	private final HudRecordingPort port;
-	private final Stage stage = new Stage(StageStyle.TRANSPARENT);
+	private final Stage stage = new Stage(StageStyle.UNDECORATED);
 	private final Pane root = new HudRoot();
 	private final Label hintLabel = new Label();
 	private final long createdAtNanos = System.nanoTime();
@@ -94,12 +92,14 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private boolean nativeDragging;
 	private double dragOffsetX;
 	private double dragOffsetY;
+	/** The user dragged the HUD away from its bottom-centre spot; kept until it is shown again. */
+	private boolean userMoved;
 	private String previewDevice;
 
 	public HudOverlayWindow(HudRecordingPort port) {
 		this.port = Objects.requireNonNull(port, "port");
 		// Everything that can be prepared before the startup gate calls show() lives here: the
-		// transparent scene shell is built in the constructor (AppContext spends ~100 ms creating
+		// scene shell is built in the constructor (AppContext spends ~100 ms creating
 		// the recording services between construction and show) and the icon SVGs are parsed on a
 		// background thread. show() then only maps the window.
 		AppFonts.load();
@@ -120,7 +120,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	}
 
 	/**
-	 * Shows the HUD. Only the transparent stage shell is created here so the startup gate sees the
+	 * Shows the HUD. Only the stage shell is created here so the startup gate sees the
 	 * window immediately; {@link #finishShow} fills the bar on the next pulse.
 	 */
 	public void show() {
@@ -128,6 +128,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			// The HUD hides its stage during capture (hideForCapture) while staying "shown".
 			// A tray/shortcut "Show Overlay" must re-map it instead of no-op-ing.
 			if (!stage.isShowing()) {
+				userMoved = false;
 				stage.show();
 				stage.toFront();
 				stage.requestFocus();
@@ -135,7 +136,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			return;
 		}
 		long start = System.nanoTime();
-		// The window is mapped with the transparent scene shell only; the stylesheets, the bar and
+		// The window is mapped with the scene shell only; the stylesheets, the bar and
 		// the state subscription are filled in on the next pulse (startup budget, plan §5.1).
 		stage.show();
 		long stageShown = System.nanoTime();
@@ -239,7 +240,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 
 			@Override
 			public void requestSourcePick() {
-				port.requestSourcePick();
+				openMenu(HudMenuWindow.Menu.SCREEN);
 			}
 
 			@Override
@@ -280,7 +281,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		KitRoot kitRoot = new KitRoot(root);
 		kitRoot.getStyleClass().add("hud-kit-root");
 		Scene scene = new Scene(kitRoot);
-		scene.setFill(Color.TRANSPARENT);
+		scene.setFill(Color.web("#1b1e25"));
 		installStyles(scene);
 		stage.setTitle("Gravaai HUD");
 		stage.setScene(scene);
@@ -385,7 +386,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		return hintLabel;
 	}
 
-	/** Called by the bar when its content changed; re-fits the transparent stage around it. */
+	/** Called by the bar when its content changed; re-fits the stage around it. */
 	void contentChanged() {
 		if (!shown) {
 			return;
@@ -413,21 +414,27 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			hintWidth = Math.min(520, Math.max(1, hintLabel.prefWidth(-1)));
 			hintHeight = Math.max(1, hintLabel.prefHeight(hintWidth)) + HINT_GAP;
 		}
-		double width = Math.max(barWidth, hintWidth) + 2 * SCREEN_MARGIN;
-		double height = barHeight + Math.max(hintHeight, TOOLTIP_HEADROOM) + 2 * SCREEN_MARGIN;
+		// Opaque window sized exactly to its content: [webcam preview] [hint] bar, top to bottom.
+		double width = Math.max(barWidth, hintWidth);
+		double height = barHeight + hintHeight;
 		boolean previewVisible = webcamPreview != null && webcamPreview.isVisible();
 		if (previewVisible) {
-			width = Math.max(width, webcamPreview.frameWidth() + 2 * SCREEN_MARGIN + 20);
-			height = Math.max(height, webcamPreview.frameHeight() + barHeight + hintHeight
-					+ 2 * SCREEN_MARGIN + 16);
+			width = Math.max(width, webcamPreview.frameWidth());
+			height += webcamPreview.frameHeight() + PREVIEW_GAP;
 		}
 		Rectangle2D bounds = hudScreen().getVisualBounds();
 		width = Math.min(width, bounds.getWidth());
 		height = Math.min(height, bounds.getHeight());
+		double oldBottom = stage.getY() + stage.getHeight();
 		stage.setWidth(width);
 		stage.setHeight(height);
-		stage.setX(bounds.getMinX() + (bounds.getWidth() - width) / 2);
-		stage.setY(bounds.getMaxY() - height - SCREEN_MARGIN);
+		if (userMoved) {
+			// Keep the dragged spot; grow upwards so the bar stays where the user put it.
+			stage.setY(oldBottom - height);
+		} else {
+			stage.setX(bounds.getMinX() + (bounds.getWidth() - width) / 2);
+			stage.setY(bounds.getMaxY() - height - SCREEN_GAP);
+		}
 		root.layout();
 	}
 
@@ -485,6 +492,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 
 	/** Starts a HUD drag: native window-manager move on X11, client move otherwise. */
 	void beginHudMove(MouseEvent event) {
+		userMoved = true;
 		if (X11Windows.isAvailable()) {
 			nativeDragging = true;
 			X11Windows.beginMove(stage, event.getScreenX(), event.getScreenY());
@@ -552,20 +560,20 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 				double barWidth = Math.max(1, bar.prefWidth(-1));
 				barHeight = Math.max(1, bar.prefHeight(barWidth));
 				bar.resize(barWidth, barHeight);
-				bar.relocate(Math.max(0, (width - barWidth) / 2), Math.max(0, height - SCREEN_MARGIN - barHeight));
+				bar.relocate(Math.max(0, (width - barWidth) / 2), Math.max(0, height - barHeight));
 			}
 			if (hintLabel.isVisible()) {
 				double hintWidth = Math.min(520, Math.max(1, hintLabel.prefWidth(-1)));
 				double hintHeight = Math.max(1, hintLabel.prefHeight(hintWidth));
 				hintLabel.resize(hintWidth, hintHeight);
 				hintLabel.relocate(Math.max(0, (width - hintWidth) / 2),
-						Math.max(0, height - SCREEN_MARGIN - barHeight - HINT_GAP - hintHeight));
+						Math.max(0, height - barHeight - HINT_GAP - hintHeight));
 			}
 			if (webcamPreview != null && webcamPreview.isVisible()) {
 				double previewWidth = webcamPreview.frameWidth();
 				double previewHeight = webcamPreview.frameHeight();
-				webcamPreview.resizeRelocate(Math.max(0, width - SCREEN_MARGIN - 20 - previewWidth),
-						SCREEN_MARGIN, previewWidth, previewHeight);
+				webcamPreview.resizeRelocate(Math.max(0, width - previewWidth),
+						0, previewWidth, previewHeight);
 			}
 		}
 	}

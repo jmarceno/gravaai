@@ -192,6 +192,11 @@ public final class SourceService {
 	}
 
 	/** Applies a source that was just built and validated by the capture picker. */
+	/** The monitors that can be recorded, one screen source per COSMIC output. */
+	public List<SelectedSource> getScreenSources(List<DisplayOutputResolver.DisplayInfo> displays) {
+		return captureSelection.listCosmicScreenSources(displays);
+	}
+
 	void applySelection(SelectedSource source) {
 		setSelectedSource(source);
 		broadcastSelectedSourceChange();

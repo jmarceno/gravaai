@@ -116,6 +116,15 @@ public interface HudRecordingPort {
 	/** The camera devices, for the HUD menu (empty when there is no V4L2 camera). */
 	List<CameraDevice> cameraDevices();
 
+	/** The monitors that can be recorded (empty when the output list is unavailable). */
+	List<ScreenDevice> screenDevices();
+
+	/** Records the given monitor ({@link ScreenDevice#id()}) from now on. */
+	void selectScreen(String screenId);
+
+	/** A monitor the HUD lists: {@code id} is the capture source id, {@code label} its name. */
+	record ScreenDevice(String id, String label) {}
+
 	/** A PulseAudio source used as a microphone. */
 	record MicDevice(String id, String label) {}
 

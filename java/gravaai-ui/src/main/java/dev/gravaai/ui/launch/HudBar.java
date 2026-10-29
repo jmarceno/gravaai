@@ -1,7 +1,6 @@
 package dev.gravaai.ui.launch;
 
 import dev.gravaai.ui.kit.Button;
-import dev.gravaai.ui.kit.HudTooltip;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.MarqueeText;
@@ -192,12 +191,12 @@ public final class HudBar extends HBox {
 			if (next.audioOnly() || next.hasSource()) {
 				port.toggleRecording();
 			} else {
-				port.requestSourcePick();
+				window.openMenu(HudMenuWindow.Menu.SCREEN);
 			}
 		});
 		record.setDisable(next.countdownActive() || next.picking());
-		HudTooltip.attach(record, next.audioOnly() || next.hasSource() ? "Record"
-				: "Pick a screen or window, then record");
+		tooltip(record, next.audioOnly() || next.hasSource() ? "Record"
+				: "Pick a screen, then record");
 		row.getChildren().add(record);
 		row.getChildren().add(separator());
 		row.getChildren().addAll(homeButton(), hideButton(), closeButton());
@@ -216,13 +215,13 @@ public final class HudBar extends HBox {
 		marquee.setMaxWidth(120);
 		graphic.getChildren().addAll(Icon.of(Icons.MonitorIcon, 20), marquee);
 		source.setGraphic(graphic);
-		source.setOnAction(event -> port.requestSourcePick());
+		source.setOnAction(event -> window.openMenu(HudMenuWindow.Menu.SCREEN));
 		source.setDisable(next.finalizing() || next.picking());
-		HudTooltip.attach(source, next.picking()
+		tooltip(source, next.picking()
 				? "Click anywhere on the screen you want to record"
 				: next.hasSource()
 						? "Recording source: " + next.sourceName() + " (click to change)"
-						: "Pick a screen or window to record");
+						: "Pick the screen to record");
 		return source;
 	}
 
@@ -281,7 +280,7 @@ public final class HudBar extends HBox {
 		Button stop = new Button("", Button.Variant.DESTRUCTIVE, Button.Size.ICON);
 		stop.setGraphic(region(STOP_SQUARE));
 		stop.setOnAction(event -> port.toggleRecording());
-		HudTooltip.attach(stop, "Stop");
+		tooltip(stop, "Stop");
 		row.getChildren().add(stop);
 
 		row.getChildren().add(iconButton(Icons.MinusIcon, "regular", 16, "Hide HUD", null, port::hideHud));
@@ -324,7 +323,7 @@ public final class HudBar extends HBox {
 		}
 		button.setOnAction(event -> action.run());
 		if (tooltip != null) {
-			HudTooltip.attach(button, tooltip);
+			tooltip(button, tooltip);
 		}
 		return button;
 	}
@@ -339,6 +338,22 @@ public final class HudBar extends HBox {
 
 	private Button closeButton() {
 		return iconButton(Icons.XIcon, "regular", 20, "Minimize to tray", null, port::hideHud);
+	}
+
+	/**
+	 * Native tooltip: the HUD is an opaque window sized to the bar, so the kit tooltip (drawn
+	 * inside the window) has no room above it; a native tooltip opens its own popup.
+	 */
+	static void tooltip(Node trigger, String label) {
+		javafx.scene.control.Tooltip tooltip = new javafx.scene.control.Tooltip(label);
+		tooltip.getStyleClass().add("hud-tooltip");
+		tooltip.setShowDelay(Duration.millis(300));
+		tooltip.setHideDelay(Duration.ZERO);
+		if (trigger instanceof javafx.scene.control.Control control) {
+			control.setTooltip(tooltip);
+		} else {
+			javafx.scene.control.Tooltip.install(trigger, tooltip);
+		}
 	}
 
 	private static Region separator() {

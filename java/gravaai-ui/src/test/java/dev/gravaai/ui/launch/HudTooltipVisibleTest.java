@@ -1,5 +1,6 @@
 package dev.gravaai.ui.launch;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,19 +15,15 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import dev.gravaai.ui.kit.Button;
-import dev.gravaai.ui.kit.KitRoot;
 import javafx.application.Platform;
-import javafx.event.Event;
-import javafx.geometry.Bounds;
+import javafx.scene.paint.Color;
+import javafx.stage.StageStyle;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.control.Label;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
 
 /**
- * User report 2026-10-28: the HUD overlay buttons showed no tooltips. The HUD scene had no
- * {@link KitRoot}, so every HudTooltip gave up silently, and the window had no room above the bar.
+ * User report 2026-10-28: the HUD overlay buttons showed no tooltips. The HUD is now an opaque
+ * window sized to the bar (2026-10-29), so its buttons carry native tooltips in their own popup.
  */
 @Timeout(120)
 @EnabledIfEnvironmentVariable(named = "DISPLAY", matches = ".+")
@@ -61,21 +58,12 @@ class HudTooltipVisibleTest {
 			Button trigger = onFx(() -> firstLabelledButton(hud.get().bar()));
 			assertNotNull(trigger, "no labelled HUD button");
 			String expected = onFx(trigger::getAccessibleText);
-			onFx(() -> Event.fireEvent(trigger, new MouseEvent(MouseEvent.MOUSE_ENTERED, 1, 1, 1, 1,
-					MouseButton.NONE, 0, false, false, false, false, false, false, false, false, false,
-					false, null)));
-			KitRoot root = onFx(() -> (KitRoot) hud.get().stage().getScene().getRoot());
-			waitFor(() -> onFx(() -> !root.popoverLayer().getChildren().isEmpty()),
-					"the tooltip was not added to the HUD popover layer");
-			Thread.sleep(300);
-			Node tooltip = onFx(() -> root.popoverLayer().getChildren().get(0));
-			assertTrue(onFx(() -> tooltip instanceof Label label && expected.equals(label.getText())),
-					"tooltip text matches the button label " + expected);
-			Bounds bounds = onFx(() -> tooltip.localToScene(tooltip.getLayoutBounds()));
-			double sceneHeight = onFx(() -> hud.get().stage().getScene().getHeight());
-			assertTrue(bounds.getMinY() >= 0 && bounds.getMaxY() <= sceneHeight,
-					"tooltip fits in the HUD window: " + bounds + " scene height " + sceneHeight);
-			assertTrue(onFx(() -> tooltip.getOpacity() > 0.5), "tooltip faded in");
+			String tooltip = onFx(() -> trigger.getTooltip() == null ? null : trigger.getTooltip().getText());
+			assertEquals(expected, tooltip, "native tooltip matches the button label");
+			assertEquals(StageStyle.UNDECORATED, onFx(() -> hud.get().stage().getStyle()),
+					"the HUD is a normal (opaque) floating window");
+			assertTrue(onFx(() -> hud.get().stage().getScene().getFill() instanceof Color fill
+					&& fill.getOpacity() == 1.0), "the HUD scene is opaque");
 		} finally {
 			if (hud.get() != null) {
 				onFx(() -> hud.get().dispose());

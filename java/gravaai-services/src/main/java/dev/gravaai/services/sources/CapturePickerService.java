@@ -115,6 +115,25 @@ public final class CapturePickerService {
 				"The capture picker is not available on this platform."));
 	}
 
+	/** The monitors the HUD lists, so the user chooses one without clicking a screen. */
+	public List<SelectedSource> screenSources() {
+		return sources.getScreenSources(displayInfos());
+	}
+
+	/** Selects one monitor from {@link #screenSources()}; false when it is gone. */
+	public boolean selectScreen(String sourceId) {
+		if (sourceId == null || cursorCaptureActive.get()) {
+			return false;
+		}
+		for (SelectedSource screen : screenSources()) {
+			if (sourceId.equals(screen.id())) {
+				sources.applySelection(screen);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private List<DisplayOutputResolver.DisplayInfo> displayInfos() {
 		List<DisplayOutputResolver.DisplayInfo> infos = new ArrayList<>();
 		for (SourceArea.PickerDisplay display : displays.get()) {

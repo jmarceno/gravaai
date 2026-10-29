@@ -6,9 +6,14 @@
  * dev/gravaai/ui/kit/README.md for the Tailwind -> px table).
  */
 
-/* The HUD stage is transparent; the bar is the only visible surface. */
+/* The HUD is an opaque floating window; the bar fills it. */
 .hud-root,
 .kit-root.hud-kit-root {
+	-fx-background-color: -g-surface;
+}
+
+/* The menu window stays a transparent full-display backdrop. */
+.hud-menu-root {
 	-fx-background-color: transparent;
 }
 
@@ -16,10 +21,10 @@
    1px border. */
 .hud-bar {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 0;
 	-fx-border-color: -g-border;
 	-fx-border-width: 1px;
-	-fx-border-radius: 12px;
+	-fx-border-radius: 0;
 	-fx-padding: 8px 12px 8px 12px;
 	-fx-spacing: 10px;
 	-fx-alignment: center-left;
@@ -312,4 +317,30 @@
 	-fx-background-color: -g-surface;
 	-fx-border-color: -g-danger;
 	-fx-text-fill: -g-danger;
+}
+
+/* Focus: the kit draws the focus ring as a filled layer, so a focused ghost button turned solid
+   cyan and hid its (often cyan) icon. Keep a 2px ring with a neutral fill inside it. */
+.hud-bar .button--ghost:focused,
+.hud-menu-panel .button--ghost:focused {
+	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+}
+
+.hud-bar .button--ghost:focused:hover,
+.hud-menu-panel .button--ghost:focused:hover {
+	-fx-background-color: -g-focus, -g-default-hover;
+	-fx-background-insets: -2, 0;
+}
+
+/* Native HUD tooltips (HudBar.tooltip): kit tooltip look. */
+.tooltip.hud-tooltip {
+	/* Literal colours: the tooltip popup does not see the scene .root tokens. */
+	-fx-background-color: #1b1e25;
+	-fx-border-color: #2a303b;
+	-fx-border-radius: 8px;
+	-fx-background-radius: 8px;
+	-fx-text-fill: #ffffff;
+	-fx-font-size: 12px;
+	-fx-padding: 6px 10px 6px 10px;
 }

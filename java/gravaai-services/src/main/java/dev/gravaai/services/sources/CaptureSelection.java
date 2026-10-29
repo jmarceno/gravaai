@@ -96,6 +96,24 @@ public final class CaptureSelection {
 		return null;
 	}
 
+	/** Every COSMIC output as a screen source, for the HUD monitor list (empty off Wayland). */
+	public List<SelectedSource> listCosmicScreenSources(List<DisplayOutputResolver.DisplayInfo> displays) {
+		if (!isWaylandSession()) {
+			return List.of();
+		}
+		List<CosmicOutput> outputs;
+		try {
+			outputs = cosmicOutputs.list();
+		} catch (Exception error) {
+			return List.of();
+		}
+		List<SelectedSource> screens = new java.util.ArrayList<>();
+		for (CosmicOutput output : outputs) {
+			screens.add(createCosmicScreenSource(output, displays));
+		}
+		return screens;
+	}
+
 	/** A COSMIC output as a selected source, tied to the display at the same spot. */
 	public static SelectedSource createCosmicScreenSource(
 			CosmicOutput output,

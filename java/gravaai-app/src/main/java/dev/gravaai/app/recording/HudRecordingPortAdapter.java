@@ -638,6 +638,27 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		return devices().cameras();
 	}
 
+	@Override
+	public List<ScreenDevice> screenDevices() {
+		List<ScreenDevice> screens = new java.util.ArrayList<>();
+		try {
+			for (SelectedSource screen : wiring.capturePicker().screenSources()) {
+				screens.add(new ScreenDevice(screen.id(), screen.name()));
+			}
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "listing screens failed: " + error);
+		}
+		return screens;
+	}
+
+	/** The HUD monitor list: selects the output directly, no click-a-screen pick. */
+	@Override
+	public void selectScreen(String screenId) {
+		if (!wiring.capturePicker().selectScreen(screenId)) {
+			LOG.log(System.Logger.Level.WARNING, "screen " + screenId + " is no longer available");
+		}
+	}
+
 	/** Enumerates devices on first use (HUD menu) and caches them briefly. */
 	private CachedDevices devices() {
 		CachedDevices cached = cachedDevices;

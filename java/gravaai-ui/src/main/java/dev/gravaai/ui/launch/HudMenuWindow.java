@@ -37,8 +37,8 @@ import javafx.stage.StageStyle;
  */
 public final class HudMenuWindow {
 
-	/** The three HUD menus (HudMenuWindow.tsx {@code HudMenuId}). */
-	public enum Menu { MIC, WEBCAM, COUNTDOWN }
+	/** The HUD menus (HudMenuWindow.tsx {@code HudMenuId}) plus the monitor list. */
+	public enum Menu { SCREEN, MIC, WEBCAM, COUNTDOWN }
 
 	private static final int[] COUNTDOWN_OPTIONS = {0, 3, 5, 10};
 
@@ -83,6 +83,7 @@ public final class HudMenuWindow {
 		switch (menu) {
 			case MIC -> buildMicMenu(state);
 			case WEBCAM -> buildWebcamMenu(state);
+			case SCREEN -> buildScreenMenu(state);
 			case COUNTDOWN -> buildCountdownMenu(state);
 		}
 		applyDisplayBounds();
@@ -131,7 +132,7 @@ public final class HudMenuWindow {
 		stage.setAlwaysOnTop(true);
 		stage.setResizable(false);
 		root = new StackPane();
-		root.getStyleClass().add("hud-root");
+		root.getStyleClass().add("hud-menu-root");
 		Region backdrop = new Region();
 		backdrop.getStyleClass().add("hud-menu-backdrop");
 		backdrop.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -260,6 +261,29 @@ public final class HudMenuWindow {
 		}
 		if (cameras.isEmpty()) {
 			content.getChildren().add(emptyNote("No webcams found"));
+		}
+	}
+
+	/**
+	 * The monitor list. On Wayland the HUD cannot stay above other windows, so clicking the screen
+	 * to record hid it behind them; choosing from a list keeps the HUD in front.
+	 */
+	private void buildScreenMenu(HudRecordingPort.State state) {
+		startPanel("Screen to record");
+		List<HudRecordingPort.ScreenDevice> screens = port.screenDevices();
+		if (screens.isEmpty()) {
+			Label empty = new Label("No screens found.");
+			empty.getStyleClass().add("hud-menu-item-empty");
+			content.getChildren().add(empty);
+			return;
+		}
+		for (HudRecordingPort.ScreenDevice screen : screens) {
+			boolean selected = screen.label().equals(state.sourceName());
+			content.getChildren().add(menuItem(screen.label(), Icons.MonitorIcon, selected, screen.label(),
+					() -> {
+						port.selectScreen(screen.id());
+						close();
+					}));
 		}
 	}
 

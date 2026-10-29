@@ -245,6 +245,23 @@ public final class HudShowcase extends Application {
 		}
 
 		@Override
+		public List<ScreenDevice> screenDevices() {
+			List<ScreenDevice> screens = new java.util.ArrayList<>();
+			int index = 1;
+			for (javafx.stage.Screen screen : javafx.stage.Screen.getScreens()) {
+				var bounds = screen.getBounds();
+				screens.add(new ScreenDevice("screen-" + index, "Screen " + index + " ("
+						+ (int) bounds.getWidth() + "×" + (int) bounds.getHeight() + ")"));
+				index++;
+			}
+			return screens;
+		}
+
+		@Override
+		public void selectScreen(String screenId) {
+		}
+
+		@Override
 		public List<CameraDevice> cameraDevices() {
 			// Real V4L2 cameras, so the harness exercises the live preview.
 			return HudDevices.cameras();

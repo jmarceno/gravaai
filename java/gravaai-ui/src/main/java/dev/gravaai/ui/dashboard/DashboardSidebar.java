@@ -13,6 +13,7 @@ import dev.gravaai.ui.kit.Kit;
 import dev.gravaai.ui.kit.ColorPicker;
 import dev.gravaai.ui.kit.Popover;
 import javafx.collections.ListChangeListener;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
@@ -49,7 +50,10 @@ public final class DashboardSidebar extends VBox {
 		HBox logo = new HBox(10);
 		logo.getStyleClass().add("dashboard-logo");
 		logo.setAlignment(Pos.CENTER_LEFT);
-		Icon logoIcon = Icon.of(Icons.AppWindowIcon, 16, "fill");
+		// The app logo (same art as the window/AppImage icon), not a generic glyph.
+		javafx.scene.image.ImageView logoIcon = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
+				DashboardSidebar.class.getResource("/app-icons/gravaai-128.png").toExternalForm(),
+				32, 32, true, true));
 		VBox markHost = new VBox(logoIcon);
 		markHost.getStyleClass().add("dashboard-logo__mark-host");
 		markHost.setAlignment(Pos.CENTER);
@@ -64,6 +68,9 @@ public final class DashboardSidebar extends VBox {
 		record.setGraphicTextGap(8);
 		record.setMaxWidth(Double.MAX_VALUE);
 		record.setOnAction(event -> dependencies.actions().showRecordingHud());
+		// The sidebar has no spacing; without a gap the focus ring (drawn 2px outside the button)
+		// spilled onto the Home row.
+		VBox.setMargin(record, new Insets(0, 0, 12, 0));
 
 		VBox nav = new VBox(4);
 		nav.getStyleClass().add("dashboard-nav");

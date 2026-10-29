@@ -266,12 +266,18 @@
 	-fx-background-color: -g-focus, -g-default-hover;
 }
 
+/*
+ * The focus ring is a solid -g-focus layer drawn 2px outside the control, with the fill on top.
+ * A translucent or transparent fill let the cyan ring layer show through the whole control and
+ * hid cyan text/icons, so every focused fill below is opaque: the soft colours are pre-blended
+ * over -g-bg (#121418).
+ */
 .button--ghost:focused:hover {
-	-fx-background-color: -g-focus, -g-default;
+	-fx-background-color: -g-focus, -g-default-hover;
 }
 
 .button--outline:focused:hover {
-	-fx-background-color: -g-focus, rgba(35, 40, 51, 0.6);
+	-fx-background-color: -g-focus, #1b2028;
 }
 
 .button--danger:focused:hover {
@@ -279,7 +285,7 @@
 }
 
 .button--danger-soft:focused:hover {
-	-fx-background-color: -g-focus, -g-danger-soft-hover;
+	-fx-background-color: -g-focus, #3c252a;
 }
 
 .button--secondary:focused,
@@ -287,9 +293,12 @@
 	-fx-background-color: -g-focus, -g-default;
 }
 
-.button--ghost:focused,
+.button--ghost:focused {
+	-fx-background-color: -g-focus, -g-default;
+}
+
 .button--outline:focused {
-	-fx-background-color: -g-focus, transparent;
+	-fx-background-color: -g-focus, -g-bg;
 }
 
 .button--danger:focused {
@@ -297,12 +306,12 @@
 }
 
 .button--danger-soft:focused {
-	-fx-background-color: -g-focus, -g-danger-soft;
+	-fx-background-color: -g-focus, #322025;
 }
 
 .button--link:focused,
 .button--link:focused:hover {
-	-fx-background-color: -g-focus, transparent;
+	-fx-background-color: -g-focus, -g-bg;
 }
 
 /* Sizes. */
@@ -374,8 +383,9 @@
 	-fx-background-radius: 26px, 24px;
 }
 
+/* Opaque accent-soft (pre-blended over -g-bg) so the focus layer does not show through. */
 .toggle-button:selected:focused {
-	-fx-background-color: -g-focus, -g-accent-soft;
+	-fx-background-color: -g-focus, #162a2a;
 }
 
 .toggle-button:disabled {
@@ -1069,9 +1079,9 @@
 }
 
 .tabs__tab:focused {
-	-fx-background-color: -g-focus;
-	-fx-background-insets: -2;
-	-fx-background-radius: 26px;
+	-fx-background-color: -g-focus, -g-segment;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 26px, 24px;
 	-fx-text-fill: -g-segment-foreground;
 }
 
@@ -1252,6 +1262,12 @@
 
 .tag:focused {
 	-fx-background-color: -g-focus, -g-default;
+	-fx-background-insets: -2, 0;
+	-fx-background-radius: 14px, 12px;
+}
+
+.tag:selected:focused {
+	-fx-background-color: -g-focus, #162a2a;
 	-fx-background-insets: -2, 0;
 	-fx-background-radius: 14px, 12px;
 }

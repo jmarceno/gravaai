@@ -141,6 +141,11 @@ public record DashboardDependencies(
 		/** Opens the recording HUD (the "Record new" buttons). */
 		void showRecordingHud();
 
+		/** A still JPEG data URL for a raw recording card; completes with null when unavailable. */
+		default java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
+			return java.util.concurrent.CompletableFuture.completedFuture(null);
+		}
+
 		/** {@code shell.openExternal} for announcement links. */
 		void openExternalUrl(String url);
 

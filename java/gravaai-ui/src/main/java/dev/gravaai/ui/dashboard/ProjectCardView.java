@@ -261,12 +261,37 @@ final class ProjectCardView extends VBox {
 			return placeholderIcon(Icons.MusicNotes);
 		}
 		if (raw != null) {
-			return placeholderIcon(Icons.FilmStrip);
+			return rawStill(raw);
 		}
 		Skeleton skeleton = new Skeleton();
 		skeleton.getStyleClass().add("project-thumbnail__skeleton");
 		skeleton.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		return skeleton;
+	}
+
+	/**
+	 * Raw recordings always show a decoded still (the hover preview plays over it); the film strip
+	 * placeholder stays until the still arrives, or for good when it cannot be decoded.
+	 */
+	private Node rawStill(RecordingEntry raw) {
+		StackPane still = new StackPane(placeholderIcon(Icons.FilmStrip));
+		still.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		dependencies.actions().recordingThumbnail(entry.path()).whenComplete((dataUrl, error) -> {
+			if (error != null || dataUrl == null) {
+				return;
+			}
+			Image image = new Image(dataUrl, true);
+			javafx.application.Platform.runLater(() -> {
+				ImageView view = new ImageView(image);
+				// Cover the 4:3 card: fill the height, the host clip trims the 16:9 sides.
+				view.setPreserveRatio(true);
+				view.setSmooth(true);
+				view.setFitHeight(209);
+				view.getStyleClass().add("project-thumbnail__image");
+				still.getChildren().setAll(view);
+			});
+		});
+		return still;
 	}
 
 	private static Node placeholderIcon(String iconName) {

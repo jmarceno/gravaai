@@ -26,14 +26,13 @@
 }
 
 .dashboard-logo__mark-host {
-	-fx-min-width: 28;
-	-fx-min-height: 28;
-	-fx-pref-width: 28;
-	-fx-pref-height: 28;
-	-fx-max-width: 28;
-	-fx-max-height: 28;
-	-fx-background-color: -g-accent-soft;
-	-fx-background-radius: 8;
+	-fx-min-width: 32;
+	-fx-min-height: 32;
+	-fx-pref-width: 32;
+	-fx-pref-height: 32;
+	-fx-max-width: 32;
+	-fx-max-height: 32;
+	-fx-background-color: transparent;
 }
 
 .dashboard-logo__text {

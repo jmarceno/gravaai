@@ -31,14 +31,15 @@ public final class KeystrokeCapture {
 	private KeystrokeCapture() {
 	}
 
+	/** Unset or unknown values default to shortcuts; only an explicit "off" turns capture off. */
 	public static KeystrokeCaptureMode normalizeKeystrokeCaptureMode(String value) {
-		if ("shortcuts".equals(value)) {
-			return KeystrokeCaptureMode.SHORTCUTS;
+		if ("off".equals(value)) {
+			return KeystrokeCaptureMode.OFF;
 		}
 		if ("all".equals(value)) {
 			return KeystrokeCaptureMode.ALL;
 		}
-		return KeystrokeCaptureMode.OFF;
+		return KeystrokeCaptureMode.SHORTCUTS;
 	}
 
 	/**

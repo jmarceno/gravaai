@@ -470,6 +470,18 @@ public final class DashboardView {
 		settingsSectionsHost.getChildren().clear();
 		List<Node> injected = settingsSections.getOrDefault(activeSettingsCategory, List.of());
 		settingsSectionsHost.getChildren().addAll(injected);
+		if ("meetings".equals(activeSettingsCategory) && injected.isEmpty()) {
+			// The meeting service is created after the dashboard; build its settings on first visit.
+			dev.gravaai.ui.meeting.MeetingUiService meetings = dependencies.meetingService();
+			if (meetings != null) {
+				addSettingsSection("meetings", new dev.gravaai.ui.meeting.MeetingSettingsView(meetings));
+				return;
+			}
+			javafx.scene.control.Label unavailable = new javafx.scene.control.Label(
+					"Meeting settings are loading. Open this tab again in a moment.");
+			unavailable.getStyleClass().add("dashboard-settings__hint");
+			settingsSectionsHost.getChildren().add(unavailable);
+		}
 		if ("files".equals(activeSettingsCategory)) {
 			settingsSectionsHost.getChildren().addAll(buildFilesSettings());
 		}

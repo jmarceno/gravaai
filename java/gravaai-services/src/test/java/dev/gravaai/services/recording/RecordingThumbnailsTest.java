@@ -128,7 +128,7 @@ class RecordingThumbnailsTest {
 	}
 
 	@Test
-	@DisplayName("decodes one 160x90 still and reuses the cache")
+	@DisplayName("decodes one 320x180 still and reuses the cache")
 	void decodesOneStillAndReusesTheCache() throws Exception {
 		RecordingThumbnails thumbnails = thumbnails();
 		String first = thumbnails.getRecordingThumbnail(
@@ -142,7 +142,7 @@ class RecordingThumbnailsTest {
 				recordings.resolve("recording-1.mp4").toString()).get();
 		assertEquals(first, second);
 		assertEquals(1, commands.size());
-		assertTrue(commands.get(0).contains("scale=160:90:force_original_aspect_ratio=increase,crop=160:90"));
+		assertTrue(commands.get(0).contains("scale=320:180:force_original_aspect_ratio=increase,crop=320:180"));
 		assertTrue(commands.get(0).contains("mjpeg"));
 	}
 

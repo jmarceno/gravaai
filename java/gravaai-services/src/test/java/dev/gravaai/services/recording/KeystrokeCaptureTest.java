@@ -41,11 +41,12 @@ class KeystrokeCaptureTest {
 
 	@Test
 	@DisplayName("falls back to off for anything unknown")
-	void fallsBackToOff() {
+	void fallsBackToShortcuts() {
 		assertEquals(KeystrokeCaptureMode.SHORTCUTS, KeystrokeCapture.normalizeKeystrokeCaptureMode("shortcuts"));
 		assertEquals(KeystrokeCaptureMode.ALL, KeystrokeCapture.normalizeKeystrokeCaptureMode("all"));
-		assertEquals(KeystrokeCaptureMode.OFF, KeystrokeCapture.normalizeKeystrokeCaptureMode("everything"));
-		assertEquals(KeystrokeCaptureMode.OFF, KeystrokeCapture.normalizeKeystrokeCaptureMode(null));
+		assertEquals(KeystrokeCaptureMode.SHORTCUTS, KeystrokeCapture.normalizeKeystrokeCaptureMode("everything"));
+		assertEquals(KeystrokeCaptureMode.SHORTCUTS, KeystrokeCapture.normalizeKeystrokeCaptureMode(null));
+		assertEquals(KeystrokeCaptureMode.OFF, KeystrokeCapture.normalizeKeystrokeCaptureMode("off"));
 	}
 
 	@Test

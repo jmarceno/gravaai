@@ -10,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.geometry.Pos;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 
@@ -66,6 +67,11 @@ public final class Switch extends HBox {
 		label.setText(labelText);
 		label.setVisible(!labelText.isEmpty());
 		label.setManaged(!labelText.isEmpty());
+		// Long labels wrap in narrow panels (the editor settings rail) instead of ending in "...".
+		label.setWrapText(true);
+		label.setMinWidth(0);
+		control.setMinWidth(Region.USE_PREF_SIZE);
+		HBox.setHgrow(label, Priority.ALWAYS);
 
 		getChildren().addAll(control, label);
 		setOnMouseClicked(event -> {

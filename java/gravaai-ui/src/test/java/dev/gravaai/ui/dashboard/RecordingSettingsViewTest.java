@@ -59,24 +59,24 @@ class RecordingSettingsViewTest {
 	}
 
 	@Test
-	@DisplayName("defaults to off and saves the key-press mode the recorder reads")
+	@DisplayName("defaults to shortcuts and saves the key-press mode the recorder reads")
 	void savesKeyPressMode() throws Exception {
 		Path file = temp.resolve("settings.json");
 		AppSettingsStore settings = new AppSettingsStore(file);
 		RecordingSettingsView view = onFx(() -> new RecordingSettingsView(settings));
-		assertEquals("off", view.keyMode());
+		assertEquals("shortcuts", view.keyMode());
 		assertEquals("off", view.micNoise());
 		assertTrue(!Files.exists(file) || !Files.readString(file).contains("keystrokeCaptureMode"),
 				"loading never writes settings");
 
 		onFx(() -> {
-			view.selectKeyMode("shortcuts");
+			view.selectKeyMode("all");
 			return null;
 		});
-		assertEquals("shortcuts",
+		assertEquals("all",
 				new AppSettingsStore(file).readSetting("keystrokeCaptureMode").asString());
 
 		RecordingSettingsView reloaded = onFx(() -> new RecordingSettingsView(new AppSettingsStore(file)));
-		assertEquals("shortcuts", reloaded.keyMode());
+		assertEquals("all", reloaded.keyMode());
 	}
 }

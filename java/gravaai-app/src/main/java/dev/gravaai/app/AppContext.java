@@ -1050,6 +1050,15 @@ public final class AppContext {
 				}
 
 				@Override
+				public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
+					RecordingWiring wiring = recordingWiring;
+					if (wiring == null) {
+						return java.util.concurrent.CompletableFuture.completedFuture(null);
+					}
+					return wiring.thumbnails().getRecordingThumbnail(videoPath);
+				}
+
+				@Override
 				public void openExternalUrl(String url) {
 					Portal opener = portal;
 					if (opener == null) {
@@ -1111,6 +1120,13 @@ public final class AppContext {
 			// recorder at each recording start.
 			view.addSettingsSection("recording", new dev.gravaai.ui.dashboard.RecordingSettingsView(
 					new AppSettingsStore(userData.appSettingsFile())));
+			// Settings -> General / Motion: the editor defaults new projects start from.
+			EditorPreferencesStore editorDefaults =
+					new EditorPreferencesStore(new AppSettingsStore(userData.appSettingsFile()));
+			view.addSettingsSection("general",
+					dev.gravaai.ui.dashboard.EditorDefaultsSettingsView.general(editorDefaults));
+			view.addSettingsSection("motion",
+					dev.gravaai.ui.dashboard.EditorDefaultsSettingsView.motion(editorDefaults));
 			dashboardView = view;
 			Scene scene = new Scene(new KitRoot(view.ui()), 1280, 800);
 			Theme.install(scene);

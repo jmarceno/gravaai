@@ -54,7 +54,7 @@ public final class RecordingThumbnails {
 		this.environment = environment;
 	}
 
-	/** Decodes (or serves from cache) a 160x90 JPEG data URL for one recording. */
+	/** Decodes (or serves from cache) a 320x180 JPEG data URL for one recording. */
 	public CompletableFuture<String> getRecordingThumbnail(String candidate) {
 		try {
 			Path root = recordingsDir.get().toRealPath();
@@ -70,7 +70,7 @@ public final class RecordingThumbnails {
 			if (!Files.isRegularFile(file)) {
 				return CompletableFuture.failedFuture(new IOException("Recording is not a file"));
 			}
-			String key = sha256(file + ":" + Files.getLastModifiedTime(file).toMillis() + ":" + Files.size(file));
+			String key = sha256(file + ":" + Files.getLastModifiedTime(file).toMillis() + ":" + Files.size(file) + ":320x180");
 			return pending.computeIfAbsent(key, cacheKey -> {
 				CompletableFuture<String> task = CompletableFuture.supplyAsync(
 						() -> decodeOrReadCache(file, cacheKey), queue);
@@ -117,7 +117,7 @@ public final class RecordingThumbnails {
 					"-i", file.toString(),
 					"-frames:v", "1",
 					"-an",
-					"-vf", "scale=160:90:force_original_aspect_ratio=increase,crop=160:90",
+					"-vf", "scale=320:180:force_original_aspect_ratio=increase,crop=320:180",
 					"-q:v", "5",
 					"-f", "image2pipe",
 					"-c:v", "mjpeg",

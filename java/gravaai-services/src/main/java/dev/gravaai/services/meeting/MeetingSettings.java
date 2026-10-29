@@ -94,9 +94,10 @@ public record MeetingSettings(
 				MeetingSettings::isNonEmpty, DEFAULT.apiTranscriptionModel());
 		String apiChatModel = (String) pick(input, "apiChatModel",
 				MeetingSettings::isNonEmpty, DEFAULT.apiChatModel());
-		List<SummarizerCapability> apiChatCapabilities = (List<SummarizerCapability>) pick(
-				input, "apiChatCapabilities", MeetingSettings::isCapabilities,
-				DEFAULT.apiChatCapabilities());
+		Object rawCapabilities = input.get("apiChatCapabilities");
+		List<SummarizerCapability> apiChatCapabilities = isCapabilities(rawCapabilities)
+				? capabilities(rawCapabilities)
+				: DEFAULT.apiChatCapabilities();
 		int apiTimeoutMinutes = ((Number) pick(input, "apiTimeoutMinutes",
 				value -> value instanceof Number number && number.doubleValue() >= 1
 						&& number.doubleValue() <= 60,

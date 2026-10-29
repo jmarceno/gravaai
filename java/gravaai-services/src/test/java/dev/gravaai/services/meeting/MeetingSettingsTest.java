@@ -47,6 +47,16 @@ class MeetingSettingsTest {
 	}
 
 	@Test
+	@DisplayName("turns saved capability strings back into capabilities")
+	void parsesWireCapabilities() {
+		Map<String, Object> raw = new LinkedHashMap<>();
+		raw.put("apiChatCapabilities", List.of("text", "images"));
+		MeetingSettings settings = MeetingSettings.normalize(raw, assets);
+		assertEquals(List.of(SummarizerCapability.TEXT, SummarizerCapability.IMAGES),
+				settings.apiChatCapabilities());
+	}
+
+	@Test
 	@DisplayName("leaves room for the prompt and the answer")
 	void transcriptCharBudgetLeavesRoom() {
 		assertEquals((16_384 - 3_500) * 3, Summarizer.transcriptCharBudget(16_384));

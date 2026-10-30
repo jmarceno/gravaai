@@ -288,7 +288,18 @@ final class ProjectCardView extends VBox {
 			if (error != null || dataUrl == null) {
 				return;
 			}
-			Image image = new Image(dataUrl, true);
+			// Background-loaded Images reject data: URLs ("unknown protocol: data"), so decode the
+			// JPEG bytes here, off the FX thread, like RecordingLibraryPanel's thumbnails.
+			Image image;
+			try {
+				byte[] jpeg = java.util.Base64.getDecoder().decode(dataUrl.substring(dataUrl.indexOf(',') + 1));
+				image = new Image(new java.io.ByteArrayInputStream(jpeg));
+			} catch (IllegalArgumentException malformed) {
+				return;
+			}
+			if (image.isError()) {
+				return;
+			}
 			javafx.application.Platform.runLater(() -> {
 				ImageView view = new ImageView(image);
 				// Cover the 4:3 card: fill the height, the host clip trims the 16:9 sides.

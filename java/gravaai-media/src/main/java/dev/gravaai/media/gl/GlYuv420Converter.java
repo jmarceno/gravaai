@@ -58,6 +58,7 @@ import static org.lwjgl.opengl.GL33C.GL_BLEND;
 import static org.lwjgl.opengl.GL33C.GL_DEPTH_TEST;
 import static org.lwjgl.opengl.GL33C.GL_SCISSOR_TEST;
 import static org.lwjgl.opengl.GL33C.GL_STENCIL_TEST;
+import static org.lwjgl.opengl.GL33C.glBindSampler;
 import static org.lwjgl.system.MemoryUtil.memAddress;
 
 import java.nio.ByteBuffer;
@@ -74,8 +75,9 @@ import java.nio.ByteBuffer;
  * (centre-sited, like swscale's default).</p>
  *
  * <p>Requires an even width and a height divisible by four (see {@link #supports}). Must be
- * created, used and closed on the GL thread; call {@link SkiaGlSurface#resetGlState()} before
- * Skia draws again.</p>
+ * created, used and closed on the GL thread; {@link #convert} establishes all state it draws
+ * with (including unbinding sampler objects Skia may have left bound) and the caller must call
+ * {@link SkiaGlSurface#resetGlState()} afterwards so Skia re-reads the GL state it caches.</p>
  */
 public final class GlYuv420Converter implements AutoCloseable {
 
@@ -203,6 +205,11 @@ public final class GlYuv420Converter implements AutoCloseable {
 		glDisable(GL_SCISSOR_TEST);
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_STENCIL_TEST);
+		// Skia may leave a sampler object bound to a unit after its flush (for example its
+		// trilinear sampler after drawing a mipmapped layer). A mipmap min filter turns every
+		// mipmap-less texture into an incomplete one, which samples as black, so the draw
+		// unbinds the sampler of the unit it reads through (unit 0, below).
+		glBindSampler(0, 0);
 		glUseProgram(program);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, sourceTexture);

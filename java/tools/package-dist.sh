@@ -75,6 +75,17 @@ mkdir -p "$INPUT" "$OUT_DIR"
 cp -a "$DEPS_DIR"/. "$INPUT"/
 cp "$MAIN_JAR" "$INPUT"/
 
+# copy-dependencies only adds files, so after a version bump the previous release's module jars
+# can still sit in the deps dir; the launcher would then resolve every class from whichever
+# duplicate comes first on the classpath and ship a mixed-version image. Fail loudly instead.
+duplicates="$(cd "$INPUT" && ls | sed -n 's/^\(.*\)-[0-9][^-]*\.jar$/\1/p' | sort | uniq -d)"
+if [ -n "$duplicates" ]; then
+	echo "package-dist.sh: multiple versions of the same artifact staged in $INPUT:" >&2
+	echo "$duplicates" | sed 's/^/  /' >&2
+	echo "package-dist.sh: remove the stale jars (mvn clean or delete $DEPS_DIR) and rebuild." >&2
+	exit 1
+fi
+
 echo "package-dist.sh: jlink runtime"
 "$JDK/bin/jlink" \
 	--module-path "$JMODS" \

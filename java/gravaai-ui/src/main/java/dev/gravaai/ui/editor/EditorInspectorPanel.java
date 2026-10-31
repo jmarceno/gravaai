@@ -624,11 +624,22 @@ public final class EditorInspectorPanel extends VBox {
 		});
 		root.getChildren().add(key);
 
-		HBox modifiers = new HBox(10);
+		// 2 × 2 grid: the settings rail is narrow, so one row squeezes each switch's label until
+		// it wraps per letter; sharing two rows leaves every label room on one line.
+		GridPane modifiers = new GridPane();
+		modifiers.setHgap(10);
+		modifiers.setVgap(10);
+		for (int column = 0; column < 2; column++) {
+			ColumnConstraints constraints = new ColumnConstraints();
+			constraints.setPercentWidth(50);
+			modifiers.getColumnConstraints().add(constraints);
+		}
+		int cell = 0;
 		for (String wire : KeystrokeElement.MODIFIER_ORDER) {
 			// Wires are the canonical constants, so capitalizing is the display label.
 			String label = wire.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + wire.substring(1);
 			Switch toggle = new Switch(label);
+			toggle.setMaxWidth(Double.MAX_VALUE);
 			toggle.setChecked(element.modifiers().contains(wire));
 			toggle.onCheckedChange(checked -> {
 				List<String> next = new ArrayList<>(element.modifiers());
@@ -641,7 +652,8 @@ public final class EditorInspectorPanel extends VBox {
 				}
 				store.apply(new KeystrokeCommands.ChangeLabel(element.id(), element.key(), next));
 			});
-			modifiers.getChildren().add(toggle);
+			modifiers.add(toggle, cell % 2, cell / 2);
+			cell++;
 		}
 		root.getChildren().add(modifiers);
 

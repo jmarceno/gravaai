@@ -57,6 +57,31 @@
 			<build>
 				<plugins>
 					<plugin>
+						<!-- copy-dependencies never removes files, so after a version bump the previous
+						     release's module jars survive here and both end up on the packaged
+						     classpath (the launcher resolves each class from whichever jar sorts
+						     first). Wipe the staging directory before the copy. -->
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-clean-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>clean-staged-runtime-libraries</id>
+								<phase>initialize</phase>
+								<goals>
+									<goal>clean</goal>
+								</goals>
+								<configuration>
+									<excludeDefaultDirectories>true</excludeDefaultDirectories>
+									<filesets>
+										<fileset>
+											<directory>${project.build.directory}/dist/libs</directory>
+										</fileset>
+									</filesets>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-dependency-plugin</artifactId>
 						<executions>

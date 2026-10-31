@@ -540,22 +540,6 @@ public final class TimelineView extends Region {
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
 
-		// The Keystrokes lanes sit with the recorded material, above the effect rows.
-		List<Integer> keystrokeLaneIndexes = new ArrayList<>();
-		for (TimelineRenderItem item : items) {
-			if (TimelineRows.isKeystrokeLaneRowId(item.rowId())) {
-				int index = TimelineRows.getKeystrokeLaneIndex(item.rowId());
-				if (!keystrokeLaneIndexes.contains(index)) {
-					keystrokeLaneIndexes.add(index);
-				}
-			}
-		}
-		keystrokeLaneIndexes.sort(Comparator.naturalOrder());
-		for (int index : keystrokeLaneIndexes) {
-			rows.add(new RowLayout(TimelineRows.getKeystrokeLaneRowId(index), top, COMPACT_ROW_HEIGHT));
-			top += COMPACT_ROW_HEIGHT + ROW_GAP;
-		}
-
 		double zoomHeight = extras > 0 ? COMPACT_ROW_HEIGHT : CLIP_ROW_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.ZOOM_ROW_ID, top, zoomHeight));
 		top += zoomHeight + ROW_GAP;
@@ -587,6 +571,24 @@ public final class TimelineView extends Region {
 		audioTrackIndexes.sort(Comparator.naturalOrder());
 		for (int index : audioTrackIndexes) {
 			rows.add(new RowLayout(TimelineRows.getAudioTrackRowId(index), top, COMPACT_ROW_HEIGHT));
+			top += COMPACT_ROW_HEIGHT + ROW_GAP;
+		}
+
+		// The Keystrokes lanes go last, below every recorded and effect row: presses overlap
+		// freely (each lasts the overlay linger), so the lanes multiply and would otherwise push
+		// the zoom and audio rows off-screen behind a scroll.
+		List<Integer> keystrokeLaneIndexes = new ArrayList<>();
+		for (TimelineRenderItem item : items) {
+			if (TimelineRows.isKeystrokeLaneRowId(item.rowId())) {
+				int index = TimelineRows.getKeystrokeLaneIndex(item.rowId());
+				if (!keystrokeLaneIndexes.contains(index)) {
+					keystrokeLaneIndexes.add(index);
+				}
+			}
+		}
+		keystrokeLaneIndexes.sort(Comparator.naturalOrder());
+		for (int index : keystrokeLaneIndexes) {
+			rows.add(new RowLayout(TimelineRows.getKeystrokeLaneRowId(index), top, COMPACT_ROW_HEIGHT));
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
 		return List.copyOf(rows);

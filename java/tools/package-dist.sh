@@ -86,10 +86,21 @@ if [ -n "$duplicates" ]; then
 	exit 1
 fi
 
+# The GraalJS dependency pulls in ICU4J with locale data for every locale on
+# earth (~18 MB stored). Trim it to the locales the app ships (root/en/pt) so
+# it only carries what Intl can actually use; verify-icu-trim.sh re-checks the
+# behavior against the packaged runtime after jpackage.
+"$SCRIPT_DIR/trim-icu.sh" --jar "$INPUT"/icu4j-*.jar --work-dir "$WORK/icu-trim"
+
 echo "package-dist.sh: jlink runtime"
+# jdk.localedata ships CLDR data for the whole world (~26 MB). The UI text is
+# English and the java.text formatters follow the user's system locale, so keep
+# only en and pt (root data is always included); any other system locale falls
+# back to English formats instead of crashing.
 "$JDK/bin/jlink" \
 	--module-path "$JMODS" \
 	--add-modules java.base,java.logging,java.net.http,jdk.unsupported,javafx.controls,jdk.crypto.ec,jdk.localedata,jdk.security.auth \
+	--include-locales=en,pt \
 	--strip-debug --no-header-files --no-man-pages \
 	--output "$RUNTIME"
 
@@ -109,13 +120,46 @@ echo "package-dist.sh: jpackage app image"
 	--dest "$OUT_DIR"
 
 # Bundled native payload (helpers, FFmpeg, whisper, models): plan §5.19.3.
+# Staged from an allowlist, never a blanket copy: the native build trees carry
+# developer artifacts that must not ship — FFmpeg's install prefix keeps
+# include/ headers and share/ examples, and the whisper.cpp cmake build emits
+# every tool (bench, quantize, server, vad-speech-segments) although only
+# whisper-cli is ever executed (captions + meeting transcription).
 if [ -n "$NATIVE_DIR" ] && [ -d "$NATIVE_DIR" ]; then
 	echo "package-dist.sh: bundling native payload from $NATIVE_DIR"
-	mkdir -p "$IMAGE/lib/native/linux-x64"
-	cp -a "$NATIVE_DIR"/. "$IMAGE/lib/native/linux-x64/"
+	LINUX="$IMAGE/lib/native/linux-x64"
+	mkdir -p "$LINUX"
+	# Capture/layer-shell helpers and the noise-suppression model.
+	find "$NATIVE_DIR" -maxdepth 1 -type f -name 'gravaai-*' -exec cp -a {} "$LINUX/" \;
+	if [ -d "$NATIVE_DIR/models" ]; then cp -a "$NATIVE_DIR/models" "$LINUX/models"; fi
+	# whisper-cli plus the manifest; libwhisper*/libggml* only exist when a
+	# shared backend is enabled, and then they must ship too.
+	mkdir -p "$LINUX/whisper"
+	for entry in whisper-cli whisper-runtime.json libwhisper* libggml*; do
+		if [ -e "$NATIVE_DIR/whisper/$entry" ]; then cp -a "$NATIVE_DIR/whisper/$entry" "$LINUX/whisper/"; fi
+	done
+	# FFmpeg: the CLI tools the export pipeline runs and the shared libs the
+	# JVM loads through FFM.
+	if [ -d "$NATIVE_DIR/ffmpeg/bin" ] || [ -d "$NATIVE_DIR/ffmpeg/lib" ]; then
+		mkdir -p "$LINUX/ffmpeg"
+		[ -d "$NATIVE_DIR/ffmpeg/bin" ] && cp -a "$NATIVE_DIR/ffmpeg/bin" "$LINUX/ffmpeg/bin"
+		[ -d "$NATIVE_DIR/ffmpeg/lib" ] && cp -a "$NATIVE_DIR/ffmpeg/lib" "$LINUX/ffmpeg/lib"
+		# lib/pkgconfig is build tooling, not runtime.
+		rm -rf "$LINUX/ffmpeg/lib/pkgconfig"
+	fi
 else
 	echo "package-dist.sh: no native payload yet ($NATIVE_DIR)"
 fi
+
+# Acceptance gate for the ICU trim: run Intl through the real engine (GraalJS
+# via the polyglot API) on the packaged runtime, so a GraalVM bump that changes
+# the ICU data layout fails the build instead of shipping broken Intl.
+echo "package-dist.sh: verifying trimmed ICU locale data"
+"$SCRIPT_DIR/verify-icu-trim.sh" \
+	--javac "$JDK/bin/javac" \
+	--java "$IMAGE/lib/runtime/bin/java" \
+	--lib-dir "$IMAGE/lib/app" \
+	--work-dir "$WORK/icu-verify"
 
 echo "package-dist.sh: AOT training"
 "$SCRIPT_DIR/train-aot.sh" --image "$IMAGE" --build-dir "$BUILD_DIR"

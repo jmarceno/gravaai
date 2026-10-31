@@ -96,6 +96,9 @@ run build nice -n 10 cmake --build "$build" --config Release --parallel "$jobs"
 
 # Port of findRuntimeArtifacts()/stageRuntimeArtifacts(): keep the whisper/ggml runtime
 # artifacts from build/bin (static build: whisper-cli, plus libs if a backend is shared).
+# Stage whisper-cli only: the cmake build also emits the other whisper.cpp tools
+# (bench, quantize, server, vad-speech-segments) and ggml-* diagnostics, and
+# nothing in the app executes them — the bundle must not carry them.
 candidates=()
 [[ -d "$build/bin" ]] && candidates+=("$build/bin")
 (("${#candidates[@]}" > 0)) || die "built whisper runtime artifacts were not found (no $build/bin)"
@@ -106,7 +109,7 @@ for dir in "${candidates[@]}"; do
 		cp -f "$entry" "$out/$base"
 		chmod 755 "$out/$base" 2>/dev/null || true
 		staged=$((staged + 1))
-	done < <(find "$dir" -maxdepth 1 -type f \( -iname 'whisper*' -o -iname 'ggml*' -o -iname 'libwhisper*' -o -iname 'libggml*' \) -print0)
+	done < <(find "$dir" -maxdepth 1 -type f \( -iname 'whisper-cli' -o -iname 'libwhisper*' -o -iname 'libggml*' \) -print0)
 done
 ((staged > 0)) || die "no whisper/ggml runtime artifact staged from $build/bin"
 [[ -x "$out/whisper-cli" ]] || die "whisper-cli was not staged"

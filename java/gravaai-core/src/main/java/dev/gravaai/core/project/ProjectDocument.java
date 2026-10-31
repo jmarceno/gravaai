@@ -39,7 +39,7 @@ public final class ProjectDocument {
 			"clipRegions", "autoFullTrackClipId", "autoFullTrackClipEndMs", "speedRegions",
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "aspectRatio", "sourceAudioTrackSettingsByClip",
-			"defaultSourceAudioTrackSettings");
+			"defaultSourceAudioTrackSettings", "keystrokeElements");
 
 	private final ObjectNode raw;
 	private final String videoPath;
@@ -188,6 +188,7 @@ public final class ProjectDocument {
 		editor.put("aspectRatio", state.aspectRatio());
 		editor.set("sourceAudioTrackSettingsByClip", state.sourceAudioTrackSettingsByClip().deepCopy());
 		editor.set("defaultSourceAudioTrackSettings", state.defaultSourceAudioTrackSettings().deepCopy());
+		editor.set("keystrokeElements", writeKeystrokeElements(state.keystrokeElements()));
 
 		// Keep the fields this build does not know; drop retired preferences and dev-only tuning.
 		ObjectNode persistedRaw = ProjectPersistence.stripPersistedDevMotionBlurSettings(
@@ -410,8 +411,7 @@ public final class ProjectDocument {
 		return node;
 	}
 
-	private static ObjectNode writeKeystrokeOverlay(KeystrokeOverlaySettings settings) {
-		ObjectNode node = Json.nodeFactory().objectNode();
+	private static ObjectNode writeKeystrokeOverlay(KeystrokeOverlaySettings settings) {		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("enabled", settings.enabled());
 		node.put("position", settings.position().wire());
 		node.put("fontSize", settings.fontSize());
@@ -420,6 +420,24 @@ public final class ProjectDocument {
 		node.put("groupingMs", settings.groupingMs());
 		node.put("bottomOffset", settings.bottomOffset());
 		return node;
+	}
+
+	/** Serialises the editable key-press elements (the timeline Keystrokes track). */
+	public static ArrayNode writeKeystrokeElements(List<KeystrokeElement> elements) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (KeystrokeElement element : elements == null ? List.<KeystrokeElement>of() : elements) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("id", element.id());
+			node.put("startMs", element.startMs());
+			node.put("endMs", element.endMs());
+			node.put("key", element.key());
+			ArrayNode modifiers = node.putArray("modifiers");
+			for (String modifier : element.orderedModifiers()) {
+				modifiers.add(modifier);
+			}
+			array.add(node);
+		}
+		return array;
 	}
 
 	/** Serialises the webcam overlay settings (the import controller writes a composed webcam). */

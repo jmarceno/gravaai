@@ -12,6 +12,7 @@ import dev.gravaai.core.editor.AudioCommands;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.AudioRegion;
@@ -22,6 +23,7 @@ import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.CursorMotionPresets;
+import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -69,6 +71,7 @@ public final class EditorInspectorPanel extends VBox {
 		CLIP,
 		AUDIO,
 		CAPTION,
+		KEYSTROKE,
 		MULTI
 	}
 
@@ -186,6 +189,13 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	/** Shows the editor for the selected keystroke press. */
+	public void showKeystrokeSettings() {
+		this.annotationMode = false;
+		this.selectionEditor = SelectionEditor.KEYSTROKE;
+		rebuild();
+	}
+
 	/** Shows the editor for a mixed multi-selection (count + batched delete). */
 	public void showMultiSelection() {
 		this.annotationMode = false;
@@ -227,6 +237,8 @@ public final class EditorInspectorPanel extends VBox {
 			showAudioSettings();
 		} else if (store.selectedCaptionId() != null) {
 			showCaptionSettings();
+		} else if (store.selectedKeystrokeId() != null) {
+			showKeystrokeSettings();
 		} else if (isSelectionMode()) {
 			show(section);
 		}
@@ -328,6 +340,7 @@ public final class EditorInspectorPanel extends VBox {
 			case CLIP -> "Clip";
 			case AUDIO -> "Audio";
 			case CAPTION -> "Caption";
+			case KEYSTROKE -> "Keystroke";
 			case MULTI -> "Multiple";
 			case NONE -> section.label();
 		};
@@ -353,6 +366,9 @@ public final class EditorInspectorPanel extends VBox {
 	}
 	if (selectionEditor == SelectionEditor.CAPTION) {
 		return captionSelectionSection();
+	}
+	if (selectionEditor == SelectionEditor.KEYSTROKE) {
+		return keystrokeSelectionSection();
 	}
 	if (selectionEditor == SelectionEditor.MULTI) {
 		return multiSelectionSection();
@@ -582,6 +598,66 @@ public final class EditorInspectorPanel extends VBox {
 		for (CaptionCue cue : store.state().autoCaptions()) {
 			if (cue.id().equals(id)) {
 				return cue;
+			}
+		}
+		return null;
+	}
+
+	/** The keystroke press editor: key text, modifier toggles, delete (React caption editor shape). */
+	private @Nullable Node keystrokeSelectionSection() {
+		KeystrokeElement element = selectedKeystroke();
+		if (element == null) {
+			return emptySelection("Select a keystroke to edit or remove it.");
+		}
+		VBox root = new VBox(14);
+
+		Input key = new Input("Key");
+		key.text(element.key()).fullWidth();
+		key.focusedProperty().addListener((observable, wasFocused, focused) -> {
+			if (!focused) {
+				String next = key.getText() == null ? "" : key.getText().strip();
+				if (!next.isEmpty() && !next.equals(element.key())) {
+					store.apply(new KeystrokeCommands.ChangeLabel(element.id(), next,
+							element.modifiers()));
+				}
+			}
+		});
+		root.getChildren().add(key);
+
+		HBox modifiers = new HBox(10);
+		for (String wire : KeystrokeElement.MODIFIER_ORDER) {
+			// Wires are the canonical constants, so capitalizing is the display label.
+			String label = wire.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + wire.substring(1);
+			Switch toggle = new Switch(label);
+			toggle.setChecked(element.modifiers().contains(wire));
+			toggle.onCheckedChange(checked -> {
+				List<String> next = new ArrayList<>(element.modifiers());
+				if (checked) {
+					if (!next.contains(wire)) {
+						next.add(wire);
+					}
+				} else {
+					next.remove(wire);
+				}
+				store.apply(new KeystrokeCommands.ChangeLabel(element.id(), element.key(), next));
+			});
+			modifiers.getChildren().add(toggle);
+		}
+		root.getChildren().add(modifiers);
+
+		root.getChildren().add(deleteSelectionButton("Delete Keystroke",
+				() -> store.apply(new KeystrokeCommands.Delete(element.id()))));
+		return root;
+	}
+
+	private @Nullable KeystrokeElement selectedKeystroke() {
+		String id = store.selectedKeystrokeId();
+		if (id == null) {
+			return null;
+		}
+		for (KeystrokeElement element : store.state().keystrokeElements()) {
+			if (element.id().equals(id)) {
+				return element;
 			}
 		}
 		return null;

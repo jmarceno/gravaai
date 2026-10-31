@@ -440,7 +440,8 @@ public final class ProjectPersistence {
 				AspectRatios.isValidAspectRatio(text(field(editor, "aspectRatio")))
 						? text(field(editor, "aspectRatio")) : "16:9",
 				objectOrEmpty(field(editor, "sourceAudioTrackSettingsByClip")),
-				objectOrEmpty(field(editor, "defaultSourceAudioTrackSettings")));
+				objectOrEmpty(field(editor, "defaultSourceAudioTrackSettings")),
+				normalizeKeystrokeElements(field(editor, "keystrokeElements")));
 	}
 
 
@@ -876,8 +877,54 @@ public final class ProjectPersistence {
 				clampSetting(field(settings, "bottomOffset"), 0, 90, defaults.bottomOffset()));
 	}
 
-	private static WebcamOverlaySettings normalizeWebcam(
-			JsonNode webcamNode, @Nullable String sourcePath, @Nullable Double legacyZoomScaleEffect) {
+	/** Same cap as the keystroke sidecar (KeystrokeCapture.MAX_KEYSTROKE_EVENTS). */
+	private static final int MAX_KEYSTROKE_ELEMENTS = 64_800;
+
+	/**
+	 * Normalises the editable key-press elements: drops unusable entries, keeps only the known
+	 * modifier wires in canonical order, and stores them in time order like the sidecar does.
+	 */
+	private static List<KeystrokeElement> normalizeKeystrokeElements(JsonNode rawElements) {
+		if (rawElements == null || !rawElements.isArray()) {
+			return List.of();
+		}
+		List<KeystrokeElement> elements = new ArrayList<>();
+		for (JsonNode node : rawElements) {
+			if (elements.size() >= MAX_KEYSTROKE_ELEMENTS) {
+				break;
+			}
+			if (node == null || !node.isObject()) {
+				continue;
+			}
+			String id = text(field(node, "id"));
+			String rawKey = text(field(node, "key"));
+			if (id == null || id.isBlank() || rawKey == null || rawKey.isBlank()) {
+				continue;
+			}
+			Span span = normalizeSpan(node);
+			String key = rawKey.trim();
+			key = key.substring(0, Math.min(32, key.length()));
+			List<String> modifiers = new ArrayList<>();
+			JsonNode rawModifiers = field(node, "modifiers");
+			if (rawModifiers != null && rawModifiers.isArray()) {
+				for (String wire : KeystrokeElement.MODIFIER_ORDER) {
+					for (JsonNode candidate : rawModifiers) {
+						String value = text(candidate);
+						if (wire.equals(value == null ? null
+								: value.toLowerCase(Locale.ROOT).trim())) {
+							modifiers.add(wire);
+							break;
+						}
+					}
+				}
+			}
+			elements.add(new KeystrokeElement(id, span.startMs(), span.endMs(), key, modifiers));
+		}
+		elements.sort((left, right) -> Long.compare(left.startMs(), right.startMs()));
+		return List.copyOf(elements);
+	}
+
+	private static WebcamOverlaySettings normalizeWebcam(			JsonNode webcamNode, @Nullable String sourcePath, @Nullable Double legacyZoomScaleEffect) {
 		WebcamOverlaySettings defaults = WebcamOverlaySettings.defaults();
 
 		List<WebcamOverlaySettings.TimeRange> visibleRanges = null;

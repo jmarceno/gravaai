@@ -70,7 +70,8 @@ public record ProjectEditorState(
 		WebcamOverlaySettings webcam,
 		String aspectRatio,
 		ObjectNode sourceAudioTrackSettingsByClip,
-		ObjectNode defaultSourceAudioTrackSettings) {
+		ObjectNode defaultSourceAudioTrackSettings,
+		List<KeystrokeElement> keystrokeElements) {
 
 	/**
 	 * Copy with a new caption list, without re-normalising the rest of the state. The editor needs
@@ -92,7 +93,7 @@ public record ProjectEditorState(
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, aspectRatio, sourceAudioTrackSettingsByClip,
-				defaultSourceAudioTrackSettings);
+				defaultSourceAudioTrackSettings, keystrokeElements);
 	}
 
 	/**
@@ -117,7 +118,7 @@ public record ProjectEditorState(
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, aspectRatio, normalized,
-				defaultSourceAudioTrackSettings);
+				defaultSourceAudioTrackSettings, keystrokeElements);
 	}
 
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
@@ -192,6 +193,7 @@ public record ProjectEditorState(
 		private String aspectRatio;
 		private ObjectNode sourceAudioTrackSettingsByClip;
 		private ObjectNode defaultSourceAudioTrackSettings;
+		private List<KeystrokeElement> keystrokeElements;
 
 		private Builder(ProjectEditorState state) {
 			wallpaper = state.wallpaper;
@@ -248,6 +250,7 @@ public record ProjectEditorState(
 			aspectRatio = state.aspectRatio;
 			sourceAudioTrackSettingsByClip = state.sourceAudioTrackSettingsByClip;
 			defaultSourceAudioTrackSettings = state.defaultSourceAudioTrackSettings;
+			keystrokeElements = state.keystrokeElements;
 		}
 
 		public Builder wallpaper(String value) {
@@ -520,6 +523,11 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder keystrokeElements(List<KeystrokeElement> value) {
+			keystrokeElements = value;
+			return this;
+		}
+
 		/**
 		 * Copies one component, named as in the project JSON, from another state. Agent settings
 		 * paths name components at run time; the switch keeps every copy type-checked.
@@ -580,6 +588,7 @@ public record ProjectEditorState(
 				case "aspectRatio" -> aspectRatio = from.aspectRatio;
 				case "sourceAudioTrackSettingsByClip" -> sourceAudioTrackSettingsByClip = from.sourceAudioTrackSettingsByClip;
 				case "defaultSourceAudioTrackSettings" -> defaultSourceAudioTrackSettings = from.defaultSourceAudioTrackSettings;
+				case "keystrokeElements" -> keystrokeElements = from.keystrokeElements;
 				default -> throw new IllegalArgumentException("unknown editor component " + component);
 			}
 			return this;
@@ -640,7 +649,8 @@ public record ProjectEditorState(
 					webcam,
 					aspectRatio,
 					sourceAudioTrackSettingsByClip,
-					defaultSourceAudioTrackSettings);
+					defaultSourceAudioTrackSettings,
+					keystrokeElements);
 		}
 	}
 }

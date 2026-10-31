@@ -52,6 +52,7 @@ public final class EditorStore {
 	private @Nullable String selectedAnnotationId;
 	private @Nullable String selectedAudioId;
 	private @Nullable String selectedCaptionId;
+	private @Nullable String selectedKeystrokeId;
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
 	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
 	private String activeEffectSection = SECTION_SCENE;
@@ -123,6 +124,12 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	public void setKeystrokeElements(java.util.List<dev.gravaai.core.project.KeystrokeElement> elements) {
+		ObjectNode json = editorJson();
+		json.set("keystrokeElements", ProjectDocument.writeKeystrokeElements(elements));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
 	/** Replaces the canonical raw source-audio settings map (unknown keys preserved). */
 	public void setSourceAudioTrackSettingsByClip(tools.jackson.databind.node.@Nullable ObjectNode next) {
 		state = state.withSourceAudioTrackSettingsByClip(next);
@@ -160,7 +167,7 @@ public final class EditorStore {
 				selectedAudioId,
 				state.sourceAudioTrackSettingsByClip() == null ? null
 						: state.sourceAudioTrackSettingsByClip().deepCopy(),
-				List.copyOf(multiSelection));
+				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId);
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -171,10 +178,12 @@ public final class EditorStore {
 		setAudioRegions(java.util.Objects.requireNonNull(snapshot.audioRegions(),
 				"snapshot audio regions"));
 		setAutoCaptions(snapshot.autoCaptions());
+		setKeystrokeElements(snapshot.keystrokeElements());
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();
 		selectedAnnotationId = snapshot.selectedAnnotationId();
 		selectedAudioId = snapshot.selectedAudioId();
+		selectedKeystrokeId = snapshot.selectedKeystrokeId();
 		multiSelection.clear();
 		multiSelection.addAll(snapshot.multiSelectedIds());
 		setSourceAudioTrackSettingsByClip(snapshot.sourceAudioTrackSettingsByClip() == null
@@ -241,6 +250,14 @@ public final class EditorStore {
 		this.selectedCaptionId = id;
 	}
 
+	public @Nullable String selectedKeystrokeId() {
+		return selectedKeystrokeId;
+	}
+
+	public void setSelectedKeystrokeId(@Nullable String id) {
+		this.selectedKeystrokeId = id;
+	}
+
 	public String activeEffectSection() {
 		return activeEffectSection;
 	}
@@ -252,11 +269,18 @@ public final class EditorStore {
 	/** Clears every timeline selection except the given one. */
 	public void clearSelectionsExcept(@Nullable String keepClip, @Nullable String keepZoom, @Nullable String keepAnnotation,
 			@Nullable String keepAudio, @Nullable String keepCaption) {
+		clearSelectionsExcept(keepClip, keepZoom, keepAnnotation, keepAudio, keepCaption, null);
+	}
+
+	/** As above, also keeping (or clearing) the keystroke selection. */
+	public void clearSelectionsExcept(@Nullable String keepClip, @Nullable String keepZoom, @Nullable String keepAnnotation,
+			@Nullable String keepAudio, @Nullable String keepCaption, @Nullable String keepKeystroke) {
 		selectedClipId = keepClip;
 		selectedZoomId = keepZoom;
 		selectedAnnotationId = keepAnnotation;
 		selectedAudioId = keepAudio;
 		selectedCaptionId = keepCaption;
+		selectedKeystrokeId = keepKeystroke;
 		multiSelection.clear();
 	}
 

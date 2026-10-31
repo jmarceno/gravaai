@@ -18,6 +18,8 @@ import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.KeystrokeElement;
+import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -33,6 +35,8 @@ import dev.gravaai.media.playback.PlaybackMedia;
 import dev.gravaai.media.playback.PlaybackMediaLoader;
 import dev.gravaai.services.projects.ProjectManager;
 import dev.gravaai.services.projects.ProjectMediaSources;
+import dev.gravaai.services.recording.KeystrokeTelemetry;
+import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.ui.editor.preview.PlaybackControllerPort;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
 import dev.gravaai.ui.editor.timeline.StoreTimelineCommands;
@@ -297,6 +301,7 @@ public final class EditorSession implements AutoCloseable {
 	/** Loads a project through the canonical persistence path and starts a playback session. */
 	public static EditorSession open(Path projectPath) throws IOException {
 		ProjectDocument document = ProjectDocument.load(projectPath);
+		document = seedKeystrokeElements(document);
 		return new EditorSession(projectPath, document, document);
 	}
 
@@ -321,10 +326,71 @@ public final class EditorSession implements AutoCloseable {
 			editor.set("clipRegions", ProjectDocument.writeClipRegions(
 					dev.gravaai.core.project.Clips.trimsToClips(List.of(), durationMs)));
 		}
+		// The Keystrokes track: recorded presses become editable elements before the store exists,
+		// so the first undo step already contains them.
+		addKeystrokeElementsFromSidecar(editor, videoPath, KeystrokeOverlaySettings.DEFAULT.lingerMs());
 		ProjectDocument document = ProjectDocument.create(
 				videoPath.toAbsolutePath().normalize().toString(),
 				ProjectPersistence.normalizeProjectEditor(editor));
 		return new EditorSession(null, document, document);
+	}
+
+	/**
+	 * The Keystrokes track for a loaded project: when the state carries no elements yet, seed them
+	 * from the recording's {@code .keys.json} sidecar so its presses become editable blocks. Once
+	 * seeded (or once the user deletes all of them), the elements are the source of truth and the
+	 * sidecar is never re-read.
+	 */
+	private static ProjectDocument seedKeystrokeElements(ProjectDocument document) {
+		String videoPath = document.videoPath();
+		if (videoPath == null || videoPath.isBlank()
+				|| !document.editor().keystrokeElements().isEmpty()) {
+			return document;
+		}
+		Path video = Path.of(videoPath);
+		if (!Files.isRegularFile(video)) {
+			return document;
+		}
+		long lingerMs = document.editor().keystrokeOverlay() == null
+				? KeystrokeOverlaySettings.DEFAULT.lingerMs()
+				: document.editor().keystrokeOverlay().lingerMs();
+		tools.jackson.databind.node.ObjectNode editor =
+				ProjectDocument.writeEditor(document.editor(), dev.gravaai.core.json.Json.nodeFactory().objectNode());
+		if (!addKeystrokeElementsFromSidecar(editor, video, lingerMs)) {
+			return document;
+		}
+		return document.withEditor(ProjectPersistence.normalizeProjectEditor(editor));
+	}
+
+	/**
+	 * Writes the sidecar's presses into {@code editor} as {@code keystrokeElements}; a no-op (and
+	 * {@code false}) when the recording has no readable sidecar or no presses.
+	 */
+	private static boolean addKeystrokeElementsFromSidecar(
+			tools.jackson.databind.node.ObjectNode editor, Path videoPath, long lingerMs) {
+		List<KeystrokeTypes.KeystrokeEvent> events;
+		try {
+			events = KeystrokeTelemetry.readKeystrokeTelemetry(videoPath.toString());
+		} catch (IOException error) {
+			return false; // No sidecar (or unreadable): the recording simply has no Keystrokes track.
+		}
+		if (events.isEmpty()) {
+			return false;
+		}
+		tools.jackson.databind.node.ArrayNode elements = editor.putArray("keystrokeElements");
+		int index = 1;
+		for (KeystrokeTypes.KeystrokeEvent event : events) {
+			tools.jackson.databind.node.ObjectNode node = elements.addObject();
+			node.put("id", "key-" + index++);
+			node.put("startMs", event.timeMs());
+			node.put("endMs", event.timeMs() + Math.max(1, lingerMs));
+			node.put("key", event.key());
+			tools.jackson.databind.node.ArrayNode modifiers = node.putArray("modifiers");
+			for (KeystrokeTypes.KeyModifier modifier : event.modifiers()) {
+				modifiers.add(modifier.wire());
+			}
+		}
+		return true;
 	}
 
 	private static long probeDurationMs(Path videoPath) {

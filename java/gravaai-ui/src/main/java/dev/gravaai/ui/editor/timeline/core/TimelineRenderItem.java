@@ -40,6 +40,7 @@ public record TimelineRenderItem(
 		ANNOTATION,
 		SPEED,
 		AUDIO,
-		CAPTION
+		CAPTION,
+		KEYSTROKE
 	}
 }

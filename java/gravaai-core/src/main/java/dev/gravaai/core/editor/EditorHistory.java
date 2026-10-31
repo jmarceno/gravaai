@@ -38,7 +38,9 @@ public final class EditorHistory {
 			@Nullable String selectedAnnotationId,
 			@Nullable String selectedAudioId,
 			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip,
-			List<String> multiSelectedIds) {
+			List<String> multiSelectedIds,
+			List<dev.gravaai.core.project.KeystrokeElement> keystrokeElements,
+			@Nullable String selectedKeystrokeId) {
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
@@ -47,7 +49,7 @@ public final class EditorHistory {
 			String selectedAudioId) {
 			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
-				null);
+				null, List.of());
 		}
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
@@ -58,6 +60,17 @@ public final class EditorHistory {
 			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
 				sourceAudio, List.of());
+		}
+
+		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
+			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
+			List<AudioRegion> audioRegions, List<CaptionCue> autoCaptions,
+			String selectedZoomId, String selectedClipId, String selectedAnnotationId,
+			String selectedAudioId, tools.jackson.databind.node.@Nullable ObjectNode sourceAudio,
+			List<String> multiSelectedIds) {
+			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
+				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
+				sourceAudio, multiSelectedIds, List.of(), null);
 		}
 		}
 
@@ -132,7 +145,9 @@ public final class EditorHistory {
 				snapshot.selectedAudioId(),
 				snapshot.sourceAudioTrackSettingsByClip() == null ? null
 						: snapshot.sourceAudioTrackSettingsByClip().deepCopy(),
-				List.copyOf(snapshot.multiSelectedIds()));
+				List.copyOf(snapshot.multiSelectedIds()),
+				List.copyOf(snapshot.keystrokeElements()),
+				snapshot.selectedKeystrokeId());
 	}
 
 	/** {@code areEditorHistorySnapshotsEqual}: records compare their lists element by element. */

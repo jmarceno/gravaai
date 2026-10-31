@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dev.gravaai.core.project.CropRegion;
+import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 
@@ -283,7 +284,10 @@ public final class ProjectEditorInputs {
 	}
 
 	/**
-	 * Maps the keystroke overlay plus its optional {@code .keys.json} sidecar.
+	 * Maps the keystroke overlay plus the presses. The editable {@code keystrokeElements} of the
+	 * state win when present (they are seeded from the sidecar at open time); the
+	 * {@code .keys.json} sidecar is the fallback so projects that never loaded elements still
+	 * render exactly as before.
 	 *
 	 * @param videoPath the source recording whose sidecar carries the presses, or null when the
 	 *        caller has no source file (then only the settings are mapped)
@@ -294,7 +298,11 @@ public final class ProjectEditorInputs {
 			return KeystrokeSpec.DISABLED;
 		}
 		List<KeystrokeSpec.Press> presses = new ArrayList<>();
-		if (videoPath != null) {
+		if (editor.keystrokeElements() != null && !editor.keystrokeElements().isEmpty()) {
+			for (KeystrokeElement element : editor.keystrokeElements()) {
+				presses.add(new KeystrokeSpec.Press(element.startMs(), element.chips()));
+			}
+		} else if (videoPath != null) {
 			Path sidecar = Path.of(videoPath.toString() + ".keys.json");
 			if (Files.isRegularFile(sidecar)) {
 				try {

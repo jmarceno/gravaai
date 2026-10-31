@@ -99,6 +99,9 @@ public final class TimelineView extends Region {
 	private static final Color AUDIO_BORDER = Color.web("#196b38");
 	private static final Color AUDIO_SELECTED = Color.web("#22c55e");
 	private static final Color SOURCE_AUDIO_FILL = Color.web("#0f3b2a");
+	private static final Color KEYSTROKE_FILL = Color.web("#3b2a63");
+	private static final Color KEYSTROKE_BORDER = Color.web("#8b5cf6");
+	private static final Color KEYSTROKE_SELECTED = Color.web("#a78bfa");
 	private static final Color CAPTION_FILL = Color.web("#b58b12");
 	private static final Color CAPTION_BORDER = Color.web("#facc15");
 	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
@@ -423,7 +426,8 @@ public final class TimelineView extends Region {
 		items = TimelineModel.buildTimelineItems(new TimelineModel.ItemsRequest(
 				project.zoomRegions(), project.clipRegions(), project.annotationRegions(),
 				project.audioRegions(), project.autoCaptions(),
-				project.sourceAudioTrackSettings(), sourceAudioTracks));
+				project.sourceAudioTrackSettings(), sourceAudioTracks,
+				project.keystrokeElements()));
 		sourceAudioTracks = dataSource.sourceAudioTracks();
 		FilmstripProvider provider = dataSource.filmstripProvider();
 		filmstripProvider = provider == null ? FilmstripProvider.empty() : provider;
@@ -522,7 +526,10 @@ public final class TimelineView extends Region {
 		long audioTracks = items.stream()
 				.filter(item -> TimelineRows.isAudioTrackRowId(item.rowId()))
 				.map(TimelineRenderItem::rowId).distinct().count();
-		long extras = annotationTracks + audioTracks + sourceAudioTracks.size();
+		long keystrokeLanes = items.stream()
+				.filter(item -> TimelineRows.isKeystrokeLaneRowId(item.rowId()))
+				.map(TimelineRenderItem::rowId).distinct().count();
+		long extras = annotationTracks + audioTracks + keystrokeLanes + sourceAudioTracks.size();
 
 		double top = AXIS_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.CLIP_ROW_ID, top, CLIP_ROW_HEIGHT));
@@ -530,6 +537,22 @@ public final class TimelineView extends Region {
 		for (TimelineSourceAudioTrack track : sourceAudioTracks) {
 			rows.add(new RowLayout(TimelineRows.getSourceAudioTrackRowId(track.id()), top,
 					COMPACT_ROW_HEIGHT));
+			top += COMPACT_ROW_HEIGHT + ROW_GAP;
+		}
+
+		// The Keystrokes lanes sit with the recorded material, above the effect rows.
+		List<Integer> keystrokeLaneIndexes = new ArrayList<>();
+		for (TimelineRenderItem item : items) {
+			if (TimelineRows.isKeystrokeLaneRowId(item.rowId())) {
+				int index = TimelineRows.getKeystrokeLaneIndex(item.rowId());
+				if (!keystrokeLaneIndexes.contains(index)) {
+					keystrokeLaneIndexes.add(index);
+				}
+			}
+		}
+		keystrokeLaneIndexes.sort(Comparator.naturalOrder());
+		for (int index : keystrokeLaneIndexes) {
+			rows.add(new RowLayout(TimelineRows.getKeystrokeLaneRowId(index), top, COMPACT_ROW_HEIGHT));
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
 
@@ -1582,6 +1605,7 @@ public final class TimelineView extends Region {
 			case ANNOTATION -> TimelineSelection.ANNOTATION;
 			case AUDIO -> TimelineSelection.AUDIO;
 			case CAPTION -> TimelineSelection.CAPTION;
+			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
 			case TRIM, SPEED -> TimelineSelection.CLIP;
 		};
 	}
@@ -1663,6 +1687,12 @@ public final class TimelineView extends Region {
 				for (TimelineRenderItem item : items) {
 					if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
 						drawZoom(graphics, item, row, width);
+					}
+				}
+			} else if (TimelineRows.isKeystrokeLaneRowId(row.id())) {
+				for (TimelineRenderItem item : items) {
+					if (row.id().equals(item.rowId())) {
+						drawKeystroke(graphics, item, row, width);
 					}
 				}
 			} else if (TimelineRows.isAnnotationTrackRowId(row.id())) {
@@ -1944,6 +1974,36 @@ public final class TimelineView extends Region {
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
 
+	/** The Keystrokes track: a keycap-chip block whose label is the pressed key combination. */
+	private void drawKeystroke(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
+			double width) {
+		Span display = getRegionDisplaySpan(item.span());
+		double startX = xForTime(display.start());
+		double endX = xForTime(display.end());
+		double blockWidth = Math.max(6, endX - startX);
+		if (endX < 0 || startX > width) {
+			return;
+		}
+		double x = Math.max(-blockWidth, startX);
+		double height = row.height() * 0.85;
+		double y = row.top() + (row.height() - height) / 2;
+		graphics.setFill(KEYSTROKE_FILL);
+		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.setStroke(KEYSTROKE_BORDER);
+		graphics.setLineWidth(1);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		if (blockWidth > 24) {
+			graphics.setFont(BLOCK_FONT);
+			graphics.setFill(BLOCK_TEXT);
+			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 4,
+					y + height / 2 + 4);
+		}
+		if (isSelected(TimelineSelection.KEYSTROKE, item.id())) {
+			drawSelection(graphics, x, y, blockWidth, height, KEYSTROKE_SELECTED);
+		}
+		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
 	private void drawAnnotation(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
 			double width) {
 		Span display = getRegionDisplaySpan(item.span());
@@ -2166,6 +2226,9 @@ public final class TimelineView extends Region {
 						yield sourceAudioTrackFor(row.id())
 								.map(track -> track.label().toUpperCase(java.util.Locale.ROOT))
 								.orElse("SOURCE");
+					}
+					if (TimelineRows.isKeystrokeLaneRowId(row.id())) {
+						yield "KEYS";
 					}
 					if (TimelineRows.isAnnotationTrackRowId(row.id())) {
 						yield "NOTE";

@@ -80,6 +80,7 @@ public final class SelectionCommands {
 		public static final String AUDIO = "audio";
 		public static final String CLIP = "clip";
 		public static final String CAPTION = "caption";
+		public static final String KEYSTROKE = "keystroke";
 
 		private TimelineSelections() {}
 	}
@@ -109,6 +110,11 @@ public final class SelectionCommands {
 		for (var cue : store.state().autoCaptions()) {
 			if (cue.id().equals(id)) {
 				return TimelineSelections.CAPTION;
+			}
+		}
+		for (var element : store.state().keystrokeElements()) {
+			if (element.id().equals(id)) {
+				return TimelineSelections.KEYSTROKE;
 			}
 		}
 		return null;

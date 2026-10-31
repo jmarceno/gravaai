@@ -31,6 +31,36 @@ class TimelineModelTest {
 	}
 
 	@Test
+	@DisplayName("packs keystroke presses into lanes so overlapping presses stack")
+	void packsKeystrokeLanes() {
+		List<TimelineRenderItem> items = TimelineModel.buildTimelineItems(
+				new TimelineModel.ItemsRequest(List.of(), List.of(), List.of(), List.of(), List.of(),
+						java.util.Map.of(), List.of(), List.of(
+								new dev.gravaai.core.project.KeystrokeElement("key-1", 0, 900, "S", List.of("ctrl")),
+								new dev.gravaai.core.project.KeystrokeElement("key-2", 200, 1100, "A", List.of()),
+								new dev.gravaai.core.project.KeystrokeElement("key-3", 1200, 2000, "Z", List.of()))));
+
+		assertEquals("row-keystrokes-0", find(items, "key-1").rowId());
+		assertEquals("row-keystrokes-1", find(items, "key-2").rowId());
+		assertEquals("row-keystrokes-0", find(items, "key-3").rowId());
+		assertEquals("Ctrl + S", find(items, "key-1").label());
+		assertEquals(TimelineRenderItem.Variant.KEYSTROKE, find(items, "key-1").variant());
+	}
+
+	@Test
+	@DisplayName("keeps non-overlapping keystroke presses in the first lane")
+	void keepsSequentialKeystrokesInFirstLane() {
+		List<TimelineRenderItem> items = TimelineModel.buildTimelineItems(
+				new TimelineModel.ItemsRequest(List.of(), List.of(), List.of(), List.of(), List.of(),
+						java.util.Map.of(), List.of(), List.of(
+								new dev.gravaai.core.project.KeystrokeElement("key-1", 0, 900, "A", List.of()),
+								new dev.gravaai.core.project.KeystrokeElement("key-2", 900, 1800, "B", List.of()))));
+
+		assertEquals("row-keystrokes-0", find(items, "key-1").rowId());
+		assertEquals("row-keystrokes-0", find(items, "key-2").rowId());
+	}
+
+	@Test
 	@DisplayName("maps regions to timeline items and labels")
 	void mapsRegionsToItems() {
 		List<TimelineRenderItem> items = TimelineModel.buildTimelineItems(request(

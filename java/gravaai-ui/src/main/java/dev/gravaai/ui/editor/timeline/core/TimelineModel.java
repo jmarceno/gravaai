@@ -13,6 +13,7 @@ import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClipSpeedChanges;
 import dev.gravaai.core.project.ClipTransitions;
+import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.ZoomDepth;
@@ -35,7 +36,8 @@ public final class TimelineModel {
 			List<AudioRegion> audioRegions,
 			List<CaptionCue> captionCues,
 			java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
-			List<TimelineSourceAudioTrack> sourceAudioTracks) {
+			List<TimelineSourceAudioTrack> sourceAudioTracks,
+			List<KeystrokeElement> keystrokeElements) {
 
 		public ItemsRequest {
 			zoomRegions = zoomRegions == null ? List.of() : List.copyOf(zoomRegions);
@@ -47,6 +49,7 @@ public final class TimelineModel {
 					? java.util.Map.of() : java.util.Map.copyOf(sourceAudioTrackSettings);
 			sourceAudioTracks = sourceAudioTracks == null ? List.of()
 					: List.copyOf(sourceAudioTracks);
+			keystrokeElements = keystrokeElements == null ? List.of() : List.copyOf(keystrokeElements);
 		}
 
 		/** Backwards-compatible request without source-audio lanes (Phase A fixtures/tests). */
@@ -54,7 +57,17 @@ public final class TimelineModel {
 				List<AnnotationRegion> annotationRegions, List<AudioRegion> audioRegions,
 				List<CaptionCue> captionCues) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					java.util.Map.of(), List.of());
+					java.util.Map.of(), List.of(), List.of());
+		}
+
+		/** Backwards-compatible request without keystroke elements. */
+		public ItemsRequest(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
+				List<AnnotationRegion> annotationRegions, List<AudioRegion> audioRegions,
+				List<CaptionCue> captionCues,
+				java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
+				List<TimelineSourceAudioTrack> sourceAudioTracks) {
+			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
+					sourceAudioTrackSettings, sourceAudioTracks, List.of());
 		}
 	}
 
@@ -214,7 +227,36 @@ public final class TimelineModel {
 					TimelineRenderItem.Variant.CAPTION));
 		}
 
+		buildKeystrokeItems(items, request.keystrokeElements());
+
 		return List.copyOf(items);
+	}
+
+	/**
+	 * The Keystrokes track: one block per recorded press, greedily packed into lanes so
+	 * overlapping presses stack instead of overdrawing (elements arrive in time order from the
+	 * project normaliser, which makes the greedy pass exact).
+	 */
+	private static void buildKeystrokeItems(List<TimelineRenderItem> items,
+			List<KeystrokeElement> keystrokeElements) {
+		List<Long> laneEnds = new ArrayList<>();
+		for (KeystrokeElement element : keystrokeElements) {
+			int lane = 0;
+			while (lane < laneEnds.size() && laneEnds.get(lane) > element.startMs()) {
+				lane++;
+			}
+			if (lane == laneEnds.size()) {
+				laneEnds.add(element.endMs());
+			} else {
+				laneEnds.set(lane, element.endMs());
+			}
+			items.add(new TimelineRenderItem(element.id(),
+					TimelineRows.getKeystrokeLaneRowId(lane),
+					new Span(element.startMs(), element.endMs()), null,
+					String.join(" + ", element.chips()),
+					null, null, null, null, null, null, null, null, null, null, null,
+					TimelineRenderItem.Variant.KEYSTROKE));
+		}
 	}
 
 	/** Port of {@code buildAllRegionSpans}: row spans used by drag constraints. */

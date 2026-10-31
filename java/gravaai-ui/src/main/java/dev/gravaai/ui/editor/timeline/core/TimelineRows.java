@@ -77,4 +77,31 @@ public final class TimelineRows {
 			return 0;
 		}
 	}
+
+	/** Row id for one keystroke lane ({@code row-keystrokes-<lane>}); lanes pack overlapping presses. */
+	public static String getKeystrokeLaneRowId(int lane) {
+		return TimelineConstants.KEYSTROKE_ROW_PREFIX + Math.max(0, lane);
+	}
+
+	/** True for any keystroke lane row (the bare base id counts as lane 0, like annotations). */
+	public static boolean isKeystrokeLaneRowId(String rowId) {
+		return TimelineConstants.KEYSTROKE_ROW_ID.equals(rowId)
+				|| (rowId != null && rowId.startsWith(TimelineConstants.KEYSTROKE_ROW_PREFIX));
+	}
+
+	/** Lane index encoded in a keystroke lane row id. */
+	public static int getKeystrokeLaneIndex(String rowId) {
+		if (TimelineConstants.KEYSTROKE_ROW_ID.equals(rowId)) {
+			return 0;
+		}
+		if (!isKeystrokeLaneRowId(rowId)) {
+			return 0;
+		}
+		try {
+			int parsed = Integer.parseInt(rowId.substring(TimelineConstants.KEYSTROKE_ROW_PREFIX.length()));
+			return Math.max(0, parsed);
+		} catch (NumberFormatException | StringIndexOutOfBoundsException error) {
+			return 0;
+		}
+	}
 }

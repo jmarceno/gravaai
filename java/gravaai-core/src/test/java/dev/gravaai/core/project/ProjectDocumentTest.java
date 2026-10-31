@@ -53,8 +53,15 @@ class ProjectDocumentTest {
 		ProjectDocument document = ProjectDocument.load(projectFile(name, contents));
 		ObjectNode saved = document.toJson();
 
+		// The canonical save always carries keystrokeElements now; these fixtures predate the
+		// editable Keystrokes track, so an absent field means the same empty list.
+		JsonNode expected = original.deepCopy();
+		if (expected.get("editor") instanceof ObjectNode editor && !editor.has("keystrokeElements")) {
+			editor.set("keystrokeElements", Json.nodeFactory().arrayNode());
+		}
+
 		assertEquals(2, saved.get("version").intValue());
-		assertSemanticallyEqual(original, saved, "$");
+		assertSemanticallyEqual(expected, saved, "$");
 	}
 
 	@Test

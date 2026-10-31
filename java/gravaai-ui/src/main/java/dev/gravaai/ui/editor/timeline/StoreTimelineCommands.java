@@ -16,6 +16,7 @@ import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorCommand;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.SourceAudioCommands;
 import dev.gravaai.core.editor.ZoomCommands;
@@ -90,6 +91,8 @@ public final class StoreTimelineCommands implements TimelineCommands {
 			case TimelineSelection.ANNOTATION ->
 				store.apply(new AnnotationCommands.Select(selection.id()));
 			case TimelineSelection.CAPTION -> store.apply(new CaptionCommands.Select(selection.id()));
+			case TimelineSelection.KEYSTROKE ->
+				store.apply(new KeystrokeCommands.Select(selection.id()));
 			default -> store.clearSelectionsExcept(null, null, null, null, null);
 		}
 	}
@@ -122,6 +125,10 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		if (TimelineRows.isAnnotationTrackRowId(rowId)) {
 			store.apply(new AnnotationCommands.ChangeSpan(itemId, span.start(), span.end(),
 					TimelineRows.getAnnotationTrackIndex(rowId)));
+			return;
+		}
+		if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
+			store.apply(new KeystrokeCommands.ChangeSpan(itemId, span.start(), span.end()));
 			return;
 		}
 		if (TimelineConstants.CAPTION_ROW_ID.equals(rowId)) {
@@ -223,6 +230,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		String caption = store.selectedCaptionId();
 		if (caption != null) {
 			store.apply(new CaptionCommands.Delete(caption));
+			return;
+		}
+		String keystroke = store.selectedKeystrokeId();
+		if (keystroke != null) {
+			store.apply(new KeystrokeCommands.Delete(keystroke));
 		}
 	}
 
@@ -326,6 +338,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		for (var caption : store.state().autoCaptions()) {
 			if (caption.id().equals(itemId)) {
 				return TimelineConstants.CAPTION_ROW_ID;
+			}
+		}
+		for (var keystroke : store.state().keystrokeElements()) {
+			if (keystroke.id().equals(itemId)) {
+				return TimelineConstants.KEYSTROKE_ROW_ID;
 			}
 		}
 		return "";

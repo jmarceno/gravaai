@@ -960,13 +960,10 @@ public final class AppContext {
 			return;
 		}
 		try {
-			RecordingsDirectory recordingsDirectory = new RecordingsDirectory(userData);
-			recentProjects = new RecentProjectsStore(userData.recentProjectsFile());
-			projects = new ProjectManager(
-					userData,
-					recordingsDirectory,
-					recentProjects,
-					new FirstFrameThumbnail(ffmpegBinary()));
+			ProjectManager projectManager = ensureProjects();
+			if (projectManager == null) {
+				throw new IllegalStateException("project library could not be created");
+			}
 			// The recording service owns the library listing and the recoverable banner (Appendix A);
 			// the dashboard consumes them through these read ports.
 			RecordingsReadModel recordings = includeSources -> {
@@ -1131,7 +1128,7 @@ public final class AppContext {
 				}
 			};
 			DashboardDependencies dependencies = new DashboardDependencies(
-					userData, projects, recordings, recoverable, preferences, Trash.defaultTrash(), actions,
+					userData, projectManager, recordings, recoverable, preferences, Trash.defaultTrash(), actions,
 					new ServiceGlobalShortcutsController(requireShortcutsService()),
 					new PlaceholderAgentSettingsController(appPath()),
 					automationService == null ? null : new ServiceAutomationsController(automationService, portal),
@@ -1275,6 +1272,9 @@ public final class AppContext {
 		if (appSettings == null) {
 			appSettings = new AppSettingsStore(userData.appSettingsFile());
 		}
+		// The editor saves/renames through the project manager even when the session never
+		// opens the dashboard (ensureProjects creates it lazily in that case).
+		ensureProjects();
 		return new EditorWindow.Services(
 				projects,
 				appSettings,
@@ -1371,12 +1371,35 @@ public final class AppContext {
 	}
 
 	private void rememberProject(Path projectPath) {
-		if (projects != null) {
-			projects.rememberRecentProject(projectPath.toString());
+		ProjectManager manager = ensureProjects();
+		if (manager != null) {
+			manager.rememberRecentProject(projectPath.toString());
 		}
 		if (dashboardView != null) {
 			dashboardView.refresh();
 		}
+	}
+
+	/**
+	 * The project manager and its recent-history store, created on first use. Editor-only
+	 * sessions (record → edit → save without ever opening the dashboard) must still remember
+	 * saved projects, so the editor's save paths cannot depend on {@link #buildDashboard()}
+	 * having run. Null when the library cannot be created; the callers degrade the same way
+	 * they did before it existed.
+	 */
+	private @Nullable ProjectManager ensureProjects() {
+		if (projects == null) {
+			try {
+				RecentProjectsStore store = new RecentProjectsStore(userData.recentProjectsFile());
+				projects = new ProjectManager(userData, new RecordingsDirectory(userData), store,
+						new FirstFrameThumbnail(ffmpegBinary()));
+				recentProjects = store;
+			} catch (RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"project library unavailable: " + error);
+			}
+		}
+		return projects;
 	}
 
 	/** Dev/automation trigger: GRAVAAI_EDITOR_OPEN=<project> opens the real editor window. */

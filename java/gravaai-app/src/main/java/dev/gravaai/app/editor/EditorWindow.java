@@ -312,6 +312,14 @@ public final class EditorWindow {
 			if (SAVE_SHORTCUT.match(event)) {
 				event.consume();
 				saveProject();
+				return;
+			}
+			// Play / pause on the configured shortcut (space by default), like Premiere and
+			// Kdenlive: it works wherever the user is, except while typing or when a focused
+			// control uses Space itself.
+			if (matchesPlayPause(event)) {
+				event.consume();
+				session.playbackPort().togglePlayPause();
 			}
 		});
 		shell.header().setDirty(unsavedChanges());
@@ -630,6 +638,40 @@ public final class EditorWindow {
 	 */
 	private boolean unsavedChanges() {
 		return session.dirty() || session.isUnsaved();
+	}
+
+	/**
+	 * The play/pause shortcut (space by default) against the user's configured binding. It yields
+	 * while the user is typing or when a focused control handles Space itself, so a focused button
+	 * or kit Switch/Select/Accordion still activates and never double-fires.
+	 */
+	private boolean matchesPlayPause(KeyEvent event) {
+		if (event.getTarget() instanceof javafx.scene.Node target
+				&& isSpaceActivatingControl(target)) {
+			return false;
+		}
+		Shortcuts.Binding binding = actions.shortcuts().get(Shortcuts.Action.PLAY_PAUSE);
+		if (binding == null) {
+			return false;
+		}
+		return Shortcuts.matchesShortcut(
+				dev.gravaai.ui.editor.timeline.core.TimelineShortcuts.keyOf(event.getCode()),
+				event.isControlDown(), event.isMetaDown(), event.isShiftDown(), event.isAltDown(),
+				binding, Shortcuts.isMacPlatform());
+	}
+
+	/** Whether the node or one of its ancestors consumes Space for its own activation. */
+	private static boolean isSpaceActivatingControl(javafx.scene.Node node) {
+		for (javafx.scene.Node current = node; current != null; current = current.getParent()) {
+			if (current instanceof javafx.scene.control.TextInputControl
+					|| current instanceof javafx.scene.control.ButtonBase
+					|| current instanceof dev.gravaai.ui.kit.Select
+					|| current instanceof dev.gravaai.ui.kit.Switch
+					|| current instanceof dev.gravaai.ui.kit.Accordion) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

@@ -19,6 +19,7 @@ import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.KeystrokeElement;
+import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
@@ -363,8 +364,10 @@ public final class EditorSession implements AutoCloseable {
 	}
 
 	/**
-	 * Writes the sidecar's presses into {@code editor} as {@code keystrokeElements}; a no-op (and
-	 * {@code false}) when the recording has no readable sidecar or no presses.
+	 * Writes the sidecar's presses into {@code editor} as {@code keystrokeElements}, grouped into
+	 * word elements by {@link KeystrokeGrouping} (fast typing becomes one element per word;
+	 * modifier combinations and special keys stay individual); a no-op (and {@code false}) when
+	 * the recording has no readable sidecar or no presses.
 	 */
 	private static boolean addKeystrokeElementsFromSidecar(
 			tools.jackson.databind.node.ObjectNode editor, Path videoPath, long lingerMs) {
@@ -377,17 +380,26 @@ public final class EditorSession implements AutoCloseable {
 		if (events.isEmpty()) {
 			return false;
 		}
+		List<KeystrokeGrouping.Event> presses = new ArrayList<>(events.size());
+		for (KeystrokeTypes.KeystrokeEvent event : events) {
+			presses.add(new KeystrokeGrouping.Event(event.timeMs(), event.key(),
+					event.modifiers().stream().map(KeystrokeTypes.KeyModifier::wire).toList()));
+		}
+		List<KeystrokeGrouping.Group> groups = KeystrokeGrouping.group(presses, lingerMs);
+		if (groups.isEmpty()) {
+			return false;
+		}
 		tools.jackson.databind.node.ArrayNode elements = editor.putArray("keystrokeElements");
 		int index = 1;
-		for (KeystrokeTypes.KeystrokeEvent event : events) {
+		for (KeystrokeGrouping.Group group : groups) {
 			tools.jackson.databind.node.ObjectNode node = elements.addObject();
 			node.put("id", "key-" + index++);
-			node.put("startMs", event.timeMs());
-			node.put("endMs", event.timeMs() + Math.max(1, lingerMs));
-			node.put("key", event.key());
+			node.put("startMs", group.startMs());
+			node.put("endMs", group.endMs());
+			node.put("key", group.text());
 			tools.jackson.databind.node.ArrayNode modifiers = node.putArray("modifiers");
-			for (KeystrokeTypes.KeyModifier modifier : event.modifiers()) {
-				modifiers.add(modifier.wire());
+			for (String modifier : group.modifiers()) {
+				modifiers.add(modifier);
 			}
 		}
 		return true;

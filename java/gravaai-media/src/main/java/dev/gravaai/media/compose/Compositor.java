@@ -229,10 +229,12 @@ public final class Compositor implements AutoCloseable {
 			CaptionRenderer.draw(canvas, input.captions(), width, height,
 					Math.round(input.sourceTimeSeconds() * 1000));
 		}
-		// Stage 10: key-press chips (TS keystrokeContainer is the topmost overlay sibling).
+		// Stage 10: key-press chips (TS keystrokeContainer is the topmost overlay sibling). The
+		// chips lift above the caption band so they never render over the subtitles.
 		if (input.keystrokes().enabled() && !input.keystrokes().presses().isEmpty()) {
 			KeystrokeRenderer.draw(canvas, input.keystrokes(), width, height,
-					Math.round(input.sourceTimeSeconds() * 1000));
+					Math.round(input.sourceTimeSeconds() * 1000),
+					CaptionRenderer.bottomBandHeight(input.captions(), width, height));
 		}
 		// Stage 11: fade-through-black clip transitions. The TS fadeOverlay is above every layer.
 		double fadeAmount = input.fade().amountAt(input.timeSeconds() * 1000);

@@ -85,7 +85,7 @@ class ZoomSuggestionUtilsTest {
 	}
 
 	@Test
-	@DisplayName("creates one zoom track for a single isolated click with 500ms padding")
+	@DisplayName("creates one zoom track for a single isolated click with the cluster padding")
 	void createsOneTrackForSingleClick() {
 		SuggestionResult result = suggest(withMoves(List.of(makeClick(5_000)), TOTAL_MS), TOTAL_MS);
 
@@ -129,7 +129,7 @@ class ZoomSuggestionUtilsTest {
 	}
 
 	@Test
-	@DisplayName("merges two clicks within 2500ms into one zoom track")
+	@DisplayName("merges two clicks within the merge gap into one zoom track")
 	void mergesClicksWithinGap() {
 		double lastClickMs = 4_000 + ZoomSuggestionUtils.CLICK_CLUSTER_MERGE_GAP_MS - 1;
 		SuggestionResult result = suggest(withMoves(
@@ -143,7 +143,7 @@ class ZoomSuggestionUtilsTest {
 	}
 
 	@Test
-	@DisplayName("splits two clicks more than 2500ms apart into separate zoom tracks")
+	@DisplayName("splits two clicks more than the merge gap apart into separate zoom tracks")
 	void splitsClicksOutsideGap() {
 		double click1 = 3_000;
 		double click2 = 3_000 + ZoomSuggestionUtils.CLICK_CLUSTER_MERGE_GAP_MS + 1;
@@ -161,7 +161,7 @@ class ZoomSuggestionUtilsTest {
 	}
 
 	@Test
-	@DisplayName("chains multiple clicks: 3 in a row within 2500ms each become one track")
+	@DisplayName("chains multiple clicks: 3 in a row within the merge gap become one track")
 	void chainsClicks() {
 		SuggestionResult result = suggest(withMoves(
 				List.of(makeClick(0), makeClick(2_000), makeClick(4_000)), TOTAL_MS), TOTAL_MS);

@@ -16,10 +16,19 @@ public record KeystrokeSpec(
 		double bottomOffset,
 		List<Press> presses) {
 
-	/** One key press: its time and the chip labels (modifiers first, then the key). */
-	public record Press(long timeMs, List<String> chipLabels) {
+	/**
+	 * One key press (or one grouped word element): its display window and the chip labels
+	 * (modifiers first, then the key). {@code endMs} 0 means the legacy window
+	 * {@code timeMs + lingerMs}.
+	 */
+	public record Press(long timeMs, long endMs, List<String> chipLabels) {
 		public Press {
 			chipLabels = chipLabels == null ? List.of() : List.copyOf(chipLabels);
+		}
+
+		/** Legacy shape without an explicit window; the renderer uses {@code timeMs + linger}. */
+		public Press(long timeMs, List<String> chipLabels) {
+			this(timeMs, 0, chipLabels);
 		}
 	}
 

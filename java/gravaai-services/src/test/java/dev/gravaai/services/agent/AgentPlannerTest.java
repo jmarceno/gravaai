@@ -350,7 +350,10 @@ class AgentPlannerTest {
 				context(telemetry)));
 		assertEquals(1, result.state().zoomRegions().size());
 		assertEquals(ZoomMode.AUTO, result.state().zoomRegions().get(0).mode());
-		assertEquals(600, result.state().zoomRegions().get(0).startMs());
+		// Click at 1100 ms with the 1500 ms pad: the region starts clamped at 0 and spans at
+		// least the 3000 ms minimum.
+		assertEquals(0, result.state().zoomRegions().get(0).startMs());
+		assertEquals(3_000, result.state().zoomRegions().get(0).endMs());
 	}
 
 	@Test

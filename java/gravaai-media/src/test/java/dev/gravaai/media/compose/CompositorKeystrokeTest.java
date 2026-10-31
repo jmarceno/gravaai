@@ -149,4 +149,19 @@ class CompositorKeystrokeTest {
 		assertTrue(darkPixels(top, 0, 80) > 50, "top-center keystrokes missing");
 		assertTrue(darkPixels(top, HEIGHT - 70, HEIGHT) == 0, "bottom chips drawn for top-center");
 	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("lifts bottom chips above the caption band when subtitles are shown")
+	void liftsAboveCaptions() throws Exception {
+		CaptionSpec captions = new CaptionSpec(true, CaptionSpec.DEFAULT_FONT_FAMILY, 30, 3, 62,
+				1, "none", 17.5, "#FFFFFF", "#A3A3A3", 0.9,
+				List.of(new CaptionSpec.Cue("c1", 0, 10_000, "hello")));
+		FrameInput lifted = new FrameInput(0, 0.8, SOURCE, null, List.of(), BACKGROUND, 0,
+				LayoutSpec.FULL_FRAME, ZoomSpec.NONE, FrameStyle.DEFAULT, CursorSpec.DEFAULT,
+				WebcamSpec.DISABLED, List.of(), captions, spec(true, "bottom-center"));
+		// At this frame size the unlifted chips start at y≈94; with the caption band they are
+		// lifted to y≈54, so rows 40..90 are empty before and hold chips after the lift.
+		assertTrue(darkPixels(render(lifted), 40, 90) > 50, "chips not lifted above the captions");
+	}
 }

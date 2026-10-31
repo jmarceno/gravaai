@@ -25,10 +25,29 @@ import io.github.humbleui.types.Rect;
 final class CaptionRenderer {
 
 	private static final double CAPTION_LINE_HEIGHT = 1.32;
+	private static final double CAPTION_PADDING_Y = 0.78;
 	private static final double DEFAULT_MAX_WIDTH = 62;
 	private static final double DEFAULT_FONT_SIZE = 30;
 
 	private CaptionRenderer() {
+	}
+
+	/**
+	 * Conservative height in px of the caption band measured from the frame's bottom edge: the
+	 * bottom offset plus the largest possible box ({@code maxRows} lines). Overlays stacked below
+	 * the captions (keystroke chips) use this to keep clear of the subtitles without measuring
+	 * text; 0 when the captions are disabled or have no cues.
+	 */
+	static double bottomBandHeight(CaptionSpec captions, int width, int height) {
+		if (captions == null || !captions.enabled() || captions.cues().isEmpty()) {
+			return 0;
+		}
+		double maxWidth = captions.maxWidth() > 0 ? captions.maxWidth() : DEFAULT_MAX_WIDTH;
+		double fontSize = scaledFontSize(captions.fontSize(), width, maxWidth);
+		int rows = Math.max(1, captions.maxRows());
+		double boxHeight = rows * fontSize * CAPTION_LINE_HEIGHT
+				+ 2 * fontSize * CAPTION_PADDING_Y;
+		return (height * captions.bottomOffset()) / 100.0 + boxHeight;
 	}
 
 	static void draw(Canvas canvas, CaptionSpec captions, int width, int height, long timeMs) {
@@ -42,7 +61,7 @@ final class CaptionRenderer {
 		}
 		try {
 			double paddingX = fontSize * 1.1;
-			double paddingY = fontSize * 0.78;
+			double paddingY = fontSize * CAPTION_PADDING_Y;
 			double targetWidth = Math.max(1, width * (captions.maxWidth() / 100.0));
 			double textMaxWidth = Math.max(fontSize * 4, targetWidth - paddingX * 2);
 			CaptionLayout.ActiveCaptionLayout layout = CaptionLayout.buildActiveCaptionLayout(

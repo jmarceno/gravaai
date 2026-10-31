@@ -20,10 +20,19 @@ public final class ZoomSuggestionUtils {
 	public static final double MAX_DWELL_DURATION_MS = 2600;
 	public static final double DWELL_MOVE_THRESHOLD = 0.02;
 	public static final double MIN_FRESH_RECORDING_AUTO_ZOOM_SOURCE_ASPECT_RATIO = 1.2;
-	/** Max gap between consecutive clicks before they are split into separate zoom clusters. */
-	public static final double CLICK_CLUSTER_MERGE_GAP_MS = 2500;
-	/** Padding added before the first click and after the last click in a cluster. */
-	public static final double CLICK_CLUSTER_PAD_MS = 500;
+	/**
+	 * Max gap between consecutive clicks before they are split into separate zoom clusters. Twice
+	 * the pad, so the padded regions of split clusters never overlap (overlapping suggestions are
+	 * dropped against the reserved spans).
+	 */
+	public static final double CLICK_CLUSTER_MERGE_GAP_MS = 3000;
+	/**
+	 * Padding added before the first click and after the last click in a cluster. The zoom-in
+	 * transition runs ≈1522 ms from the region start, so 1500 ms lands the zoom exactly on the
+	 * click and holds it ≈1.5 s before the ease out — short pads make the in/out overlap and whip
+	 * (motion-sickness jarring).
+	 */
+	public static final double CLICK_CLUSTER_PAD_MS = 1500;
 
 	/**
 	 * Port of {@code CursorTelemetryPoint}; {@code interactionType} and {@code cursorType} are null

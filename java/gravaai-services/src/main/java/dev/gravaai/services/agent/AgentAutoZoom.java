@@ -12,9 +12,12 @@ import java.util.Set;
  */
 public final class AgentAutoZoom {
 
-	static final double CLICK_CLUSTER_MERGE_GAP_MS = 2500;
-	static final double CLICK_CLUSTER_PAD_MS = 500;
+	static final double CLICK_CLUSTER_MERGE_GAP_MS = 3000;
+	/** Mirrors the editor's pad: the zoom lands on the click instead of whipping in and out. */
+	static final double CLICK_CLUSTER_PAD_MS = 1500;
 	static final double DEFAULT_DURATION_MS = 1000;
+	/** Floor for the zoom span — shorter in/out whipsaws are jarring. */
+	static final double MIN_DURATION_MS = 3000;
 
 	/** One cursor telemetry sample (source time), public so app-side planners can build a context. */
 	public record Sample(double timeMs, double cx, double cy, String interactionType) {}
@@ -51,11 +54,14 @@ public final class AgentAutoZoom {
 		List<Suggestion> suggestions = new ArrayList<>();
 		for (List<Sample> cluster : clusters) {
 			double firstMs = cluster.get(0).timeMs();
+			double lastMs = cluster.get(cluster.size() - 1).timeMs();
 			double start = Math.max(0, firstMs - CLICK_CLUSTER_PAD_MS);
-			double duration = defaultDurationMs > 0 && Double.isFinite(defaultDurationMs)
+			double requested = defaultDurationMs > 0 && Double.isFinite(defaultDurationMs)
 					? defaultDurationMs
 					: DEFAULT_DURATION_MS;
-			double end = Math.min(Math.max(start + 1, totalMs), start + duration);
+			double duration = Math.max(requested, MIN_DURATION_MS);
+			double end = Math.min(Math.max(start + 1, totalMs),
+					Math.max(start + duration, lastMs + CLICK_CLUSTER_PAD_MS));
 			double sumX = 0;
 			double sumY = 0;
 			for (Sample sample : cluster) {

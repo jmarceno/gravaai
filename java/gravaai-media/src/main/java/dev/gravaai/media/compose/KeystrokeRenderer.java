@@ -17,21 +17,25 @@ import io.github.humbleui.skija.Typeface;
 /**
  * Port of {@code src/lib/exporter/keystrokeRenderer.ts} + the grouping/layout half of
  * {@code src/components/video-editor/keystrokeOverlay.ts} (plan §5.8 stage 10): presses grouped by
- * the grouping window, one group active at a time, fading in/out over {@code fadeMs}, laid out as
- * keycap chips wrapping at 90% of the frame width and positioned by the overlay settings.
+ * the grouping window (word elements carry their own display window via {@code Press.endMs}),
+ * one group active at a time, fading in/out over {@code fadeMs}, laid out as keycap chips
+ * wrapping at 90% of the frame width and positioned by the overlay settings. Bottom-positioned
+ * groups lift above the caption band ({@code reservedBottomPx}) so they never cover subtitles.
  */
 final class KeystrokeRenderer {
 
 	private static final int KEYSTROKE_REFERENCE_HEIGHT = 1080;
 	private static final double KEYSTROKE_MIN_FONT_PX = 9;
 	private static final int MAX_KEYSTROKE_PRESSES_PER_GROUP = 6;
+	/** Gap kept between the chips and the overlay band reserved below them (captions). */
+	private static final double RESERVED_BAND_GAP_FONT = 0.5;
 	private static final int CHIP_FILL = 0xCC000000;
 	private static final int CHIP_TEXT = 0xFFFFFFFF;
 	private static final int CHIP_STROKE = 0x29FFFFFF;
 	private static final int SEPARATOR_TEXT = 0xBFFFFFFF;
 	private static final String SEPARATOR = "+";
 
-	private record Group(long startMs, long endMs, List<List<String>> presses) {
+	record Group(long startMs, long endMs, List<List<String>> presses) {
 	}
 
 	private record Chip(String label, double x, double y, double width, double height,
@@ -50,6 +54,16 @@ final class KeystrokeRenderer {
 	}
 
 	static void draw(Canvas canvas, KeystrokeSpec spec, int width, int height, long timeMs) {
+		draw(canvas, spec, width, height, timeMs, 0);
+	}
+
+	/**
+	 * @param reservedBottomPx height in px reserved at the frame's bottom edge (the caption band,
+	 *        per {@link CaptionRenderer#bottomBandHeight}); bottom-positioned chips are lifted
+	 *        above it so they never cover the subtitles
+	 */
+	static void draw(Canvas canvas, KeystrokeSpec spec, int width, int height, long timeMs,
+			double reservedBottomPx) {
 		if (spec == null || !spec.enabled() || spec.presses().isEmpty()) {
 			return;
 		}
@@ -74,41 +88,45 @@ final class KeystrokeRenderer {
 			return;
 		}
 		try {
-			Layout layout = measure(font, active, spec, width, height);
+			Layout layout = measure(font, active, spec, width, height, reservedBottomPx);
 			drawLayout(canvas, layout, spec, opacity, font);
 		} finally {
 			font.close();
 		}
 	}
 
-	private static List<Group> buildGroups(KeystrokeSpec spec) {
+	/** The display window of one press: the explicit element span, or the legacy linger window. */
+	private static long pressEndMs(KeystrokeSpec.Press press, long lingerMs) {
+		return press.endMs() > 0 ? press.endMs() : press.timeMs() + lingerMs;
+	}
+
+	static List<Group> buildGroups(KeystrokeSpec spec) {
 		List<KeystrokeSpec.Press> sorted = new ArrayList<>(spec.presses());
 		sorted.sort(Comparator.comparingLong(KeystrokeSpec.Press::timeMs));
 		List<Group> groups = new ArrayList<>();
 		List<KeystrokeSpec.Press> current = new ArrayList<>();
 		List<List<String>> chips = new ArrayList<>();
+		long currentEndMs = 0;
 		for (KeystrokeSpec.Press press : sorted) {
 			if (press.chipLabels().isEmpty()) {
 				continue;
 			}
 			KeystrokeSpec.Press last = current.isEmpty() ? null : current.get(current.size() - 1);
 			if (last != null && press.timeMs() - last.timeMs() > spec.groupingMs()) {
-				groups.add(new Group(current.get(0).timeMs(),
-						current.get(current.size() - 1).timeMs() + spec.lingerMs(),
-						List.copyOf(chips)));
+				groups.add(new Group(current.get(0).timeMs(), currentEndMs, List.copyOf(chips)));
 				current = new ArrayList<>();
 				chips = new ArrayList<>();
+				currentEndMs = 0;
 			}
 			current.add(press);
 			chips.add(press.chipLabels());
+			currentEndMs = Math.max(currentEndMs, pressEndMs(press, spec.lingerMs()));
 			if (chips.size() > MAX_KEYSTROKE_PRESSES_PER_GROUP) {
 				chips.remove(0);
 			}
 		}
 		if (!current.isEmpty()) {
-			groups.add(new Group(current.get(0).timeMs(),
-					current.get(current.size() - 1).timeMs() + spec.lingerMs(),
-					List.copyOf(chips)));
+			groups.add(new Group(current.get(0).timeMs(), currentEndMs, List.copyOf(chips)));
 		}
 		return groups;
 	}
@@ -128,7 +146,7 @@ final class KeystrokeRenderer {
 
 	/** {@code measureKeystrokeGroupLayout}. */
 	private static Layout measure(Font font, Group group, KeystrokeSpec spec, double width,
-			double height) {
+			double height, double reservedBottomPx) {
 		double fontPx = font.getSize();
 		double chipPadX = fontPx * 0.42;
 		double chipPadY = fontPx * 0.2;
@@ -191,12 +209,19 @@ final class KeystrokeRenderer {
 		double boxHeight = rowCount * chipHeight + Math.max(0, rowCount - 1) * rowGap
 				+ boxPadY * 2;
 		double offsetPx = (height * spec.bottomOffset()) / 100.0;
+		boolean bottomPositioned = !"top-center".equals(spec.position());
+		if (bottomPositioned && reservedBottomPx > 0) {
+			// Lift the chips above the reserved band (captions) with one small gap, never past
+			// mid-frame, so keystrokes and subtitles stay readable side by side.
+			offsetPx = Math.min(height * 0.5,
+					Math.max(offsetPx, reservedBottomPx + fontPx * RESERVED_BAND_GAP_FONT));
+		}
 		double x = switch (spec.position()) {
 			case "bottom-left" -> sidePadding;
 			case "bottom-right" -> width - boxWidth - sidePadding;
 			default -> (width - boxWidth) / 2;
 		};
-		double y = "top-center".equals(spec.position()) ? offsetPx : height - offsetPx - boxHeight;
+		double y = bottomPositioned ? height - offsetPx - boxHeight : offsetPx;
 
 		List<Chip> shiftedChips = new ArrayList<>();
 		for (Chip chip : chips) {

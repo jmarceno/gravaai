@@ -10,6 +10,7 @@ import java.util.List;
 
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.KeystrokeElement;
+import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 
@@ -285,9 +286,9 @@ public final class ProjectEditorInputs {
 
 	/**
 	 * Maps the keystroke overlay plus the presses. The editable {@code keystrokeElements} of the
-	 * state win when present (they are seeded from the sidecar at open time); the
-	 * {@code .keys.json} sidecar is the fallback so projects that never loaded elements still
-	 * render exactly as before.
+	 * state win when present (they are seeded word-grouped from the sidecar at open time); the
+	 * {@code .keys.json} sidecar is the fallback for projects that never loaded elements, grouped
+	 * through the same {@link KeystrokeGrouping} rules so both paths render the same elements.
 	 *
 	 * @param videoPath the source recording whose sidecar carries the presses, or null when the
 	 *        caller has no source file (then only the settings are mapped)
@@ -300,7 +301,8 @@ public final class ProjectEditorInputs {
 		List<KeystrokeSpec.Press> presses = new ArrayList<>();
 		if (editor.keystrokeElements() != null && !editor.keystrokeElements().isEmpty()) {
 			for (KeystrokeElement element : editor.keystrokeElements()) {
-				presses.add(new KeystrokeSpec.Press(element.startMs(), element.chips()));
+				presses.add(new KeystrokeSpec.Press(element.startMs(), element.endMs(),
+						element.chips()));
 			}
 		} else if (videoPath != null) {
 			Path sidecar = Path.of(videoPath.toString() + ".keys.json");
@@ -310,6 +312,7 @@ public final class ProjectEditorInputs {
 							.shared().readTree(Files.readString(sidecar));
 					tools.jackson.databind.JsonNode events = root.path("events");
 					if (events.isArray()) {
+						List<KeystrokeGrouping.Event> raw = new ArrayList<>();
 						for (tools.jackson.databind.JsonNode event : events) {
 							String key = event.path("key").isString()
 									? event.path("key").asString().trim()
@@ -317,25 +320,28 @@ public final class ProjectEditorInputs {
 							if (key.isEmpty()) {
 								continue;
 							}
-							List<String> chips = new ArrayList<>();
-							tools.jackson.databind.JsonNode modifiers = event.path("modifiers");
-							if (modifiers.isArray()) {
-								for (tools.jackson.databind.JsonNode modifier : modifiers) {
-									String label = switch (modifier.asString()) {
-										case "ctrl" -> "Ctrl";
-										case "alt" -> "Alt";
-										case "shift" -> "Shift";
-										case "super" -> "Super";
-										default -> null;
-									};
-									if (label != null) {
-										chips.add(label);
-									}
+							List<String> modifiers = new ArrayList<>();
+							tools.jackson.databind.JsonNode rawModifiers = event.path("modifiers");
+							if (rawModifiers.isArray()) {
+								for (tools.jackson.databind.JsonNode modifier : rawModifiers) {
+									modifiers.add(modifier.asString());
 								}
 							}
-							chips.add(key);
-							presses.add(new KeystrokeSpec.Press(
-									Math.round(event.path("timeMs").asDouble()), chips));
+							raw.add(new KeystrokeGrouping.Event(
+									Math.round(event.path("timeMs").asDouble()), key, modifiers));
+						}
+						for (KeystrokeGrouping.Group group : KeystrokeGrouping.group(raw,
+								settings.lingerMs())) {
+							List<String> chips = new ArrayList<>();
+							for (String modifier : group.modifiers()) {
+								String label = KeystrokeElement.modifierLabel(modifier);
+								if (label != null) {
+									chips.add(label);
+								}
+							}
+							chips.add(group.text());
+							presses.add(new KeystrokeSpec.Press(group.startMs(), group.endMs(),
+									chips));
 						}
 					}
 				} catch (IOException error) {

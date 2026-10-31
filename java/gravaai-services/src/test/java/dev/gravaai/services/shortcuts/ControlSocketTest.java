@@ -57,6 +57,22 @@ class ControlSocketTest {
 	}
 
 	@Test
+	@DisplayName("handleControlLine dispatches open <path> only when an open sink is installed")
+	void handleControlLineOpensFiles() {
+		List<Path> opened = new ArrayList<>();
+		List<GlobalShortcutAction> seen = new ArrayList<>();
+		assertEquals("ok\n", ControlSocket.handleControlLine(
+				"open /home/u/My project.gravaai", seen::add, null, opened::add));
+		assertEquals("error\n", ControlSocket.handleControlLine("open", seen::add, null, opened::add));
+		assertEquals("error\n", ControlSocket.handleControlLine("open ", seen::add, null, opened::add));
+		assertEquals(List.of(Path.of("/home/u/My project.gravaai")), opened);
+		assertTrue(seen.isEmpty());
+		// Without a sink the line is an unknown action, so a second launch cannot silently drop it.
+		assertEquals("error\n", ControlSocket.handleControlLine(
+				"open /home/u/My project.gravaai", seen::add));
+	}
+
+	@Test
 	@DisplayName("getControlSocketPath prefers XDG_RUNTIME_DIR")
 	void getControlSocketPathPrefersRuntimeDir() {
 		assertEquals(
@@ -114,6 +130,25 @@ class ControlSocketTest {
 			assertEquals(ControlSocket.SendResult.ERROR, ControlSocket.send("x".repeat(65), server.socketPath()));
 			assertTrue(seen.isEmpty());
 		}
+	}
+
+	@Test
+	@DisplayName("the control socket forwards open <path> and accepts long file paths")
+	void forwardsOpenLine() throws IOException {
+		Path runtime = Files.createDirectory(tempDir.resolve("runtime"));
+		Path socketPath = ControlSocket.getControlSocketPath(Map.of("XDG_RUNTIME_DIR", runtime.toString()));
+		List<Path> opened = new ArrayList<>();
+		try (ControlSocket.Server _ = ControlSocket.start(
+				action -> { }, () -> { }, opened::add, socketPath)) {
+			assertEquals(ControlSocket.SendResult.OK,
+					ControlSocket.send(ControlSocket.openLine(tempDir.resolve("a.gravaai")), socketPath));
+			assertEquals(ControlSocket.SendResult.OK,
+					ControlSocket.send(ControlSocket.openLine(Path.of("/x".repeat(120) + "/deep project.gravaai")),
+							socketPath));
+			assertEquals(ControlSocket.SendResult.ERROR, ControlSocket.send("open", socketPath));
+		}
+		assertEquals(List.of(tempDir.resolve("a.gravaai"),
+				Path.of("/x".repeat(120) + "/deep project.gravaai")), opened);
 	}
 
 	@Test

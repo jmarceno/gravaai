@@ -70,6 +70,7 @@ Exec=$NAME %U
 Icon=$NAME
 Terminal=false
 Categories=AudioVideo;Recorder;
+MimeType=application/x-gravaai;
 StartupWMClass=GravaaiApp
 DESKTOP
 
@@ -116,10 +117,11 @@ if [ -n "${APPIMAGE:-}" ] && [ -z "${GRAVAAI_NO_DESKTOP_INTEGRATION:-}" ]; then
 		*)
 			_data="${XDG_DATA_HOME:-$HOME/.local/share}"
 			_desktop="$_data/applications/gravaai.desktop"
-			if ! grep -qxF "Exec=\"$APPIMAGE\" %U" "$_desktop" 2>/dev/null; then
-				mkdir -p "$_data/applications" "$_data/icons/hicolor/256x256/apps" 2>/dev/null
-				cp "$APPDIR/Gravaai.png" "$_data/icons/hicolor/256x256/apps/gravaai.png" 2>/dev/null
-				cat > "$_desktop.tmp" 2>/dev/null <<DESKTOP
+			mkdir -p "$_data/applications" "$_data/mime/packages" "$_data/icons/hicolor/256x256/apps" 2>/dev/null
+			cp "$APPDIR/Gravaai.png" "$_data/icons/hicolor/256x256/apps/gravaai.png" 2>/dev/null
+			# Rewritten whenever the AppImage moves or the entry format changes (an older build
+			# skipped the write when the Exec line matched, leaving entries without MimeType).
+			cat > "$_desktop.tmp" 2>/dev/null <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Gravaai
@@ -130,12 +132,31 @@ TryExec=$APPIMAGE
 Icon=gravaai
 Terminal=false
 Categories=AudioVideo;Recorder;
+MimeType=application/x-gravaai;
 StartupWMClass=GravaaiApp
 DESKTOP
+			if ! cmp -s "$_desktop.tmp" "$_desktop" 2>/dev/null; then
 				mv "$_desktop.tmp" "$_desktop" 2>/dev/null
 				command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$_data/applications" >/dev/null 2>&1
-				command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$_data/icons/hicolor" >/dev/null 2>&1
+			else
+				rm -f "$_desktop.tmp" 2>/dev/null
 			fi
+			# The .gravaai project type (legacy .openscreen included) so the file manager offers
+			# Gravaai and opens projects by default when a file is clicked.
+			cat > "$_data/mime/packages/gravaai.xml" 2>/dev/null <<MIME
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+	<mime-type type="application/x-gravaai">
+		<comment>Gravaai project</comment>
+		<sub-class-of type="application/json"/>
+		<glob pattern="*.gravaai"/>
+		<glob pattern="*.openscreen"/>
+	</mime-type>
+</mime-info>
+MIME
+			command -v update-mime-database >/dev/null 2>&1 && update-mime-database "$_data/mime" >/dev/null 2>&1
+			command -v xdg-mime >/dev/null 2>&1 && xdg-mime default gravaai.desktop application/x-gravaai >/dev/null 2>&1
+			command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$_data/icons/hicolor" >/dev/null 2>&1
 			;;
 	esac
 fi

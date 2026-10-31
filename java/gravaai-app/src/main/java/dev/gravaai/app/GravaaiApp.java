@@ -23,8 +23,7 @@ public final class GravaaiApp extends Application {
 		// Plan §5.12: the bundled DM Sans static instances must be loaded before any real Scene.
 		// In the direct-editor startup path the lightweight skeleton window is shown first (before
 		// the budget lines), so the font join moves after it (AppContext.ensureFonts()).
-		if (System.getenv("GRAVAAI_EDITOR_OPEN") == null
-				|| System.getenv("GRAVAAI_EDITOR_OPEN").isBlank()) {
+		if (!Main.isEditorFirstLaunch()) {
 			Main.ensureFontsLoaded();
 		}
 	}
@@ -32,7 +31,7 @@ public final class GravaaiApp extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		Startup.log("Application.start");
-		context = AppContext.create(Main.launchAction());
+		context = AppContext.create(Main.launchAction(), Main.launchFile());
 		context.start(primaryStage);
 		Startup.log("services ready");
 		Platform.runLater(() -> Startup.log("first pulse done"));

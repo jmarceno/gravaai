@@ -51,6 +51,8 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final Consumer<GlobalShortcutAction> actionSink;
 	/** Null when a second launch cannot bring the app to the front. */
 	private final @Nullable Runnable showSink;
+	/** Null when the app cannot open a project/recording passed by a second launch. */
+	private final @Nullable Consumer<Path> openFileSink;
 	private final Object lock = new Object();
 
 	private ControlSocket.@Nullable Server controlSocket;
@@ -81,12 +83,27 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			Map<String, String> env,
 			Consumer<GlobalShortcutAction> actionSink,
 			@Nullable Runnable showSink) {
+		this(settings, bundledCtl, appPath, env, actionSink, showSink, null);
+	}
+
+	/**
+	 * @param openFileSink opens a project/recording when a second launch sends {@code open <path>}
+	 */
+	public GlobalShortcutsService(
+			GlobalShortcutSettings settings,
+			Supplier<Path> bundledCtl,
+			String appPath,
+			Map<String, String> env,
+			Consumer<GlobalShortcutAction> actionSink,
+			@Nullable Runnable showSink,
+			@Nullable Consumer<Path> openFileSink) {
 		this.settings = settings;
 		this.bundledCtl = bundledCtl;
 		this.appPath = appPath;
 		this.env = env == null ? Map.of() : Map.copyOf(env);
 		this.actionSink = actionSink;
 		this.showSink = showSink;
+		this.openFileSink = openFileSink;
 	}
 
 	/** Port of {@code isCosmicDesktop}. */
@@ -145,7 +162,8 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	public void init() {
 		synchronized (lock) {
 			try {
-				controlSocket = ControlSocket.start(actionSink, showSink, ControlSocket.getControlSocketPath(env));
+				controlSocket = ControlSocket.start(actionSink, showSink, openFileSink,
+						ControlSocket.getControlSocketPath(env));
 			} catch (IOException error) {
 				LOG.log(System.Logger.Level.WARNING, "Could not start the control socket: " + error);
 			}

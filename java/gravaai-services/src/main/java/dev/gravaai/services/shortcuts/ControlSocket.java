@@ -37,14 +37,24 @@ public final class ControlSocket {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.shortcuts");
 
-	/** Port of {@code MAX_LINE_BYTES}: gravaai-ctl truncates its own line at 80 bytes. */
-	static final int MAX_LINE_BYTES = 64;
+	/** Port of {@code MAX_LINE_BYTES}: gravaai-ctl truncates its own line at 80 bytes. The
+	 *  server-side accept limit is larger so a second launch can forward {@code open} with a full
+	 *  file-system path (a gravaai-ctl client never sends one). */
+	static final int MAX_LINE_BYTES = 4096;
 
 	/** Port of the socket's 2 s timeout (C sets SO_RCVTIMEO/SO_SNDTIMEO to 2 s). */
 	private static final Duration TIMEOUT = Duration.ofSeconds(2);
 
 	/** Sent by a second plain launch: the running app brings its window to the front. */
 	public static final String SHOW_LINE = "show";
+
+	/** Prefix of the line a second launch sends to open a project/recording file. */
+	public static final String OPEN_PREFIX = "open ";
+
+	/** The control-socket line that asks the running app to open a project or recording file. */
+	public static String openLine(Path file) {
+		return OPEN_PREFIX + file;
+	}
 
 	private static final ScheduledExecutorService TIMEOUTS =
 			Executors.newSingleThreadScheduledExecutor(task -> {
@@ -86,10 +96,31 @@ public final class ControlSocket {
 	 */
 	public static String handleControlLine(
 			String line, Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow) {
+		return handleControlLine(line, onAction, onShow, null);
+	}
+
+	/**
+	 * Like the three-argument overload, and also accepts {@code open <path>} when
+	 * {@code onOpenFile} is set (a second launch with a project/recording file argument).
+	 */
+	public static String handleControlLine(String line, Consumer<GlobalShortcutAction> onAction,
+			@Nullable Runnable onShow, @Nullable Consumer<Path> onOpenFile) {
 		String action = line == null ? "" : line.trim();
 		if (onShow != null && SHOW_LINE.equals(action)) {
 			onShow.run();
 			return "ok\n";
+		}
+		if (onOpenFile != null && action.startsWith(OPEN_PREFIX)) {
+			String raw = action.substring(OPEN_PREFIX.length()).trim();
+			if (raw.isEmpty()) {
+				return "error\n";
+			}
+			try {
+				onOpenFile.accept(Path.of(raw));
+				return "ok\n";
+			} catch (RuntimeException error) {
+				return "error\n";
+			}
 		}
 		GlobalShortcutAction parsed = GlobalShortcutAction.fromWire(action);
 		if (parsed == null) {
@@ -113,6 +144,13 @@ public final class ControlSocket {
 	public static Server start(Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow,
 			Path socketPath)
 			throws IOException {
+		return start(onAction, onShow, null, socketPath);
+	}
+
+	/** Starts a server that also answers {@code open <path>} through {@code onOpenFile}. */
+	public static Server start(Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow,
+			@Nullable Consumer<Path> onOpenFile, Path socketPath)
+			throws IOException {
 		Path directory = socketPath.getParent();
 		Files.createDirectories(directory);
 		setPermissions(directory, "rwx------");
@@ -127,7 +165,7 @@ public final class ControlSocket {
 		}
 		setPermissions(socketPath, "rw-------");
 
-		Server server = new Server(socketPath, channel, onAction, onShow);
+		Server server = new Server(socketPath, channel, onAction, onShow, onOpenFile);
 		server.startAccepting();
 		return server;
 	}
@@ -194,15 +232,18 @@ public final class ControlSocket {
 		private final ServerSocketChannel channel;
 		private final Consumer<GlobalShortcutAction> onAction;
 		private final @Nullable Runnable onShow;
+		private final @Nullable Consumer<Path> onOpenFile;
 		private volatile boolean running = true;
 		private @Nullable Thread acceptThread;
 
 		private Server(Path socketPath, ServerSocketChannel channel,
-				Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow) {
+				Consumer<GlobalShortcutAction> onAction, @Nullable Runnable onShow,
+				@Nullable Consumer<Path> onOpenFile) {
 			this.socketPath = socketPath;
 			this.channel = channel;
 			this.onAction = onAction;
 			this.onShow = onShow;
+			this.onOpenFile = onOpenFile;
 		}
 
 		public Path socketPath() {
@@ -253,7 +294,9 @@ public final class ControlSocket {
 					}
 					String line = newline == -1 ? "" : new String(bytes, 0, newline, StandardCharsets.UTF_8);
 					answered = true;
-					String reply = line.length() > MAX_LINE_BYTES ? "error\n" : handleControlLine(line, onAction, onShow);
+					String reply = line.length() > MAX_LINE_BYTES
+							? "error\n"
+							: handleControlLine(line, onAction, onShow, onOpenFile);
 					writeFully(client, reply.getBytes(StandardCharsets.UTF_8));
 				}
 			} catch (IOException error) {

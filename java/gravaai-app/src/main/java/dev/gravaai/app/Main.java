@@ -2,6 +2,8 @@ package dev.gravaai.app;
 
 import org.jspecify.annotations.Nullable;
 
+import java.nio.file.Path;
+
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.services.shortcuts.ControlSocket;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
@@ -24,6 +26,8 @@ import javafx.application.Application;
 public final class Main {
 
 	private static volatile @Nullable GlobalShortcutAction launchAction;
+	/** Project or recording file passed as a positional CLI argument, or null. */
+	private static volatile @Nullable Path launchFile;
 	/** Background font preload thread; {@code null} on the direct-editor startup path. */
 	private static @Nullable Thread fontPreload;
 
@@ -47,12 +51,16 @@ public final class Main {
 		if (cli.dashboard()) {
 			System.setProperty("gravaai.dashboard", "true");
 		}
+		if (cli.launchFile() != null) {
+			launchFile = Path.of(cli.launchFile()).toAbsolutePath().normalize();
+		}
 
 		launchAction = GlobalShortcuts.parseCliAction(args);
 		if (!SingleInstance.acquire(userData.dir().resolve("instance.lock"))) {
-			// Another Gravaai is running: never open a second one. Hand it the launch action, or
-			// ask it to come to the front, and exit.
-			String line = launchAction != null ? launchAction.wire() : ControlSocket.SHOW_LINE;
+			// Another Gravaai is running: never open a second one. Hand it the launch file, the
+			// launch action, or a show request, and exit.
+			String line = launchFile != null ? ControlSocket.openLine(launchFile)
+					: launchAction != null ? launchAction.wire() : ControlSocket.SHOW_LINE;
 			if (SingleInstance.forward(line)) {
 				Startup.log("forwarded " + line + " to the running instance");
 			} else {
@@ -69,8 +77,7 @@ public final class Main {
 		// Plan §5.12 wants the bundled DM Sans faces loaded before any Scene. Loading them on a
 		// platform thread overlaps the ~60 ms it takes with JavaFX toolkit start-up (the init()
 		// thread joins this thread before building a Scene).
-		String editorOpen = System.getenv("GRAVAAI_EDITOR_OPEN");
-		boolean editorFirst = editorOpen != null && !editorOpen.isBlank();
+		boolean editorFirst = isEditorFirstLaunch();
 		if (!editorFirst) {
 			// The direct-editor fast path defers the font join past its budget lines; starting the
 			// preload thread there only adds CPU/IO contention before the skeleton is visible.
@@ -109,5 +116,22 @@ public final class Main {
 	/** The launch action that must be dispatched once the HUD is ready, or null. */
 	static @Nullable GlobalShortcutAction launchAction() {
 		return launchAction;
+	}
+
+	/** The project/recording file passed on the command line, or null. */
+	static @Nullable Path launchFile() {
+		return launchFile;
+	}
+
+	/**
+	 * True when the editor is the startup window (a launch file argument or the
+	 * {@code GRAVAAI_EDITOR_OPEN} dev trigger): the skeleton-first path skips the font preload.
+	 */
+	static boolean isEditorFirstLaunch() {
+		if (launchFile != null) {
+			return true;
+		}
+		String editorOpen = System.getenv("GRAVAAI_EDITOR_OPEN");
+		return editorOpen != null && !editorOpen.isBlank();
 	}
 }

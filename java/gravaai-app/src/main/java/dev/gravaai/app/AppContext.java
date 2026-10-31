@@ -17,6 +17,7 @@ import dev.gravaai.app.recording.RecordingWiring;
 import dev.gravaai.core.editor.EditorPreferencesStore;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.RecentProjectsStore;
+import dev.gravaai.core.storage.StorageFiles;
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.platform.dbus.SessionBus;
 import dev.gravaai.media.ffmpeg.MediaProbe;
@@ -86,6 +87,8 @@ public final class AppContext {
 	private final UserData userData;
 	/** The shortcut that started this process, or {@code null} for a plain launch. */
 	private final @Nullable GlobalShortcutAction pendingAction;
+	/** Project/recording passed on the command line (file-manager association), or null. */
+	private @Nullable Path launchFile;
 	private final AppIcons icons;
 
 	private @Nullable Stage primaryStage;
@@ -133,7 +136,18 @@ public final class AppContext {
 	}
 
 	public static AppContext create(@Nullable GlobalShortcutAction pendingAction) {
-		return new AppContext(UserData.resolve(), pendingAction);
+		return create(pendingAction, null);
+	}
+
+	/**
+	 * @param launchFile a project/recording passed on the command line (file-manager association);
+	 *        it takes precedence over the {@code GRAVAAI_EDITOR_OPEN} dev trigger
+	 */
+	public static AppContext create(@Nullable GlobalShortcutAction pendingAction,
+			@Nullable Path launchFile) {
+		AppContext context = new AppContext(UserData.resolve(), pendingAction);
+		context.launchFile = launchFile;
+		return context;
 	}
 
 	/** The app-settings store: created on first use, then shared by every service. */
@@ -158,12 +172,15 @@ public final class AppContext {
 		mainWindows.setEditorLauncher(this::openProjectInEditor);
 		// P2.11 fast path: when a project is requested at launch, the editor is the startup
 		// window. Skip the HUD and the heavy services on the critical path; they start after
-		// the editor window is visible.
-		String launchProject = System.getenv("GRAVAAI_EDITOR_OPEN");
-		if (launchProject != null && !launchProject.isBlank()) {
+		// the editor window is visible. The launch file (CLI/file-manager) wins over the
+		// GRAVAAI_EDITOR_OPEN dev trigger.
+		String envLaunchProject = System.getenv("GRAVAAI_EDITOR_OPEN");
+		Path launchPath = launchFile != null ? launchFile
+				: envLaunchProject != null && !envLaunchProject.isBlank()
+						? Path.of(envLaunchProject) : null;
+		if (launchPath != null) {
 			// P2.11 skeleton-first: show an editor-shaped skeleton immediately, then build the real
 			// EditorWindow on the next FX pulse (the skeleton is the visible startup window).
-			Path launchPath = Path.of(launchProject);
 			String launchName = launchPath.getFileName().toString().replaceFirst("\\.(gravaai|openscreen)$", "");
 			javafx.scene.image.Image preloadedPoster = loadPoster(launchPath);
 			// Single window: the skeleton is shown in the app's main window and the real editor
@@ -1043,12 +1060,16 @@ public final class AppContext {
 					}
 					Thread.ofVirtual().name("dashboard-import").start(() -> {
 						try {
-							chooser.openFile(Portal.FileDialogRequest.open("Import a recording"))
-									.ifPresent(path -> Platform.runLater(() -> {
-										if (dashboardView != null) {
-											dashboardView.refresh();
-										}
-									}));
+					chooser.openFile(Portal.FileDialogRequest.open("Import a recording"))
+							.ifPresent(path -> Platform.runLater(() -> {
+								if (StorageFiles.hasProjectFileExtension(path)) {
+									// A picked project file opens in the editor; it is not a
+									// recording to list on the dashboard.
+									openProjectInEditor(path);
+								} else if (dashboardView != null) {
+									dashboardView.refresh();
+								}
+							}));
 						} catch (IOException error) {
 							LOG.log(System.Logger.Level.WARNING, "import file failed: " + error);
 						}
@@ -1457,7 +1478,10 @@ public final class AppContext {
 					appPath(),
 					System.getenv(),
 					dispatcher::dispatch,
-					() -> Platform.runLater(this::bringToFrontForSecondLaunch));
+					() -> Platform.runLater(this::bringToFrontForSecondLaunch),
+					// A second launch with a project/recording file argument (file-manager
+					// association) hands the path over the control socket.
+					path -> Platform.runLater(() -> openProjectInEditor(path)));
 			LOG.log(System.Logger.Level.INFO, "global shortcut service created");
 		} catch (Exception error) {
 			LOG.log(System.Logger.Level.WARNING, "global shortcuts unavailable: " + error);

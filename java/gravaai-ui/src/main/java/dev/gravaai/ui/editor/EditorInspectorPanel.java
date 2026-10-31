@@ -2,14 +2,18 @@ package dev.gravaai.ui.editor;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.DoubleFunction;
 
+import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.SelectionCommands;
+import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.AutoCaptionAnimation;
 import dev.gravaai.core.project.AutoCaptionSettings;
@@ -64,7 +68,8 @@ public final class EditorInspectorPanel extends VBox {
 		ZOOM,
 		CLIP,
 		AUDIO,
-		CAPTION
+		CAPTION,
+		MULTI
 	}
 
 	private final EditorStore store;
@@ -181,12 +186,37 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	/** Shows the editor for a mixed multi-selection (count + batched delete). */
+	public void showMultiSelection() {
+		this.annotationMode = false;
+		this.selectionEditor = SelectionEditor.MULTI;
+		rebuild();
+	}
+
 	/**
-	 * Picks the editor from the store's timeline selection. No selection falls back to the rail
-	 * section that was active before the selection, so a click on empty timeline space cannot
-	 * leave a stale editor behind.
+	 * Picks the editor from the store's timeline selection. A multi-selection of one kind reuses
+	 * that kind's editor (edits batch over all selected ids); a mixed multi-selection gets the
+	 * MULTI editor. No selection falls back to the rail section that was active before the
+	 * selection, so a click on empty timeline space cannot leave a stale editor behind.
 	 */
 	public void showSelectionSettings() {
+		String multiKind = multiSelectionKind();
+		if (SelectionCommands.TimelineSelections.ZOOM.equals(multiKind)) {
+			showZoomSettings();
+			return;
+		}
+		if (SelectionCommands.TimelineSelections.ANNOTATION.equals(multiKind)) {
+			showAnnotationSettings();
+			return;
+		}
+		if (SelectionCommands.TimelineSelections.AUDIO.equals(multiKind)) {
+			showAudioSettings();
+			return;
+		}
+		if (multiKind != null) {
+			showMultiSelection();
+			return;
+		}
 		if (store.selectedAnnotationId() != null) {
 			showAnnotationSettings();
 		} else if (store.selectedZoomId() != null) {
@@ -298,6 +328,7 @@ public final class EditorInspectorPanel extends VBox {
 			case CLIP -> "Clip";
 			case AUDIO -> "Audio";
 			case CAPTION -> "Caption";
+			case MULTI -> "Multiple";
 			case NONE -> section.label();
 		};
 	}
@@ -322,6 +353,9 @@ public final class EditorInspectorPanel extends VBox {
 	}
 	if (selectionEditor == SelectionEditor.CAPTION) {
 		return captionSelectionSection();
+	}
+	if (selectionEditor == SelectionEditor.MULTI) {
+		return multiSelectionSection();
 	}
 		return switch (section) {
 			case SCENE -> sceneSection();
@@ -378,19 +412,118 @@ public final class EditorInspectorPanel extends VBox {
 		if (audio == null) {
 			return emptySelection("Select an audio region to edit its volume.");
 		}
+		List<String> multiIds = multiIdsOfKind(SelectionCommands.TimelineSelections.AUDIO);
 		VBox root = new VBox(14);
+		if (multiIds.size() > 1) {
+			Label multi = new Label(
+					multiIds.size() + " audio regions selected — edits apply to all.");
+			multi.setWrapText(true);
+			multi.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			root.getChildren().add(multi);
+		}
 		Slider volume = new Slider("Volume");
 		volume.range(0, 1).step(0.01)
 				.formatter(value -> Math.round(value * 100) + "%").sliderControl();
 		volume.setValue(audio.volume());
-		volume.onValueCommit(value -> store.apply(new AudioCommands.ChangeVolume(value)));
+		volume.onValueCommit(value -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
+				id -> new AudioCommands.ChangeVolume(id, value),
+				new AudioCommands.ChangeVolume(value)));
 
 		Switch normalize = new Switch("Normalize");
 		normalize.setChecked(Boolean.TRUE.equals(audio.normalize()));
-		normalize.onCheckedChange(value -> store.apply(new AudioCommands.SetNormalize(value)));
-		root.getChildren().addAll(volume, normalize, deleteSelectionButton("Delete Audio",
-				() -> store.apply(new AudioCommands.Delete(audio.id()))));
+		normalize.onCheckedChange(value -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
+				id -> new AudioCommands.SetNormalize(id, value),
+				new AudioCommands.SetNormalize(value)));
+		root.getChildren().addAll(volume, normalize,
+				deleteSelectionButton(multiIds.size() > 1
+						? "Delete " + multiIds.size() + " Audio Regions" : "Delete Audio",
+						() -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
+								AudioCommands.Delete::new,
+								new AudioCommands.Delete(audio.id()))));
 		return root;
+	}
+
+	/** The multi-selection section for a mixed selection: count + batched delete. */
+	private Node multiSelectionSection() {
+		VBox root = new VBox(14);
+		Label count = new Label(store.multiSelection().size() + " elements selected.");
+		count.setWrapText(true);
+		count.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
+		root.getChildren().addAll(count,
+				deleteSelectionButton("Delete " + store.multiSelection().size() + " Elements",
+						this::deleteMultiSelection));
+		return root;
+	}
+
+	/** Deletes every multi-selected zoom/annotation/audio as one undoable batch. */
+	private void deleteMultiSelection() {
+		List<dev.gravaai.core.editor.EditorCommand> deletes = new ArrayList<>();
+		for (String id : store.multiSelection()) {
+			String kind = SelectionCommands.kindOf(store, id);
+			if (SelectionCommands.TimelineSelections.ZOOM.equals(kind)) {
+				deletes.add(new ZoomCommands.Delete(id));
+			} else if (SelectionCommands.TimelineSelections.ANNOTATION.equals(kind)) {
+				deletes.add(new AnnotationCommands.Delete(id));
+			} else if (SelectionCommands.TimelineSelections.AUDIO.equals(kind)) {
+				deletes.add(new AudioCommands.Delete(id));
+			}
+		}
+		if (!deletes.isEmpty()) {
+			store.apply(new dev.gravaai.core.editor.BatchCommand(deletes));
+			store.clearSelectionsExcept(null, null, null, null, null);
+		}
+	}
+
+	/**
+	 * Applies one edit to every multi-selected element of {@code kind} (one undoable batch) or to
+	 * the single selection when fewer than two of that kind are selected.
+	 */
+	private void applyMulti(String kind,
+			java.util.function.Function<String, dev.gravaai.core.editor.EditorCommand> commandForId,
+			dev.gravaai.core.editor.EditorCommand single) {
+		List<String> ids = multiIdsOfKind(kind);
+		if (ids.size() > 1) {
+			List<dev.gravaai.core.editor.EditorCommand> batch = new ArrayList<>(ids.size());
+			for (String id : ids) {
+				batch.add(commandForId.apply(id));
+			}
+			store.apply(new dev.gravaai.core.editor.BatchCommand(batch));
+		} else {
+			store.apply(single);
+		}
+	}
+
+	/** The multi-selected ids of one kind; empty when fewer than two are selected. */
+	private List<String> multiIdsOfKind(String kind) {
+		List<String> ids = new ArrayList<>();
+		if (store.multiSelection().size() > 1) {
+			for (String id : store.multiSelection()) {
+				if (kind.equals(SelectionCommands.kindOf(store, id))) {
+					ids.add(id);
+				}
+			}
+		}
+		return ids;
+	}
+
+	/** The homogeneous kind of the multi-selection, {@code "mixed"} for several kinds, null for a single selection. */
+	private @Nullable String multiSelectionKind() {
+		if (store.multiSelection().size() <= 1) {
+			return null;
+		}
+		String kind = null;
+		for (String id : store.multiSelection()) {
+			String idKind = SelectionCommands.kindOf(store, id);
+			if (idKind == null) {
+				continue;
+			}
+			if (kind == null) {
+				kind = idKind;
+			} else if (!kind.equals(idKind)) {
+				return "mixed";
+			}
+		}
+		return kind;
 	}
 
 	private @Nullable Node captionSelectionSection() {

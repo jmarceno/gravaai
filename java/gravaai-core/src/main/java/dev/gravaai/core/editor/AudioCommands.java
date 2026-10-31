@@ -3,6 +3,8 @@ package dev.gravaai.core.editor;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.AudioRegion;
 
 /** The {@code useAudioRegionCommands} operations, one class per command. */
@@ -100,15 +102,22 @@ public final class AudioCommands {
 
 	/** {@code handleAudioVolumeChange}: clamps into 0..1 on the selected region. */
 	public static final class ChangeVolume implements EditorCommand {
+		private final @Nullable String id;
 		private final double volume;
 
 		public ChangeVolume(double volume) {
+			this(null, volume);
+		}
+
+		/** Applies the volume to one region (multi-selection batches per id); null uses the selection. */
+		public ChangeVolume(@Nullable String id, double volume) {
+			this.id = id;
 			this.volume = volume;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
-			String selectedAudioId = store.selectedAudioId();
+			String selectedAudioId = id == null ? store.selectedAudioId() : id;
 			if (selectedAudioId == null || !Double.isFinite(volume)) {
 				return false;
 			}
@@ -152,15 +161,22 @@ public final class AudioCommands {
 
 	/** {@code handleAudioNormalizeChange}. */
 	public static final class SetNormalize implements EditorCommand {
+		private final @Nullable String id;
 		private final boolean normalize;
 
 		public SetNormalize(boolean normalize) {
+			this(null, normalize);
+		}
+
+		/** Applies to one region (multi-selection batches per id); null uses the selection. */
+		public SetNormalize(@Nullable String id, boolean normalize) {
+			this.id = id;
 			this.normalize = normalize;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
-			String selectedAudioId = store.selectedAudioId();
+			String selectedAudioId = id == null ? store.selectedAudioId() : id;
 			if (selectedAudioId == null) {
 				return false;
 			}

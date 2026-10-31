@@ -73,6 +73,14 @@ public interface TimelineCommands {
 	/** Select one block; {@code null} clears the selection. */
 	void select(TimelineSelection selection);
 
+	/**
+	 * Select many blocks of one kind ({@code "zoom"}, {@code "annotation"} or {@code "audio"}), with
+	 * {@code primaryId} as the inspector target. The default is a no-op so preview-only command
+	 * sinks stay valid.
+	 */
+	default void selectMany(String kind, String primaryId, java.util.Collection<String> ids) {
+	}
+
 	/** Clear every block selection. */
 	void clearSelection();
 
@@ -81,6 +89,14 @@ public interface TimelineCommands {
 	 * editor reorders the clip); other rows are plain moves on their lane.
 	 */
 	void move(String itemId, String rowId, Span span);
+
+	/**
+	 * Commit a multi-selection move: every id of {@code spansByItemId} shifts to its span as one
+	 * undoable batch. The default is a no-op so preview-only command sinks stay valid.
+	 */
+	default void moveMany(@org.jspecify.annotations.Nullable String rowId,
+			java.util.Map<String, Span> spansByItemId) {
+	}
 
 	/** Commit a resized edge. */
 	void resizeEnd(String itemId, Span span);

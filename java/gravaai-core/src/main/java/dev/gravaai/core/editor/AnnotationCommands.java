@@ -54,6 +54,11 @@ public final class AnnotationCommands {
 		@Override
 		public boolean apply(EditorStore store) {
 			store.setSelectedAnnotationId(id);
+			if (id != null) {
+				// The preview overlay is a single-selection gesture: any Ctrl/Cmd multi-selection
+				// on the timeline ends here (zoom/audio select paths clear through the store).
+				store.setMultiSelection(java.util.List.of());
+			}
 			return true;
 		}
 	}

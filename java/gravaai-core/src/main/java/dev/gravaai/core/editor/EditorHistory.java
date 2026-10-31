@@ -37,7 +37,8 @@ public final class EditorHistory {
 			@Nullable String selectedClipId,
 			@Nullable String selectedAnnotationId,
 			@Nullable String selectedAudioId,
-			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip) {
+			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip,
+			List<String> multiSelectedIds) {
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
@@ -47,6 +48,16 @@ public final class EditorHistory {
 			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
 				null);
+		}
+
+		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
+			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
+			List<AudioRegion> audioRegions, List<CaptionCue> autoCaptions,
+			String selectedZoomId, String selectedClipId, String selectedAnnotationId,
+			String selectedAudioId, tools.jackson.databind.node.@Nullable ObjectNode sourceAudio) {
+			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
+				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
+				sourceAudio, List.of());
 		}
 		}
 
@@ -120,7 +131,8 @@ public final class EditorHistory {
 				snapshot.selectedAnnotationId(),
 				snapshot.selectedAudioId(),
 				snapshot.sourceAudioTrackSettingsByClip() == null ? null
-						: snapshot.sourceAudioTrackSettingsByClip().deepCopy());
+						: snapshot.sourceAudioTrackSettingsByClip().deepCopy(),
+				List.copyOf(snapshot.multiSelectedIds()));
 	}
 
 	/** {@code areEditorHistorySnapshotsEqual}: records compare their lists element by element. */

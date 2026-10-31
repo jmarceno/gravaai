@@ -94,6 +94,13 @@ public final class AnnotationSettingsPanel extends VBox {
 			return;
 		}
 
+		List<String> multiIds = multiSelectionIds();
+		if (multiIds.size() > 1) {
+			Label multi = new Label(multiIds.size() + " annotations selected — edits apply to all.");
+			multi.setWrapText(true);
+			multi.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			content.getChildren().add(multi);
+		}
 		content.getChildren().add(typeSection(region));
 		content.getChildren().add(positionSection(region));
 		content.getChildren().add(sizeSection(region));
@@ -116,7 +123,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		tabs.setValue(region.type().wire());
 		tabs.onValueChange(value -> {
 			AnnotationType type = AnnotationType.fromWire(value);
-			apply(new AnnotationCommands.ChangeType(region.id(), type));
+			applyForSelection(id -> new AnnotationCommands.ChangeType(id, type));
 			refresh();
 		});
 		return new VBox(8, sectionLabel("Annotation"), tabs);
@@ -140,8 +147,8 @@ public final class AnnotationSettingsPanel extends VBox {
 			if (matches(region.position(), preset)) {
 				button.getStyleClass().add("editor-tile--selected");
 			}
-			button.setOnAction(event -> apply(new AnnotationCommands.ChangePosition(region.id(),
-					new AnnotationPosition(preset.x(), preset.y()))));
+			button.setOnAction(event -> applyForSelection(id -> new AnnotationCommands.ChangePosition(
+					id, new AnnotationPosition(preset.x(), preset.y()))));
 			grid.add(button, index % 3, index / 3);
 		}
 		return new VBox(8, sectionLabel("Position"), grid);
@@ -151,12 +158,12 @@ public final class AnnotationSettingsPanel extends VBox {
 		Slider width = new Slider("Width");
 		width.range(5, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
 		width.setValue(region.size().width());
-		width.onValueCommit(value -> apply(new AnnotationCommands.ChangeSize(region.id(),
+		width.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.ChangeSize(id,
 				new AnnotationSize(value, region.size().height()))));
 		Slider height = new Slider("Height");
 		height.range(5, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
 		height.setValue(region.size().height());
-		height.onValueCommit(value -> apply(new AnnotationCommands.ChangeSize(region.id(),
+		height.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.ChangeSize(id,
 				new AnnotationSize(region.size().width(), value))));
 		return new VBox(8, sectionLabel("Size"), width, height);
 	}
@@ -223,18 +230,18 @@ public final class AnnotationSettingsPanel extends VBox {
 			arrow.item(direction.name(), prettify(direction.name()));
 		}
 		arrow.value(arrowDirectionValue(figure));
-		arrow.onValueChange(value -> apply(new AnnotationCommands.SetFigureData(region.id(),
+		arrow.onValueChange(value -> applyForSelection(id -> new AnnotationCommands.SetFigureData(id,
 				new FigureData(direction(value), figure.color(), figure.strokeWidth()))));
 
 		Slider stroke = new Slider("Stroke width");
 		stroke.range(1, 12).step(0.5).formatter(value -> String.format(Locale.ROOT, "%.1fpx", value))
 				.sliderControl();
 		stroke.setValue(figure.strokeWidth());
-		stroke.onValueCommit(value -> apply(new AnnotationCommands.SetFigureData(region.id(),
-				new FigureData(direction(arrowDirectionValue(figure)), figure.color(), value))));
+		stroke.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.SetFigureData(
+				id, new FigureData(direction(arrowDirectionValue(figure)), figure.color(), value))));
 
 		LazyColorField color = colorField("Figure color", figure.color(), value ->
-				apply(new AnnotationCommands.SetFigureData(region.id(),
+				applyForSelection(id -> new AnnotationCommands.SetFigureData(id,
 						new FigureData(direction(arrowDirectionValue(figure)), value,
 								figure.strokeWidth()))));
 
@@ -247,11 +254,11 @@ public final class AnnotationSettingsPanel extends VBox {
 		Slider strength = new Slider("Blur intensity");
 		strength.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
 		strength.setValue(intensity);
-		strength.onValueCommit(value -> apply(new AnnotationCommands.SetBlurIntensity(region.id(),
-				value)));
+		strength.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.SetBlurIntensity(
+				id, value)));
 		LazyColorField color = colorField("Blur color",
 				region.blurColor() == null ? "#000000" : region.blurColor(),
-				value -> apply(new AnnotationCommands.SetBlurColor(region.id(), value)));
+				value -> applyForSelection(id -> new AnnotationCommands.SetBlurColor(id, value)));
 		return new VBox(10, header("Blur"), strength, color.node());
 	}
 
@@ -271,8 +278,43 @@ public final class AnnotationSettingsPanel extends VBox {
 		refresh();
 	}
 
+	/**
+	 * Applies one annotation edit to every multi-selected annotation (one undoable batch) or to the
+	 * primary selection when a single annotation is selected.
+	 */
+	private void applyForSelection(
+			java.util.function.Function<String, dev.gravaai.core.editor.EditorCommand> commandForId) {
+		List<String> ids = multiSelectionIds();
+		if (ids.size() > 1) {
+			List<dev.gravaai.core.editor.EditorCommand> batch = new ArrayList<>(ids.size());
+			for (String id : ids) {
+				batch.add(commandForId.apply(id));
+			}
+			store.apply(new dev.gravaai.core.editor.BatchCommand(batch));
+		} else if (store.selectedAnnotationId() != null) {
+			store.apply(commandForId.apply(store.selectedAnnotationId()));
+		}
+		refresh();
+	}
+
+	/** The multi-selected annotation ids; empty when fewer than two are selected. */
+	private List<String> multiSelectionIds() {
+		List<String> ids = new ArrayList<>();
+		if (store.multiSelection().size() > 1) {
+			for (String id : store.multiSelection()) {
+				for (AnnotationRegion region : store.state().annotationRegions()) {
+					if (region.id().equals(id)) {
+						ids.add(id);
+						break;
+					}
+				}
+			}
+		}
+		return ids;
+	}
+
 	private void applyStyle(AnnotationRegion region, StylePatch patch) {
-		apply(new AnnotationCommands.ChangeStyle(region.id(), patch));
+		applyForSelection(id -> new AnnotationCommands.ChangeStyle(id, patch));
 	}
 
 	private @Nullable AnnotationRegion selected() {

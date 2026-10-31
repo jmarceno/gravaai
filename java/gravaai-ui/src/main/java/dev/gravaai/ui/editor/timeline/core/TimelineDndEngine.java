@@ -196,6 +196,63 @@ public final class TimelineDndEngine {
 		return TimelineSpanResult.of(clamped);
 	}
 
+	/**
+	 * Clamps a shared move delta for a group of blocks (multi-selection move) so no group block
+	 * overlaps a non-group sibling on its row or leaves the timeline. {@code groupItems} must hold
+	 * the pre-move spans; returns the clamped delta in milliseconds.
+	 */
+	public static double clampGroupDelta(List<TimelineRegionSpan> groupItems,
+			List<TimelineRegionSpan> allRegionSpans, double deltaMs, double totalMs) {
+		if (!Double.isFinite(deltaMs) || groupItems.isEmpty()) {
+			return 0;
+		}
+		double low = Double.NEGATIVE_INFINITY;
+		double high = Double.POSITIVE_INFINITY;
+		for (TimelineRegionSpan item : groupItems) {
+			low = Math.max(low, -item.start());
+			if (totalMs > 0) {
+				high = Math.min(high, totalMs - item.end());
+			}
+			TimelineRegionSpan previous = null;
+			TimelineRegionSpan next = null;
+			for (TimelineRegionSpan region : allRegionSpans) {
+				if (!item.rowId().equals(region.rowId()) || isGroupMember(groupItems, region)) {
+					continue;
+				}
+				if (region.end() <= item.start()
+						&& (previous == null || region.end() > previous.end())) {
+					previous = region;
+				}
+				if (region.start() >= item.end()
+						&& (next == null || region.start() < next.start())) {
+					next = region;
+				}
+			}
+			if (previous != null) {
+				low = Math.max(low, previous.end() - item.start());
+			}
+			if (next != null) {
+				high = Math.min(high, next.start() - item.end());
+			}
+		}
+		if (low > high) {
+			return 0;
+		}
+		double clamped = Math.max(low, Math.min(deltaMs, high));
+		// Normalise -0.0 (from negating a zero start) so comparisons see a plain zero.
+		return clamped == 0.0 ? 0.0 : clamped;
+	}
+
+	private static boolean isGroupMember(List<TimelineRegionSpan> groupItems,
+			TimelineRegionSpan region) {
+		for (TimelineRegionSpan item : groupItems) {
+			if (item.id().equals(region.id())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Port of {@code resolveResizeEnd}; {@code null} when the resize is rejected. */
 	public static @Nullable Span resolveResizeEnd(String activeItemId, Span updatedSpan, ResizeConfig config) {
 		double totalMs = config.totalMs();

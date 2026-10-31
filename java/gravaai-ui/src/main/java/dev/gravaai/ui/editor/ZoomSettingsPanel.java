@@ -2,6 +2,9 @@ package dev.gravaai.ui.editor;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ZoomDepth;
@@ -44,6 +47,7 @@ public final class ZoomSettingsPanel extends VBox {
 		modeGroup = null;
 		amountGroup = null;
 		deleteButton = null;
+		List<String> multiIds = multiSelectionIds();
 		ZoomRegion region = selected();
 		if (region == null) {
 			Label empty = new Label("Select a zoom region to edit its amount.");
@@ -51,6 +55,12 @@ public final class ZoomSettingsPanel extends VBox {
 			empty.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
 			content.getChildren().add(empty);
 			return;
+		}
+		if (multiIds.size() > 1) {
+			Label multi = new Label(multiIds.size() + " zooms selected — edits apply to all.");
+			multi.setWrapText(true);
+			multi.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			content.getChildren().add(multi);
 		}
 
 		ZoomMode mode = region.mode() == null ? ZoomMode.AUTO : region.mode();
@@ -61,8 +71,8 @@ public final class ZoomSettingsPanel extends VBox {
 		modeGroup.item(ZoomMode.AUTO.wire(), "Auto");
 		modeGroup.item(ZoomMode.MANUAL.wire(), "Manual");
 		modeGroup.setValue(mode.wire());
-		modeGroup.onValueChange(value -> store.apply(
-				new ZoomCommands.ChangeMode(ZoomMode.fromWire(value))));
+		modeGroup.onValueChange(value -> applyToSelection(id -> new ZoomCommands.ChangeMode(id,
+				ZoomMode.fromWire(value)), new ZoomCommands.ChangeMode(ZoomMode.fromWire(value))));
 		Label modeHint = new Label(mode == ZoomMode.MANUAL
 				? "Set a fixed focus point for this zoom"
 				: "Camera recenters when the cursor nears the edge of the zoomed view");
@@ -76,18 +86,57 @@ public final class ZoomSettingsPanel extends VBox {
 					TimelineModel.formatZoomScale(option.scale()));
 		}
 		amountGroup.setValue(Integer.toString(depth.wire()));
-		amountGroup.onValueChange(value -> store.apply(
+		amountGroup.onValueChange(value -> applyToSelection(id -> new ZoomCommands.ChangeDepth(id,
+				ZoomDepth.fromWire(Integer.parseInt(value))),
 				new ZoomCommands.ChangeDepth(ZoomDepth.fromWire(Integer.parseInt(value)))));
 
-		deleteButton = new Button("Delete Zoom", Button.Variant.DESTRUCTIVE_SOFT,
-				Button.Size.SM);
+		deleteButton = new Button(multiIds.size() > 1
+				? "Delete " + multiIds.size() + " Zooms" : "Delete Zoom",
+				Button.Variant.DESTRUCTIVE_SOFT, Button.Size.SM);
 		deleteButton.setMaxWidth(Double.MAX_VALUE);
 		deleteButton.setAlignment(Pos.CENTER_LEFT);
 		deleteButton.setContentDisplay(ContentDisplay.LEFT);
-		deleteButton.setOnAction(event -> store.apply(new ZoomCommands.Delete(region.id())));
+		deleteButton.setOnAction(event -> applyToSelection(ZoomCommands.Delete::new,
+				new ZoomCommands.Delete(region.id())));
 
 		content.getChildren().addAll(modeLabel, modeGroup, modeHint, amountLabel, amountGroup,
 				spacer(), deleteButton);
+	}
+
+	/**
+	 * Applies one zoom edit to every multi-selected zoom (one undoable batch) or to the primary
+	 * selection when a single zoom is selected.
+	 */
+	private void applyToSelection(
+			java.util.function.Function<String, dev.gravaai.core.editor.EditorCommand> commandForId,
+			dev.gravaai.core.editor.EditorCommand single) {
+		List<String> ids = multiSelectionIds();
+		if (ids.size() > 1) {
+			List<dev.gravaai.core.editor.EditorCommand> batch = new ArrayList<>(ids.size());
+			for (String id : ids) {
+				batch.add(commandForId.apply(id));
+			}
+			store.apply(new dev.gravaai.core.editor.BatchCommand(batch));
+		} else {
+			store.apply(single);
+		}
+		refresh();
+	}
+
+	/** The multi-selected zoom ids; empty when fewer than two are selected. */
+	private List<String> multiSelectionIds() {
+		List<String> ids = new ArrayList<>();
+		if (store.multiSelection().size() > 1) {
+			for (String id : store.multiSelection()) {
+				for (ZoomRegion region : store.state().zoomRegions()) {
+					if (region.id().equals(id)) {
+						ids.add(id);
+						break;
+					}
+				}
+			}
+		}
+		return ids;
 	}
 
 	/** The amount chips in depth order (1.25x, 1.5x, 1.8x, 2.2x, 3.5x, 5x). */

@@ -2,9 +2,12 @@ package dev.gravaai.core.editor;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.SequencedSet;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.event.Subscription;
@@ -49,6 +52,8 @@ public final class EditorStore {
 	private @Nullable String selectedAnnotationId;
 	private @Nullable String selectedAudioId;
 	private @Nullable String selectedCaptionId;
+	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
+	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
 	private String activeEffectSection = SECTION_SCENE;
 
 	public EditorStore(ProjectEditorState initialState) {
@@ -154,7 +159,8 @@ public final class EditorStore {
 				state.autoCaptions(), selectedZoomId, selectedClipId, selectedAnnotationId,
 				selectedAudioId,
 				state.sourceAudioTrackSettingsByClip() == null ? null
-						: state.sourceAudioTrackSettingsByClip().deepCopy());
+						: state.sourceAudioTrackSettingsByClip().deepCopy(),
+				List.copyOf(multiSelection));
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -169,6 +175,8 @@ public final class EditorStore {
 		selectedClipId = snapshot.selectedClipId();
 		selectedAnnotationId = snapshot.selectedAnnotationId();
 		selectedAudioId = snapshot.selectedAudioId();
+		multiSelection.clear();
+		multiSelection.addAll(snapshot.multiSelectedIds());
 		setSourceAudioTrackSettingsByClip(snapshot.sourceAudioTrackSettingsByClip() == null
 				? null : snapshot.sourceAudioTrackSettingsByClip().deepCopy());
 	}
@@ -249,6 +257,27 @@ public final class EditorStore {
 		selectedAnnotationId = keepAnnotation;
 		selectedAudioId = keepAudio;
 		selectedCaptionId = keepCaption;
+		multiSelection.clear();
+	}
+
+	/** The multi-selected element ids (insertion order, includes the primary id); read-only. */
+	public SequencedSet<String> multiSelection() {
+		return java.util.Collections.unmodifiableSequencedSet(multiSelection);
+	}
+
+	/** Replaces the multi-selection with the given ids (the primary id must be among them). */
+	public void setMultiSelection(Collection<String> ids) {
+		multiSelection.clear();
+		multiSelection.addAll(ids);
+	}
+
+	/** Toggles one id in the multi-selection; returns whether it is now selected. */
+	public boolean toggleMultiSelection(String id) {
+		if (!multiSelection.remove(id)) {
+			multiSelection.add(id);
+			return true;
+		}
+		return false;
 	}
 
 	/**

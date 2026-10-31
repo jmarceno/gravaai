@@ -241,4 +241,29 @@ class TimelineDndEngineTest {
 						(span, excludeId, rowId) -> false), null);
 		assertEquals("row-audio-2", result.rowId());
 	}
+
+	@Test
+	@DisplayName("clamps a group move delta against non-group neighbours and the timeline bounds")
+	void clampsGroupDelta() {
+		// Group {a, b} on row-clip with c (3000-3600) to the right; total 5000.
+		List<TimelineRegionSpan> group = List.of(BASE_SPANS.get(0), BASE_SPANS.get(1));
+
+		// Free move within the gap before c: b ends at 2500, c starts at 3000 → +500 max.
+		assertEquals(300, TimelineDndEngine.clampGroupDelta(group, BASE_SPANS, 300, 5000));
+		assertEquals(500, TimelineDndEngine.clampGroupDelta(group, BASE_SPANS, 800, 5000));
+
+		// a starts at 0 → no leftward move.
+		assertEquals(0, TimelineDndEngine.clampGroupDelta(group, BASE_SPANS, -200, 5000));
+	}
+
+	@Test
+	@DisplayName("clamps a group move against the nearest neighbour of any group member")
+	void clampsGroupDeltaToTightestMember() {
+		// Group {c, aud-1}: c's forward room is 5000-3600 = 1400 (no audio sibling after aud-1);
+		// leftward, aud-1 hits 0 at -100 while c could go to 2500-3000 = -500.
+		List<TimelineRegionSpan> group = List.of(BASE_SPANS.get(2), BASE_SPANS.get(3));
+
+		assertEquals(1400, TimelineDndEngine.clampGroupDelta(group, BASE_SPANS, 2000, 5000));
+		assertEquals(-100, TimelineDndEngine.clampGroupDelta(group, BASE_SPANS, -400, 5000));
+	}
 }

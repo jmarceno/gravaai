@@ -218,7 +218,10 @@ public final class TimelineView extends Region {
 	private javafx.collections.@Nullable ListChangeListener<AgentHighlightView> agentHighlightsListener;
 	private java.util.function.@Nullable Consumer<String> onCaptionSelected;
 	private @Nullable Runnable onItemPressed;
-	private boolean selectAllBlocksActive;
+	/** Ids of every multi-selected element (Ctrl/Cmd+click toggles; Ctrl/Cmd+A selects all zooms). */
+	private final java.util.LinkedHashSet<String> selectedIds = new java.util.LinkedHashSet<>();
+	/** Live spans of the same-row group during a multi-selection move drag (id → translated span). */
+	private java.util.@Nullable LinkedHashMap<String, Span> dragGroupSpans;
 	private TimelineShortcuts.Bindings shortcutBindings = TimelineShortcuts.defaults();
 	private boolean macPlatform;
 
@@ -618,11 +621,21 @@ public final class TimelineView extends Region {
 			return;
 		}
 		canvas.requestFocus();
-		pressAt(event.getX(), contentY(event.getY()));
+		pressAt(event.getX(), contentY(event.getY()),
+				event.isControlDown() || event.isMetaDown());
 	}
 
 	/** Picks a block edge for resize, or starts a move; the TestFX harness uses this. */
 	public void pressAt(double x, double y) {
+		pressAt(x, y, false);
+	}
+
+	/**
+	 * Picks a block edge for resize, or starts a move; the TestFX harness uses this. With
+	 * {@code additive} (Ctrl/Cmd pressed) a multi-selectable block toggles in the multi-selection
+	 * instead of replacing it.
+	 */
+	public void pressAt(double x, double y, boolean additive) {
 		resetDrag();
 		if (isOnPlayhead(x, y)) {
 			// PlaybackCursor cap drag: scrub without changing the selection.
@@ -635,7 +648,7 @@ public final class TimelineView extends Region {
 			// empty strip space starts the add-caption gesture.
 			TimelineSelection captionHit = captionHitAt(x, y);
 			if (captionHit != null) {
-				selectAllBlocksActive = false;
+				selectedIds.clear();
 				String sourceId = captionSourceId(captionHit.id());
 				setSelection(new TimelineSelection(TimelineSelection.CAPTION, sourceId));
 				commands.select(new TimelineSelection(TimelineSelection.CAPTION, sourceId));
@@ -665,7 +678,7 @@ public final class TimelineView extends Region {
 			}
 			// handleTimelineMouseDown: clear the block selection, seek at once, then keep seeking
 			// while the pointer drags (the preview follows in real time).
-			selectAllBlocksActive = false;
+			selectedIds.clear();
 			setSelection(null);
 			commands.clearSelection();
 			scrubbing = true;
@@ -684,7 +697,7 @@ public final class TimelineView extends Region {
 		if (TimelineRows.isSourceAudioTrackRowId(item.rowId())) {
 			// Source-audio blocks are display/inspector affordances: clicking selects the owning
 			// clip (React renders them as disabled Items with onSelect={() => onSelectClip(item.id)}).
-			selectAllBlocksActive = false;
+			selectedIds.clear();
 			TimelineSelection clipSelection = new TimelineSelection(TimelineSelection.CLIP,
 					sourceAudioOwnerClipId(item.rowId(), item.id()));
 			setSelection(clipSelection);
@@ -693,9 +706,31 @@ public final class TimelineView extends Region {
 			redraw();
 			return;
 		}
-		selectAllBlocksActive = false;
-		setSelection(hit);
-		commands.select(hit);
+		if (additive && isMultiSelectableKind(hit.kind())) {
+			// Ctrl/Cmd+click toggles the block in the multi-selection; pressing an already selected
+			// block keeps the group move gesture, pressing a deselected one just toggles it out.
+			boolean added = selectedIds.contains(hit.id())
+					? !selectedIds.remove(hit.id()) : selectedIds.add(hit.id());
+			setSelection(hit);
+			if (!added || selectedIds.isEmpty()) {
+				commands.select(hit);
+				fireItemPressed();
+				redraw();
+				return;
+			}
+			commands.selectMany(hit.kind(), hit.id(), List.copyOf(selectedIds));
+		} else {
+			selectedIds.clear();
+			setSelection(hit);
+			if (isMultiSelectableKind(hit.kind())) {
+				// Single blocks of a multi-selectable kind join the multi-selection so a follow-up
+				// Ctrl+click extends it and Delete uses the same batched path.
+				selectedIds.add(hit.id());
+				commands.selectMany(hit.kind(), hit.id(), List.copyOf(selectedIds));
+			} else {
+				commands.select(hit);
+			}
+		}
 		fireItemPressed();
 		dragItemId = hit.id();
 		dragRowId = item.rowId();
@@ -710,6 +745,12 @@ public final class TimelineView extends Region {
 		} else {
 			dragMode = DragMode.MOVE;
 		}
+	}
+
+	/** Whether a selection kind supports Ctrl/Cmd+click multi-selection. */
+	private static boolean isMultiSelectableKind(String kind) {
+		return TimelineSelection.ZOOM.equals(kind) || TimelineSelection.ANNOTATION.equals(kind)
+				|| TimelineSelection.AUDIO.equals(kind);
 	}
 
 	private void handleMouseDragged(MouseEvent event) {
@@ -763,11 +804,48 @@ public final class TimelineView extends Region {
 				proposed = ClipPresentation.snapRegionSpan(proposed, snapTargets(dragItemId),
 						clipPresentation, msPerPixel());
 			}
-			proposed = TimelineDndEngine.clampDraggedSpanToNeighbours(proposed, dragItemId,
-					dragRowId, neighbourConfig()).span();
+			if (isGroupMoveDrag()) {
+				// Group move: one shared delta clamped against the row's non-selected neighbours
+				// (the per-item clamp would pin the dragged block against the moving group).
+				double achievedDelta = proposed.start() - original.start();
+				double groupDelta = TimelineDndEngine.clampGroupDelta(groupMoveItems(),
+						regionSpans(), achievedDelta, fullRange.end());
+				proposed = new Span(original.start() + groupDelta, original.end() + groupDelta);
+				dragGroupSpans = new java.util.LinkedHashMap<>();
+				for (TimelineRenderItem groupItem : items) {
+					if (selectedIds.contains(groupItem.id())
+							&& item.rowId().equals(groupItem.rowId())) {
+						dragGroupSpans.put(groupItem.id(),
+								new Span(groupItem.span().start() + groupDelta,
+										groupItem.span().end() + groupDelta));
+					}
+				}
+			} else {
+				proposed = TimelineDndEngine.clampDraggedSpanToNeighbours(proposed, dragItemId,
+						dragRowId, neighbourConfig()).span();
+			}
 		}
 		dragLiveSpan = proposed;
 		redraw();
+	}
+
+	/** Whether the active drag moves every selected block of the row (multi-selection move). */
+	private boolean isGroupMoveDrag() {
+		return dragItemId != null && dragRowId != null && selectedIds.size() > 1
+				&& selectedIds.contains(dragItemId)
+				&& !TimelineConstants.CLIP_ROW_ID.equals(dragRowId);
+	}
+
+	/** Original spans of the multi-selected blocks on the dragged row. */
+	private List<TimelineRegionSpan> groupMoveItems() {
+		List<TimelineRegionSpan> group = new ArrayList<>();
+		for (TimelineRenderItem item : items) {
+			if (selectedIds.contains(item.id()) && item.rowId().equals(dragRowId)) {
+				group.add(new TimelineRegionSpan(item.id(), item.span().start(), item.span().end(),
+						item.rowId()));
+			}
+		}
+		return group;
 	}
 
 	private void handleMouseReleased(MouseEvent event) {
@@ -794,7 +872,10 @@ public final class TimelineView extends Region {
 			if (dragged && dragLiveSpan != null && dragItemId != null) {
 				if (dragMode == DragMode.MOVE) {
 					String rowId = dragRowId;
-					if (rowId != null) {
+					if (dragGroupSpans != null && dragGroupSpans.size() > 1) {
+						// Multi-selection move: every selected block of the row shifts together.
+						commands.moveMany(rowId, dragGroupSpans);
+					} else if (rowId != null) {
 						commands.move(dragItemId, rowId, dragLiveSpan);
 					}
 				} else {
@@ -808,7 +889,7 @@ public final class TimelineView extends Region {
 		boolean wasEmpty = pressedEmpty;
 		resetDrag();
 		if (wasEmpty) {
-			selectAllBlocksActive = false;
+			selectedIds.clear();
 			handleEmptyClick(x, y);
 		}
 	}
@@ -819,6 +900,7 @@ public final class TimelineView extends Region {
 		dragRowId = null;
 		dragOriginalSpan = null;
 		dragLiveSpan = null;
+		dragGroupSpans = null;
 		dragged = false;
 		pressedEmpty = false;
 		scrubbing = false;
@@ -977,18 +1059,27 @@ public final class TimelineView extends Region {
 		return null;
 	}
 
-	public boolean selectAllBlocksActive() {
-		return selectAllBlocksActive;
-	}
-
 	/** Port of {@code activateSelectAllZooms}: Ctrl/Cmd+A selects every zoom block. */
 	public void selectAllZooms() {
-		if (!hasAnyZoomBlocks()) {
+		List<String> zoomIds = new ArrayList<>();
+		String primary = selection != null && TimelineSelection.ZOOM.equals(selection.kind())
+				? selection.id()
+				: null;
+		for (TimelineRenderItem item : items) {
+			if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
+				zoomIds.add(item.id());
+				if (primary == null) {
+					primary = item.id();
+				}
+			}
+		}
+		if (zoomIds.isEmpty() || primary == null) {
 			return;
 		}
-		selectAllBlocksActive = true;
-		setSelection(null);
-		commands.clearSelection();
+		selectedIds.clear();
+		selectedIds.addAll(zoomIds);
+		setSelection(new TimelineSelection(TimelineSelection.ZOOM, primary));
+		commands.selectMany(TimelineSelection.ZOOM, primary, zoomIds);
 		redraw();
 	}
 
@@ -1025,21 +1116,15 @@ public final class TimelineView extends Region {
 				|| ((code == KeyCode.DELETE || code == KeyCode.BACK_SPACE) && !ctrl && !meta
 						&& !alt && !shift);
 		if (deleteShortcut) {
-			if (selectAllBlocksActive) {
-				for (TimelineRenderItem item : items) {
-					if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
-						commands.deleteZoom(item.id());
-					}
-				}
-				selectAllBlocksActive = false;
-			} else if (selection != null) {
+			if (selection != null || !selectedIds.isEmpty()) {
 				commands.deleteSelection();
 			}
+			selectedIds.clear();
 			consume(event);
 			return;
 		}
 		if (code == KeyCode.ESCAPE) {
-			selectAllBlocksActive = false;
+			selectedIds.clear();
 			setSelection(null);
 			commands.clearSelection();
 			consume(event);
@@ -1286,7 +1371,7 @@ public final class TimelineView extends Region {
 			if (!fragment.sourceCueId().equals(sourceCueId)) {
 				continue;
 			}
-			selectAllBlocksActive = false;
+			selectedIds.clear();
 			setSelection(new TimelineSelection(TimelineSelection.CAPTION, sourceCueId));
 			commands.select(new TimelineSelection(TimelineSelection.CAPTION, sourceCueId));
 			commands.seek(fragment.startMs());
@@ -1415,19 +1500,15 @@ public final class TimelineView extends Region {
 
 	private void drawInteractionOverlays(GraphicsContext graphics) {
 		if (dragMode != DragMode.NONE && dragLiveSpan != null) {
-			double startX = xForTime(dragLiveSpan.start());
-			double width = Math.max(4, xForTime(dragLiveSpan.end()) - startX);
 			RowLayout row = rowById(dragRowId);
-			double top = row == null ? AXIS_HEIGHT : row.top() + 2;
-			double height = row == null ? 24 : row.height() - 4;
-			graphics.setFill(Color.web("#2fb3a3", 0.25));
-			graphics.fillRoundRect(startX, top, width, height, 8, 8);
-			graphics.setStroke(Color.web("#3fd4c1", 0.8));
-			graphics.setLineWidth(1.5);
-			graphics.setLineDashes(5, 4);
-			graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 8,
-					8);
-			graphics.setLineDashes(null);
+			if (dragMode == DragMode.MOVE && dragGroupSpans != null && dragGroupSpans.size() > 1) {
+				// Multi-selection move: every block of the group previews its translated span.
+				for (Span groupSpan : dragGroupSpans.values()) {
+					drawDragGhost(graphics, groupSpan, row);
+				}
+			} else {
+				drawDragGhost(graphics, dragLiveSpan, row);
+			}
 		}
 		if (hoverGhost != null) {
 			double startX = xForTime(hoverGhost.start());
@@ -1459,6 +1540,22 @@ public final class TimelineView extends Region {
 			graphics.setFill(Color.WHITE);
 			graphics.fillText("+", centerX - 4.5, centerY + 5);
 		}
+	}
+
+	/** The translucent drag preview of one span inside its row. */
+	private void drawDragGhost(GraphicsContext graphics, Span span, @Nullable RowLayout row) {
+		double startX = xForTime(span.start());
+		double width = Math.max(4, xForTime(span.end()) - startX);
+		double top = row == null ? AXIS_HEIGHT : row.top() + 2;
+		double height = row == null ? 24 : row.height() - 4;
+		graphics.setFill(Color.web("#2fb3a3", 0.25));
+		graphics.fillRoundRect(startX, top, width, height, 8, 8);
+		graphics.setStroke(Color.web("#3fd4c1", 0.8));
+		graphics.setLineWidth(1.5);
+		graphics.setLineDashes(5, 4);
+		graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 8,
+				8);
+		graphics.setLineDashes(null);
 	}
 
 	/** Simulates a primary click at a view-local point (press + release; click semantics). */
@@ -2148,7 +2245,7 @@ public final class TimelineView extends Region {
 	}
 
 	private boolean isSelected(String kind, String id) {
-		if (selectAllBlocksActive && TimelineSelection.ZOOM.equals(kind)) {
+		if (selectedIds.contains(id)) {
 			return true;
 		}
 		return selection != null && kind.equals(selection.kind()) && id.equals(selection.id());

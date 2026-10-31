@@ -5,14 +5,18 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.ToLongFunction;
 
 import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
+import dev.gravaai.core.editor.BatchCommand;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
+import dev.gravaai.core.editor.EditorCommand;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.SourceAudioCommands;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.CaptionOps;
@@ -91,6 +95,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
+	public void selectMany(String kind, String primaryId, java.util.Collection<String> ids) {
+		store.apply(new SelectionCommands.SelectMany(kind, primaryId, ids));
+	}
+
+	@Override
 	public void clearSelection() {
 		store.clearSelectionsExcept(null, null, null, null, null);
 	}
@@ -121,6 +130,38 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
+	public void moveMany(@org.jspecify.annotations.Nullable String rowId,
+			Map<String, Span> spansByItemId) {
+		if (rowId == null || spansByItemId.size() < 2) {
+			return;
+		}
+		List<EditorCommand> moves = new ArrayList<>();
+		for (Map.Entry<String, Span> entry : spansByItemId.entrySet()) {
+			String itemId = entry.getKey();
+			Span span = entry.getValue();
+			if (TimelineConstants.CLIP_ROW_ID.equals(rowId)) {
+				moves.add(new ClipCommands.ChangeSpan(itemId, span.start(), span.end(),
+						sequenceIndex(itemId, span.start()),
+						sourceDurationMs.applyAsLong(itemId)));
+			} else if (TimelineConstants.ZOOM_ROW_ID.equals(rowId)) {
+				moves.add(new ZoomCommands.ChangeSpan(itemId, span.start(), span.end()));
+			} else if (TimelineRows.isAudioTrackRowId(rowId)) {
+				moves.add(new AudioCommands.ChangeSpan(itemId, span.start(), span.end(),
+						TimelineRows.getAudioTrackIndex(rowId)));
+			} else if (TimelineRows.isAnnotationTrackRowId(rowId)) {
+				moves.add(new AnnotationCommands.ChangeSpan(itemId, span.start(), span.end(),
+						TimelineRows.getAnnotationTrackIndex(rowId)));
+			} else if (TimelineConstants.CAPTION_ROW_ID.equals(rowId)) {
+				moves.add(new CaptionCommands.Retime(itemId, new CaptionOps.RetimeSpan(
+						Math.round(span.start()), Math.round(span.end()))));
+			}
+		}
+		if (!moves.isEmpty()) {
+			store.apply(new BatchCommand(moves));
+		}
+	}
+
+	@Override
 	public void resizeEnd(String itemId, Span span) {
 		if (isClip(itemId)) {
 			applyClipSpan(itemId, span, null);
@@ -140,6 +181,25 @@ public final class StoreTimelineCommands implements TimelineCommands {
 
 	@Override
 	public void deleteSelection() {
+		// Multi-selection: one batched undo step removes every selected zoom/annotation/audio.
+		if (store.multiSelection().size() > 1) {
+			List<EditorCommand> deletes = new ArrayList<>();
+			for (String id : store.multiSelection()) {
+				String kind = SelectionCommands.kindOf(store, id);
+				if (TimelineSelection.ZOOM.equals(kind)) {
+					deletes.add(new ZoomCommands.Delete(id));
+				} else if (TimelineSelection.ANNOTATION.equals(kind)) {
+					deletes.add(new AnnotationCommands.Delete(id));
+				} else if (TimelineSelection.AUDIO.equals(kind)) {
+					deletes.add(new AudioCommands.Delete(id));
+				}
+			}
+			if (!deletes.isEmpty()) {
+				store.apply(new BatchCommand(deletes));
+				store.clearSelectionsExcept(null, null, null, null, null);
+			}
+			return;
+		}
 		String zoom = store.selectedZoomId();
 		if (zoom != null) {
 			store.apply(new ZoomCommands.Delete(zoom));

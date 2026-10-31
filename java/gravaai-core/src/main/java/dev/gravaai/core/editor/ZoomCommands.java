@@ -3,6 +3,8 @@ package dev.gravaai.core.editor;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.core.project.ZoomDepth;
 import dev.gravaai.core.project.ZoomFocus;
 import dev.gravaai.core.project.ZoomMode;
@@ -144,15 +146,22 @@ public final class ZoomCommands {
 
 	/** {@code handleZoomDepthChange}. */
 	public static final class ChangeDepth implements EditorCommand {
+		private final @Nullable String id;
 		private final ZoomDepth depth;
 
 		public ChangeDepth(ZoomDepth depth) {
+			this(null, depth);
+		}
+
+		/** Applies the depth to one zoom (multi-selection batches per id); null uses the selection. */
+		public ChangeDepth(@Nullable String id, ZoomDepth depth) {
+			this.id = id;
 			this.depth = depth;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
-			String selectedZoomId = store.selectedZoomId();
+			String selectedZoomId = id == null ? store.selectedZoomId() : id;
 			if (selectedZoomId == null) {
 				return false;
 			}
@@ -170,15 +179,22 @@ public final class ZoomCommands {
 
 	/** {@code handleZoomModeChange}. */
 	public static final class ChangeMode implements EditorCommand {
+		private final @Nullable String id;
 		private final ZoomMode mode;
 
 		public ChangeMode(ZoomMode mode) {
+			this(null, mode);
+		}
+
+		/** Applies the mode to one zoom (multi-selection batches per id); null uses the selection. */
+		public ChangeMode(@Nullable String id, ZoomMode mode) {
+			this.id = id;
 			this.mode = mode;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
-			String selectedZoomId = store.selectedZoomId();
+			String selectedZoomId = id == null ? store.selectedZoomId() : id;
 			if (selectedZoomId == null) {
 				return false;
 			}

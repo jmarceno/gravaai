@@ -18,7 +18,7 @@ import dev.gravaai.services.agent.AgentSocketBridge;
 public final class McpMain {
 
 	private static final String APP_NAME = "Gravaai";
-	private static final String FALLBACK_VERSION = "1.4.0";
+	private static final String FALLBACK_VERSION = "1.5.0";
 
 	private McpMain() {}
 

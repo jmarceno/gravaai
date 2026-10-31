@@ -1,5 +1,12 @@
 package dev.gravaai.media.compose;
 
+import io.github.humbleui.skija.ColorAlphaType;
+import io.github.humbleui.skija.ColorSpace;
+import io.github.humbleui.skija.ColorType;
+import io.github.humbleui.skija.Data;
+import io.github.humbleui.skija.EncoderPNG;
+import io.github.humbleui.skija.Image;
+import io.github.humbleui.skija.ImageInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -61,8 +68,7 @@ class BackgroundRenderTest {
 	@Timeout(60)
 	@DisplayName("cover-fits an image wallpaper")
 	void imageWallpaper() throws Exception {
-		byte[] png = GoldenImages.encodePng(
-				CompositorPipelineTest.solidFrame(4, 2, 0, 200, 0, 255));
+		byte[] png = encodePng(CompositorPipelineTest.solidFrame(4, 2, 0, 200, 0, 255));
 		ByteBuffer frame = renderBackground(new Background.Image(png), 0);
 		assertColour(frame, 2, 2, 0, 200, 0);
 		assertColour(frame, WIDTH - 3, HEIGHT - 3, 0, 200, 0);
@@ -150,5 +156,27 @@ class BackgroundRenderTest {
 				+ Byte.toUnsignedInt(frame.get(offset + 1)) + ","
 				+ Byte.toUnsignedInt(frame.get(offset + 2)) + ","
 				+ Byte.toUnsignedInt(frame.get(offset + 3)) + ")";
+	}
+
+	/** Encodes top-first RGBA pixels as PNG (via Skija), for image-wallpaper fixtures. */
+	private static byte[] encodePng(RgbaFrame frame) {
+		ImageInfo info = new ImageInfo(frame.width(), frame.height(), ColorType.RGBA_8888,
+				ColorAlphaType.OPAQUE, ColorSpace.getSRGB());
+		byte[] pixels = new byte[frame.height() * frame.strideBytes()];
+		frame.pixelsTopFirstRgba().duplicate().get(pixels, 0, pixels.length);
+		Image image = Image.makeRasterFromBytes(info, pixels, frame.strideBytes());
+		if (image == null) {
+			throw new IllegalStateException("cannot make raster image");
+		}
+		try {
+			Data data = EncoderPNG.encode(image);
+			try {
+				return data.getBytes();
+			} finally {
+				data.close();
+			}
+		} finally {
+			image.close();
+		}
 	}
 }

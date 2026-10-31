@@ -85,7 +85,7 @@ class ProjectFrameInputFactoryTest {
 			RgbaFrame frame = renderer.frameAtTime(0.6);
 			Assumptions.assumeTrue(frame != null, "GL context unavailable");
 			assertEquals(320, frame.width());
-			assertFalse(GoldenRenderer.isUniform(frame), "production resolver rendered a blank frame");
+			assertFalse(isUniform(frame), "production resolver rendered a blank frame");
 		}
 	}
 
@@ -147,5 +147,17 @@ class ProjectFrameInputFactoryTest {
 			hash = 31 * hash + pixels.get();
 		}
 		return hash;
+	}
+
+	/** True when every pixel of {@code frame} is identical (a blank render). */
+	private static boolean isUniform(RgbaFrame frame) {
+		java.nio.ByteBuffer pixels = frame.pixelsTopFirstRgba();
+		int first = pixels.getInt(0);
+		for (int pixel = 1; pixel < frame.width() * frame.height(); pixel++) {
+			if (pixels.getInt(pixel * 4) != first) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

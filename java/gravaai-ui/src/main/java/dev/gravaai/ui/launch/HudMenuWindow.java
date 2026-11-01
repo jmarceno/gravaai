@@ -266,11 +266,19 @@ public final class HudMenuWindow {
 					"Floating webcam preview during recording",
 					() -> port.setFloatingWebcamPreview(!state.floatingWebcamPreview())));
 			menuPreview = new WebcamPreviewView();
+			menuPreview.setMinSize(0, 0);
 			StackPane frame = new StackPane(menuPreview);
 			frame.getStyleClass().add("hud-menu-webcam-frame");
+			frame.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 			frame.setPrefSize(420, 315);
 			frame.setMaxSize(420, 315);
-			contentPane.getChildren().add(frame);
+			// The rows above stretch to the panel width but the preview keeps its 4:3 box, so adding
+			// it directly left it flush against the left edge with the leftover gap all on the right.
+			// A centring host spans the column and keeps the letterbox even on both sides.
+			StackPane frameHost = new StackPane(frame);
+			frameHost.setAlignment(Pos.CENTER);
+			frameHost.setMaxWidth(Double.MAX_VALUE);
+			contentPane.getChildren().add(frameHost);
 			List<HudRecordingPort.CameraDevice> cameras = port.cameraDevices();
 			if (!cameras.isEmpty()) {
 				menuPreview.start(selectCamera(state, cameras).path());

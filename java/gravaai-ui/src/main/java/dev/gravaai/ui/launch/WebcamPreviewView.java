@@ -6,10 +6,12 @@ import dev.gravaai.media.capture.WebcamCapture;
 import dev.gravaai.media.capture.WebcamFormat;
 import java.nio.ByteBuffer;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Rectangle;
 
 /**
  * Live webcam preview (plan §5.6.6 / §7.1 P1.7), ported from the {@code <video>} elements of
@@ -33,11 +35,32 @@ public final class WebcamPreviewView extends StackPane {
 	private @Nullable Thread reader;
 
 	public WebcamPreviewView() {
-		view.setPreserveRatio(false);
+		view.setPreserveRatio(true);
 		view.setSmooth(true);
 		view.setScaleX(-1);
+		// An ImageView is not resizable: left alone it reports the capture's natural 640x480 as its
+		// layout bounds, which becomes this pane's *minimum* size. A container that gives the pane
+		// less room (the 420x315 menu frame) is then forced past its own max size and the preview
+		// paints over the menu rows beneath it — including "Turn Off Webcam". Fitting the image to
+		// the pane and clipping to it keeps the preview inside the space it was given.
+		view.fitWidthProperty().bind(widthProperty());
+		view.fitHeightProperty().bind(heightProperty());
+		Rectangle clip = new Rectangle();
+		clip.widthProperty().bind(widthProperty());
+		clip.heightProperty().bind(heightProperty());
+		setClip(clip);
+		// preserveRatio scales the frame to fit the box without stretching it, so the ImageView is
+		// smaller than the pane on one axis whenever the camera's aspect differs from the frame's.
+		// Centring it leaves an even letterbox instead of the frame sitting against one edge.
+		setAlignment(Pos.CENTER);
 		getChildren().add(view);
 		setMinSize(0, 0);
+		setPrefSize(0, 0);
+	}
+
+	/** The frame surface (tests). */
+	ImageView imageView() {
+		return view;
 	}
 
 	/** Starts (or restarts) the preview for {@code devicePath}; no-op for a blank path. */

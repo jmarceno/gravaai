@@ -44,7 +44,7 @@ There are no accounts, no telemetry and no cloud sharing. Recordings, projects, 
 - Text, image and shape annotations
 - Crop and aspect-ratio presets
 - Rendered cursor with size, smoothing, motion blur, click bounce and loop mode
-- Webcam mirror, size, position, roundness, shadow and zoom-reactive scaling
+- Webcam mirror, size, position, split screen (camera beside or above/below the video), roundness, shadow and zoom-reactive scaling
 - Wallpapers, colors, gradients, padding, rounded corners, blur and shadows
 - Auto-captions with a local Whisper model
 - Projects saved as `.gravaai` files: save while editing with **Ctrl + S** (⌘ S) or the **Save**

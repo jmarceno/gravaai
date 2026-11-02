@@ -436,29 +436,38 @@ public final class Compositor implements AutoCloseable {
 	 * preset/custom position, margin, crop-matched size, {@code reactToZoom} counter-scale,
 	 * squircle mask, {@code WEBCAM_SHADOW_LAYER_PROFILES} shadow, mirror and crop, plus the per-clip
 	 * camera layout: {@code cameraFill} lerps the box to the full frame (camera-only) and
-	 * {@code cameraOpacity} fades the whole overlay.
+	 * {@code cameraOpacity} fades the whole overlay. The split screen presets instead cover-fit
+	 * the camera into its full-bleed region beside/above/below the content (no margin, radius or
+	 * shadow); {@code cameraFill} still lerps it to the full frame.
 	 */
 	private void renderWebcam(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		WebcamSpec spec = input.webcam();
-		double zoomScale = lastAppliedTransform.scale();
-		double margin = WebcamOverlay.scalePixels(spec.margin(), width);
-		double widthPercent = spec.width() > 0 ? spec.width() : spec.size();
-		double heightPercent = spec.height() > 0 ? spec.height() : spec.size();
-		double matchedHeightPercent = WebcamOverlay.cropMatchedHeightPercent(widthPercent,
-				heightPercent, (double) frame.width(), (double) frame.height(),
-				spec.cropRegion());
-		WebcamOverlay.Size size = WebcamOverlay.dimensionsPx(width, height, widthPercent,
-				matchedHeightPercent, margin, zoomScale, spec.reactToZoom());
-		WebcamOverlay.Position position = WebcamOverlay.position(width, height, size.width(),
-				size.height(), margin, spec.positionPreset(), spec.positionX(), spec.positionY(),
-				spec.corner());
-		double radius = WebcamOverlay.cornerRadiusPx(spec.roundness(), size.width(),
-				size.height());
-		Rect box = Rect.makeXYWH((float) position.x(), (float) position.y(),
-				(float) size.width(), (float) size.height());
 		SceneSpec scene = input.scene();
 		double fill = clamp01(scene.cameraFill());
 		double opacity = clamp01(scene.cameraOpacity());
+		SplitScreenLayout.Regions split = splitRegions(input);
+		Rect box;
+		double radius;
+		if (split != null) {
+			box = split.camera();
+			radius = 0;
+		} else {
+			double zoomScale = lastAppliedTransform.scale();
+			double margin = WebcamOverlay.scalePixels(spec.margin(), width);
+			double widthPercent = spec.width() > 0 ? spec.width() : spec.size();
+			double heightPercent = spec.height() > 0 ? spec.height() : spec.size();
+			double matchedHeightPercent = WebcamOverlay.cropMatchedHeightPercent(widthPercent,
+					heightPercent, (double) frame.width(), (double) frame.height(),
+					spec.cropRegion());
+			WebcamOverlay.Size size = WebcamOverlay.dimensionsPx(width, height, widthPercent,
+					matchedHeightPercent, margin, zoomScale, spec.reactToZoom());
+			WebcamOverlay.Position position = WebcamOverlay.position(width, height, size.width(),
+					size.height(), margin, spec.positionPreset(), spec.positionX(),
+					spec.positionY(), spec.corner());
+			radius = WebcamOverlay.cornerRadiusPx(spec.roundness(), size.width(), size.height());
+			box = Rect.makeXYWH((float) position.x(), (float) position.y(),
+					(float) size.width(), (float) size.height());
+		}
 		if (fill > 0) {
 			box = lerpRect(box, Rect.makeWH(width, height), (float) fill);
 			radius *= 1 - fill;
@@ -476,7 +485,8 @@ public final class Compositor implements AutoCloseable {
 		try {
 			try (Image image = frameTextures.image(target,
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
-				drawWebcamShadowLayers(canvas, box, radius, spec.shadow() * (1 - fill),
+				drawWebcamShadowLayers(canvas, box, radius,
+						split != null ? 0 : spec.shadow() * (1 - fill),
 						Math.min(box.getWidth(), box.getHeight()));
 				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
 						radius, WEBCAM_SAMPLING);
@@ -486,6 +496,44 @@ public final class Compositor implements AutoCloseable {
 				canvas.restore();
 			}
 		}
+	}
+
+	/**
+	 * The split screen regions for this frame, or {@code null} when the webcam preset is not a
+	 * split preset or the webcam is not visible at this source time (the content then uses the
+	 * full frame, exactly like the overlay mode). Side-by-side presets take their camera share
+	 * from the webcam width percent, stacked ones from the height percent (the size percent as
+	 * the fallback), so the existing webcam sliders drive the split.
+	 */
+	private SplitScreenLayout.@Nullable Regions splitRegions(FrameInput input) {
+		WebcamSpec spec = input.webcam();
+		if (!SplitScreenLayout.isSplit(spec.positionPreset())
+				|| !spec.isVisibleAt(input.sourceTimeSeconds() * 1000)) {
+			return null;
+		}
+		boolean horizontal = "split-right".equals(spec.positionPreset())
+				|| "split-left".equals(spec.positionPreset());
+		double sharePercent = horizontal
+				? (spec.width() > 0 ? spec.width() : spec.size())
+				: (spec.height() > 0 ? spec.height() : spec.size());
+		return SplitScreenLayout.resolve(spec.positionPreset(), width, height, sharePercent);
+	}
+
+	/**
+	 * The area the screen content fits into: the split content region while the camera is shown
+	 * in split screen, blended back to the full frame as the per-clip camera layout fades the
+	 * camera out ({@code cameraOpacity}), and the full frame for the overlay mode.
+	 */
+	private Rect splitContentRect(FrameInput input) {
+		SplitScreenLayout.Regions split = splitRegions(input);
+		if (split == null) {
+			return Rect.makeWH(width, height);
+		}
+		double opacity = clamp01(input.scene().cameraOpacity());
+		if (opacity >= 1) {
+			return split.content();
+		}
+		return lerpRect(Rect.makeWH(width, height), split.content(), (float) opacity);
 	}
 
 	private static double clamp01(double value) {
@@ -583,15 +631,21 @@ public final class Compositor implements AutoCloseable {
 
 	private void renderSourceVideo(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		LayoutSpec spec = input.layout();
-		PaddedLayout layout = LayoutUtils.computePaddedLayout(width, height, spec.padding(),
-				null, spec.crop(), frame.width(), frame.height());
+		// Split screen: the screen content fits into the region left of/above the camera strip
+		// (the full frame for the overlay mode). The padded layout runs inside that region.
+		Rect contentRect = splitContentRect(input);
+		int contentWidth = Math.max(1, Math.round(contentRect.getWidth()));
+		int contentHeight = Math.max(1, Math.round(contentRect.getHeight()));
+		PaddedLayout layout = LayoutUtils.computePaddedLayout(contentWidth, contentHeight,
+				spec.padding(), null, spec.crop(), frame.width(), frame.height());
 		// The camera transform is applied around the cropped content rect (the TS
 		// layoutCache.maskRect), while the background stays untransformed.
-		Rect baseMask = Rect.makeXYWH((float) layout.centerOffsetX(),
-				(float) layout.centerOffsetY(), (float) layout.croppedDisplayWidth(),
-				(float) layout.croppedDisplayHeight());
+		Rect baseMask = Rect.makeXYWH((float) (contentRect._left + layout.centerOffsetX()),
+				(float) (contentRect._top + layout.centerOffsetY()),
+				(float) layout.croppedDisplayWidth(), (float) layout.croppedDisplayHeight());
 		lastMaskRect = baseMask;
-		ZoomTransform.AppliedTransform transform = resolveZoomTransform(input, baseMask);
+		ZoomTransform.AppliedTransform transform = resolveZoomTransform(input, baseMask,
+				contentRect, contentWidth, contentHeight);
 		lastAppliedTransform = transform;
 		Rect source = Rect.makeXYWH((float) layout.cropStartX(), (float) layout.cropStartY(),
 				(float) (frame.width() * spec.crop().width()),
@@ -600,7 +654,8 @@ public final class Compositor implements AutoCloseable {
 		double maskRadius = LayoutUtils.scalePreviewBorderRadius(
 				layout.croppedDisplayWidth(), layout.croppedDisplayHeight(),
 				style.borderRadiusPercent());
-		MotionBlur.Effect motionBlur = resolveMotionBlur(input, baseMask, transform);
+		MotionBlur.Effect motionBlur = resolveMotionBlur(input, baseMask, transform,
+				contentWidth, contentHeight);
 		lastMotionBlurEffect = motionBlur;
 		SkiaGlSurface target = currentTarget();
 		try (Image image = frameTextures.image(target, GpuFrameTextures.Slot.SOURCE, frame,
@@ -713,7 +768,7 @@ public final class Compositor implements AutoCloseable {
 	 * {@code applyZoomTransform} transformOverride path) and the frame history.
 	 */
 	private MotionBlur.Effect resolveMotionBlur(FrameInput input, Rect baseMask,
-			ZoomTransform.AppliedTransform transform) {
+			ZoomTransform.AppliedTransform transform, int contentWidth, int contentHeight) {
 		ZoomSpec zoom = input.zoom();
 		double amount = zoom == null ? 0 : zoom.motionBlurAmount();
 		if (amount <= 0) {
@@ -721,8 +776,8 @@ public final class Compositor implements AutoCloseable {
 			return MotionBlur.Effect.NONE;
 		}
 		return MotionBlur.update(motionBlurState, baseMask, transform,
-				new RenderTargetSize(width, height), true, amount, MotionBlur.Tuning.DEFAULT,
-				input.timeSeconds() * 1000, null, false);
+				new RenderTargetSize(contentWidth, contentHeight), true, amount,
+				MotionBlur.Tuning.DEFAULT, input.timeSeconds() * 1000, null, false);
 	}
 
 	private Surface ensureBlurSurface() {
@@ -806,9 +861,12 @@ public final class Compositor implements AutoCloseable {
 	/**
 	 * Port of {@code modernFrameRenderer.updateAnimationState}: resolve the scene camera target
 	 * for this frame and advance the zoom springs by the content-time delta (or snap in classic
-	 * mode).
+	 * mode). The transform is computed against the content region as the stage (the full frame
+	 * for the overlay mode), so a split screen zoom stays centred on the content, and is
+	 * translated back into output coordinates.
 	 */
-	private ZoomTransform.AppliedTransform resolveZoomTransform(FrameInput input, Rect baseMask) {
+	private ZoomTransform.AppliedTransform resolveZoomTransform(FrameInput input, Rect baseMask,
+			Rect contentRect, int contentWidth, int contentHeight) {
 		ZoomSpec zoom = input.zoom();
 		if (zoom == null || !zoom.isActive()) {
 			resetZoomState();
@@ -820,9 +878,15 @@ public final class Compositor implements AutoCloseable {
 						input.sourceTimeSeconds() * 1000,
 						zoom.connectZooms(), zoom.zoomInDurationMs(), zoom.zoomOutDurationMs(),
 						zoom.zoomClassicMode(), input.cursorSamples(), cursorFollowCamera));
+		Rect localMask = new Rect(baseMask._left - contentRect._left,
+				baseMask._top - contentRect._top,
+				baseMask.getRight() - contentRect._left,
+				baseMask.getBottom() - contentRect._top);
 		ZoomTransform.AppliedTransform projected = ZoomTransform.computeZoomTransform(
-				new RenderTargetSize(width, height), baseMask, target.scale(), target.progress(),
-				target.focus().cx(), target.focus().cy());
+				new RenderTargetSize(contentWidth, contentHeight), localMask, target.scale(),
+				target.progress(), target.focus().cx(), target.focus().cy());
+		projected = new ZoomTransform.AppliedTransform(projected.scale(),
+				projected.x() + contentRect._left, projected.y() + contentRect._top);
 		double deltaMs = lastContentTimeMs == null
 				? 1000.0 / 60.0
 				: timeMs - lastContentTimeMs;

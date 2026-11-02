@@ -63,7 +63,8 @@ final class AgentEditorViews {
 			Map.entry("autoCaptionSettings.backgroundOpacity", "0-1"),
 			Map.entry("webcam.size", "10-100 (percent of the frame)"),
 			Map.entry("webcam.positionPreset", "top-left, top-center, top-right, center-left,"
-					+ " center, center-right, bottom-left, bottom-center, bottom-right, custom"),
+					+ " center, center-right, bottom-left, bottom-center, bottom-right, custom,"
+					+ " split-right, split-left, split-top, split-bottom"),
 			Map.entry("keystrokeOverlay.position", "top-left, top-center, top-right, bottom-left,"
 					+ " bottom-center, bottom-right"));
 

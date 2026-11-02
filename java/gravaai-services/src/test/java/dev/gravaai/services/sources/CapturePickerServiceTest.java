@@ -21,6 +21,8 @@ import dev.gravaai.services.recording.CosmicOutput;
 class CapturePickerServiceTest {
 
 	private static final Map<String, String> WAYLAND = Map.of("XDG_SESSION_TYPE", "wayland");
+	private static final Map<String, String> KDE_WAYLAND =
+			Map.of("XDG_SESSION_TYPE", "wayland", "XDG_CURRENT_DESKTOP", "KDE");
 	private static final Map<String, String> X11 = Map.of("XDG_SESSION_TYPE", "x11");
 	private static final CosmicOutput DP1 = new CosmicOutput("DP-1", 0, 0, 1728, 1117);
 	private static final List<SourceArea.PickerDisplay> DISPLAYS =
@@ -163,5 +165,21 @@ class CapturePickerServiceTest {
 		CapturePickerService.CapturePickerContext context = picker.getCapturePickerContext(9);
 		assertNull(context.displayBounds());
 		assertTrue(context.windows().isEmpty());
+	}
+
+	@Test
+	@DisplayName("a portal compositor uses the desktop's own picker instead of waiting for a click")
+	void portalCompositorUsesTheSystemPicker() {
+		SourceService sources = sources(KDE_WAYLAND);
+		CapturePickerService picker = picker(KDE_WAYLAND, sources);
+
+		SourceService.PickResult result = picker.pickCaptureTarget().join();
+
+		assertEquals(true, result.success());
+		assertEquals(SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, result.source().id());
+		assertEquals(result.source(), sources.getSelectedSource());
+		// The portal dialog chose the screen; a click would never arrive.
+		assertEquals(0, clickCalls.get());
+		assertEquals(0, pickerWindowsCreated.get());
 	}
 }

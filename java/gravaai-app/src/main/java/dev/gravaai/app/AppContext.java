@@ -44,6 +44,7 @@ import dev.gravaai.services.projects.RecordingsDirectory;
 import dev.gravaai.services.projects.RecordingsReadModel;
 import dev.gravaai.services.recording.CosmicRecorder.StopResult;
 import dev.gravaai.services.recording.RecordingService;
+import dev.gravaai.services.shortcuts.DesktopShortcutPortal;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
 import dev.gravaai.services.shortcuts.GlobalShortcutDispatcher;
 import dev.gravaai.services.shortcuts.GlobalShortcutSettings;
@@ -1477,11 +1478,20 @@ public final class AppContext {
 					() -> NativeHelpers.path("gravaai-ctl"),
 					appPath(),
 					System.getenv(),
-					dispatcher::dispatch,
+					// The control socket reads on a virtual thread, but every action ends in the HUD,
+					// which is JavaFX: hand over through the FX thread like the other two sinks.
+					action -> Platform.runLater(() -> {
+						GlobalShortcutDispatcher current = dispatcher;
+						if (current != null) {
+							current.dispatch(action);
+						}
+					}),
 					() -> Platform.runLater(this::bringToFrontForSecondLaunch),
 					// A second launch with a project/recording file argument (file-manager
 					// association) hands the path over the control socket.
-					path -> Platform.runLater(() -> openProjectInEditor(path)));
+					path -> Platform.runLater(() -> openProjectInEditor(path)),
+					// KDE Plasma, GNOME 48+ and others register shortcuts through the desktop portal.
+					DesktopShortcutPortal.SYSTEM);
 			LOG.log(System.Logger.Level.INFO, "global shortcut service created");
 		} catch (Exception error) {
 			LOG.log(System.Logger.Level.WARNING, "global shortcuts unavailable: " + error);

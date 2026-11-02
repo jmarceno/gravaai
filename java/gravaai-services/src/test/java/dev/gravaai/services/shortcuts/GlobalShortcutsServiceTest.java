@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.platform.portal.GlobalShortcutsPortal;
 
 /**
  * Behaviour of {@code electron/globalShortcuts/index.ts} (the TS file has no unit test of its
@@ -226,6 +227,102 @@ class GlobalShortcutsServiceTest {
 		assertEquals(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS, service(env("COSMIC")).readConfig());
 		settings.value = Json.MAPPER.readTree("42");
 		assertEquals(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS, service(env("COSMIC")).readConfig());
+	}
+
+	/** Records what the service asks of the desktop portal, and plays the user pressing a key. */
+	private static final class FakePortal implements DesktopShortcutPortal {
+		final java.util.concurrent.CompletableFuture<List<GlobalShortcutsPortal.Shortcut>> bound =
+				new java.util.concurrent.CompletableFuture<>();
+		boolean unbound;
+		java.util.function.Consumer<String> onActivated = id -> { };
+
+		@Override
+		public List<GlobalShortcutsPortal.BoundShortcut> bind(List<GlobalShortcutsPortal.Shortcut> shortcuts) {
+			bound.complete(shortcuts);
+			return List.of(new GlobalShortcutsPortal.BoundShortcut("toggle-recording", "Meta+Alt+R"));
+		}
+
+		@Override
+		public void unbind() {
+			unbound = true;
+		}
+
+		@Override
+		public void close() {
+		}
+	}
+
+	private GlobalShortcutsService portalService(FakePortal portal) {
+		return new GlobalShortcutsService(settings, () -> bundledCtl, APP_PATH, env("KDE"), actions::add,
+				null, null, onActivated -> {
+					portal.onActivated = onActivated;
+					return java.util.Optional.of(portal);
+				});
+	}
+
+	@Test
+	@DisplayName("off COSMIC, a desktop portal registers the enabled bindings as preferred triggers")
+	void portalRegistersPreferredTriggers() throws Exception {
+		FakePortal portal = new FakePortal();
+		GlobalShortcutsStatus status = portalService(portal).apply(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS);
+
+		assertEquals(GlobalShortcutsStatus.Backend.PORTAL, status.backend());
+		List<GlobalShortcutsPortal.Shortcut> shortcuts = portal.bound.get(5, java.util.concurrent.TimeUnit.SECONDS);
+		assertEquals(4, shortcuts.size());
+		assertEquals("toggle-recording", shortcuts.getFirst().id());
+		assertEquals("Start / stop recording", shortcuts.getFirst().description());
+		assertEquals("ALT+LOGO+r", shortcuts.getFirst().preferredTrigger());
+		// The default config leaves cancel unbound; the desktop still lists it for the user to set.
+		assertEquals("", shortcuts.get(2).preferredTrigger());
+		assertFalse(Files.exists(cosmicPaths(env("KDE")).custom()));
+	}
+
+	@Test
+	@DisplayName("the keys the desktop bound are reported once it answers")
+	void portalReportsTheBoundTriggers() throws Exception {
+		FakePortal portal = new FakePortal();
+		GlobalShortcutsService service = portalService(portal);
+		service.apply(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS);
+		portal.bound.get(5, java.util.concurrent.TimeUnit.SECONDS);
+
+		long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+		while (service.getStatus().triggers().isEmpty() && System.nanoTime() < deadline) {
+			Thread.sleep(10);
+		}
+		assertEquals(Map.of(GlobalShortcutAction.TOGGLE_RECORDING, "Meta+Alt+R"), service.getStatus().triggers());
+	}
+
+	@Test
+	@DisplayName("a pressed portal shortcut is dispatched like a control-socket action")
+	void portalActivationDispatches() {
+		FakePortal portal = new FakePortal();
+		portalService(portal).apply(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS);
+
+		portal.onActivated.accept("toggle-pause");
+		portal.onActivated.accept("not-an-action");
+
+		assertEquals(List.of(GlobalShortcutAction.TOGGLE_PAUSE), actions);
+	}
+
+	@Test
+	@DisplayName("turning global shortcuts off unbinds them at the desktop")
+	void portalDisableUnbinds() {
+		FakePortal portal = new FakePortal();
+		GlobalShortcutsStatus status = portalService(portal).apply(
+				new GlobalShortcutsConfig(false, GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS.bindings()));
+
+		assertEquals(GlobalShortcutsStatus.Backend.PORTAL, status.backend());
+		assertTrue(portal.unbound);
+		assertFalse(portal.bound.isDone());
+	}
+
+	@Test
+	@DisplayName("portal triggers use the XDG shortcut format")
+	void portalTriggerFormat() {
+		assertEquals("CTRL+ALT+SHIFT+LOGO+F9",
+				GlobalShortcutsService.portalTrigger(new GlobalShortcutBinding("F9", true, true, true, true)));
+		assertEquals("CTRL+Return",
+				GlobalShortcutsService.portalTrigger(new GlobalShortcutBinding("Return", false, true, false, false)));
 	}
 
 	private GlobalShortcutsService service(Map<String, String> env) {

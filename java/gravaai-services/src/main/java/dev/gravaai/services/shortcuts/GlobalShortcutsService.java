@@ -15,9 +15,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
+import dev.gravaai.platform.portal.GlobalShortcutsPortal;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -26,8 +29,9 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Port of {@code electron/globalShortcuts/index.ts}. On COSMIC the user's
  * {@code custom} RON file is spliced: only Gravaai's own entries are touched, every other byte is
- * preserved, and a parse error aborts without writing. Elsewhere the actions only work as
- * {@code --action} CLI flags ({@code cli-only}).
+ * preserved, and a parse error aborts without writing. Elsewhere the shortcuts are registered
+ * through the desktop's GlobalShortcuts portal when it has one (KDE Plasma, GNOME 48+), and
+ * otherwise the actions only work as {@code --action} CLI flags ({@code cli-only}).
  *
  * <p>Dependencies are injected (plan §5.3): the app-settings slot, the bundled
  * {@code gravaai-ctl} locator, the app path the shortcut command runs and the action sink (the
@@ -55,9 +59,16 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final @Nullable Consumer<Path> openFileSink;
 	private final Object lock = new Object();
 
+	private final Function<Consumer<String>, Optional<DesktopShortcutPortal>> portalOpener;
+
 	private ControlSocket.@Nullable Server controlSocket;
 	private @Nullable Path installedCtlPath;
 	private @Nullable GlobalShortcutsStatus lastStatus;
+	/** Opened on the first sync off COSMIC; stays empty when the desktop has no portal. */
+	private Optional<DesktopShortcutPortal> portal = Optional.empty();
+	private boolean portalProbed;
+	/** Bumped by every portal sync, so a slow bind cannot overwrite a newer one's status. */
+	private long portalGeneration;
 
 	/**
 	 * @param settings the {@code globalShortcuts} app setting
@@ -97,6 +108,22 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			Consumer<GlobalShortcutAction> actionSink,
 			@Nullable Runnable showSink,
 			@Nullable Consumer<Path> openFileSink) {
+		this(settings, bundledCtl, appPath, env, actionSink, showSink, openFileSink, DesktopShortcutPortal.NONE);
+	}
+
+	/**
+	 * @param portalOpener opens the desktop's GlobalShortcuts portal, used on every desktop but
+	 *     COSMIC when it exists ({@link DesktopShortcutPortal#SYSTEM} in the app)
+	 */
+	public GlobalShortcutsService(
+			GlobalShortcutSettings settings,
+			Supplier<Path> bundledCtl,
+			String appPath,
+			Map<String, String> env,
+			Consumer<GlobalShortcutAction> actionSink,
+			@Nullable Runnable showSink,
+			@Nullable Consumer<Path> openFileSink,
+			Function<Consumer<String>, Optional<DesktopShortcutPortal>> portalOpener) {
 		this.settings = settings;
 		this.bundledCtl = bundledCtl;
 		this.appPath = appPath;
@@ -104,6 +131,7 @@ public final class GlobalShortcutsService implements AutoCloseable {
 		this.actionSink = actionSink;
 		this.showSink = showSink;
 		this.openFileSink = openFileSink;
+		this.portalOpener = portalOpener;
 	}
 
 	/** Port of {@code isCosmicDesktop}. */
@@ -150,7 +178,14 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			if (persist) {
 				settings.write(GlobalShortcuts.toJson(config, tools.jackson.databind.node.JsonNodeFactory.instance));
 			}
-			lastStatus = isCosmicDesktop() ? syncCosmic(config) : emptyStatus(GlobalShortcutsStatus.Backend.CLI_ONLY);
+			if (isCosmicDesktop()) {
+				lastStatus = syncCosmic(config);
+			} else {
+				Optional<DesktopShortcutPortal> desktopPortal = desktopPortal();
+				lastStatus = desktopPortal.isPresent()
+						? syncPortal(desktopPortal.get(), config)
+						: emptyStatus(GlobalShortcutsStatus.Backend.CLI_ONLY);
+			}
 			return lastStatus;
 		}
 	}
@@ -183,7 +218,98 @@ public final class GlobalShortcutsService implements AutoCloseable {
 			if (socket != null) {
 				socket.close();
 			}
+			portal.ifPresent(DesktopShortcutPortal::close);
+			portal = Optional.empty();
 		}
+	}
+
+	/** The desktop's shortcut portal, opened once; presses are dispatched like control-socket actions. */
+	private Optional<DesktopShortcutPortal> desktopPortal() {
+		if (!portalProbed) {
+			portalProbed = true;
+			portal = portalOpener.apply(id -> {
+				GlobalShortcutAction action = GlobalShortcutAction.fromWire(id);
+				if (action != null) {
+					actionSink.accept(action);
+				}
+			});
+		}
+		return portal;
+	}
+
+	/**
+	 * Hands the enabled bindings to the desktop as preferred triggers. The first bind waits for the
+	 * user to confirm the desktop's dialog, so it runs off the caller's thread; the returned status
+	 * carries the previous triggers until the desktop answers. After that the desktop owns the keys:
+	 * the user changes them in its keyboard settings, and the next sync reports what it bound.
+	 */
+	private GlobalShortcutsStatus syncPortal(DesktopShortcutPortal desktopPortal, GlobalShortcutsConfig config) {
+		long generation = ++portalGeneration;
+		Map<GlobalShortcutAction, String> previousTriggers =
+				lastStatus == null ? Map.of() : lastStatus.triggers();
+		if (!config.enabled()) {
+			desktopPortal.unbind();
+			return portalStatus(Map.of(), null);
+		}
+		List<GlobalShortcutsPortal.Shortcut> shortcuts = new ArrayList<>();
+		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
+			GlobalShortcutBinding binding = config.bindings().get(action);
+			shortcuts.add(new GlobalShortcutsPortal.Shortcut(
+					action.wire(),
+					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.getOrDefault(action, action.wire()),
+					binding == null ? "" : portalTrigger(binding)));
+		}
+		Thread.ofVirtual().name("gravaai-shortcuts-portal").start(() -> {
+			GlobalShortcutsStatus status;
+			try {
+				Map<GlobalShortcutAction, String> triggers = new LinkedHashMap<>();
+				for (GlobalShortcutsPortal.BoundShortcut bound : desktopPortal.bind(shortcuts)) {
+					GlobalShortcutAction action = GlobalShortcutAction.fromWire(bound.id());
+					if (action != null && !bound.trigger().isEmpty()) {
+						triggers.put(action, bound.trigger());
+					}
+				}
+				LOG.log(System.Logger.Level.INFO, "global shortcuts bound through the desktop portal: " + triggers);
+				status = portalStatus(triggers, null);
+			} catch (IOException error) {
+				LOG.log(System.Logger.Level.WARNING, "the desktop did not bind the global shortcuts: " + error);
+				status = portalStatus(Map.of(), "Your desktop did not register the shortcuts: " + error.getMessage());
+			}
+			synchronized (lock) {
+				if (generation == portalGeneration) {
+					lastStatus = status;
+				}
+			}
+		});
+		return portalStatus(previousTriggers, null);
+	}
+
+	private GlobalShortcutsStatus portalStatus(Map<GlobalShortcutAction, String> triggers, @Nullable String error) {
+		return new GlobalShortcutsStatus(GlobalShortcutsStatus.Backend.PORTAL, Map.of(), Map.of(), error,
+				GlobalShortcuts.cliCommands(appPath), triggers);
+	}
+
+	/**
+	 * A binding in the XDG shortcuts format the portal takes as {@code preferred_trigger}: the
+	 * modifiers {@code CTRL}, {@code ALT}, {@code SHIFT} and {@code LOGO}, then the xkb keysym name,
+	 * joined by {@code +} (for example {@code LOGO+ALT+r}).
+	 */
+	static String portalTrigger(GlobalShortcutBinding binding) {
+		List<String> parts = new ArrayList<>();
+		if (binding.ctrl()) {
+			parts.add("CTRL");
+		}
+		if (binding.alt()) {
+			parts.add("ALT");
+		}
+		if (binding.shift()) {
+			parts.add("SHIFT");
+		}
+		if (binding.sup()) {
+			parts.add("LOGO");
+		}
+		parts.add(binding.key());
+		return String.join("+", parts);
 	}
 
 	/** Port of {@code syncCosmic}. */

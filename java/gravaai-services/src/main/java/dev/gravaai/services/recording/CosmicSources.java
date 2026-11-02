@@ -38,14 +38,12 @@ public final class CosmicSources {
 		return sourceId != null && sourceId.startsWith(COSMIC_SOURCE_PREFIX);
 	}
 
-	/** The output name embedded in a COSMIC source id (empty for a missing id). */
+	/** The output name embedded in a COSMIC source id (empty for a missing or foreign id). */
 	public static String outputNameForSourceId(@Nullable String sourceId) {
-		if (sourceId == null) {
+		if (sourceId == null || !sourceId.startsWith(COSMIC_SOURCE_PREFIX)) {
 			return "";
 		}
-		return sourceId.length() <= COSMIC_SOURCE_PREFIX.length()
-				? ""
-				: sourceId.substring(COSMIC_SOURCE_PREFIX.length());
+		return sourceId.substring(COSMIC_SOURCE_PREFIX.length());
 	}
 
 	/** Parses the helper's {@code --list} stdout: {@code OUTPUT name x y w h} lines, anything else ignored. */

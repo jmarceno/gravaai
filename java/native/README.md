@@ -15,9 +15,11 @@ java/native/
   build-whisper.sh             whisper.cpp v1.8.4 runtime (whisper-cli)
   make-fixtures.sh             writes the wrapper-test fixtures into java/parity/fixtures/media
   ffmpeg-jextract-includes.txt curated FFM binding symbol list (jextract input)
-  wayland-capture/ wayland-cursor/ gravaai-ctl/ models/   copies of electron/native/*
+  wayland-capture/ wayland-cursor/ gravaai-ctl/ portal-capture/ kwin-cursor/ models/
+                               helper sources
   build/                       build output (git-ignored, never committed)
     gravaai-wayland-capture, gravaai-wayland-cursor, gravaai-ctl
+    gravaai-portal-capture, gravaai-kwin-cursor   (optional, see "Compositor backends" below)
     models/rnnoise/voice.rnnn
     ffmpeg/{bin,lib,include}
     whisper/{whisper-cli,*,whisper-runtime.json}
@@ -25,6 +27,90 @@ java/native/
 
 The C sources are **copies**; the Electron copy stays until P3.6 (plan §1.2 rule 10). Nothing
 here touches a GPU: no VA-API, VDPAU, Vulkan or `-hwaccel` (plan §1.1.1).
+
+## Compositor backends
+
+Screen capture has two interchangeable helpers that share one command line
+(`<output-name> <fps>`) and one stream contract: a single
+`FORMAT <w> <h> <rgba|bgra> <transform>` line on stderr, then raw frames on stdout, with
+`pause`/`resume`/`stop` on stdin. The Java recording pipeline is therefore identical for both.
+
+- `gravaai-wayland-capture` — direct capture over `ext-image-copy-capture`, used on COSMIC and
+  any compositor that advertises the protocol.
+- `gravaai-portal-capture` — `xdg-desktop-portal` ScreenCast into PipeWire, used on desktops
+  whose compositor only exposes the portal: KDE Plasma/KWin, GNOME and wlroots sessions. Here
+  the portal's own dialog picks the monitor, so the `<output-name>` argument is accepted and
+  ignored, and `--list` enumerates monitors over `wl_output`.
+
+`dev.gravaai.platform.compositor.CaptureBackend` chooses between them from `XDG_SESSION_TYPE`
+and `XDG_CURRENT_DESKTOP`; anything unrecognised keeps the historical COSMIC behaviour, and
+`CompositorRecordingEnvironment` applies the choice to the recorder.
+
+What the portal helper does beyond the COSMIC contract:
+
+- **Restore token.** It asks for `persist_mode=2` and keeps the token the portal returns in
+  `$XDG_STATE_HOME/gravaai/portal-restore-token` (mode 0600). The desktop's dialog appears on the
+  first recording only; later ones start silently. A rejected token is deleted and the dialog
+  comes back.
+- **Hidden cursor.** It requests `cursor_mode=1`, so the frames carry no pointer and the editor
+  draws its own from the cursor helper's telemetry. With the cursor embedded the video showed
+  two pointers.
+- **Ended from the desktop.** When the user stops sharing from the desktop's own indicator
+  ("End" on KDE, the top-bar button on GNOME), the portal emits `Session.Closed` and the
+  PipeWire stream disconnects. The helper prints `ENDED ...` and exits; `CosmicRecorder` sees a
+  capture helper exit while the recording is still active and raises
+  `recording-stop-requested`, so the recording is saved and opened like a normal stop.
+- **Frame pacing.** Frames are written at most `<fps>` times a second and late ticks are
+  dropped. The encoder stamps each frame with its arrival time (`-use_wallclock_as_timestamps 1`,
+  `-fps_mode vfr`), so recordings keep their wall-clock length even when the machine encodes
+  slower than `<fps>`.
+
+### Pointer position
+
+The pointer is a separate choice, `dev.gravaai.platform.compositor.CursorBackend`, because no
+portal reports where the pointer is. Every cursor helper prints the same lines (`POS:x:y`,
+`READY`, `INTERACTION:mousedown:N`, `INTERACTION:mouseup`, and `KEY:down|up:code` with
+`--keys`), so `CursorCaptureSession` does not care which one runs.
+
+- `gravaai-wayland-cursor` — COSMIC's ext-image-copy-capture cursor sessions.
+- `gravaai-kwin-cursor` — KDE Plasma. It loads a KWin script (through `org.kde.kwin.Scripting`)
+  that polls `workspace.cursorPos` every 16 ms and calls back into the helper over D-Bus. KWin's
+  `cursorPosChanged` does not fire for pointer motion and the script engine has no
+  `setTimeout`, hence the `QTimer`. Buttons and keys come from evdev (`/dev/input`, the user must
+  be in the `input` group, as on COSMIC). A press is held until the next position report (at most
+  60 ms), so a quick move-then-click is attributed to where the pointer landed.
+
+### Global shortcuts
+
+On COSMIC the shortcuts are written into COSMIC's own keyboard settings and run `gravaai-ctl`.
+Everywhere else `GlobalShortcutsService` uses the `org.freedesktop.portal.GlobalShortcuts`
+portal (`dev.gravaai.platform.portal.GlobalShortcutsPortal`) when the desktop offers it, and
+falls back to the copyable `--action` commands when it does not. The portal needs an app id
+for unsandboxed apps: the client registers as `gravaai` through
+`org.freedesktop.host.portal.Registry` on a D-Bus connection of its own, matching the
+`gravaai.desktop` entry the AppImage installs. The desktop confirms the shortcuts with the user
+once and owns the keys afterwards, so the settings page lists the keys it reports instead of
+editing them.
+
+### Adding another desktop (GNOME)
+
+KDE Plasma 6 is verified end to end. For GNOME:
+
+1. **Capture** already selects the portal helper (`CaptureBackend` maps `GNOME` to `PORTAL`);
+   check the restore token and the `Session.Closed` path against GNOME's own dialog.
+2. **Pointer** needs a new `CursorBackend` constant and helper. GNOME has no KWin scripting;
+   Mutter does fill the ScreenCast stream's `SPA_META_Cursor` metadata (`cursor_mode=4`), which
+   KWin leaves empty, so the portal helper itself is the likely source there.
+3. **Shortcuts** work through the same portal on GNOME 48+; older GNOME falls back to the
+   `--action` commands automatically.
+
+Building the portal and KWin helpers needs `libpipewire-0.3-dev` and `libdbus-1-dev` in addition
+to the usual toolchain. Without them `build-native-helpers.sh` prints a skip line and builds only
+the COSMIC helpers, which is enough for a COSMIC-only build:
+
+```bash
+sudo apt install libpipewire-0.3-dev libdbus-1-dev
+```
 
 ## Quick start
 

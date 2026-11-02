@@ -698,6 +698,13 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 			}
 			publish();
 		}));
+		// A stop the user did not press here (the desktop ended the screen share, the disk filled
+		// up) still runs the full stop flow, so the recording is saved and opens in the editor.
+		subscriptions.add(wiring.events().onRecordingStopRequested(event -> Platform.runLater(() -> {
+			LOG.log(System.Logger.Level.INFO,
+					"recording stop requested (" + event.reason() + "): " + event.message());
+			stopRecordingFromTray();
+		})));
 		subscriptions.add(wiring.countdown().onRemainingChanged(remaining -> publish()));
 		subscriptions.add(wiring.sources().onSelectedSourceChanged(selected -> publish()));
 		subscriptions.add(countdownDelayStore.onCountdownDelayChanged(delay -> {

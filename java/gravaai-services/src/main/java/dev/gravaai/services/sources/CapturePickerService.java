@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.platform.compositor.CaptureBackend;
 import dev.gravaai.services.recording.CosmicOutput;
 
 /**
@@ -98,6 +99,15 @@ public final class CapturePickerService {
 			return CompletableFuture.completedFuture(SourceService.PickResult.canceledPick());
 		}
 		if ("linux".equals(platform) && SourceMapping.isLikelyLinuxWaylandSession(env)) {
+			if (CaptureBackend.detect(env) == CaptureBackend.PORTAL) {
+				// On a portal compositor the desktop's own screen-sharing dialog is the picker:
+				// it asks the user which monitor to share and remembers the choice. Waiting for a
+				// click would never resolve, because the portal hides where the cursor is.
+				SelectedSource source = SelectedSource.screen(
+						SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null);
+				sources.applySelection(source);
+				return CompletableFuture.completedFuture(SourceService.PickResult.picked(source));
+			}
 			// The portal screencast is unreliable on COSMIC, so record an output
 			// directly: the user clicks anywhere on the screen they want.
 			return clickWaiter.waitForCosmicOutputClick(15_000).thenApply(output -> {

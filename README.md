@@ -30,8 +30,10 @@ There are no accounts, no telemetry and no cloud sharing. Recordings, projects, 
 ### Capture
 
 - Native COSMIC Wayland capture (ext-image-copy-capture), including rotated monitors; **Pick screen** selects the monitor you click on
+- On KDE Plasma, GNOME and other portal-only Wayland desktops the same pipeline runs over the xdg-desktop-portal ScreenCast (PipeWire) stream; there the system's own screen-sharing dialog picks the monitor the first time and is remembered after that, and ending the share from the desktop's indicator saves the recording
 - Microphone and system audio through PipeWire/PulseAudio, kept in sync with the video
-- Cursor position and clicks recorded by a native helper, so auto-zoom and the cursor overlay work on Wayland
+- Cursor position and clicks recorded by a native helper, so auto-zoom and the cursor overlay work on Wayland (on KDE Plasma the position comes from a KWin script)
+- Global recording shortcuts: written into COSMIC's keyboard settings, or registered through the desktop's GlobalShortcuts portal on KDE Plasma and GNOME 48+
 - Webcam overlay
 - Recording opens straight into the editor
 
@@ -80,6 +82,8 @@ Prerequisites (Pop!_OS / Ubuntu):
 
 ```bash
 sudo apt install build-essential cmake libwayland-dev pulseaudio-utils
+# plus, for the KDE/GNOME/wlroots (xdg-desktop-portal) capture backend:
+sudo apt install libpipewire-0.3-dev libdbus-1-dev
 ```
 
 Your user must be in the `input` group for click capture.

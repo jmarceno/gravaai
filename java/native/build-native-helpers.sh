@@ -71,6 +71,29 @@ cc "${cc_flags[@]}" -I"$gen" -o "$out/gravaai-wayland-capture" \
 say "building gravaai-ctl"
 cc "${cc_flags[@]}" -o "$out/gravaai-ctl" "$here/gravaai-ctl/main.c"
 
+# gravaai-portal-capture is the xdg-desktop-portal ScreenCast fallback for compositors
+# without ext-image-copy-capture (KDE Plasma/KWin, GNOME, wlroots). It is optional: a
+# machine that only targets COSMIC can build without the PipeWire and D-Bus dev packages,
+# and the app falls back to the COSMIC helper at runtime anyway.
+if pkg-config --exists dbus-1 libpipewire-0.3 2>/dev/null; then
+	say "building gravaai-portal-capture"
+	pipewire_flags=($(pkg-config --cflags --libs dbus-1 libpipewire-0.3))
+	# Reuse the xdg-output bindings generated above; the portal helper lists outputs the
+	# same way the COSMIC helper does.
+	cc "${cc_flags[@]}" -I"$gen" -o "$out/gravaai-portal-capture" \
+		"$here/portal-capture/main.c" "$gen/xdg-output-unstable-v1.c" \
+		"${wl_flags[@]}" "${pipewire_flags[@]}"
+
+	# The pointer position on portal-only desktops comes from the compositor's own scripting
+	# engine (KWin exposes workspace.cursorPos to scripts but no D-Bus method), so it needs
+	# only D-Bus - not PipeWire.
+	say "building gravaai-kwin-cursor"
+	cc "${cc_flags[@]}" -o "$out/gravaai-kwin-cursor" \
+		"$here/kwin-cursor/main.c" $(pkg-config --cflags --libs dbus-1)
+else
+	say "skipping gravaai-portal-capture and gravaai-kwin-cursor (install libpipewire-0.3-dev and libdbus-1-dev)"
+fi
+
 # rnnoise models for the mic noise reduction filter (plan §5.6.5): staged into the native
 # payload so NativeHelpers.path("models/rnnoise/voice.rnnn") works in development and in the
 # app image. The source copy stays in java/native/models/.

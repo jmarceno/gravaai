@@ -97,16 +97,29 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		}
 
 		GlobalShortcutsConfig current = loadedConfig();
+		boolean portal = status != null && status.backend() == GlobalShortcutsStatus.Backend.PORTAL;
 		Switch enabled = new Switch("", current.enabled());
 		enabled.setAccessibleText("Global shortcuts");
-		enabled.setDisable(busy || !cosmic);
+		enabled.setDisable(busy || !(cosmic || portal));
 		enabled.onCheckedChange(checked ->
 				apply(new GlobalShortcutsConfig(checked, current.bindings())));
-		rows.getChildren().add(new SettingsRow("Global shortcuts", cosmic
-				? "Work in every app. Gravaai adds them to COSMIC's keyboard shortcuts for you."
-				: "Your desktop doesn't let apps add shortcuts. Bind these commands in its keyboard settings:",
-				enabled));
+		String description;
+		if (cosmic) {
+			description = "Work in every app. Gravaai adds them to COSMIC's keyboard shortcuts for you.";
+		} else if (portal) {
+			description = "Work in every app. Your desktop asks you to confirm them once; "
+					+ "change the keys in its keyboard settings.";
+		} else {
+			description = "Your desktop doesn't let apps add shortcuts. Bind these commands in its keyboard settings:";
+		}
+		rows.getChildren().add(new SettingsRow("Global shortcuts", description, enabled));
 
+		if (portal) {
+			if (current.enabled()) {
+				buildPortalTriggers(rows);
+			}
+			return;
+		}
 		if (!cosmic) {
 			buildCliCommands(rows);
 			return;
@@ -128,6 +141,20 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		reset.setDisable(busy);
 		reset.setOnAction(event -> reset());
 		rows.getChildren().add(reset);
+	}
+
+	/** The keys the desktop bound: it owns them, so they are shown, not edited, here. */
+	private void buildPortalTriggers(VBox host) {
+		java.util.Map<GlobalShortcutAction, String> triggers =
+				status == null ? java.util.Map.of() : status.triggers();
+		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
+			Label trigger = new Label(triggers.getOrDefault(action, "Not set"));
+			trigger.getStyleClass().add("global-shortcuts-settings__command");
+			host.getChildren().add(new SettingsRow(
+					java.util.Objects.requireNonNull(
+					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
+					"missing shortcut label for " + action), "", trigger));
+		}
 	}
 
 	private void buildCliCommands(VBox host) {

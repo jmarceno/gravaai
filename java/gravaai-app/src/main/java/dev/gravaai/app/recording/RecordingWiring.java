@@ -39,6 +39,7 @@ import dev.gravaai.services.recording.RecordingImportService;
 import dev.gravaai.services.recording.RecordingLibrary;
 import dev.gravaai.services.recording.RecordingService;
 import dev.gravaai.services.recording.RecordingThumbnails;
+import dev.gravaai.services.recording.ports.CompositorRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingProcesses;
 import dev.gravaai.services.recording.ports.PlatformRecordingTrash;
@@ -171,7 +172,11 @@ public final class RecordingWiring implements AutoCloseable {
 			}
 		};
 		RecordingProcesses processes = new PlatformRecordingProcesses();
-		RecordingEnvironment environment = new PlatformRecordingEnvironment();
+		// Resolves the screen-capture helper for this compositor: COSMIC keeps the direct
+		// ext-image-copy-capture helper, portal-only desktops (KDE/GNOME/wlroots) get the
+		// xdg-desktop-portal one. Everything else is delegated unchanged.
+		RecordingEnvironment environment =
+				new CompositorRecordingEnvironment(new PlatformRecordingEnvironment(), System.getenv());
 		FxCursorScreen cursorScreen = new FxCursorScreen();
 
 		RecordingLibrary library = new RecordingLibrary(recordingsDir, new PlatformRecordingTrash());

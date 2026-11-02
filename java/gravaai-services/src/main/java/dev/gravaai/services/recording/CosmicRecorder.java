@@ -249,6 +249,26 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}, DISK_CHECK_INTERVAL_MS, DISK_CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS);
 	}
 
+	/**
+	 * Asks for a normal stop when the capture helper exits while the recording is still active.
+	 * That happens when the recording is ended outside the app: the desktop's own screen-sharing
+	 * indicator ("End" on KDE, the top-bar button on GNOME) or the captured monitor going away.
+	 * Without this the app kept "recording" a pipe that no longer delivered frames.
+	 */
+	private void watchCaptureEnd(ActiveRecording recording, SpawnedProcess capture) {
+		processExit(capture).thenRun(() -> {
+			synchronized (this) {
+				// The app stopped or discarded the recording itself.
+				if (active != recording) {
+					return;
+				}
+			}
+			LOG.log(System.Logger.Level.WARNING, "The screen capture ended outside the app; stopping");
+			events.emitRecordingStopRequested(
+					"capture-ended", "The screen share was ended — the recording was stopped and saved.");
+		});
+	}
+
 	private static void stopDiskCheck(ActiveRecording recording) {
 		if (recording.diskCheck != null) {
 			recording.diskCheck.cancel(false);
@@ -597,12 +617,15 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 				currentMicNoiseReduction(), timestamp,
 				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
 		beginRecordingSession(recording);
+		watchCaptureEnd(recording, capture);
 		LOG.log(System.Logger.Level.INFO, "Recording " + outputName + " " + format.width() + "x"
 				+ format.height() + " transform " + format.transform() + " to " + outputPath);
 		return StartResult.ok();
 	}
 
-	private List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath) {
+	/** Visible for {@code RecordingTimestampContractTest}: the encoder arguments are the contract
+	 *  that keeps a recording the same length as the time it took. */
+	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath) {
 		return List.of(
 				environment.ffmpeg().toString(),
 				"-hide_banner",
@@ -615,12 +638,20 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 				format.pixelFormat(),
 				"-s",
 				format.width() + "x" + format.height(),
-				"-r",
-				String.valueOf(CosmicSources.CAPTURE_FPS),
+				// Stamp each frame with its arrival time instead of assuming a fixed rate. The
+				// helper writes at CAPTURE_FPS, but encoding 1080p can fall behind on a busy or
+				// virtual machine. With a fixed "-r" those late frames were still labelled as if
+				// they had arrived on time, so a 15 s capture came out as a ~2.5 s clip that
+				// played at several times the real speed. Wall-clock timestamps keep the video
+				// the same length as the recording, at a variable frame rate.
+				"-use_wallclock_as_timestamps",
+				"1",
 				"-i",
 				"pipe:0",
 				"-vf",
 				filters,
+				"-fps_mode",
+				"vfr",
 				"-c:v",
 				"libx264",
 				"-preset",

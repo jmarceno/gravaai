@@ -13,7 +13,11 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.project.AnnotationPosition;
 import dev.gravaai.core.project.AnnotationRegion;
+import dev.gravaai.core.project.AnnotationSize;
+import dev.gravaai.core.project.AnnotationTextStyle;
+import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClipSequence;
@@ -141,8 +145,11 @@ public final class RecordingImportController {
 		String sourcePath = source;
 		int insertAt = Math.min(before.size(), Math.max(0, index == null ? before.size() : index));
 		List<ZoomRegion> addedZooms = new ArrayList<>();
+		List<AnnotationRegion> addedLoupes = new ArrayList<>();
 		List<String> clipIds = new ArrayList<>(before.stream().map(ClipRegion::id).toList());
 		List<String> zoomIds = new ArrayList<>(state.zoomRegions().stream().map(ZoomRegion::id).toList());
+		List<String> annotationIds = new ArrayList<>(
+				state.annotationRegions().stream().map(AnnotationRegion::id).toList());
 		List<String> pending = new ArrayList<>();
 		int completed = 0;
 		String failure = null;
@@ -191,7 +198,8 @@ public final class RecordingImportController {
 						null, null, null, null));
 				sequence = ClipSequence.packClipSequence(next);
 				if (autoZoomsEnabled.getAsBoolean()) {
-					addZoomSuggestions(media, id, sequence, zoomIds, addedZooms);
+					addZoomSuggestions(media, id, sequence, zoomIds, addedZooms, annotationIds,
+							addedLoupes);
 				}
 			}
 		} catch (IOException | RuntimeException error) {
@@ -223,8 +231,9 @@ public final class RecordingImportController {
 		List<ZoomRegion> zooms = new ArrayList<>(ClipSequence.rippleRegions(
 				state.zoomRegions(), before, sequence, ClipSequence.ZOOM_SPAN));
 		zooms.addAll(addedZooms);
-		List<AnnotationRegion> annotations = ClipSequence.rippleRegions(
-				state.annotationRegions(), before, sequence, ClipSequence.ANNOTATION_SPAN);
+		List<AnnotationRegion> annotations = new ArrayList<>(ClipSequence.rippleRegions(
+				state.annotationRegions(), before, sequence, ClipSequence.ANNOTATION_SPAN));
+		annotations.addAll(addedLoupes);
 		List<AudioRegion> audios = ClipSequence.rippleRegionAnchors(
 				state.audioRegions(), before, sequence, ClipSequence.AUDIO_SPAN);
 		WebcamOverlaySettings committedWebcam = media.webcam() != null ? webcam : null;
@@ -253,9 +262,10 @@ public final class RecordingImportController {
 		return new EditorViewActions.ClipImportResult(true, completed, null, cancelled.get());
 	}
 
-	/** Cursor-based zoom suggestions for one imported recording (React's per-iteration block). */
+	/** Cursor-based zoom and loupe suggestions for one imported recording (React's per-iteration block). */
 	private void addZoomSuggestions(RecordingImportService.ImportResult media, String clipId,
-			List<ClipRegion> sequence, List<String> zoomIds, List<ZoomRegion> addedZooms) {
+			List<ClipRegion> sequence, List<String> zoomIds, List<ZoomRegion> addedZooms,
+			List<String> annotationIds, List<AnnotationRegion> addedLoupes) {
 		long start = media.sourceStartMs();
 		long duration = media.durationMs();
 		long offset = sequence.stream()
@@ -272,11 +282,10 @@ public final class RecordingImportController {
 						point.cursorType() == null ? null : point.cursorType().wire()));
 			}
 		}
-		List<ZoomSuggestionUtils.SuggestedZoomRegion> suggestions = ZoomSuggestionUtils
+		ZoomSuggestionUtils.SuggestionResult result = ZoomSuggestionUtils
 				.buildInteractionZoomSuggestions(new ZoomSuggestionUtils.SuggestionParams(
-						telemetry, duration, Math.min(1000, duration), List.of()))
-				.suggestions();
-		for (ZoomSuggestionUtils.SuggestedZoomRegion suggestion : suggestions) {
+						telemetry, duration, Math.min(1000, duration), List.of()));
+		for (ZoomSuggestionUtils.SuggestedZoomRegion suggestion : result.suggestions()) {
 			String id = session.store().nextId("zoom", zoomIds);
 			zoomIds.add(id);
 			addedZooms.add(new ZoomRegion(id,
@@ -285,6 +294,20 @@ public final class RecordingImportController {
 					ZoomDepth.DEFAULT_AUTO,
 					suggestion.focus().clampToDepth(ZoomDepth.DEFAULT_AUTO),
 					ZoomMode.AUTO));
+		}
+		for (ZoomSuggestionUtils.SuggestedLoupeRegion loupe : result.loupeSuggestions()) {
+			String id = session.store().nextId("annotation", annotationIds);
+			annotationIds.add(id);
+			addedLoupes.add(new AnnotationRegion(id,
+					offset + Math.round(loupe.startMs()),
+					offset + Math.round(loupe.endMs()),
+					AnnotationType.LOUPE, "", null, null,
+					AnnotationPosition.DEFAULT,
+					new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+							AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
+					AnnotationTextStyle.defaultStyle(),
+					session.store().nextIndex("annotation-zIndex"), 0, null, null, null,
+					AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION));
 		}
 	}
 

@@ -51,6 +51,10 @@ public interface TimelineCommands {
 		}
 
 		@Override
+		public void addSuggestedLoupe(double startMs, double endMs) {
+		}
+
+		@Override
 		public void deleteZoom(String id) {
 		}
 
@@ -121,6 +125,9 @@ public interface TimelineCommands {
 
 	/** Add a cursor-telemetry suggested zoom with the click-derived focus. */
 	void addSuggestedZoom(double startMs, double endMs, dev.gravaai.core.project.ZoomFocus focus);
+
+	/** Add a magnifying-glass loupe over a press-and-hold span (the lens follows the cursor). */
+	void addSuggestedLoupe(double startMs, double endMs);
 
 	/** Delete one zoom block (used by the select-all-zooms Delete action). */
 	void deleteZoom(String id);

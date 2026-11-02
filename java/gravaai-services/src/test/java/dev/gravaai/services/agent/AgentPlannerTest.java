@@ -400,6 +400,25 @@ class AgentPlannerTest {
 	}
 
 	@Test
+	@DisplayName("adds a loupe with the requested magnification, clamped and cursor-driven")
+	void loupeOp() {
+		Ok result = ok(apply(baseState(),
+				"[{\"op\":\"loupe\",\"from\":3,\"to\":5,\"magnification\":9},"
+						+ "{\"op\":\"loupe\",\"from\":6,\"to\":7}]"));
+		List<AnnotationRegion> regions = result.state().annotationRegions();
+		assertEquals(2, regions.size());
+		assertEquals(AnnotationType.LOUPE, regions.get(0).type());
+		assertEquals(4, regions.get(0).loupeMagnificationOrDefault());
+		assertEquals(new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+				AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT), regions.get(0).size());
+		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+				regions.get(1).loupeMagnificationOrDefault());
+		Ok updated = ok(apply(result.state(),
+				"[{\"op\":\"update_annotation\",\"id\":\"a1\",\"magnification\":1.5}]"));
+		assertEquals(1.5, updated.state().annotationRegions().get(0).loupeMagnificationOrDefault());
+	}
+
+	@Test
 	@DisplayName("updates and deletes annotations")
 	void annotationCrud() {
 		Ok added = ok(apply(baseState(),

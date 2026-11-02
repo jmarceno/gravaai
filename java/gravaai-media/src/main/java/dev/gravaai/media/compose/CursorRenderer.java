@@ -109,6 +109,14 @@ final class CursorRenderer {
 		return visible;
 	}
 
+	/**
+	 * The cursor hotspot of the frame just drawn, in viewport coordinates (pre-camera), or null
+	 * when nothing was drawn this frame (used by the loupe stage to centre the lens).
+	 */
+	double @Nullable [] lastDrawnPosition() {
+		return visible ? new double[] {lastPx, lastPy} : null;
+	}
+
 	/** Draws the cursor overlay for one frame inside the current camera transform. */
 	void draw(Canvas canvas, Rect viewport, LayoutCrop crop, List<CursorSample> samples,
 			double timeMs, CursorSpec spec) {

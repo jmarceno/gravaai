@@ -158,6 +158,9 @@ public interface EditorViewActions {
 	/** Timeline toolbar: add a blur annotation at the playhead. */
 	default void addBlurAnnotation() {}
 
+	/** Timeline toolbar: add a magnifying-glass loupe at the playhead. */
+	default void addLoupeAnnotation() {}
+
 	/** Timeline toolbar: add an audio track row. */
 	default void addAudioLayer() {}
 

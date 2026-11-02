@@ -244,7 +244,8 @@ public final class ProjectEditorInputs {
 					region.zIndex(),
 					figure,
 					region.blurIntensity(),
-					region.blurColor()));
+					region.blurColor(),
+					region.loupeMagnification()));
 		}
 		return List.copyOf(specs);
 	}

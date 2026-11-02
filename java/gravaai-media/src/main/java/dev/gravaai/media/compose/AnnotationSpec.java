@@ -21,14 +21,21 @@ public record AnnotationSpec(
 		int zIndex,
 		@Nullable Figure figure,
 		@Nullable Double blurIntensity,
-		@Nullable String blurColor) {
+		@Nullable String blurColor,
+		@Nullable Double loupeMagnification) {
 
-	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur"}). */
+	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur" | "loupe"}). */
 	public enum Type {
 		TEXT,
 		IMAGE,
 		FIGURE,
-		BLUR
+		BLUR,
+		LOUPE
+	}
+
+	/** The effective magnification of a loupe lens (never below 1). */
+	public double loupeMagnificationOrDefault() {
+		return loupeMagnification == null || loupeMagnification < 1 ? 2.0 : loupeMagnification;
 	}
 
 	/** Center position in percent of the annotation coordinate rect. */

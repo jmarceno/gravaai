@@ -345,6 +345,9 @@ public final class ProjectDocument {
 			if (region.blurColor() != null) {
 				node.put("blurColor", region.blurColor());
 			}
+			if (region.type() == AnnotationType.LOUPE) {
+				node.put("loupeMagnification", region.loupeMagnificationOrDefault());
+			}
 			array.add(node);
 		}
 		return array;

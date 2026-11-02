@@ -22,7 +22,7 @@ class TimelineModelTest {
 
 	private static AnnotationRegion annotation(AnnotationType type, String content, Integer trackIndex) {
 		return new AnnotationRegion("a1", 200, 1200, type, content, null, null, null, null, null, 0,
-				trackIndex, null, null, null);
+				trackIndex, null, null, null, null);
 	}
 
 	private static TimelineModel.ItemsRequest request(List<ZoomRegion> zooms, List<ClipRegion> clips,

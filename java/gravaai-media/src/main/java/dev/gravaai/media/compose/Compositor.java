@@ -221,6 +221,9 @@ public final class Compositor implements AutoCloseable {
 		// annotations sample the already-rendered frame, so they draw last but before flush.
 		if (!input.annotations().isEmpty()) {
 			renderAnnotations(canvas, target, input);
+			// Stage 8.5: glass loupes magnify the rendered frame around the cursor. They sample a
+			// snapshot taken AFTER the annotations so blurred regions stay blurred under the lens.
+			renderLoupes(canvas, target, input);
 		}
 		// Extension hook: post-annotations runs after the built-in transform is restored.
 		dispatchHook(canvas, FrameOverlayHooks.Phase.POST_ANNOTATIONS, input);
@@ -422,6 +425,44 @@ public final class Compositor implements AutoCloseable {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * The glass loupes (annotation stage 8.5): each active loupe magnifies the frame rendered so
+	 * far around the cursor hotspot. The lens is drawn in screen space — the cursor position is
+	 * mapped through the camera transform, the diameter is a percent of the video mask height and
+	 * the magnification applies on top of whatever the camera is doing.
+	 */
+	private void renderLoupes(Canvas canvas, SkiaGlSurface target, FrameInput input) {
+		long timeMs = Math.round(input.timeSeconds() * 1000);
+		double[] cursor = cursorRenderer.lastDrawnPosition();
+		if (cursor == null || lastMaskRect == null) {
+			return;
+		}
+		java.util.List<AnnotationSpec> loupes = AnnotationSpec
+				.activeAt(input.annotations(), timeMs).stream()
+				.filter(annotation -> annotation.type() == AnnotationSpec.Type.LOUPE)
+				.toList();
+		if (loupes.isEmpty()) {
+			return;
+		}
+		Image snapshot = null;
+		try {
+			snapshot = target.snapshot();
+			ZoomTransform.AppliedTransform transform = lastAppliedTransform;
+			double centreX = cursor[0] * transform.scale() + transform.x();
+			double centreY = cursor[1] * transform.scale() + transform.y();
+			double maskHeight = lastMaskRect.getHeight();
+			for (AnnotationSpec loupe : loupes) {
+				double diameter = (loupe.size().width() / 100.0) * maskHeight;
+				LoupeRenderer.draw(canvas, snapshot, centreX, centreY, diameter / 2,
+						loupe.loupeMagnificationOrDefault(), annotationScaleFactor());
+			}
+		} finally {
+			if (snapshot != null) {
+				snapshot.close();
+			}
+		}
 	}
 
 	/** {@code calculateAnnotationScaleFactor}: output size over the 1920x1080 reference. */

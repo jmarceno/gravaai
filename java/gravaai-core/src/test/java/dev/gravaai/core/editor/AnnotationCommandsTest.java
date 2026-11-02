@@ -128,4 +128,56 @@ class AnnotationCommandsTest {
 		assertTrue(store.state().annotationRegions().isEmpty());
 		assertNull(store.selectedAnnotationId());
 	}
+
+	// ---- loupe (the "Magnifying Glass" card) ---------------------------------------
+
+	@Test
+	@DisplayName("adds a loupe with the lens defaults on a new lane and selects it")
+	void addsLoupeWithLensDefaults() {
+		EditorStore store = storeWithAnnotation();
+
+		store.apply(new AnnotationCommands.AddLoupe(2_000, 2_600));
+
+		assertEquals(2, store.state().annotationRegions().size());
+		AnnotationRegion loupe = store.state().annotationRegions().get(1);
+		assertEquals(AnnotationType.LOUPE, loupe.type());
+		assertEquals("", loupe.content());
+		assertEquals(new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+				AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT), loupe.size());
+		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+				loupe.loupeMagnificationOrDefault());
+		assertEquals(1, loupe.trackIndex());
+		assertEquals(loupe.id(), store.selectedAnnotationId());
+	}
+
+	@Test
+	@DisplayName("switching an annotation to a loupe applies the lens defaults")
+	void switchesToLoupeAppliesLensDefaults() {
+		EditorStore store = storeWithAnnotation();
+		String id = store.selectedAnnotationId();
+		store.apply(new AnnotationCommands.ChangeSize(id, new AnnotationSize(40, 30)));
+
+		store.apply(new AnnotationCommands.ChangeType(id, AnnotationType.LOUPE));
+
+		AnnotationRegion loupe = store.state().annotationRegions().get(0);
+		assertEquals(AnnotationType.LOUPE, loupe.type());
+		assertEquals("", loupe.content());
+		assertEquals(new AnnotationSize(40, 40), loupe.size());
+		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+				loupe.loupeMagnificationOrDefault());
+	}
+
+	@Test
+	@DisplayName("clamps the loupe magnification into the 1.2–4 renderer range")
+	void clampsLoupeMagnification() {
+		EditorStore store = storeWithAnnotation();
+		String id = store.selectedAnnotationId();
+		store.apply(new AnnotationCommands.ChangeType(id, AnnotationType.LOUPE));
+
+		store.apply(new AnnotationCommands.SetLoupeMagnification(id, 9));
+		assertEquals(4, store.state().annotationRegions().get(0).loupeMagnificationOrDefault());
+
+		store.apply(new AnnotationCommands.SetLoupeMagnification(id, 0.5));
+		assertEquals(1.2, store.state().annotationRegions().get(0).loupeMagnificationOrDefault());
+	}
 }

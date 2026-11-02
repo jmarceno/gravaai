@@ -1130,6 +1130,11 @@ public final class TimelineView extends Region {
 			commands.addSuggestedZoom(suggestion.startMs(), suggestion.endMs(), suggestion.focus());
 			added++;
 		}
+		// Held presses become magnifying-glass loupes instead of click zooms.
+		for (ZoomSuggestionUtils.SuggestedLoupeRegion loupe : result.loupeSuggestions()) {
+			commands.addSuggestedLoupe(loupe.startMs(), loupe.endMs());
+			added++;
+		}
 		return added;
 	}
 

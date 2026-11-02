@@ -129,6 +129,11 @@ public final class AnnotationOverlayController {
 		double timeMs = Math.round(timeSeconds.get() * 1000);
 		List<AnnotationRegion> result = new ArrayList<>();
 		for (AnnotationRegion annotation : store.state().annotationRegions()) {
+			// Loupes follow the cursor and have no box: the composited lens is the visual, and
+			// the inspector edits them, so no drag node or handles here.
+			if (annotation.type() == dev.gravaai.core.project.AnnotationType.LOUPE) {
+				continue;
+			}
 			if (timeMs >= annotation.startMs() && timeMs <= annotation.endMs()) {
 				result.add(annotation);
 			}

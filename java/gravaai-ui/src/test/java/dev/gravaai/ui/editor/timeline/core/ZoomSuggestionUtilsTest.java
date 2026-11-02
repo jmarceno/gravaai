@@ -33,6 +33,10 @@ class ZoomSuggestionUtilsTest {
 		return new CursorTelemetryPoint(timeMs, cx, cy, interactionType, null);
 	}
 
+	private static CursorTelemetryPoint makeMouseUp(double timeMs, double cx, double cy) {
+		return new CursorTelemetryPoint(timeMs, cx, cy, "mouseup", null);
+	}
+
 	private static CursorTelemetryPoint makeMove(double timeMs, double cx, double cy) {
 		return new CursorTelemetryPoint(timeMs, cx, cy, "move", null);
 	}
@@ -231,5 +235,94 @@ class ZoomSuggestionUtilsTest {
 		ZoomFocus focus = result.suggestions().get(0).focus();
 		assertEquals(0.25, focus.cx());
 		assertEquals(0.75, focus.cy());
+	}
+
+	// ---- hold-to-loupe (the "Magnifying Glass" card) -------------------------------
+
+	@Test
+	@DisplayName("places a loupe over a press held longer than 200 ms instead of a zoom")
+	void placesLoupeForHold() {
+		SuggestionResult result = suggest(
+				withMoves(List.of(makeClick(5_000), makeMouseUp(5_600, 0.5, 0.5)), TOTAL_MS),
+				TOTAL_MS);
+
+		assertEquals(SuggestionStatus.OK, result.status());
+		assertEquals(0, result.suggestions().size());
+		assertEquals(1, result.loupeSuggestions().size());
+		ZoomSuggestionUtils.SuggestedLoupeRegion loupe = result.loupeSuggestions().get(0);
+		assertEquals(5_000, loupe.startMs());
+		assertEquals(5_600, loupe.endMs());
+	}
+
+	@Test
+	@DisplayName("keeps a quick press-and-release as a click zoom")
+	void keepsQuickClickAsZoom() {
+		SuggestionResult result = suggest(
+				withMoves(List.of(makeClick(5_000), makeMouseUp(5_100, 0.5, 0.5)), TOTAL_MS),
+				TOTAL_MS);
+
+		assertEquals(SuggestionStatus.OK, result.status());
+		assertEquals(1, result.suggestions().size());
+		assertEquals(0, result.loupeSuggestions().size());
+	}
+
+	@Test
+	@DisplayName("a hold of exactly 200 ms is still a zoom (the rule is more than 200 ms)")
+	void treatsExactThresholdAsZoom() {
+		SuggestionResult result = suggest(
+				withMoves(List.of(makeClick(5_000), makeMouseUp(5_200, 0.5, 0.5)), TOTAL_MS),
+				TOTAL_MS);
+
+		assertEquals(1, result.suggestions().size());
+		assertEquals(0, result.loupeSuggestions().size());
+	}
+
+	@Test
+	@DisplayName("a press without a mouseup cannot be measured and stays a zoom")
+	void keepsClickWithoutMouseUpAsZoom() {
+		SuggestionResult result = suggest(withMoves(List.of(makeClick(5_000)), TOTAL_MS), TOTAL_MS);
+
+		assertEquals(1, result.suggestions().size());
+		assertEquals(0, result.loupeSuggestions().size());
+	}
+
+	@Test
+	@DisplayName("mixes quick-click zooms with held-press loupes in one result")
+	void mixesZoomsAndLoupes() {
+		SuggestionResult result = suggest(withMoves(List.of(
+				makeClick(4_000), makeMouseUp(4_080, 0.5, 0.5),
+				makeClick(12_000), makeMouseUp(13_000, 0.4, 0.6)), TOTAL_MS), TOTAL_MS);
+
+		assertEquals(SuggestionStatus.OK, result.status());
+		assertEquals(1, result.suggestions().size());
+		assertEquals(4_000 - ZoomSuggestionUtils.CLICK_CLUSTER_PAD_MS,
+				result.suggestions().get(0).startMs());
+		assertEquals(1, result.loupeSuggestions().size());
+		assertEquals(12_000, result.loupeSuggestions().get(0).startMs());
+		assertEquals(13_000, result.loupeSuggestions().get(0).endMs());
+	}
+
+	@Test
+	@DisplayName("returns ok with only loupes when every press is a hold")
+	void returnsOnlyLoupesWhenAllHolds() {
+		SuggestionResult result = suggest(
+				withMoves(List.of(makeClick(5_000), makeMouseUp(5_800, 0.5, 0.5),
+						makeClick(10_000), makeMouseUp(10_900, 0.6, 0.6)), TOTAL_MS), TOTAL_MS);
+
+		assertEquals(SuggestionStatus.OK, result.status());
+		assertEquals(0, result.suggestions().size());
+		assertEquals(2, result.loupeSuggestions().size());
+	}
+
+	@Test
+	@DisplayName("detects hold spans straight from a telemetry stream")
+	void detectsHoldSpans() {
+		List<ZoomSuggestionUtils.SuggestedLoupeRegion> holds = ZoomSuggestionUtils.detectHoldSpans(
+				List.of(makeClick(100), makeMouseUp(500, 0.5, 0.5),
+						makeClick(1_000), makeMouseUp(1_100, 0.5, 0.5)));
+
+		assertEquals(1, holds.size());
+		assertEquals(100, holds.get(0).startMs());
+		assertEquals(500, holds.get(0).endMs());
 	}
 }

@@ -40,7 +40,7 @@ public final class AnnotationCommands {
 		return new AnnotationRegion(region.id(), startMs, endMs, region.type(), content,
 				textContent, imageContent, position, size, style, region.zIndex(),
 				trackIndex != null ? trackIndex : region.trackIndex(), figureData, blurIntensity,
-				blurColor);
+				blurColor, region.loupeMagnification());
 	}
 
 	/** Selects an annotation region (the hook's {@code onSelectAnnotation}). */
@@ -87,7 +87,48 @@ public final class AnnotationCommands {
 					Math.round(endMs), AnnotationType.TEXT, "Enter text...", null, null,
 					AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
-					trackIndex == null ? 0 : trackIndex, null, null, null);
+					trackIndex == null ? 0 : trackIndex, null, null, null, null);
+			List<AnnotationRegion> next = new ArrayList<>(regions);
+			next.add(region);
+			store.setAnnotationRegions(next);
+			store.setSelectedAnnotationId(id);
+			store.setSelectedZoomId(null);
+			return true;
+		}
+	}
+
+	/**
+	 * Adds a loupe annotation (the "Magnifying Glass"): a lens that follows the cursor, so unlike
+	 * {@link Add} there is no text placeholder — the region only carries the span, the lens
+	 * diameter and the magnification. It lands on a new lane below the existing overlays so it
+	 * never hides under another block.
+	 */
+	public static final class AddLoupe implements EditorCommand {
+		private final double startMs;
+		private final double endMs;
+
+		public AddLoupe(double startMs, double endMs) {
+			this.startMs = startMs;
+			this.endMs = endMs;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			List<AnnotationRegion> regions = store.state().annotationRegions();
+			List<String> ids = new ArrayList<>();
+			int nextTrack = 0;
+			for (AnnotationRegion region : regions) {
+				ids.add(region.id());
+				nextTrack = Math.max(nextTrack,
+						(region.trackIndex() == null ? 0 : region.trackIndex()) + 1);
+			}
+			String id = store.nextId("annotation", ids);
+			double diameter = AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT;
+			AnnotationRegion region = new AnnotationRegion(id, Math.round(startMs),
+					Math.round(endMs), AnnotationType.LOUPE, "", null, null,
+					AnnotationPosition.DEFAULT, new AnnotationSize(diameter, diameter),
+					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
+					nextTrack, null, null, null, AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION);
 			List<AnnotationRegion> next = new ArrayList<>(regions);
 			next.add(region);
 			store.setAnnotationRegions(next);
@@ -125,7 +166,8 @@ public final class AnnotationCommands {
 						region.type(), region.content(), region.textContent(), region.imageContent(),
 						region.position(), region.size(), region.style(), region.zIndex(),
 						normalizedTrackIndex >= 0 ? normalizedTrackIndex : region.trackIndex(),
-						region.figureData(), region.blurIntensity(), region.blurColor()));
+						region.figureData(), region.blurIntensity(), region.blurColor(),
+						region.loupeMagnification()));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -209,6 +251,8 @@ public final class AnnotationCommands {
 				String content = region.content();
 				FigureData figureData = region.figureData();
 				Double blurIntensity = region.blurIntensity();
+				Double loupeMagnification = region.loupeMagnification();
+				AnnotationSize size = region.size();
 				if (type == AnnotationType.TEXT) {
 					content = region.textContent() != null ? region.textContent() : "Enter text...";
 				} else if (type == AnnotationType.IMAGE) {
@@ -223,11 +267,19 @@ public final class AnnotationCommands {
 					if (blurIntensity == null) {
 						blurIntensity = 20.0;
 					}
+				} else if (type == AnnotationType.LOUPE) {
+					content = "";
+					if (loupeMagnification == null) {
+						loupeMagnification = AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION;
+					}
+					if (size.width() != size.height()) {
+						size = loupeSize(size.width());
+					}
 				}
 				next.add(new AnnotationRegion(region.id(), region.startMs(), region.endMs(), type,
 						content, region.textContent(), region.imageContent(), region.position(),
-						region.size(), region.style(), region.zIndex(), region.trackIndex(),
-						figureData, blurIntensity, region.blurColor()));
+						size, region.style(), region.zIndex(), region.trackIndex(),
+						figureData, blurIntensity, region.blurColor(), loupeMagnification));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -351,6 +403,41 @@ public final class AnnotationCommands {
 			store.setAnnotationRegions(next);
 			return true;
 		}
+	}
+
+	/** {@code handleAnnotationLoupeMagnificationChange}: clamped to the 1.2–4× renderer range. */
+	public static final class SetLoupeMagnification implements EditorCommand {
+		private final String id;
+		private final double loupeMagnification;
+
+		public SetLoupeMagnification(String id, double loupeMagnification) {
+			this.id = id;
+			this.loupeMagnification = loupeMagnification;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			double clamped = Math.max(1.2, Math.min(4, loupeMagnification));
+			List<AnnotationRegion> next = new ArrayList<>();
+			for (AnnotationRegion region : store.state().annotationRegions()) {
+				next.add(region.id().equals(id)
+						? new AnnotationRegion(region.id(), region.startMs(), region.endMs(),
+								region.type(), region.content(), region.textContent(),
+								region.imageContent(), region.position(), region.size(),
+								region.style(), region.zIndex(), region.trackIndex(),
+								region.figureData(), region.blurIntensity(), region.blurColor(),
+								clamped)
+						: region);
+			}
+			store.setAnnotationRegions(next);
+			return true;
+		}
+	}
+
+	/** The square lens size for a loupe diameter percent (the lens stays circular). */
+	public static AnnotationSize loupeSize(double diameterPercent) {
+		double diameter = Math.max(5, Math.min(100, diameterPercent));
+		return new AnnotationSize(diameter, diameter);
 	}
 
 	/** {@code handleAnnotationPositionChange}. */

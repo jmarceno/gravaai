@@ -392,7 +392,7 @@ public final class AgentPlanner {
 					region.type(), region.content(), region.textContent(), region.imageContent(),
 					region.position(), region.size(), region.style(), region.zIndex(),
 					region.trackIndex(), region.figureData(), region.blurIntensity(),
-					region.blurColor()));
+					region.blurColor(), region.loupeMagnification()));
 		}
 		return List.copyOf(next);
 	}
@@ -807,7 +807,7 @@ public final class AgentPlanner {
 			case "auto_zoom" -> autoZoom(draft, raw);
 			case "speed" -> addSpeed(draft, raw);
 			case "delete_speed" -> deleteSpeed(draft, raw);
-			case "text", "image", "figure", "blur" -> addAnnotation(draft, op, raw);
+			case "text", "image", "figure", "blur", "loupe" -> addAnnotation(draft, op, raw);
 			case "update_annotation" -> updateAnnotation(draft, raw);
 			case "delete_annotation" -> deleteAnnotation(draft, raw);
 			case "audio" -> addAudio(draft, raw);
@@ -1326,7 +1326,7 @@ public final class AgentPlanner {
 			AnnotationTextStyle resolved = AgentTextStyles.apply(style);
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.TEXT, text, text, null, annotationPosition(geometry),
-					annotationSize(geometry), resolved, zIndex, 0, null, null, null);
+					annotationSize(geometry), resolved, zIndex, 0, null, null, null, null);
 		} else if ("image".equals(op)) {
 			String path = AgentOpReader.string(raw, "path");
 			String imageContent = raw.path("imageContent").isString()
@@ -1339,7 +1339,7 @@ public final class AgentPlanner {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.IMAGE, imageContent, null, imageContent,
 					annotationPosition(geometry), annotationSize(geometry),
-					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null);
+					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null, null);
 		} else if ("figure".equals(op)) {
 			ArrowDirection arrow = AgentOpReader.readArrow(raw);
 			String color = AgentOpReader.optionalString(raw, "color");
@@ -1348,12 +1348,23 @@ public final class AgentPlanner {
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
 					new FigureData(arrow, color == null ? FigureData.DEFAULT.color() : color,
 							FigureData.DEFAULT.strokeWidth()),
-					null, null);
+					null, null, null);
+		} else if ("loupe".equals(op)) {
+			Double magnification = AgentOpReader.optionalNumber(raw, "magnification");
+			double resolved = magnification == null
+					? AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION
+					: Math.max(1.2, Math.min(4, magnification));
+			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
+					AnnotationType.LOUPE, "", null, null, annotationPosition(geometry),
+					new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+							AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
+					AnnotationTextStyle.defaultStyle(), zIndex, 0,
+					null, null, null, resolved);
 		} else {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.BLUR, "", null, null, annotationPosition(geometry),
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
-					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null);
+					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null);
 		}
 		List<AnnotationRegion> annotations = new ArrayList<>(draft.state.annotationRegions());
 		annotations.add(annotation);
@@ -1409,12 +1420,19 @@ public final class AgentPlanner {
 					figure == null ? FigureData.DEFAULT.color() : figure.color(),
 					figure == null ? FigureData.DEFAULT.strokeWidth() : figure.strokeWidth());
 		}
+		Double magnification = AgentOpReader.optionalNumber(raw, "magnification");
+		Double loupeMagnification;
+		if (magnification == null) {
+			loupeMagnification = annotation.loupeMagnification();
+		} else {
+			loupeMagnification = Math.max(1.2, Math.min(4, magnification));
+		}
 		AnnotationRegion next = new AnnotationRegion(annotation.id(), startMs, endMs,
 				annotation.type(), text == null ? annotation.content() : text,
 				text == null ? annotation.textContent() : text, annotation.imageContent(),
 				annotationPosition(geometry), annotationSize(geometry), style,
 				annotation.zIndex(), annotation.trackIndex(), figure,
-				annotation.blurIntensity(), annotation.blurColor());
+				annotation.blurIntensity(), annotation.blurColor(), loupeMagnification);
 		draft.state = draft.state.toBuilder().annotationRegions(draft.state.annotationRegions().stream()
 						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);

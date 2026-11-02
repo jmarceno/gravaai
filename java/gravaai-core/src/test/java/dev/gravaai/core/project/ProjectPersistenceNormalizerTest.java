@@ -54,6 +54,43 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("reads loupe annotations with the lens magnification and defaults it")
+	void readsLoupeAnnotations() {
+		ProjectEditorState normalized = normalize("""
+				{"annotationRegions":[
+					{"id":"a1","startMs":100,"endMs":900,"type":"loupe","content":"",
+						"loupeMagnification":3},
+					{"id":"a2","startMs":1000,"endMs":1500,"type":"loupe","content":""}]}
+				""");
+		assertEquals(2, normalized.annotationRegions().size());
+		assertEquals(AnnotationType.LOUPE, normalized.annotationRegions().get(0).type());
+		assertEquals(3, normalized.annotationRegions().get(0).loupeMagnificationOrDefault());
+		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+				normalized.annotationRegions().get(1).loupeMagnificationOrDefault());
+	}
+
+	@Test
+	@DisplayName("round-trips a loupe annotation through the project document writer")
+	void roundTripsLoupeAnnotations() {
+		AnnotationRegion loupe = new AnnotationRegion("a1", 100, 900, AnnotationType.LOUPE, "",
+				null, null, AnnotationPosition.DEFAULT,
+				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, 2.5);
+		String json = ProjectDocument.writeAnnotationRegions(List.of(loupe)).toString();
+
+		ProjectEditorState normalized = normalize("{\"annotationRegions\":" + json + "}");
+		// The writer always persists blurIntensity (the loupe ignores it), matching every type.
+		assertEquals(List.of(new AnnotationRegion("a1", 100, 900, AnnotationType.LOUPE, "",
+				null, null, AnnotationPosition.DEFAULT,
+				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
+						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
+				AnnotationTextStyle.defaultStyle(), 1, 0, null,
+				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, 2.5)),
+				normalized.annotationRegions());
+	}
+
+	@Test
 	@DisplayName("converts legacy 1080p-relative radius pixels to percentages")
 	void convertsLegacyRadiusPixels() {
 		assertEquals(5, ProjectPersistence.legacyBorderRadiusPixelsToPercent(54));

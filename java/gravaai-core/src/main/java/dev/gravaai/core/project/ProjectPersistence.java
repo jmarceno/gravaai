@@ -639,7 +639,8 @@ public final class ProjectPersistence {
 			String rawType = text(field(region, "type"));
 			AnnotationType type = "image".equals(rawType) ? AnnotationType.IMAGE
 					: "figure".equals(rawType) ? AnnotationType.FIGURE
-					: "blur".equals(rawType) ? AnnotationType.BLUR : AnnotationType.TEXT;
+					: "blur".equals(rawType) ? AnnotationType.BLUR
+					: "loupe".equals(rawType) ? AnnotationType.LOUPE : AnnotationType.TEXT;
 
 			JsonNode positionNode = field(region, "position");
 			double positionX = isFiniteNumber(field(positionNode, "x"))
@@ -667,10 +668,25 @@ public final class ProjectPersistence {
 					normalizeFigureData(field(region, "figureData")),
 					isFiniteNumber(field(region, "blurIntensity"))
 							? clamp(field(region, "blurIntensity").doubleValue(), 1, 100) : 20,
-					text(field(region, "blurColor"))));
+					text(field(region, "blurColor")),
+					normalizeLoupeMagnification(type, region)));
 			index++;
 		}
 		return List.copyOf(regions);
+	}
+
+	/**
+	 * The loupe magnification of an annotation: clamped for loupes (defaulting when absent),
+	 * {@code null} for every other type.
+	 */
+	private static @Nullable Double normalizeLoupeMagnification(AnnotationType type, JsonNode region) {
+		if (type != AnnotationType.LOUPE) {
+			return null;
+		}
+		if (!isFiniteNumber(field(region, "loupeMagnification"))) {
+			return AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION;
+		}
+		return clamp(field(region, "loupeMagnification").doubleValue(), 1.2, 4);
 	}
 
 	private static AnnotationTextStyle normalizeAnnotationStyle(JsonNode rawStyle) {

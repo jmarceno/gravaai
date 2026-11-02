@@ -102,13 +102,18 @@ public final class AnnotationSettingsPanel extends VBox {
 			content.getChildren().add(multi);
 		}
 		content.getChildren().add(typeSection(region));
-		content.getChildren().add(positionSection(region));
-		content.getChildren().add(sizeSection(region));
+		if (region.type() != AnnotationType.LOUPE) {
+			// The loupe follows the cursor, so it has no position and its diameter lives in the
+			// loupe section instead of the generic size sliders.
+			content.getChildren().add(positionSection(region));
+			content.getChildren().add(sizeSection(region));
+		}
 		switch (region.type()) {
 			case TEXT -> content.getChildren().add(textSection(region));
 			case FIGURE -> content.getChildren().add(figureSection(region));
 			case BLUR -> content.getChildren().add(blurSection(region));
 			case IMAGE -> content.getChildren().add(imageSection(region));
+			case LOUPE -> content.getChildren().add(loupeSection(region));
 		}
 	}
 
@@ -120,6 +125,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		tabs.item("figure", "Figure");
 		tabs.item("image", "Image");
 		tabs.item("blur", "Blur");
+		tabs.item("loupe", "Loupe");
 		tabs.setValue(region.type().wire());
 		tabs.onValueChange(value -> {
 			AnnotationType type = AnnotationType.fromWire(value);
@@ -248,8 +254,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		return new VBox(10, header("Figure"), row("Arrow", arrow), stroke, color.node());
 	}
 
-	private Node blurSection(AnnotationRegion region) {
-		double intensity = region.blurIntensity() == null
+	private Node blurSection(AnnotationRegion region) {		double intensity = region.blurIntensity() == null
 				? AnnotationRegion.BLUR_ANNOTATION_STRENGTH : region.blurIntensity();
 		Slider strength = new Slider("Blur intensity");
 		strength.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
@@ -260,6 +265,25 @@ public final class AnnotationSettingsPanel extends VBox {
 				region.blurColor() == null ? "#000000" : region.blurColor(),
 				value -> applyForSelection(id -> new AnnotationCommands.SetBlurColor(id, value)));
 		return new VBox(10, header("Blur"), strength, color.node());
+	}
+
+	private Node loupeSection(AnnotationRegion region) {
+		double diameter = AnnotationCommands.loupeSize(region.size().width()).width();
+		Slider magnification = new Slider("Magnification");
+		magnification.range(1.2, 4).step(0.1)
+				.formatter(value -> String.format(Locale.ROOT, "%.1f×", value)).sliderControl();
+		magnification.setValue(region.loupeMagnificationOrDefault());
+		magnification.onValueCommit(value -> applyForSelection(id ->
+				new AnnotationCommands.SetLoupeMagnification(id, value)));
+		Slider size = new Slider("Diameter");
+		size.range(5, 60).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
+		size.setValue(diameter);
+		size.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.ChangeSize(id,
+				AnnotationCommands.loupeSize(value))));
+		Label note = new Label("The lens follows the cursor while the region is active.");
+		note.setWrapText(true);
+		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		return new VBox(10, header("Loupe"), magnification, size, note);
 	}
 
 	private @Nullable Node imageSection(AnnotationRegion region) {

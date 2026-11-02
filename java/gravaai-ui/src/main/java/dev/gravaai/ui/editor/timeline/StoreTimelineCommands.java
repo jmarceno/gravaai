@@ -250,6 +250,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
+	public void addSuggestedLoupe(double startMs, double endMs) {
+		store.apply(new AnnotationCommands.AddLoupe(startMs, endMs));
+	}
+
+	@Override
 	public void setSourceAudioTrack(String clipId, String trackId, double volume,
 			boolean normalize) {
 		store.apply(new SourceAudioCommands.SetTrackSettings(clipId, trackId, volume, normalize));

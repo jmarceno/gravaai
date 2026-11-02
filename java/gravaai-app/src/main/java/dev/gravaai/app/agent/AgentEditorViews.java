@@ -195,13 +195,19 @@ final class AgentEditorViews {
 			}
 			anyAnnotation = true;
 			String text = annotationText(annotation);
-			lines.add("  " + ids.annotationShortById().getOrDefault(annotation.id(), "?") + " "
-					+ seconds(annotation.startMs()) + "\u2013" + seconds(annotation.endMs()) + " "
-					+ annotation.type().wire() + " \"" + text + "\" x "
+			// A loupe follows the cursor: its lens magnification/diameter replaces the geometry.
+			String geometry = annotation.type() == dev.gravaai.core.project.AnnotationType.LOUPE
+					? " magnification " + String.format(java.util.Locale.ROOT, "%.1f",
+							annotation.loupeMagnificationOrDefault())
+							+ " diameter " + frac(annotation.size().width() / 100)
+					: " x "
 					+ frac((annotation.position().x() + annotation.size().width() / 2) / 100)
 					+ " y " + frac((annotation.position().y() + annotation.size().height() / 2) / 100)
 					+ " w " + frac(annotation.size().width() / 100)
-					+ " h " + frac(annotation.size().height() / 100));
+					+ " h " + frac(annotation.size().height() / 100);
+			lines.add("  " + ids.annotationShortById().getOrDefault(annotation.id(), "?") + " "
+					+ seconds(annotation.startMs()) + "\u2013" + seconds(annotation.endMs()) + " "
+					+ annotation.type().wire() + " \"" + text + "\"" + geometry);
 		}
 		if (!anyAnnotation) {
 			lines.add("  (none in window)");

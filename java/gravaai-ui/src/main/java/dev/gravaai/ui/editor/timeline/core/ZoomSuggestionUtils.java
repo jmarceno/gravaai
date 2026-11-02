@@ -33,6 +33,11 @@ public final class ZoomSuggestionUtils {
 	 * (motion-sickness jarring).
 	 */
 	public static final double CLICK_CLUSTER_PAD_MS = 1500;
+	/**
+	 * A press held longer than this is a deliberate "show this detail" gesture: it suggests a
+	 * magnifying-glass loupe over the hold instead of a click zoom (the card's 200 ms rule).
+	 */
+	public static final double HOLD_LOUPE_MIN_MS = 200;
 
 	/**
 	 * Port of {@code CursorTelemetryPoint}; {@code interactionType} and {@code cursorType} are null
@@ -71,6 +76,13 @@ public final class ZoomSuggestionUtils {
 	public record SuggestedZoomRegion(double startMs, double endMs, ZoomFocus focus) {
 	}
 
+	/**
+	 * A press-and-hold span: the magnifying glass is placed over the held mouse position (the
+	 * lens follows the cursor at render time, so no focus is needed).
+	 */
+	public record SuggestedLoupeRegion(double startMs, double endMs) {
+	}
+
 	public enum SuggestionStatus {
 		OK,
 		NO_TELEMETRY,
@@ -78,8 +90,18 @@ public final class ZoomSuggestionUtils {
 		NO_SLOTS
 	}
 
-	/** Port of {@code InteractionZoomSuggestionResult}. */
-	public record SuggestionResult(SuggestionStatus status, List<SuggestedZoomRegion> suggestions) {
+	/** Port of {@code InteractionZoomSuggestionResult}, extended with the loupe placements. */
+	public record SuggestionResult(SuggestionStatus status, List<SuggestedZoomRegion> suggestions,
+			List<SuggestedLoupeRegion> loupeSuggestions) {
+
+		public SuggestionResult(SuggestionStatus status, List<SuggestedZoomRegion> suggestions) {
+			this(status, suggestions, List.of());
+		}
+
+		public SuggestionResult {
+			suggestions = suggestions == null ? List.of() : suggestions;
+			loupeSuggestions = loupeSuggestions == null ? List.of() : loupeSuggestions;
+		}
 	}
 
 	/** Port of the {@code buildInteractionZoomSuggestions} params object. */
@@ -119,6 +141,35 @@ public final class ZoomSuggestionUtils {
 	/** Port of {@code isExplicitClickType}; {@code null} (position-only sample) is never a click. */
 	public static boolean isExplicitClickType(@Nullable String interactionType) {
 		return interactionType != null && EXPLICIT_CLICK_TYPES.contains(interactionType);
+	}
+
+	/**
+	 * The press-and-hold spans in a telemetry stream: every explicit click paired with its
+	 * mouseup that is held for more than {@link #HOLD_LOUPE_MIN_MS}. Each span becomes a loupe
+	 * placement instead of a click zoom.
+	 */
+	public static List<SuggestedLoupeRegion> detectHoldSpans(List<CursorTelemetryPoint> samples) {
+		List<SuggestedLoupeRegion> holds = new ArrayList<>();
+		for (CursorTelemetryPoint sample : samples) {
+			if (!isExplicitClickType(sample.interactionType())) {
+				continue;
+			}
+			CursorTelemetryPoint mouseUp = null;
+			for (CursorTelemetryPoint candidate : samples) {
+				if (candidate.timeMs() > sample.timeMs()
+						&& "mouseup".equals(candidate.interactionType())) {
+					mouseUp = candidate;
+					break;
+				}
+			}
+			if (mouseUp == null) {
+				continue;
+			}
+			if (mouseUp.timeMs() - sample.timeMs() > HOLD_LOUPE_MIN_MS) {
+				holds.add(new SuggestedLoupeRegion(sample.timeMs(), mouseUp.timeMs()));
+			}
+		}
+		return holds;
 	}
 
 	/** Port of {@code normalizeCursorTelemetry}. */
@@ -300,11 +351,26 @@ public final class ZoomSuggestionUtils {
 		List<CursorInteractionCandidate> clickCandidates = detectInteractionCandidates(normalized)
 				.stream().filter(candidate -> candidate.source() == InteractionSource.EXPLICIT)
 				.toList();
-		if (clickCandidates.isEmpty()) {
-			return new SuggestionResult(SuggestionStatus.NO_INTERACTIONS, List.of());
+
+		// Presses held longer than HOLD_LOUPE_MIN_MS place a magnifying glass over the hold
+		// instead of a click zoom, so they are both new loupe suggestions and excluded from the
+		// click clusters.
+		List<SuggestedLoupeRegion> loupeSuggestions = buildLoupeSuggestions(normalized, totalMs);
+		java.util.Set<Long> holdStarts = new java.util.HashSet<>();
+		for (SuggestedLoupeRegion loupe : loupeSuggestions) {
+			holdStarts.add(Math.round(loupe.startMs()));
+		}
+		List<CursorInteractionCandidate> zoomCandidates = clickCandidates.stream()
+				.filter(candidate -> !holdStarts.contains(Math.round(candidate.centerTimeMs())))
+				.toList();
+		if (zoomCandidates.isEmpty()) {
+			if (loupeSuggestions.isEmpty()) {
+				return new SuggestionResult(SuggestionStatus.NO_INTERACTIONS, List.of());
+			}
+			return new SuggestionResult(SuggestionStatus.OK, List.of(), loupeSuggestions);
 		}
 
-		List<ClickCluster> clusters = buildClickClusters(clickCandidates, mergeGapMs);
+		List<ClickCluster> clusters = buildClickClusters(zoomCandidates, mergeGapMs);
 		List<Span> reserved = new ArrayList<>(reservedSpans);
 		reserved.sort(Comparator.comparingDouble(Span::start));
 		List<SuggestedZoomRegion> suggestions = new ArrayList<>();
@@ -330,10 +396,41 @@ public final class ZoomSuggestionUtils {
 		}
 
 		if (suggestions.isEmpty()) {
-			return new SuggestionResult(SuggestionStatus.NO_SLOTS, List.of());
+			if (loupeSuggestions.isEmpty()) {
+				return new SuggestionResult(SuggestionStatus.NO_SLOTS, List.of());
+			}
+			return new SuggestionResult(SuggestionStatus.OK, List.of(), loupeSuggestions);
 		}
 		suggestions.sort(Comparator.comparingDouble(SuggestedZoomRegion::startMs));
-		return new SuggestionResult(SuggestionStatus.OK, suggestions);
+		return new SuggestionResult(SuggestionStatus.OK, suggestions, loupeSuggestions);
+	}
+
+	/**
+	 * Clamped, time-sorted hold spans without duplicates (a hold that overlaps an earlier one is
+	 * dropped — one mouse press chain places one lens).
+	 */
+	private static List<SuggestedLoupeRegion> buildLoupeSuggestions(
+			List<CursorTelemetryPoint> normalized, double totalMs) {
+		List<SuggestedLoupeRegion> holds = new ArrayList<>();
+		for (SuggestedLoupeRegion hold : detectHoldSpans(normalized)) {
+			double start = clamp(hold.startMs(), 0, totalMs);
+			double end = clamp(hold.endMs(), 0, totalMs);
+			if (end <= start) {
+				continue;
+			}
+			boolean overlaps = false;
+			for (SuggestedLoupeRegion accepted : holds) {
+				if (end > accepted.startMs() && start < accepted.endMs()) {
+					overlaps = true;
+					break;
+				}
+			}
+			if (!overlaps) {
+				holds.add(new SuggestedLoupeRegion(start, end));
+			}
+		}
+		holds.sort(Comparator.comparingDouble(SuggestedLoupeRegion::startMs));
+		return holds;
 	}
 
 	private record ClickCluster(double firstMs, double lastMs, ZoomFocus focus) {

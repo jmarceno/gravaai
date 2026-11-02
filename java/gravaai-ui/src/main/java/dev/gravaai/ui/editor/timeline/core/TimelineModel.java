@@ -106,6 +106,9 @@ public final class TimelineModel {
 		if (region.type() == AnnotationType.IMAGE) {
 			return "Image";
 		}
+		if (region.type() == AnnotationType.LOUPE) {
+			return "Loupe";
+		}
 		return "Annotation";
 	}
 

@@ -914,6 +914,12 @@ public final class EditorWindow {
 		}
 	}
 
+	/** Whether a magnifying-glass loupe annotation exists (the fresh-recording guard). */
+	private boolean hasLoupeAnnotations() {
+		return session.store().state().annotationRegions().stream()
+				.anyMatch(region -> region.type() == dev.gravaai.core.project.AnnotationType.LOUPE);
+	}
+
 	/**
 	 * {@code useFreshRecordingAutoZoom}: a new recording opens with interaction-based zooms, once,
 	 * when the setting is on, there is cursor telemetry, no zoom exists yet and the source shape is
@@ -926,6 +932,7 @@ public final class EditorWindow {
 		freshRecordingZoomsTried = true;
 		if (!actions.autoApplyFreshRecordingAutoZooms() || timelineTotalMs() == 0
 				|| !session.store().state().zoomRegions().isEmpty()
+				|| hasLoupeAnnotations()
 				|| session.cursorTelemetryPoints().size() < 2) {
 			return;
 		}
@@ -942,7 +949,7 @@ public final class EditorWindow {
 		}
 		int added = timeline.addSuggestedZooms();
 		if (added > 0) {
-			toast("Added " + added + " interaction-based zoom suggestion"
+			toast("Added " + added + " interaction-based zoom or loupe suggestion"
 					+ (added == 1 ? "" : "s"), null, Toast.Variant.SUCCESS);
 		}
 	}
@@ -951,8 +958,7 @@ public final class EditorWindow {
 	 * Port of {@code useTimelineZoomActions.handleSuggestZooms}: guards, telemetry check, the
 	 * suggestion build through {@link TimelineView#suggestZooms()} and the applied result toast.
 	 */
-	private void suggestInteractionZooms() {
-		long totalMs = timelineTotalMs();
+	private void suggestInteractionZooms() {		long totalMs = timelineTotalMs();
 		if (totalMs == 0) {
 			return;
 		}
@@ -978,7 +984,7 @@ public final class EditorWindow {
 					"Detected dwell points overlap existing zoom regions.", Toast.Variant.ACCENT);
 			default -> {
 				int added = timeline.addSuggestedZooms();
-				toast("Added " + added + " interaction-based zoom suggestion"
+				toast("Added " + added + " interaction-based zoom or loupe suggestion"
 						+ (added == 1 ? "" : "s"), null, Toast.Variant.SUCCESS);
 			}
 		}
@@ -1304,6 +1310,11 @@ public final class EditorWindow {
 		@Override
 		public void addBlurAnnotation() {
 			addAnnotationOfType(dev.gravaai.core.project.AnnotationType.BLUR);
+		}
+
+		@Override
+		public void addLoupeAnnotation() {
+			addAnnotationOfType(dev.gravaai.core.project.AnnotationType.LOUPE);
 		}
 
 		/**

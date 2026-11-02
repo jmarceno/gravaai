@@ -1088,28 +1088,72 @@ public final class EditorInspectorPanel extends VBox {
 		Switch react = new Switch("React to zoom");
 		react.setChecked(webcam.reactToZoom());
 		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
-		root.getChildren().addAll(enabled, mirror, react);
+		boolean split = webcam.positionPreset().isSplit();
+		// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
+		root.getChildren().addAll(split ? List.of(enabled, mirror) : List.of(enabled, mirror, react));
 
-		Select position = new Select();
-		for (WebcamPositionPreset preset : WebcamPositionPreset.values()) {
-			position.item(preset.wire(), labelFor(preset.wire()));
-		}
-		position.value(webcam.positionPreset().wire());
-		position.onValueChange(value -> applyWebcam(json -> {
-			json.put("positionPreset", value);
-			WebcamPositionPreset preset = WebcamPositionPreset.fromWireOrNull(value);
-			if (preset != null && preset.isCorner()) {
-				json.put("corner", value);
+		// Layout first: the floating bubble or split screen, each with its own position control.
+		ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");
+		layout.setValue(split ? "split" : "overlay");
+		layout.setAccessibleText("Webcam layout");
+		layout.onValueChange(value -> {
+			if (value.equals("split") == split) {
+				return;
 			}
-		}));
-		root.getChildren().add(row("Position", position));
+			applyWebcam(json -> json.put("positionPreset", value.equals("split")
+					? defaultSplitPreset(store.state().aspectRatio())
+					: webcam.corner().wire()));
+			rebuild();
+		});
+		root.getChildren().add(layout);
 
-		root.getChildren().add(slider("Size", webcam.size(), 10, 100, 1, value -> formatPercent(value),
-				value -> applyWebcam(json -> json.put("size", value))));
-		root.getChildren().add(slider("Width", webcam.width(), 10, 100, 1, value -> formatPercent(value),
-				value -> applyWebcam(json -> json.put("width", value))));
-		root.getChildren().add(slider("Height", webcam.height(), 10, 100, 1, value -> formatPercent(value),
-				value -> applyWebcam(json -> json.put("height", value))));
+		if (split) {
+			ChoiceGroup side = choice("split-right", "Right", "split-left", "Left",
+					"split-top", "Top", "split-bottom", "Bottom");
+			side.setValue(webcam.positionPreset().wire());
+			side.setAccessibleText("Camera side");
+			side.onValueChange(value -> {
+				if (!value.equals(webcam.positionPreset().wire())) {
+					applyWebcam(json -> json.put("positionPreset", value));
+					rebuild();
+				}
+			});
+			// Four chips do not fit beside a caption in the inspector width: caption above.
+			Label sideCaption = new Label("Camera side");
+			sideCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			root.getChildren().add(new VBox(8, sideCaption, side));
+			// The camera share of the split axis: the width percent beside the content, the
+			// height percent above/below it (the compositor reads the same fields).
+			boolean stacked = webcam.positionPreset() == WebcamPositionPreset.SPLIT_TOP
+					|| webcam.positionPreset() == WebcamPositionPreset.SPLIT_BOTTOM;
+			String shareField = stacked ? "height" : "width";
+			root.getChildren().add(slider("Camera share", stacked ? webcam.height() : webcam.width(),
+					10, 90, 1, value -> formatPercent(value),
+					value -> applyWebcam(json -> json.put(shareField, value))));
+		} else {
+			Select position = new Select();
+			for (WebcamPositionPreset preset : WebcamPositionPreset.values()) {
+				if (!preset.isSplit()) {
+					position.item(preset.wire(), labelFor(preset.wire()));
+				}
+			}
+			position.value(webcam.positionPreset().wire());
+			position.onValueChange(value -> applyWebcam(json -> {
+				json.put("positionPreset", value);
+				WebcamPositionPreset preset = WebcamPositionPreset.fromWireOrNull(value);
+				if (preset != null && preset.isCorner()) {
+					json.put("corner", value);
+				}
+			}));
+			root.getChildren().add(row("Position", position));
+
+			root.getChildren().add(slider("Size", webcam.size(), 10, 100, 1, value -> formatPercent(value),
+					value -> applyWebcam(json -> json.put("size", value))));
+			root.getChildren().add(slider("Width", webcam.width(), 10, 100, 1, value -> formatPercent(value),
+					value -> applyWebcam(json -> json.put("width", value))));
+			root.getChildren().add(slider("Height", webcam.height(), 10, 100, 1, value -> formatPercent(value),
+					value -> applyWebcam(json -> json.put("height", value))));
+		}
 		if (advanced) {
 			// React: the crop control sits under Webcam > Advanced with a reset action.
 			CropRegion cropRegion = webcam.cropRegion() == null ? CropRegion.DEFAULT
@@ -1141,7 +1185,7 @@ public final class EditorInspectorPanel extends VBox {
 		root.getChildren().add(slider("Shadow", webcam.shadow(), 0, 1, 0.01,
 				value -> Math.round(value * 100) + "%",
 				value -> applyWebcam(json -> json.put("shadow", value))));
-		root.getChildren().add(slider("Margin", webcam.margin(), 0, 96, 1,
+		root.getChildren().add(slider(split ? "Gap" : "Margin", webcam.margin(), 0, 96, 1,
 				value -> Math.round(value) + "px",
 				value -> applyWebcam(json -> json.put("margin", value))));
 		return root;
@@ -1527,6 +1571,29 @@ public final class EditorInspectorPanel extends VBox {
 
 	private static String formatPercent(double value) {
 		return Math.round(value) + "%";
+	}
+
+	/**
+	 * The split preset picked when the user switches the webcam to split screen: the camera
+	 * stacks below the content in a portrait frame and sits beside it otherwise.
+	 */
+	static String defaultSplitPreset(String aspectRatio) {
+		return isPortraitAspect(aspectRatio)
+				? WebcamPositionPreset.SPLIT_BOTTOM.wire()
+				: WebcamPositionPreset.SPLIT_RIGHT.wire();
+	}
+
+	/** True for a taller-than-wide aspect wire ({@code 9:16}, {@code 4:5}, custom {@code W:H}). */
+	static boolean isPortraitAspect(String aspectRatio) {
+		String[] parts = aspectRatio == null ? new String[0] : aspectRatio.split(":");
+		if (parts.length != 2) {
+			return false;
+		}
+		try {
+			return Double.parseDouble(parts[0]) < Double.parseDouble(parts[1]);
+		} catch (NumberFormatException notARatio) {
+			return false;
+		}
 	}
 
 	private static String labelFor(String wire) {

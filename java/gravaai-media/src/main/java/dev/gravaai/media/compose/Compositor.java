@@ -429,14 +429,21 @@ public final class Compositor implements AutoCloseable {
 
 	/**
 	 * The glass loupes (annotation stage 8.5): each active loupe magnifies the frame rendered so
-	 * far around the cursor hotspot. The lens is drawn in screen space — the cursor position is
-	 * mapped through the camera transform, the diameter is a percent of the video mask height and
-	 * the magnification applies on top of whatever the camera is doing.
+	 * far around the cursor hotspot (the recorded pointer when the cursor is hidden). The lens is
+	 * drawn in screen space — the cursor position is mapped through the camera transform, the
+	 * diameter is a percent of the frame's short side (so portrait and landscape frames get the
+	 * same lens) and the magnification applies on top of whatever the camera is doing. Each lens
+	 * grows in and shrinks out at its region edges.
 	 */
 	private void renderLoupes(Canvas canvas, SkiaGlSurface target, FrameInput input) {
-		long timeMs = Math.round(input.timeSeconds() * 1000);
-		double[] cursor = cursorRenderer.lastDrawnPosition();
-		if (cursor == null || lastMaskRect == null) {
+		double exactMs = input.timeSeconds() * 1000;
+		long timeMs = Math.round(exactMs);
+		if (lastMaskRect == null) {
+			return;
+		}
+		double[] cursor = cursorRenderer.loupeAnchor(lastMaskRect, input.layout().crop(),
+				input.cursorSamples(), input.sourceTimeSeconds() * 1000);
+		if (cursor == null) {
 			return;
 		}
 		java.util.List<AnnotationSpec> loupes = AnnotationSpec
@@ -452,11 +459,12 @@ public final class Compositor implements AutoCloseable {
 			ZoomTransform.AppliedTransform transform = lastAppliedTransform;
 			double centreX = cursor[0] * transform.scale() + transform.x();
 			double centreY = cursor[1] * transform.scale() + transform.y();
-			double maskHeight = lastMaskRect.getHeight();
+			double shortSide = Math.min(width, height);
 			for (AnnotationSpec loupe : loupes) {
-				double diameter = (loupe.size().width() / 100.0) * maskHeight;
+				double diameter = (loupe.size().width() / 100.0) * shortSide;
 				LoupeRenderer.draw(canvas, snapshot, centreX, centreY, diameter / 2,
-						loupe.loupeMagnificationOrDefault(), annotationScaleFactor());
+						loupe.loupeMagnificationOrDefault(), annotationScaleFactor(),
+						LoupeRenderer.presence(exactMs, loupe.startMs(), loupe.endMs()));
 			}
 		} finally {
 			if (snapshot != null) {
@@ -478,8 +486,9 @@ public final class Compositor implements AutoCloseable {
 	 * squircle mask, {@code WEBCAM_SHADOW_LAYER_PROFILES} shadow, mirror and crop, plus the per-clip
 	 * camera layout: {@code cameraFill} lerps the box to the full frame (camera-only) and
 	 * {@code cameraOpacity} fades the whole overlay. The split screen presets instead cover-fit
-	 * the camera into its full-bleed region beside/above/below the content (no margin, radius or
-	 * shadow); {@code cameraFill} still lerps it to the full frame.
+	 * the camera into a card inset by the margin inside its strip beside/above/below the content,
+	 * with a card radius from the roundness and the same shadow; {@code cameraFill} still lerps
+	 * it to the full frame.
 	 */
 	private void renderWebcam(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		WebcamSpec spec = input.webcam();
@@ -490,8 +499,11 @@ public final class Compositor implements AutoCloseable {
 		Rect box;
 		double radius;
 		if (split != null) {
-			box = split.camera();
-			radius = 0;
+			// The camera floats as a card in its strip, like the screen card beside it: the
+			// margin is the gap (scaled on the long side so portrait and landscape match).
+			box = SplitScreenLayout.cameraCard(split.camera(),
+					WebcamOverlay.scalePixels(spec.margin(), Math.max(width, height)));
+			radius = SplitScreenLayout.cardRadius(spec.roundness(), box);
 		} else {
 			double zoomScale = lastAppliedTransform.scale();
 			double margin = WebcamOverlay.scalePixels(spec.margin(), width);
@@ -526,8 +538,7 @@ public final class Compositor implements AutoCloseable {
 		try {
 			try (Image image = frameTextures.image(target,
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
-				drawWebcamShadowLayers(canvas, box, radius,
-						split != null ? 0 : spec.shadow() * (1 - fill),
+				drawWebcamShadowLayers(canvas, box, radius, spec.shadow() * (1 - fill),
 						Math.min(box.getWidth(), box.getHeight()));
 				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
 						radius, WEBCAM_SAMPLING);

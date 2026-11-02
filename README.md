@@ -41,6 +41,8 @@ There are no accounts, no telemetry and no cloud sharing. Recordings, projects, 
 
 - Drag-and-drop timeline with trims, speed regions and extra audio tracks
 - Manual zooms plus automatic zoom suggestions from cursor activity
+- Glass loupe: a circular magnifying glass that follows the cursor, placed automatically when a
+  click is held for more than 200 ms
 - Text, image and shape annotations
 - Crop and aspect-ratio presets
 - Rendered cursor with size, smoothing, motion blur, click bounce and loop mode

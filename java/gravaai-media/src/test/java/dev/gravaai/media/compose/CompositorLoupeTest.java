@@ -102,12 +102,73 @@ class CompositorLoupeTest {
 	@DisplayName("magnifies the rendered scene inside the lens while the loupe is active")
 	void magnifiesAroundTheCursor() throws Exception {
 		RgbaFrame detailed = stripes();
-		ByteBuffer plain = render(input(0.0, detailed, List.of()));
-		ByteBuffer loupes = render(input(0.0, detailed, List.of(loupe(0, 1000, 2.0))));
+		// Mid-region, past the grow-in, so the lens is fully present.
+		ByteBuffer plain = render(input(0.5, detailed, List.of()));
+		ByteBuffer loupes = render(input(0.5, detailed, List.of(loupe(0, 1000, 2.0))));
 
 		int difference = difference(plain, loupes);
 		assertTrue(difference > 10_000,
 				"loupe did not change the frame (difference " + difference + ")");
+	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("follows the recorded pointer even when the cursor is hidden")
+	void magnifiesWithHiddenCursor() throws Exception {
+		RgbaFrame detailed = stripes();
+		FrameInput hiddenPlain = new FrameInput(0, 0.5, detailed, null,
+				List.of(new CursorSample(0.0, 0.5, 0.5)), BACKGROUND, 0, LayoutSpec.FULL_FRAME,
+				ZoomSpec.NONE, FrameStyle.DEFAULT, CursorSpec.DEFAULT, WebcamSpec.DISABLED,
+				List.of());
+		FrameInput hiddenLoupe = new FrameInput(0, 0.5, detailed, null,
+				List.of(new CursorSample(0.0, 0.5, 0.5)), BACKGROUND, 0, LayoutSpec.FULL_FRAME,
+				ZoomSpec.NONE, FrameStyle.DEFAULT, CursorSpec.DEFAULT, WebcamSpec.DISABLED,
+				List.of(loupe(0, 1000, 2.0)));
+
+		int difference = difference(render(hiddenPlain), render(hiddenLoupe));
+		assertTrue(difference > 10_000,
+				"loupe vanished with the cursor hidden (difference " + difference + ")");
+	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("near the frame edge the lens slides inward instead of being cut off")
+	void lensStaysInsideTheFrame() throws Exception {
+		// Cursor 8 px from the right edge; the 100 px lens (50% of the 200 px short side) would
+		// span x 342..400 if centred on it, but slides in to centre near x 347, reaching x 298.
+		RgbaFrame detailed = stripes();
+		List<CursorSample> edge = List.of(new CursorSample(0.0, 0.98, 0.5));
+		FrameInput plain = new FrameInput(0, 0.5, detailed, null, edge, BACKGROUND, 0,
+				LayoutSpec.FULL_FRAME, ZoomSpec.NONE, FrameStyle.DEFAULT, CURSOR,
+				WebcamSpec.DISABLED, List.of());
+		FrameInput lens = new FrameInput(0, 0.5, detailed, null, edge, BACKGROUND, 0,
+				LayoutSpec.FULL_FRAME, ZoomSpec.NONE, FrameStyle.DEFAULT, CURSOR,
+				WebcamSpec.DISABLED, List.of(loupe(0, 1000, 2.0)));
+		ByteBuffer before = render(plain);
+		ByteBuffer after = render(lens);
+
+		int changed = 0;
+		for (int x = 300; x < 340; x++) {
+			int index = (100 * WIDTH + x) * 4;
+			if (before.get(index) != after.get(index)) {
+				changed++;
+			}
+		}
+		assertTrue(changed > 10, "lens did not slide inside the frame (" + changed + " px)");
+	}
+
+	@Test
+	@DisplayName("the lens grows in and shrinks out at the region edges instead of popping")
+	void presenceEasesAtRegionEdges() {
+		assertEquals(0, LoupeRenderer.presence(0, 0, 1000), 1e-9);
+		assertTrue(LoupeRenderer.presence(50, 0, 1000) > 0);
+		assertTrue(LoupeRenderer.presence(50, 0, 1000) < 1);
+		assertEquals(1, LoupeRenderer.presence(500, 0, 1000), 1e-9);
+		assertTrue(LoupeRenderer.presence(950, 0, 1000) < 1);
+		assertEquals(0, LoupeRenderer.presence(1000, 0, 1000), 1e-9);
+		assertEquals(0, LoupeRenderer.presence(1500, 0, 1000), 1e-9);
+		// A region shorter than the two transitions still peaks at full size in its middle.
+		assertEquals(1, LoupeRenderer.presence(100, 0, 200), 1e-9);
 	}
 
 	@Test

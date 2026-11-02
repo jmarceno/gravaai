@@ -38,6 +38,15 @@ public final class ZoomSuggestionUtils {
 	 * magnifying-glass loupe over the hold instead of a click zoom (the card's 200 ms rule).
 	 */
 	public static final double HOLD_LOUPE_MIN_MS = 200;
+	/**
+	 * A suggested loupe starts this long before the press, so the lens has grown in by the time
+	 * the button goes down, and lingers this long after the release so it does not vanish the
+	 * instant the button comes up.
+	 */
+	public static final double LOUPE_LEAD_MS = 120;
+	public static final double LOUPE_TAIL_MS = 350;
+	/** A suggested loupe is on screen at least this long: a 250 ms hold must not flash a lens. */
+	public static final double LOUPE_MIN_MS = 1_000;
 
 	/**
 	 * Port of {@code CursorTelemetryPoint}; {@code interactionType} and {@code cursorType} are null
@@ -144,29 +153,25 @@ public final class ZoomSuggestionUtils {
 	}
 
 	/**
-	 * The press-and-hold spans in a telemetry stream: every explicit click paired with its
-	 * mouseup that is held for more than {@link #HOLD_LOUPE_MIN_MS}. Each span becomes a loupe
-	 * placement instead of a click zoom.
+	 * The press-and-hold spans in a telemetry stream: every explicit click paired with its own
+	 * mouseup — the first one before the next press — that is held for more than
+	 * {@link #HOLD_LOUPE_MIN_MS}. A press whose mouseup was never recorded pairs with nothing
+	 * (it must not borrow a later press's release). Each span becomes a loupe placement instead
+	 * of a click zoom.
 	 */
 	public static List<SuggestedLoupeRegion> detectHoldSpans(List<CursorTelemetryPoint> samples) {
+		List<CursorTelemetryPoint> sorted = new ArrayList<>(samples);
+		sorted.sort(Comparator.comparingDouble(CursorTelemetryPoint::timeMs));
 		List<SuggestedLoupeRegion> holds = new ArrayList<>();
-		for (CursorTelemetryPoint sample : samples) {
-			if (!isExplicitClickType(sample.interactionType())) {
-				continue;
-			}
-			CursorTelemetryPoint mouseUp = null;
-			for (CursorTelemetryPoint candidate : samples) {
-				if (candidate.timeMs() > sample.timeMs()
-						&& "mouseup".equals(candidate.interactionType())) {
-					mouseUp = candidate;
-					break;
+		CursorTelemetryPoint press = null;
+		for (CursorTelemetryPoint sample : sorted) {
+			if (isExplicitClickType(sample.interactionType())) {
+				press = sample;
+			} else if ("mouseup".equals(sample.interactionType()) && press != null) {
+				if (sample.timeMs() - press.timeMs() > HOLD_LOUPE_MIN_MS) {
+					holds.add(new SuggestedLoupeRegion(press.timeMs(), sample.timeMs()));
 				}
-			}
-			if (mouseUp == null) {
-				continue;
-			}
-			if (mouseUp.timeMs() - sample.timeMs() > HOLD_LOUPE_MIN_MS) {
-				holds.add(new SuggestedLoupeRegion(sample.timeMs(), mouseUp.timeMs()));
+				press = null;
 			}
 		}
 		return holds;
@@ -357,8 +362,8 @@ public final class ZoomSuggestionUtils {
 		// click clusters.
 		List<SuggestedLoupeRegion> loupeSuggestions = buildLoupeSuggestions(normalized, totalMs);
 		java.util.Set<Long> holdStarts = new java.util.HashSet<>();
-		for (SuggestedLoupeRegion loupe : loupeSuggestions) {
-			holdStarts.add(Math.round(loupe.startMs()));
+		for (SuggestedLoupeRegion hold : detectHoldSpans(normalized)) {
+			holdStarts.add(Math.round(hold.startMs()));
 		}
 		List<CursorInteractionCandidate> zoomCandidates = clickCandidates.stream()
 				.filter(candidate -> !holdStarts.contains(Math.round(candidate.centerTimeMs())))
@@ -413,8 +418,9 @@ public final class ZoomSuggestionUtils {
 			List<CursorTelemetryPoint> normalized, double totalMs) {
 		List<SuggestedLoupeRegion> holds = new ArrayList<>();
 		for (SuggestedLoupeRegion hold : detectHoldSpans(normalized)) {
-			double start = clamp(hold.startMs(), 0, totalMs);
-			double end = clamp(hold.endMs(), 0, totalMs);
+			double start = clamp(hold.startMs() - LOUPE_LEAD_MS, 0, totalMs);
+			double end = clamp(Math.max(hold.endMs() + LOUPE_TAIL_MS, start + LOUPE_MIN_MS), 0,
+					totalMs);
 			if (end <= start) {
 				continue;
 			}

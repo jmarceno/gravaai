@@ -947,10 +947,9 @@ public final class EditorWindow {
 				.SuggestionStatus.OK) {
 			return;
 		}
-		int added = timeline.addSuggestedZooms();
-		if (added > 0) {
-			toast("Added " + added + " interaction-based zoom or loupe suggestion"
-					+ (added == 1 ? "" : "s"), null, Toast.Variant.SUCCESS);
+		var added = timeline.addSuggestedZooms();
+		if (added.total() > 0) {
+			toast(added.summary(), null, Toast.Variant.SUCCESS);
 		}
 	}
 
@@ -958,7 +957,8 @@ public final class EditorWindow {
 	 * Port of {@code useTimelineZoomActions.handleSuggestZooms}: guards, telemetry check, the
 	 * suggestion build through {@link TimelineView#suggestZooms()} and the applied result toast.
 	 */
-	private void suggestInteractionZooms() {		long totalMs = timelineTotalMs();
+	private void suggestInteractionZooms() {
+		long totalMs = timelineTotalMs();
 		if (totalMs == 0) {
 			return;
 		}
@@ -983,9 +983,14 @@ public final class EditorWindow {
 			case NO_SLOTS -> toast("No auto-zoom slots available",
 					"Detected dwell points overlap existing zoom regions.", Toast.Variant.ACCENT);
 			default -> {
-				int added = timeline.addSuggestedZooms();
-				toast("Added " + added + " interaction-based zoom or loupe suggestion"
-						+ (added == 1 ? "" : "s"), null, Toast.Variant.SUCCESS);
+				var added = timeline.addSuggestedZooms();
+				if (added.total() == 0) {
+					toast("No new suggestions",
+							"All found moments are covered.",
+							Toast.Variant.ACCENT);
+				} else {
+					toast(added.summary(), null, Toast.Variant.SUCCESS);
+				}
 			}
 		}
 	}

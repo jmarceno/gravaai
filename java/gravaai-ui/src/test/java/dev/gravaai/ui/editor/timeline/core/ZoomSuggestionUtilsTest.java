@@ -250,8 +250,9 @@ class ZoomSuggestionUtilsTest {
 		assertEquals(0, result.suggestions().size());
 		assertEquals(1, result.loupeSuggestions().size());
 		ZoomSuggestionUtils.SuggestedLoupeRegion loupe = result.loupeSuggestions().get(0);
-		assertEquals(5_000, loupe.startMs());
-		assertEquals(5_600, loupe.endMs());
+		// A lead-in before the press grows the lens in; a tail after the release lets it linger.
+		assertEquals(5_000 - ZoomSuggestionUtils.LOUPE_LEAD_MS, loupe.startMs());
+		assertEquals(5_600 + ZoomSuggestionUtils.LOUPE_TAIL_MS, loupe.endMs());
 	}
 
 	@Test
@@ -298,8 +299,10 @@ class ZoomSuggestionUtilsTest {
 		assertEquals(4_000 - ZoomSuggestionUtils.CLICK_CLUSTER_PAD_MS,
 				result.suggestions().get(0).startMs());
 		assertEquals(1, result.loupeSuggestions().size());
-		assertEquals(12_000, result.loupeSuggestions().get(0).startMs());
-		assertEquals(13_000, result.loupeSuggestions().get(0).endMs());
+		assertEquals(12_000 - ZoomSuggestionUtils.LOUPE_LEAD_MS,
+				result.loupeSuggestions().get(0).startMs());
+		assertEquals(13_000 + ZoomSuggestionUtils.LOUPE_TAIL_MS,
+				result.loupeSuggestions().get(0).endMs());
 	}
 
 	@Test
@@ -324,5 +327,29 @@ class ZoomSuggestionUtilsTest {
 		assertEquals(1, holds.size());
 		assertEquals(100, holds.get(0).startMs());
 		assertEquals(500, holds.get(0).endMs());
+	}
+
+	@Test
+	@DisplayName("a press without a recorded mouseup never borrows a later press's release")
+	void pressWithoutMouseUpDoesNotPairWithLaterRelease() {
+		// The 1 s press lost its mouseup; the 30 s quick click's release must not turn it into
+		// a 29 s loupe.
+		List<ZoomSuggestionUtils.SuggestedLoupeRegion> holds = ZoomSuggestionUtils.detectHoldSpans(
+				List.of(makeClick(1_000), makeClick(30_000), makeMouseUp(30_080, 0.5, 0.5)));
+
+		assertEquals(0, holds.size());
+	}
+
+	@Test
+	@DisplayName("a short hold still shows the lens for the minimum duration")
+	void shortHoldGetsMinimumLoupeDuration() {
+		SuggestionResult result = suggest(
+				withMoves(List.of(makeClick(5_000), makeMouseUp(5_250, 0.5, 0.5)), TOTAL_MS),
+				TOTAL_MS);
+
+		assertEquals(1, result.loupeSuggestions().size());
+		ZoomSuggestionUtils.SuggestedLoupeRegion loupe = result.loupeSuggestions().get(0);
+		assertEquals(ZoomSuggestionUtils.LOUPE_MIN_MS, loupe.endMs() - loupe.startMs(), 0.001);
+		assertEquals(0, result.suggestions().size(), "the hold is not also a click zoom");
 	}
 }

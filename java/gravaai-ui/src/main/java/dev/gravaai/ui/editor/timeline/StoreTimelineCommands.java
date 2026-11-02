@@ -250,8 +250,8 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
-	public void addSuggestedLoupe(double startMs, double endMs) {
-		store.apply(new AnnotationCommands.AddLoupe(startMs, endMs));
+	public boolean addSuggestedLoupe(double startMs, double endMs) {
+		return store.apply(new AnnotationCommands.AddLoupe(startMs, endMs, true));
 	}
 
 	@Override

@@ -110,11 +110,30 @@ final class CursorRenderer {
 	}
 
 	/**
-	 * The cursor hotspot of the frame just drawn, in viewport coordinates (pre-camera), or null
-	 * when nothing was drawn this frame (used by the loupe stage to centre the lens).
+	 * Where the loupe lens centres, in viewport coordinates (pre-camera): the smoothed hotspot
+	 * of the cursor drawn this frame, or — when the cursor is hidden (Show cursor off) — the raw
+	 * recorded position, so the lens still follows the pointer. Null when there is no sample or
+	 * the pointer is outside the crop.
 	 */
-	double @Nullable [] lastDrawnPosition() {
-		return visible ? new double[] {lastPx, lastPy} : null;
+	double @Nullable [] loupeAnchor(Rect viewport, LayoutCrop crop, List<CursorSample> samples,
+			double timeMs) {
+		if (visible) {
+			return new double[] {lastPx, lastPy};
+		}
+		if (samples == null || samples.isEmpty() || viewport.getWidth() <= 0
+				|| viewport.getHeight() <= 0) {
+			return null;
+		}
+		CursorSample target = CursorPosition.interpolateCursorPosition(samples, timeMs);
+		if (target == null) {
+			return null;
+		}
+		double[] projected = project(target.x(), target.y(), crop);
+		if (projected[2] <= 0) {
+			return null;
+		}
+		return new double[] {viewport._left + projected[0] * viewport.getWidth(),
+				viewport._top + projected[1] * viewport.getHeight()};
 	}
 
 	/** Draws the cursor overlay for one frame inside the current camera transform. */

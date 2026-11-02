@@ -17,7 +17,7 @@ import dev.gravaai.media.gl.GlPreviewThread;
 import dev.gravaai.media.gl.PboFormat;
 
 /**
- * Split screen end to end through the compositor: the camera strip is full-bleed beside or
+ * Split screen end to end through the compositor: the camera card sits inset in its strip beside or
  * above/below the content, the content fits the remaining region, and a hidden camera hands the
  * whole frame back to the content.
  */
@@ -97,14 +97,17 @@ class CompositorSplitScreenTest {
 
 	@Test
 	@Timeout(60)
-	@DisplayName("split-right fills a full-height camera strip on the right with the content beside it")
+	@DisplayName("split-right fills a camera card on the right with the content beside it")
 	void splitsRight() throws Exception {
-		// 30% of the 400 px width is the camera strip: x >= 280. The 400x200 source fits its
-		// 280x200 content region at scale 0.7, so it spans the full width, vertically centred.
+		// 30% of the 400 px width is the camera strip: x >= 280. The 24 px margin (5 px at this
+		// size) insets the card to 285..395 x 5..195. The 400x200 source fits its 280x200
+		// content region at scale 0.7, so it spans the full width, vertically centred.
 		ByteBuffer frame = render(input(0.0, splitSpec("split-right", 30)));
 		assertTrue(isGreen(pixel(frame, 390, 100)), "camera strip missing on the right");
 		assertTrue(isGreen(pixel(frame, 290, 10)) && isGreen(pixel(frame, 290, 190)),
-				"camera strip is not full height");
+				"camera card does not span its strip");
+		assertTrue(!isGreen(pixel(frame, 282, 100)) && !isGreen(pixel(frame, 390, 2)),
+				"camera card is not inset by the margin");
 		assertTrue(isRed(pixel(frame, 100, 100)), "content missing beside the camera");
 		assertTrue(isRed(pixel(frame, 270, 100)), "content does not reach the split");
 	}

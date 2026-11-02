@@ -107,7 +107,8 @@ public final class TimelineModel {
 			return "Image";
 		}
 		if (region.type() == AnnotationType.LOUPE) {
-			return "Loupe";
+			return String.format(java.util.Locale.ROOT, "Loupe %.1f×",
+					region.loupeMagnificationOrDefault());
 		}
 		return "Annotation";
 	}
@@ -187,7 +188,8 @@ public final class TimelineModel {
 			items.add(new TimelineRenderItem(region.id(), TimelineRows.getAnnotationTrackRowId(trackIndex),
 					new Span(region.startMs(), region.endMs()), null, getAnnotationLabel(region),
 					null, null, null, null, null, null, null, null, null, null, null,
-					TimelineRenderItem.Variant.ANNOTATION));
+					region.type() == AnnotationType.LOUPE ? TimelineRenderItem.Variant.LOUPE
+							: TimelineRenderItem.Variant.ANNOTATION));
 		}
 
 		for (AudioRegion region : request.audioRegions()) {

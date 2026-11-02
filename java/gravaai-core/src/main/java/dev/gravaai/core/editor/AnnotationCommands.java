@@ -100,32 +100,46 @@ public final class AnnotationCommands {
 	/**
 	 * Adds a loupe annotation (the "Magnifying Glass"): a lens that follows the cursor, so unlike
 	 * {@link Add} there is no text placeholder — the region only carries the span, the lens
-	 * diameter and the magnification. It lands on a new lane below the existing overlays so it
-	 * never hides under another block.
+	 * diameter and the magnification. It lands on the first lane that is free over its span, so
+	 * it never hides under another block and a batch of suggestions shares one lane.
 	 */
 	public static final class AddLoupe implements EditorCommand {
 		private final double startMs;
 		private final double endMs;
+		private final boolean suggestion;
 
 		public AddLoupe(double startMs, double endMs) {
+			this(startMs, endMs, false);
+		}
+
+		/**
+		 * @param suggestion true for a suggested loupe: it is skipped when a loupe already covers
+		 *        any of its span (re-running "Suggest zooms" must not stack lenses)
+		 */
+		public AddLoupe(double startMs, double endMs, boolean suggestion) {
 			this.startMs = startMs;
 			this.endMs = endMs;
+			this.suggestion = suggestion;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
 			List<AnnotationRegion> regions = store.state().annotationRegions();
+			long start = Math.round(startMs);
+			long end = Math.round(endMs);
+			if (suggestion && regions.stream().anyMatch(region -> region.type() == AnnotationType.LOUPE
+					&& region.startMs() < end && start < region.endMs())) {
+				return false;
+			}
 			List<String> ids = new ArrayList<>();
-			int nextTrack = 0;
 			for (AnnotationRegion region : regions) {
 				ids.add(region.id());
-				nextTrack = Math.max(nextTrack,
-						(region.trackIndex() == null ? 0 : region.trackIndex()) + 1);
 			}
+			int nextTrack = freeLane(regions, start, end);
 			String id = store.nextId("annotation", ids);
 			double diameter = AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT;
-			AnnotationRegion region = new AnnotationRegion(id, Math.round(startMs),
-					Math.round(endMs), AnnotationType.LOUPE, "", null, null,
+			AnnotationRegion region = new AnnotationRegion(id, start, end,
+					AnnotationType.LOUPE, "", null, null,
 					AnnotationPosition.DEFAULT, new AnnotationSize(diameter, diameter),
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
 					nextTrack, null, null, null, AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION);
@@ -135,6 +149,21 @@ public final class AnnotationCommands {
 			store.setSelectedAnnotationId(id);
 			store.setSelectedZoomId(null);
 			return true;
+		}
+
+		/** The lowest annotation lane with no block overlapping {@code [start, end)}. */
+		private static int freeLane(List<AnnotationRegion> regions, long start, long end) {
+			int lane = 0;
+			while (true) {
+				int candidate = lane;
+				boolean taken = regions.stream().anyMatch(region ->
+						(region.trackIndex() == null ? 0 : region.trackIndex()) == candidate
+								&& region.startMs() < end && start < region.endMs());
+				if (!taken) {
+					return lane;
+				}
+				lane++;
+			}
 		}
 	}
 

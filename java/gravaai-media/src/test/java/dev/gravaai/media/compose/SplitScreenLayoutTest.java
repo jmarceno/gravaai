@@ -103,4 +103,28 @@ class SplitScreenLayoutTest {
 		assertFalse(SplitScreenLayout.isSplit("bottom-right"));
 		assertFalse(SplitScreenLayout.isSplit(null));
 	}
+
+	@Test
+	@DisplayName("the camera card is inset by the gap, never below a quarter of its strip")
+	void cameraCardInsetsByGap() {
+		io.github.humbleui.types.Rect strip = io.github.humbleui.types.Rect.makeLTRB(1200, 0,
+				1920, 1080);
+		io.github.humbleui.types.Rect card = SplitScreenLayout.cameraCard(strip, 24);
+		assertEquals(1224, card.getLeft(), 0.001);
+		assertEquals(24, card.getTop(), 0.001);
+		assertEquals(1896, card.getRight(), 0.001);
+		assertEquals(1056, card.getBottom(), 0.001);
+		io.github.humbleui.types.Rect capped = SplitScreenLayout.cameraCard(strip, 10_000);
+		assertEquals(strip.getWidth() / 2, capped.getWidth(), 0.001);
+	}
+
+	@Test
+	@DisplayName("roundness drives a card radius, not a pill")
+	void cardRadiusStaysACard() {
+		io.github.humbleui.types.Rect card = io.github.humbleui.types.Rect.makeWH(700, 1000);
+		assertEquals(0, SplitScreenLayout.cardRadius(0, card), 0.001);
+		assertEquals(700 * SplitScreenLayout.MAX_CARD_RADIUS_FRACTION,
+				SplitScreenLayout.cardRadius(100, card), 0.001);
+		assertEquals(0, SplitScreenLayout.cardRadius(Double.NaN, card), 0.001);
+	}
 }

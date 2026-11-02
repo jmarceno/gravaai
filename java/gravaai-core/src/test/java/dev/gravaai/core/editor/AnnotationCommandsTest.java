@@ -132,7 +132,7 @@ class AnnotationCommandsTest {
 	// ---- loupe (the "Magnifying Glass" card) ---------------------------------------
 
 	@Test
-	@DisplayName("adds a loupe with the lens defaults on a new lane and selects it")
+	@DisplayName("adds a loupe with the lens defaults on the first free lane and selects it")
 	void addsLoupeWithLensDefaults() {
 		EditorStore store = storeWithAnnotation();
 
@@ -146,8 +146,36 @@ class AnnotationCommandsTest {
 				AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT), loupe.size());
 		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
 				loupe.loupeMagnificationOrDefault());
-		assertEquals(1, loupe.trackIndex());
+		assertEquals(0, loupe.trackIndex(), "the text annotation ends before the loupe starts");
 		assertEquals(loupe.id(), store.selectedAnnotationId());
+	}
+
+	@Test
+	@DisplayName("loupes that do not overlap share one lane instead of opening a lane each")
+	void loupesShareAFreeLane() {
+		EditorStore store = new EditorStore(state("{}"));
+
+		store.apply(new AnnotationCommands.AddLoupe(1_000, 2_000, true));
+		store.apply(new AnnotationCommands.AddLoupe(5_000, 6_000, true));
+		store.apply(new AnnotationCommands.AddLoupe(5_500, 7_000));
+
+		java.util.List<AnnotationRegion> regions = store.state().annotationRegions();
+		assertEquals(3, regions.size());
+		assertEquals(0, regions.get(0).trackIndex());
+		assertEquals(0, regions.get(1).trackIndex());
+		assertEquals(1, regions.get(2).trackIndex(), "an overlapping loupe takes the next lane");
+	}
+
+	@Test
+	@DisplayName("a suggested loupe over an existing loupe is skipped (re-running suggestions)")
+	void suggestedLoupeSkipsExistingLoupe() {
+		EditorStore store = new EditorStore(state("{}"));
+		store.apply(new AnnotationCommands.AddLoupe(1_000, 2_000, true));
+
+		store.apply(new AnnotationCommands.AddLoupe(1_000, 2_000, true));
+		store.apply(new AnnotationCommands.AddLoupe(1_500, 2_500, true));
+
+		assertEquals(1, store.state().annotationRegions().size());
 	}
 
 	@Test

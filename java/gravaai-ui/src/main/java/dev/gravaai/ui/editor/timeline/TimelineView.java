@@ -95,6 +95,11 @@ public final class TimelineView extends Region {
 	private static final Color ANNOTATION_FILL = Color.web("#4e4726");
 	private static final Color ANNOTATION_BORDER = Color.web("#62582c");
 	private static final Color ANNOTATION_SELECTED = Color.web("#b4a046");
+	/* Loupe blocks: a cool glass tint so a magnifying glass reads apart from text overlays. */
+	private static final Color LOUPE_FILL = Color.web("#1d4250");
+	private static final Color LOUPE_BORDER = Color.web("#2f6d80");
+	private static final Color LOUPE_SELECTED = Color.web("#67d4f0");
+	private static final Color LOUPE_GLYPH = Color.web("#a5ecff");
 	private static final Color AUDIO_FILL = Color.web("#164f2d");
 	private static final Color AUDIO_BORDER = Color.web("#196b38");
 	private static final Color AUDIO_SELECTED = Color.web("#22c55e");
@@ -1122,20 +1127,40 @@ public final class TimelineView extends Region {
 						Math.min(1_000, total), reserved));
 	}
 
+	/** How many zooms and loupes one suggest-zooms run actually added. */
+	public record SuggestedAdditions(int zooms, int loupes) {
+		public int total() {
+			return zooms + loupes;
+		}
+
+		/** Toast copy, e.g. "Added 2 zooms and 3 loupes". */
+		public String summary() {
+			String zoomText = zooms + (zooms == 1 ? " zoom" : " zooms");
+			String loupeText = loupes + (loupes == 1 ? " loupe" : " loupes");
+			if (loupes == 0) {
+				return "Added " + zoomText;
+			}
+			return zooms == 0 ? "Added " + loupeText : "Added " + zoomText + " and " + loupeText;
+		}
+	}
+
 	/** Applies the suggest-zooms result through {@link TimelineCommands#addSuggestedZoom}. */
-	public int addSuggestedZooms() {
+	public SuggestedAdditions addSuggestedZooms() {
 		ZoomSuggestionUtils.SuggestionResult result = suggestZooms();
-		int added = 0;
+		int zooms = 0;
 		for (ZoomSuggestionUtils.SuggestedZoomRegion suggestion : result.suggestions()) {
 			commands.addSuggestedZoom(suggestion.startMs(), suggestion.endMs(), suggestion.focus());
-			added++;
+			zooms++;
 		}
-		// Held presses become magnifying-glass loupes instead of click zooms.
+		// Held presses become magnifying-glass loupes instead of click zooms; a span an existing
+		// loupe already covers is skipped, so re-running the suggestions adds nothing twice.
+		int loupes = 0;
 		for (ZoomSuggestionUtils.SuggestedLoupeRegion loupe : result.loupeSuggestions()) {
-			commands.addSuggestedLoupe(loupe.startMs(), loupe.endMs());
-			added++;
+			if (commands.addSuggestedLoupe(loupe.startMs(), loupe.endMs())) {
+				loupes++;
+			}
 		}
-		return added;
+		return new SuggestedAdditions(zooms, loupes);
 	}
 
 	private void keyAction(KeyCode code, boolean ctrl, boolean meta, boolean shift, boolean alt,
@@ -1609,7 +1634,7 @@ public final class TimelineView extends Region {
 		return switch (variant) {
 			case ZOOM -> TimelineSelection.ZOOM;
 			case CLIP -> TimelineSelection.CLIP;
-			case ANNOTATION -> TimelineSelection.ANNOTATION;
+			case ANNOTATION, LOUPE -> TimelineSelection.ANNOTATION;
 			case AUDIO -> TimelineSelection.AUDIO;
 			case CAPTION -> TimelineSelection.CAPTION;
 			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
@@ -2023,19 +2048,36 @@ public final class TimelineView extends Region {
 		double x = Math.max(-blockWidth, startX);
 		double height = row.height() * 0.85;
 		double y = row.top() + (row.height() - height) / 2;
-		graphics.setFill(ANNOTATION_FILL);
+		boolean loupe = item.variant() == TimelineRenderItem.Variant.LOUPE;
+		graphics.setFill(loupe ? LOUPE_FILL : ANNOTATION_FILL);
 		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
-		graphics.setStroke(ANNOTATION_BORDER);
+		graphics.setStroke(loupe ? LOUPE_BORDER : ANNOTATION_BORDER);
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 24) {
+		double textX = x + 4;
+		if (loupe && blockWidth > 18) {
+			// A small lens glyph marks the block as a magnifying glass at any zoom level.
+			double lensRadius = Math.min(4.5, height * 0.2);
+			double lensX = x + 6 + lensRadius;
+			double lensY = y + height / 2 - 1;
+			graphics.setStroke(LOUPE_GLYPH);
+			graphics.setLineWidth(1.5);
+			graphics.strokeOval(lensX - lensRadius, lensY - lensRadius, lensRadius * 2,
+					lensRadius * 2);
+			double handle = lensRadius * 0.7071;
+			graphics.strokeLine(lensX + handle, lensY + handle, lensX + handle + 3.5,
+					lensY + handle + 3.5);
+			textX = lensX + lensRadius + 6;
+		}
+		if (blockWidth - (textX - x) > 20) {
 			graphics.setFont(BLOCK_FONT);
 			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 4,
-					y + height / 2 + 4);
+			graphics.fillText(fitText(item.label(), blockWidth - (textX - x) - 4, BLOCK_FONT),
+					textX, y + height / 2 + 4);
 		}
 		if (isSelected(TimelineSelection.ANNOTATION, item.id())) {
-			drawSelection(graphics, x, y, blockWidth, height, ANNOTATION_SELECTED);
+			drawSelection(graphics, x, y, blockWidth, height,
+					loupe ? LOUPE_SELECTED : ANNOTATION_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}

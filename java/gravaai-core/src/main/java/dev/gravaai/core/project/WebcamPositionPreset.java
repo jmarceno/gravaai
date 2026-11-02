@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-/** Webcam overlay anchor preset. The {@code split-*} values lay the camera out as a full-bleed
+/** Webcam overlay anchor preset. The {@code split-*} values lay the camera out as its own
  *  region beside or above/below the screen content instead of a floating bubble. */
 public enum WebcamPositionPreset {
 	TOP_LEFT("top-left"), TOP_CENTER("top-center"), TOP_RIGHT("top-right"),

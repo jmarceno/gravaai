@@ -6,9 +6,10 @@ import io.github.humbleui.types.Rect;
 
 /**
  * Split screen geometry for the {@code split-*} webcam position presets: the output frame divides
- * into one full-bleed region for the webcam and the remaining region for the screen content,
- * side by side or one above the other. Any other preset is the floating bubble overlay and
- * resolves to {@code null}.
+ * into one region for the webcam and the remaining region for the screen content, side by side
+ * or one above the other. The camera draws as a rounded card inset in its region
+ * ({@link #cameraCard}, {@link #cardRadius}). Any other preset is the floating bubble overlay
+ * and resolves to {@code null}.
  *
  * <p>The camera region takes the authored webcam {@code width} percent of the frame for the
  * side-by-side presets and the {@code height} percent for the stacked ones, so the existing
@@ -65,6 +66,33 @@ public final class SplitScreenLayout {
 		double fraction = Math.min(MAX_SHARE, Math.max(MIN_SHARE, percent / 100.0));
 		return axis * fraction;
 	}
+
+	/**
+	 * The camera card inside its region: inset by {@code gapPx} on every side so it floats like
+	 * the screen card next to it (never collapsing below a quarter of the region).
+	 */
+	public static Rect cameraCard(Rect camera, double gapPx) {
+		double maxInset = Math.min(camera.getWidth(), camera.getHeight()) / 4;
+		float inset = (float) Math.min(maxInset, Math.max(0, gapPx));
+		return Rect.makeLTRB(camera.getLeft() + inset, camera.getTop() + inset,
+				camera.getRight() - inset, camera.getBottom() - inset);
+	}
+
+	/**
+	 * The camera card corner radius: the webcam roundness percent drives a rounded rectangle
+	 * (up to {@link #MAX_CARD_RADIUS_FRACTION} of the card's short side) instead of the overlay's
+	 * pill/circle, so a large strip stays a card.
+	 */
+	public static double cardRadius(double roundnessPercent, Rect card) {
+		double roundness = Double.isFinite(roundnessPercent)
+				? Math.min(100, Math.max(0, roundnessPercent))
+				: 0;
+		double shortSide = Math.max(0, Math.min(card.getWidth(), card.getHeight()));
+		return shortSide * MAX_CARD_RADIUS_FRACTION * Math.sqrt(roundness / 100);
+	}
+
+	/** The camera card radius at 100% roundness, as a fraction of its short side. */
+	public static final double MAX_CARD_RADIUS_FRACTION = 0.1;
 
 	/** Builds the regions from the camera strip size on the split axis (Skija rects are LTRB). */
 	private static Regions regions(int width, int height, double cameraWidth, double cameraHeight,

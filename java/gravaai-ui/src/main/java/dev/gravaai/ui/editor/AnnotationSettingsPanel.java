@@ -254,7 +254,8 @@ public final class AnnotationSettingsPanel extends VBox {
 		return new VBox(10, header("Figure"), row("Arrow", arrow), stroke, color.node());
 	}
 
-	private Node blurSection(AnnotationRegion region) {		double intensity = region.blurIntensity() == null
+	private Node blurSection(AnnotationRegion region) {
+		double intensity = region.blurIntensity() == null
 				? AnnotationRegion.BLUR_ANNOTATION_STRENGTH : region.blurIntensity();
 		Slider strength = new Slider("Blur intensity");
 		strength.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
@@ -276,7 +277,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		magnification.onValueCommit(value -> applyForSelection(id ->
 				new AnnotationCommands.SetLoupeMagnification(id, value)));
 		Slider size = new Slider("Diameter");
-		size.range(5, 60).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
+		size.range(10, 80).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
 		size.setValue(diameter);
 		size.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.ChangeSize(id,
 				AnnotationCommands.loupeSize(value))));

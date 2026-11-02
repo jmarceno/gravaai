@@ -38,6 +38,8 @@ public record TimelineRenderItem(
 		TRIM,
 		CLIP,
 		ANNOTATION,
+		/** A magnifying-glass loupe: an annotation lane block with its own lens styling. */
+		LOUPE,
 		SPEED,
 		AUDIO,
 		CAPTION,

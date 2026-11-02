@@ -28,6 +28,10 @@ class ShortcutsTest {
 				defaults.get(Shortcuts.Action.PLAY_PAUSE));
 		assertEquals(new Shortcuts.Binding("d", true, false, false),
 				defaults.get(Shortcuts.Action.DELETE_SELECTED));
+		assertEquals(new Shortcuts.Binding(".", false, false, false),
+				defaults.get(Shortcuts.Action.PLAYBACK_FASTER));
+		assertEquals(new Shortcuts.Binding(",", false, false, false),
+				defaults.get(Shortcuts.Action.PLAYBACK_SLOWER));
 		assertEquals(List.of(Shortcuts.Action.values()), List.of(Shortcuts.Action.values()));
 	}
 
@@ -91,6 +95,6 @@ class ShortcutsTest {
 
 		assertEquals(Shortcuts.Binding.of("q"), merged.get(Shortcuts.Action.ADD_ZOOM));
 		assertEquals(Shortcuts.Binding.of("c"), merged.get(Shortcuts.Action.SPLIT_CLIP));
-		assertEquals(6, merged.size());
+		assertEquals(8, merged.size());
 	}
 }

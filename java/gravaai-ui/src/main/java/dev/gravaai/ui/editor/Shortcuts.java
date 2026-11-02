@@ -22,7 +22,9 @@ public final class Shortcuts {
 		ADD_ANNOTATION("addAnnotation"),
 		ADD_KEYFRAME("addKeyframe"),
 		DELETE_SELECTED("deleteSelected"),
-		PLAY_PAUSE("playPause");
+		PLAY_PAUSE("playPause"),
+		PLAYBACK_FASTER("playbackFaster"),
+		PLAYBACK_SLOWER("playbackSlower");
 
 		private final String wire;
 
@@ -98,6 +100,8 @@ public final class Shortcuts {
 		labels.put(Action.ADD_KEYFRAME, "Add Keyframe");
 		labels.put(Action.DELETE_SELECTED, "Delete Selected");
 		labels.put(Action.PLAY_PAUSE, "Play / Pause");
+		labels.put(Action.PLAYBACK_FASTER, "Playback Faster");
+		labels.put(Action.PLAYBACK_SLOWER, "Playback Slower");
 		return java.util.Collections.unmodifiableMap(labels);
 	}
 
@@ -109,6 +113,9 @@ public final class Shortcuts {
 		defaults.put(Action.ADD_KEYFRAME, Binding.of("f"));
 		defaults.put(Action.DELETE_SELECTED, Binding.ctrl("d"));
 		defaults.put(Action.PLAY_PAUSE, Binding.of(" "));
+		// The YouTube-style step keys: "." (unshifted ">") speeds up, "," slows down.
+		defaults.put(Action.PLAYBACK_FASTER, Binding.of("."));
+		defaults.put(Action.PLAYBACK_SLOWER, Binding.of(","));
 		return java.util.Collections.unmodifiableMap(defaults);
 	}
 

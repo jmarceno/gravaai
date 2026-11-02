@@ -258,7 +258,7 @@ public final class EditorSnapshot {
 		private PlaybackState state;
 
 		IdlePlayback(double durationSeconds) {
-			state = new PlaybackState(false, 0, durationSeconds, 1);
+			state = new PlaybackState(false, 0, durationSeconds, 1, 1);
 		}
 
 		@Override
@@ -274,14 +274,14 @@ public final class EditorSnapshot {
 		@Override
 		public void togglePlayPause() {
 			state = new PlaybackState(!state.isPlaying(), state.currentTimeSeconds(),
-					state.durationSeconds(), state.volume());
+					state.durationSeconds(), state.volume(), state.rate());
 			changes.publish(state);
 		}
 
 		@Override
 		public void seek(double seconds) {
 			state = new PlaybackState(state.isPlaying(), seconds, state.durationSeconds(),
-					state.volume());
+					state.volume(), state.rate());
 			changes.publish(state);
 		}
 
@@ -293,7 +293,14 @@ public final class EditorSnapshot {
 		@Override
 		public void setVolume(double volume) {
 			state = new PlaybackState(state.isPlaying(), state.currentTimeSeconds(),
-					state.durationSeconds(), volume);
+					state.durationSeconds(), volume, state.rate());
+			changes.publish(state);
+		}
+
+		@Override
+		public void setRate(double rate) {
+			state = new PlaybackState(state.isPlaying(), state.currentTimeSeconds(),
+					state.durationSeconds(), state.volume(), EditorPlaybackPort.normalizeRate(rate));
 			changes.publish(state);
 		}
 	}

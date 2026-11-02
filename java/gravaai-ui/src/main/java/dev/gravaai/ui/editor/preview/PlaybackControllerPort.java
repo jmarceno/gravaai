@@ -26,7 +26,6 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 
 	private final PlaybackController controller;
 	private final Consumer<Runnable> fxDispatcher;
-	private volatile double rate = 1;
 	private volatile @Nullable PlaybackState cached;
 
 	private final AutoCloseable statusSubscription;
@@ -76,7 +75,7 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 		PlaybackState before = state();
 		controller.togglePlayPause();
 		update(new PlaybackState(!before.isPlaying(), before.currentTimeSeconds(),
-				before.durationSeconds(), before.volume()));
+				before.durationSeconds(), before.volume(), before.rate()));
 	}
 
 	@Override
@@ -85,7 +84,7 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 		PlaybackState before = state();
 		controller.seek(target);
 		update(new PlaybackState(before.isPlaying(), target, before.durationSeconds(),
-				before.volume()));
+				before.volume(), before.rate()));
 	}
 
 	@Override
@@ -99,7 +98,7 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 		controller.setVolume(volume);
 		PlaybackState before = state();
 		update(new PlaybackState(before.isPlaying(), before.currentTimeSeconds(),
-				before.durationSeconds(), volume));
+				before.durationSeconds(), volume, before.rate()));
 	}
 
 	/** Scrubbing: latest-wins at the engine (plan §5.9 {@code scrub}). */
@@ -108,17 +107,21 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 		controller.scrub(target);
 		PlaybackState before = state();
 		update(new PlaybackState(before.isPlaying(), target, before.durationSeconds(),
-				before.volume()));
+				before.volume(), before.rate()));
 	}
 
-	/** Playback rate (quarter steps between 0.25x and 30x); pass-through to the engine. */
+	@Override
 	public void setRate(double nextRate) {
-		rate = nextRate;
-		controller.setRate(nextRate);
+		double rate = EditorPlaybackPort.normalizeRate(nextRate);
+		controller.setRate(rate);
+		PlaybackState before = state();
+		update(new PlaybackState(before.isPlaying(), before.currentTimeSeconds(),
+				before.durationSeconds(), before.volume(), rate));
 	}
 
+	/** The active preview rate (the cached state's rate; no engine lock). */
 	public double rate() {
-		return rate;
+		return state().rate();
 	}
 
 	/** Current playhead in editor-timeline seconds (cached; no engine lock). */
@@ -155,10 +158,12 @@ public final class PlaybackControllerPort implements EditorPlaybackPort, AutoClo
 			PlaybackStatus status = controller.status();
 			return new PlaybackState(
 					status.state() == dev.gravaai.media.playback.PlaybackState.PLAYING,
-					status.timelineSeconds(), status.durationSeconds(), readVolume());
+					status.timelineSeconds(), status.durationSeconds(), readVolume(),
+					EditorPlaybackPort.normalizeRate(status.rate()));
 		} catch (RuntimeException busyEngine) {
-			// The engine is starting/stopping; keep a neutral snapshot rather than freezing FX.
-			return new PlaybackState(false, 0, 0, 1);
+			// The engine is starting/stopping; keep the last snapshot rather than freezing FX.
+			PlaybackState last = cached;
+			return last != null ? last : new PlaybackState(false, 0, 0, 1, 1);
 		}
 	}
 

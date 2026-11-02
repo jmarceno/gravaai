@@ -81,14 +81,40 @@ class PlaybackControllerPortTest {
 		engine.setBusy(false);
 	}
 
-	@DisplayName("rate is passed to the engine and remembered")
+	@DisplayName("rate is passed to the engine, clamped to the editor range and published")
 	@Test
 	void rate() {
 		FakeController engine = new FakeController(5);
 		PlaybackControllerPort port = new PlaybackControllerPort(engine, Runnable::run);
+		List<EditorPlaybackPort.PlaybackState> published = new CopyOnWriteArrayList<>();
+		port.changes().subscribe(published::add);
 		port.setRate(2.5);
 		assertEquals(2.5, engine.rate(), 1e-9);
 		assertEquals(2.5, port.rate(), 1e-9);
+		assertEquals(2.5, port.state().rate(), 1e-9);
+		assertEquals(2.5, published.get(published.size() - 1).rate(), 1e-9);
+
+		port.setRate(9);
+		assertEquals(4, engine.rate(), 1e-9);
+		port.setRate(0.1);
+		assertEquals(0.25, engine.rate(), 1e-9);
+		port.setRate(Double.NaN);
+		assertEquals(1, engine.rate(), 1e-9);
+	}
+
+	@DisplayName("the rate vocabulary steps on the quarter grid and formats compactly")
+	@Test
+	void rateVocabulary() {
+		assertEquals(0.5, EditorPlaybackPort.stepRate(0.75, -1), 1e-9);
+		assertEquals(1.25, EditorPlaybackPort.stepRate(1, 1), 1e-9);
+		assertEquals(2.25, EditorPlaybackPort.stepRate(2, 1), 1e-9);
+		assertEquals(0.25, EditorPlaybackPort.stepRate(0.25, -1), 1e-9);
+		assertEquals(4, EditorPlaybackPort.stepRate(4, 1), 1e-9);
+		assertEquals("1×", EditorPlaybackPort.formatRate(1));
+		assertEquals("1.5×", EditorPlaybackPort.formatRate(1.5));
+		assertEquals("1.25×", EditorPlaybackPort.formatRate(1.25));
+		assertEquals("0.25×", EditorPlaybackPort.formatRate(0.25));
+		assertEquals(10, EditorPlaybackPort.RATE_PRESETS.size());
 	}
 
 	/** Minimal engine double: no media, a fixed duration, synchronous listeners. */

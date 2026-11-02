@@ -328,6 +328,67 @@
 .editor-playback__play.editor-playback__play--playing.button:hover {
 	-fx-background-color: #38414d;
 }
+.editor-playback__right {
+	-fx-spacing: 4px;
+	-fx-alignment: center-right;
+}
+.editor-playback__rate.button {
+	-fx-background-color: transparent;
+	-fx-text-fill: rgba(255, 255, 255, 0.72);
+	-fx-background-radius: 8px;
+	-fx-min-height: 32px;
+	-fx-pref-height: 32px;
+	-fx-padding: 0 8px;
+	-fx-font-size: 11px;
+	-fx-font-weight: 600;
+}
+.editor-playback__rate.button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.08);
+	-fx-text-fill: -g-fg;
+}
+.editor-playback__rate.editor-playback__rate--accented.button,
+.editor-playback__rate.editor-playback__rate--accented.button:hover {
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+.editor-playback__rate-title {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 10px;
+	-fx-font-weight: 600;
+}
+.editor-playback__rate-chip.button {
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-text-fill: rgba(255, 255, 255, 0.72);
+	-fx-background-radius: 10px;
+	-fx-min-width: 46px;
+	-fx-pref-width: 46px;
+	-fx-min-height: 30px;
+	-fx-pref-height: 30px;
+	-fx-padding: 0;
+	-fx-font-size: 11px;
+	-fx-font-weight: 500;
+}
+.editor-playback__rate-chip.button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.12);
+	-fx-text-fill: -g-fg;
+}
+.editor-playback__rate-chip.editor-playback__rate-chip--active.button,
+.editor-playback__rate-chip.editor-playback__rate-chip--active.button:hover {
+	-fx-background-color: -g-accent;
+	-fx-text-fill: -g-accent-foreground;
+	-fx-font-weight: 600;
+}
+.editor-playback__rate-hints {
+	-fx-padding: 2px 0 0 0;
+}
+.editor-playback__rate-hint {
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 10px;
+}
+.editor-playback__rate-hint-key {
+	-fx-text-fill: rgba(255, 255, 255, 0.6);
+	-fx-font-size: 10px;
+	-fx-font-weight: 600;
+}
 
 /* ---- Timeline panel ------------------------------------------------------ */
 

@@ -4,10 +4,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import dev.gravaai.ui.editor.timeline.core.TimelineShortcuts;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Dialog;
 import dev.gravaai.ui.kit.Icon;
@@ -234,15 +234,12 @@ public final class ShortcutsConfigDialog {
 		status.setVisible(visible);
 	}
 
+	/**
+	 * The same key vocabulary the dispatch side uses ({@link TimelineShortcuts#keyOf}), so a
+	 * captured binding actually fires: punctuation keys store "." / "," rather than "period".
+	 */
 	private static String keyFromEvent(KeyEvent event) {
-		if (event.getCode() == KeyCode.SPACE) {
-			return " ";
-		}
-		String text = event.getText();
-		if (text != null && !text.isEmpty() && text.codePoints().allMatch(Character::isLetterOrDigit)) {
-			return text.toLowerCase(Locale.ROOT);
-		}
-		return event.getCode().getName().toLowerCase(Locale.ROOT);
+		return TimelineShortcuts.keyOf(event.getCode());
 	}
 
 	private static Label sectionTitle(String text) {

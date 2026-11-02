@@ -35,6 +35,7 @@ import dev.gravaai.ui.editor.AddCustomFontDialog;
 import dev.gravaai.ui.editor.Announcements;
 import dev.gravaai.ui.editor.CustomFonts;
 import dev.gravaai.media.compose.FrameOverlayHooks;
+import dev.gravaai.ui.editor.EditorPlaybackPort;
 import dev.gravaai.ui.editor.EditorShellView;
 import dev.gravaai.ui.editor.EditorViewActions;
 import dev.gravaai.ui.editor.ExtensionManager;
@@ -131,6 +132,7 @@ public final class EditorWindow {
 	}
 
 	private static final String SHORTCUTS_SETTING = "editor_shortcuts";
+	private static final String PLAYBACK_RATE_SETTING = "editor_playback_rate";
 	private static final String AUTO_ZOOMS_SETTING = "editor_auto_apply_recording_zooms";
 	private static final double NEW_ZOOM_SECONDS = 1.0;
 	/**
@@ -159,6 +161,9 @@ public final class EditorWindow {
 	private @Nullable AutoCaptionController captions;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
 	private dev.gravaai.core.event.@Nullable Subscription playheadSubscription;
+	private final Subscription playbackRateSubscription;
+	/** The rate last written to the app settings, so changes() only persists real changes. */
+	private double savedPlaybackRate = 1;
 	private final java.util.concurrent.atomic.AtomicBoolean playheadScheduled =
 			new java.util.concurrent.atomic.AtomicBoolean();
 	private final java.util.concurrent.atomic.AtomicLong pendingPlayheadMs =
@@ -176,6 +181,11 @@ public final class EditorWindow {
 		this.services = services == null ? Services.bare() : services;
 		this.session = session;
 		this.actions = new Actions();
+		// The preview rate persists app-wide (like the shortcuts): apply it before the shell is
+		// built so the transport bar paints the saved speed, then keep saving changes.
+		applySavedPlaybackRate();
+		this.playbackRateSubscription =
+				session.playbackPort().changes().subscribe(this::savePlaybackRate);
 		java.util.function.Supplier<@Nullable RecordingService> recordingSupplier = services.recordings();
 		if (recordingSupplier == null) {
 			this.recordingImport = null;
@@ -322,6 +332,23 @@ public final class EditorWindow {
 				session.playbackPort().togglePlayPause();
 			}
 		});
+		// Speed steps (, and . by default) run as a bubbling handler instead of a filter: while
+		// the shortcuts dialog captures a key its filter consumes the press first, and a focused
+		// text field keeps its punctuation.
+		scene.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+			if (event.isConsumed()) {
+				return;
+			}
+			if (matchesRateShortcut(event, Shortcuts.Action.PLAYBACK_FASTER)) {
+				event.consume();
+				session.playbackPort().setRate(EditorPlaybackPort.stepRate(
+						session.playbackPort().state().rate(), 1));
+			} else if (matchesRateShortcut(event, Shortcuts.Action.PLAYBACK_SLOWER)) {
+				event.consume();
+				session.playbackPort().setRate(EditorPlaybackPort.stepRate(
+						session.playbackPort().state().rate(), -1));
+			}
+		});
 		shell.header().setDirty(unsavedChanges());
 		// Single-window mode: the app owns the primary stage (and its close request). The editor
 		// disposes itself when the main window navigates back to the dashboard.
@@ -386,6 +413,7 @@ public final class EditorWindow {
 				playheadSubscription.close();
 				playheadSubscription = null;
 			}
+			playbackRateSubscription.close();
 			if (storeSubscription != null) {
 				storeSubscription.close();
 			}
@@ -672,6 +700,67 @@ public final class EditorWindow {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * The configured faster/slower speed binding (, and . by default) against the key event. It
+	 * yields while the user is typing, so text fields keep their punctuation.
+	 */
+	private boolean matchesRateShortcut(KeyEvent event, Shortcuts.Action action) {
+		if (event.getTarget() instanceof javafx.scene.Node target && isTypingTarget(target)) {
+			return false;
+		}
+		Shortcuts.Binding binding = actions.shortcuts().get(action);
+		if (binding == null) {
+			return false;
+		}
+		return Shortcuts.matchesShortcut(
+				dev.gravaai.ui.editor.timeline.core.TimelineShortcuts.keyOf(event.getCode()),
+				event.isControlDown(), event.isMetaDown(), event.isShiftDown(), event.isAltDown(),
+				binding, Shortcuts.isMacPlatform());
+	}
+
+	/** Whether the node or one of its ancestors is a text input. */
+	private static boolean isTypingTarget(javafx.scene.Node node) {
+		for (javafx.scene.Node current = node; current != null; current = current.getParent()) {
+			if (current instanceof javafx.scene.control.TextInputControl) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Applies the persisted preview rate (app settings "editor_playback_rate") to the engine. */
+	private void applySavedPlaybackRate() {
+		AppSettingsStore settings = services.settings();
+		if (settings == null) {
+			return;
+		}
+		JsonNode stored = settings.readSetting(PLAYBACK_RATE_SETTING);
+		if (stored == null || !stored.isNumber()) {
+			return;
+		}
+		double rate = EditorPlaybackPort.normalizeRate(stored.doubleValue());
+		savedPlaybackRate = rate;
+		session.playbackPort().setRate(rate);
+	}
+
+	/** Persists preview-rate changes; the speed popover and the shortcuts both land here. */
+	private void savePlaybackRate(EditorPlaybackPort.PlaybackState state) {
+		double rate = EditorPlaybackPort.normalizeRate(state.rate());
+		if (rate == savedPlaybackRate) {
+			return;
+		}
+		savedPlaybackRate = rate;
+		AppSettingsStore settings = services.settings();
+		if (settings == null) {
+			return;
+		}
+		try {
+			settings.writeSetting(PLAYBACK_RATE_SETTING, Json.nodeFactory().numberNode(rate));
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.WARNING, "save playback rate failed: " + error);
+		}
 	}
 
 	/**

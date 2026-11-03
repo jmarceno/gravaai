@@ -6,11 +6,11 @@
 
 <p align="center">
   <strong>Record your screen. Record your meetings. Keep everything local.</strong><br />
-  An offline screen recorder, video editor and meeting note-taker for Linux on the COSMIC Wayland desktop.
+  An offline screen recorder, video editor and meeting note-taker for Linux on Wayland: COSMIC, KDE Plasma and GNOME.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Linux%20%C2%B7%20COSMIC%20Wayland-024e67?style=for-the-badge" alt="Linux COSMIC Wayland" />
+  <img src="https://img.shields.io/badge/Wayland%20%C2%B7%20COSMIC%20%7C%20KDE%20%7C%20GNOME-024e67?style=for-the-badge" alt="Wayland: COSMIC, KDE Plasma, GNOME" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-941e1e" alt="MIT license" /></a>
 </p>
 
@@ -25,6 +25,18 @@ Gravaai has two modes, both started from the same floating HUD:
 
 There are no accounts, no telemetry and no cloud sharing. Recordings, projects, transcripts and exports stay on your machine.
 
+## Supported desktops
+
+Wayland only. Each desktop is tested by recording in the real session.
+
+| Desktop | Capture | Cursor and clicks | Stop from the desktop | Global shortcuts |
+| --- | --- | --- | --- | --- |
+| COSMIC | Native (ext-image-copy-capture); **Pick screen** picks the monitor you click | Native helper | HUD | Written into COSMIC keyboard settings |
+| KDE Plasma 6 | xdg-desktop-portal; KDE's share dialog the first time, remembered after | KWin script | "End" in the screen-sharing indicator | GlobalShortcuts portal (Ctrl+Alt+R) |
+| GNOME 45+ (tested on 51) | xdg-desktop-portal; GNOME's share dialog the first time, remembered after | `gravaai-cursor` shell extension, installed and enabled by the app | Stop button in the top-bar sharing indicator | GlobalShortcuts portal on GNOME 48+ (not yet verified) |
+
+On GNOME the cursor extension is installed on the first recording; Wayland only loads it after you log out and back in once, so that first recording has no cursor track. Click capture on every desktop needs your user in the `input` group.
+
 ## Screen recording
 
 ### Capture
@@ -32,7 +44,7 @@ There are no accounts, no telemetry and no cloud sharing. Recordings, projects, 
 - Native COSMIC Wayland capture (ext-image-copy-capture), including rotated monitors; **Pick screen** selects the monitor you click on
 - On KDE Plasma, GNOME and other portal-only Wayland desktops the same pipeline runs over the xdg-desktop-portal ScreenCast (PipeWire) stream; there the system's own screen-sharing dialog picks the monitor the first time and is remembered after that, and ending the share from the desktop's indicator saves the recording
 - Microphone and system audio through PipeWire/PulseAudio, kept in sync with the video
-- Cursor position and clicks recorded by a native helper, so auto-zoom and the cursor overlay work on Wayland (on KDE Plasma the position comes from a KWin script)
+- Cursor position and clicks recorded by a native helper, so auto-zoom and the cursor overlay work on Wayland (on KDE Plasma the position comes from a KWin script, on GNOME from a small shell extension the app installs itself)
 - Global recording shortcuts: written into COSMIC's keyboard settings, or registered through the desktop's GlobalShortcuts portal on KDE Plasma and GNOME 48+
 - Webcam overlay
 - Recording opens straight into the editor

@@ -301,7 +301,10 @@ public final class AnnotationCommands {
 					if (loupeMagnification == null) {
 						loupeMagnification = AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION;
 					}
-					if (size.width() != size.height()) {
+					if (region.type() != AnnotationType.LOUPE) {
+						// A box annotation's size means nothing for a lens: start from the default.
+						size = loupeSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT);
+					} else if (size.width() != size.height()) {
 						size = loupeSize(size.width());
 					}
 				}

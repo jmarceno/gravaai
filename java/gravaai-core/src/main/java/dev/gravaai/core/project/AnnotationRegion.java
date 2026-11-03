@@ -30,7 +30,7 @@ public record AnnotationRegion(
 	 * Loupe lens diameter as percent of the output frame's short side (the loupe follows the
 	 * cursor, so unlike the other annotations its {@code position} is not rendered).
 	 */
-	public static final double LOUPE_DEFAULT_DIAMETER_PERCENT = 40.0;
+	public static final double LOUPE_DEFAULT_DIAMETER_PERCENT = 60.0;
 
 	/** The effective magnification of a loupe region (never below 1). */
 	public double loupeMagnificationOrDefault() {

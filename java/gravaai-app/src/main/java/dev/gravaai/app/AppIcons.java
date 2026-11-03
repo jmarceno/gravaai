@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javafx.scene.image.Image;
 
@@ -72,20 +73,24 @@ public final class AppIcons {
 		return List.copyOf(images);
 	}
 
-	/** Extracts {@code app-icons/<name>} and returns the cached file. */
+	/**
+	 * Extracts {@code app-icons/<name>} and returns the cached file. A cached copy is reused only
+	 * while it matches the packaged bytes, so an icon changed by an update replaces the old one.
+	 */
 	public Path load(String name) {
 		Path target = directory.resolve(name);
-		if (Files.isRegularFile(target)) {
-			return target;
-		}
 		String resource = "/app-icons/" + name;
 		try (InputStream stream = AppIcons.class.getResourceAsStream(resource)) {
 			if (stream == null) {
 				throw new IllegalStateException("Missing packaged icon resource: " + resource);
 			}
+			byte[] packaged = stream.readAllBytes();
+			if (Files.isRegularFile(target) && Arrays.equals(Files.readAllBytes(target), packaged)) {
+				return target;
+			}
 			Files.createDirectories(directory);
 			Path temporary = Files.createTempFile(directory, name, ".tmp");
-			Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
+			Files.write(temporary, packaged);
 			try {
 				Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
 			} catch (IOException error) {

@@ -131,6 +131,27 @@ class CompositorLoupeTest {
 	}
 
 	@Test
+	@DisplayName("the lens sits beside the cursor tip with its rim on the tip, inside the frame")
+	void lensRimTouchesTheTip() {
+		double distance = 440;
+		double inset = 435;
+		double[][] tips = {{960, 540}, {1500, 900}, {200, 100}, {1700, 300}, {870, 540}};
+		for (double[] tip : tips) {
+			double[] centre = LoupeRenderer.besideTip(tip[0], tip[1], distance, inset, 1920,
+					1080);
+			assertEquals(distance, Math.hypot(centre[0] - tip[0], centre[1] - tip[1]), 1e-6,
+					"rim misses the tip at " + tip[0] + "," + tip[1]);
+			assertTrue(centre[0] >= inset && centre[0] <= 1920 - inset,
+					"lens leaves the frame horizontally at " + tip[0]);
+			assertTrue(centre[1] >= inset && centre[1] <= 1080 - inset,
+					"lens leaves the frame vertically at " + tip[1]);
+		}
+		// Room on the left: the lens is up-left of the tip, never covering the arrow body.
+		double[] middle = LoupeRenderer.besideTip(1500, 900, distance, inset, 1920, 1080);
+		assertTrue(middle[0] < 1500 && middle[1] < 900);
+	}
+
+	@Test
 	@Timeout(60)
 	@DisplayName("near the frame edge the lens slides inward instead of being cut off")
 	void lensStaysInsideTheFrame() throws Exception {

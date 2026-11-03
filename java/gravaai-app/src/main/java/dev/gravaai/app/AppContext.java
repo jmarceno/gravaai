@@ -210,6 +210,9 @@ public final class AppContext {
 			// The skeleton is visible and the budget lines are logged; load the UI fonts now, before
 			// the full editor shell is built (Application.init skips this in the editor fast path).
 			Main.ensureFontsLoaded();
+			// The HUD stays hidden, but the recording services attach to it: without it the
+			// dashboard's Record button and the record shortcut have nothing to drive.
+			startHudWindow(mainWindows);
 			Platform.runLater(() -> {
 			try {
 				openEditorStartup(launchPath);
@@ -848,7 +851,7 @@ public final class AppContext {
 	private void showHud() {
 		HudOverlayWindow hud = hudWindow;
 		if (hud == null) {
-			windows().showMainWindow();
+			LOG.log(System.Logger.Level.WARNING, "HUD requested but it was never built");
 			return;
 		}
 		LOG.log(System.Logger.Level.INFO, "HUD shown");
@@ -956,12 +959,15 @@ public final class AppContext {
 		if (primaryStage == null) {
 			return;
 		}
-		if (dashboardScene != null) {
-			primaryStage.setTitle("Gravaai");
-			primaryStage.setMinWidth(900);
-			primaryStage.setMinHeight(600);
-			StageScenes.setSceneKeepingSize(primaryStage, dashboardScene);
+		if (dashboardScene == null) {
+			// Launched straight into a project: the dashboard was never built.
+			buildDashboard();
+			return;
 		}
+		primaryStage.setTitle("Gravaai");
+		primaryStage.setMinWidth(900);
+		primaryStage.setMinHeight(600);
+		StageScenes.setSceneKeepingSize(primaryStage, dashboardScene);
 		if (!primaryStage.isShowing()) {
 			primaryStage.show();
 		}

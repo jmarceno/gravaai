@@ -76,8 +76,9 @@ final class LoupeRenderer {
 	/**
 	 * Draws one loupe lens magnifying {@code scene} (a snapshot of the rendered frame, same pixel
 	 * space as the canvas) by {@code magnification} around the focus ({@code fx}, {@code fy}).
-	 * The lens is centred on the focus but kept fully inside the frame: near an edge it slides
-	 * inward and the focus sits off-centre in the glass instead of the lens being cut off.
+	 * The focus is the cursor tip, and the lens sits beside it with its rim touching the tip, so
+	 * the cursor stays outside the glass: up-left of the tip (the arrow points up-left), flipped
+	 * per axis when that side has no room. The lens is still kept fully inside the frame.
 	 * {@code presence} (0..1, see {@link #presence}) grows the lens from a smaller, unmagnified,
 	 * transparent glass to its full size.
 	 */
@@ -87,10 +88,13 @@ final class LoupeRenderer {
 		if (scene == null || radius <= 0.5 || magnification <= 1 || amount <= 0) {
 			return;
 		}
-		double inset = radius + Math.max(2, RIM_WIDTH_REFERENCE * scaleFactor);
-		double cx = clampInside(fx, inset, scene.getWidth());
-		double cy = clampInside(fy, inset, scene.getHeight());
+		double rimWidth = Math.max(2, RIM_WIDTH_REFERENCE * scaleFactor);
+		double inset = radius + rimWidth;
 		float r = (float) (radius * (START_RADIUS_FRACTION + (1 - START_RADIUS_FRACTION) * amount));
+		double[] centre = besideTip(fx, fy, r + rimWidth, inset, scene.getWidth(),
+				scene.getHeight());
+		double cx = clampInside(centre[0], inset, scene.getWidth());
+		double cy = clampInside(centre[1], inset, scene.getHeight());
 		double zoom = 1 + (magnification - 1) * amount;
 		boolean layered = amount < 1;
 		if (layered) {
@@ -146,6 +150,22 @@ final class LoupeRenderer {
 			paint.setShader(shader);
 			canvas.drawCircle((float) cx, (float) cy, r, paint);
 		}
+	}
+
+	/**
+	 * The lens centre whose rim (at {@code distance}) passes through the cursor tip. The centre
+	 * starts up-left of the tip, is pulled vertically inside the frame, then sits left of the tip
+	 * at whatever horizontal distance puts the rim on the tip; right of it when the left side has
+	 * no room. The position changes continuously with the tip, except for that one side switch.
+	 */
+	static double[] besideTip(double tipX, double tipY, double distance, double inset,
+			double width, double height) {
+		double diagonal = distance / Math.sqrt(2);
+		double cy = clampInside(tipY - diagonal, inset, height);
+		double dy = tipY - cy;
+		double dx = Math.abs(dy) >= distance ? 0 : Math.sqrt(distance * distance - dy * dy);
+		double cx = tipX - dx >= inset ? tipX - dx : tipX + dx;
+		return new double[] {cx, cy};
 	}
 
 	/** Clamps a lens centre so a lens of {@code inset} half-size stays inside {@code [0, size]}. */

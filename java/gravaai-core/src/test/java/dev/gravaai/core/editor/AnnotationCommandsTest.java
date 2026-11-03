@@ -190,7 +190,8 @@ class AnnotationCommandsTest {
 		AnnotationRegion loupe = store.state().annotationRegions().get(0);
 		assertEquals(AnnotationType.LOUPE, loupe.type());
 		assertEquals("", loupe.content());
-		assertEquals(new AnnotationSize(40, 40), loupe.size());
+		assertEquals(AnnotationCommands.loupeSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
+				loupe.size());
 		assertEquals(AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
 				loupe.loupeMagnificationOrDefault());
 	}

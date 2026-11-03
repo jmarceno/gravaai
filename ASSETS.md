@@ -1,8 +1,8 @@
 # Bundled media assets
 
-Gravaai ships with wallpaper artwork, one animated wallpaper and the recording-state tray
-icon. This file records where every one of those assets came from and the license it is
-distributed under, so the media can be audited separately from the source code.
+Gravaai ships with wallpaper artwork, one animated wallpaper, the recording-state tray icon
+and the cursor sprites. This file records where every one of those assets came from and the
+license it is distributed under, so the media can be audited separately from the source code.
 
 The application code and the original artwork in this repository are MIT licensed
 (see [LICENSE.md](LICENSE.md)). The wallpaper images below are **CC0 1.0** public-domain
@@ -75,6 +75,15 @@ StockSnap collection is published under the
 licensed. `app-icons/rec-button.png` is the same drawing rendered at 64×64 for the
 StatusNotifierItem tray icon; `gravaai-platform/src/test/resources/icons/rec-button.png`
 is the test copy.
+
+## Cursor sprites
+
+The cursor sprites under `java/gravaai-media/src/main/resources/dev/gravaai/media/cursors/`
+are selected outline cursors from [Kenney's Cursor Pack](https://kenney.nl/assets/cursor-pack),
+which is released under **CC0 1.0**. The I-beam is composed from the pack's line shapes. The
+style names (`macos`, `tahoe`, `windows11`, `golden-gate`, `figma`) are picker labels; every
+sprite comes from the same CC0 pack. The pack's license is reproduced in
+`java/gravaai-media/src/main/resources/dev/gravaai/media/cursors/LICENSE.txt`.
 
 ## Logo
 

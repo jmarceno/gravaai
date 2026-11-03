@@ -129,43 +129,43 @@ final class CursorAssets {
 
 	private static Map<String, Source> macosSources() {
 		return Map.of(
-				"arrow", asset("macos/pointer-1__34-24.svg", 34, 24),
+				"arrow", asset("macos/pointer-1__34-24.svg", 33.8, 18.75),
 				"text", asset("macos/ibeamstroke-1__50-50.svg", 50, 50),
-				"pointer", asset("macos/pointinghand-1__39-26.svg", 39, 26),
+				"pointer", asset("macos/pointinghand-1__39-26.svg", 31, 5.9),
 				"crosshair", asset("macos/crosshair-1__50-50.svg", 50, 50),
 				"open-hand", asset("macos/openhand-1__50-50.svg", 50, 50),
 				"closed-hand", asset("macos/closedhand-1__50-50.svg", 50, 50),
 				"resize-ew", asset("macos/resizeeastwest-1__50-50.svg", 50, 50),
 				"resize-ns", asset("macos/resizenorthsouth-1__50-50.svg", 50, 50),
-				"not-allowed", asset("macos/notallowed-1__23-0.svg", 23, 0));
+				"not-allowed", asset("macos/notallowed-1__23-0.svg", 50, 50));
 	}
 
-	/** The legacy {@code tahoe} id draws the Golden Gate pack for hands. */
+	/** The {@code tahoe} id uses the golden-gate hand shapes. */
 	private static Map<String, Source> tahoeSources() {
 		return Map.of(
-				"arrow", asset("tahoe/pointer-1__14-6.svg", 14, 6),
-				"text", asset("tahoe/ibeam-1__50-44.svg", 50, 44),
-				"pointer", asset("golden-gate/pointinghand.svg", 37.5, 25),
+				"arrow", asset("tahoe/pointer-1__14-6.svg", 33.8, 18.75),
+				"text", asset("tahoe/ibeam-1__50-44.svg", 50, 50),
+				"pointer", asset("golden-gate/pointinghand.svg", 30.5, 12.5),
 				"crosshair", asset("tahoe/crosshair-1__50-50.svg", 50, 50),
-				"open-hand", asset("golden-gate/openhand.svg", 46.875, 50),
-				"closed-hand", asset("golden-gate/closedhand.svg", 46.875, 50),
+				"open-hand", asset("golden-gate/openhand.svg", 50, 50),
+				"closed-hand", asset("golden-gate/closedhand.svg", 50, 50),
 				"resize-ew", asset("tahoe/resizeeastwest-1__50-50.svg", 50, 50),
-				"resize-ns", asset("tahoe/resizenorthsouth-1__50-49.svg", 50, 49),
-				"not-allowed", asset("tahoe/notallowed-1__23-0.svg", 23, 0));
+				"resize-ns", asset("tahoe/resizenorthsouth-1__50-49.svg", 50, 50),
+				"not-allowed", asset("tahoe/notallowed-1__23-0.svg", 50, 50));
 	}
 
-	/** Hotspots are from the 32px frames embedded in the matching Windows .cur files. */
+	/** Hotspots are the visible tips or centres of the drawings in the 32px canvas. */
 	private static Map<String, Source> windows11Sources() {
 		return Map.of(
-				"arrow", windowsSystemAsset("windows11/arrow__31-22.svg", 0, 0),
+				"arrow", windowsSystemAsset("windows11/arrow__31-22.svg", 10.8, 6),
 				"text", windowsSystemAsset("windows11/text__50-50.svg", 16, 16),
-				"pointer", windowsSystemAsset("windows11/pointer__54-35.svg", 6, 0),
+				"pointer", windowsSystemAsset("windows11/pointer__54-35.svg", 11.5, 4.9),
 				"crosshair", windowsSystemAsset("windows11/cross__50-50.svg", 16, 16),
 				"open-hand", windowsSystemAsset("windows11/grab__50-50.svg", 16, 16),
 				"closed-hand", windowsSystemAsset("windows11/grabbing__50-50.svg", 16, 16),
-				"resize-ew", windowsSystemAsset("windows11/resize-horizontal__51-49.svg", 11, 4),
-				"resize-ns", windowsSystemAsset("windows11/resize-vertical__48-50.svg", 4, 11),
-				"not-allowed", windowsSystemAsset("windows11/block__50-50.svg", 8, 8));
+				"resize-ew", windowsSystemAsset("windows11/resize-horizontal__51-49.svg", 16, 16),
+				"resize-ns", windowsSystemAsset("windows11/resize-vertical__48-50.svg", 16, 16),
+				"not-allowed", windowsSystemAsset("windows11/block__50-50.svg", 16, 16));
 	}
 
 	private static Map<String, Asset> loadSet(Map<String, Source> sources) {
@@ -230,11 +230,10 @@ final class CursorAssets {
 					+ "L [0-9.]+ ([0-9.]+)");
 
 	/**
-	 * The macOS/Tahoe raster cursors are SVG wrappers around one embedded PNG ({@code <image>} +
+	 * Some uploaded cursor SVGs are wrappers around one embedded PNG ({@code <image>} +
 	 * {@code <use>}); Skia's SVG module has no data-URI image provider, so they are drawn here.
-	 * The {@code notallowed} variant masks the cursor PNG with a second PNG's alpha (its
-	 * {@code filter-remove-color} keeps alpha only) and clips to {@code clip-0}; its ±18 px
-	 * {@code <use>} translations cancel out, so both images draw at their own origin.
+	 * A masked variant clips the image and applies the mask's alpha; its {@code <use>}
+	 * translations cancel out, so both images draw at their own origin.
 	 */
 	private static void renderEmbeddedRaster(Canvas canvas, String text) {
 		Map<String, Image> images = new HashMap<>();
@@ -428,8 +427,9 @@ final class CursorAssets {
 
 	/** The minimal Figma-style cursor, trimmed around its (40, 22) hotspot. */
 	private static Asset figmaAsset() {
-		Pixels pixels = renderSvg(readResource("custom/minimal-cursor.svg"), 0);
-		return trimToAlpha(pixels, 40, 22, 0, 0);
+		Pixels pixels = renderSvg(readResource("custom/minimal-cursor.svg"),
+				MIN_RASTERIZED_CURSOR_HEIGHT);
+		return trimToAlpha(pixels, pixels.width() * 0.342, pixels.height() * 0.1875, 0, 0);
 	}
 
 	// ---- helpers --------------------------------------------------------------------------

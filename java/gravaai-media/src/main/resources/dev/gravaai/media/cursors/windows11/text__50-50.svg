@@ -1,8 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 32 32" style="enable-background:new 0 0 32 32;" xml:space="preserve">
-<g transform="translate(0 32) scale(1 -1)">
-<polygon style="fill:#FFFFFE;stroke:#000001;stroke-miterlimit:10;" points="21,9.5 21,7.5 17,7.5 17,8 15,8 15,7.5 11,7.5 11,9.5
-	15,9.5 15,22.5 11,22.5 11,24.5 15,24.5 15,24 17,24 17,24.5 21,24.5 21,22.5 17,22.5 17,9.5 "/>
-</g>
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#000000">
+    <rect x="9" y="3" width="14" height="6" rx="2"/>
+    <rect x="9" y="23" width="14" height="6" rx="2"/>
+    <rect x="13" y="5" width="6" height="22" rx="2"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="11" y="5" width="10" height="2" rx="1"/>
+    <rect x="11" y="25" width="10" height="2" rx="1"/>
+    <rect x="15" y="7" width="2" height="18" rx="1"/>
+  </g>
 </svg>

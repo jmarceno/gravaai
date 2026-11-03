@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 /** Defaults and normalisers that types.ts keeps next to its types (plan §5.11). */
 public final class EditorDefaults {
 
-	public static final String DEFAULT_WALLPAPER_PATH = "/wallpapers/tahoe-light.jpg";
+	public static final String DEFAULT_WALLPAPER_PATH = "/wallpapers/morning-tide.jpg";
 
 	public static final String DEFAULT_CURSOR_STYLE = "tahoe";
 	public static final CursorClickEffectStyle DEFAULT_CURSOR_CLICK_EFFECT = CursorClickEffectStyle.NONE;

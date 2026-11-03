@@ -12,6 +12,7 @@ import java.util.Optional;
 import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CropRegion;
+import dev.gravaai.core.project.EditorDefaults;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.Padding;
@@ -22,8 +23,9 @@ import dev.gravaai.core.project.ProjectEditorState;
  * compositor inputs (plan §5.8): the single resolver preview, export and filmstrip must share.
  *
  * <p>Ported from the golden/test {@code ProjectFixture}; the only difference is that the wallpaper
- * asset root is passed in, so the app can point at its packaged assets while tests point at
- * {@code public/}. Missing wallpaper assets degrade to black instead of failing a preview frame.</p>
+ * asset root is passed in, so the app can point at its packaged assets while tests point at the
+ * resources. Missing wallpaper assets fall back to the configured default wallpaper instead of
+ * failing a preview frame.</p>
  */
 public final class ProjectEditorInputs {
 
@@ -34,41 +36,68 @@ public final class ProjectEditorInputs {
 	}
 
 	/**
-	 * Resolves the project wallpaper to a compositor background; every unsupported/missing
-	 * wallpaper degrades to black.
+	 * Resolves the project wallpaper to a compositor background. Unsupported or missing values
+	 * fall back to {@link EditorDefaults#DEFAULT_WALLPAPER_PATH}; if even that asset is
+	 * unavailable the result is black.
 	 *
 	 * @param wallpaperRoot directory holding {@code wallpapers/}, or null when the caller has no
-	 *        asset root (bundled wallpapers then degrade to black)
+	 *        asset root
 	 */
 	public static Background background(ProjectEditorState editor, @Nullable Path wallpaperRoot) {
 		String wallpaper = editor.wallpaper();
-		if (wallpaper == null || wallpaper.isBlank()) {
-			return Background.black();
+		if (wallpaper == null || wallpaper.isBlank() || Background.isVideoWallpaper(wallpaper)) {
+			return defaultBackground(wallpaperRoot);
 		}
 		if (wallpaper.startsWith("/wallpapers/")) {
-			if (wallpaperRoot == null) {
-				LOG.log(System.Logger.Level.WARNING,
-						"no wallpaper asset root; painting black for " + wallpaper);
-				return Background.black();
+			byte @Nullable [] bytes = bundledWallpaperBytes(wallpaperRoot, wallpaper);
+			if (bytes != null) {
+				return new Background.Image(bytes);
 			}
-			Path asset = wallpaperRoot.resolve(wallpaper.substring(1));
-			try {
-				if (Files.isRegularFile(asset)) {
-					return new Background.Image(Files.readAllBytes(asset));
-				}
-				LOG.log(System.Logger.Level.WARNING, "wallpaper asset not found: " + asset);
-			} catch (IOException error) {
-				LOG.log(System.Logger.Level.WARNING,
-						"could not read wallpaper " + asset + ": " + error);
-			}
-			return Background.black();
+			LOG.log(System.Logger.Level.WARNING, "wallpaper asset not found: " + wallpaper);
+			return defaultBackground(wallpaperRoot);
 		}
 		try {
 			return Background.parse(wallpaper);
-		} catch (RuntimeException error) {
+		} catch (RuntimeException imageSource) {
+			byte @Nullable [] bytes = fileWallpaperBytes(wallpaper);
+			if (bytes != null) {
+				return new Background.Image(bytes);
+			}
 			LOG.log(System.Logger.Level.WARNING,
-					"unsupported wallpaper '" + wallpaper + "': " + error);
-			return Background.black();
+					"unsupported wallpaper '" + wallpaper + "': " + imageSource);
+			return defaultBackground(wallpaperRoot);
+		}
+	}
+
+	private static Background defaultBackground(@Nullable Path wallpaperRoot) {
+		byte @Nullable [] bytes = bundledWallpaperBytes(wallpaperRoot,
+				EditorDefaults.DEFAULT_WALLPAPER_PATH);
+		return bytes == null ? Background.black() : new Background.Image(bytes);
+	}
+
+	private static byte @Nullable [] bundledWallpaperBytes(@Nullable Path wallpaperRoot,
+			String wallpaper) {
+		if (wallpaperRoot == null) {
+			return null;
+		}
+		Path asset = wallpaperRoot.resolve(wallpaper.substring(1));
+		try {
+			return Files.isRegularFile(asset) ? Files.readAllBytes(asset) : null;
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.WARNING,
+					"could not read wallpaper " + asset + ": " + error);
+			return null;
+		}
+	}
+
+	private static byte @Nullable [] fileWallpaperBytes(String wallpaper) {
+		try {
+			Path path = wallpaper.startsWith("file:")
+					? Path.of(java.net.URI.create(wallpaper))
+					: Path.of(wallpaper);
+			return Files.isRegularFile(path) ? Files.readAllBytes(path) : null;
+		} catch (RuntimeException | IOException unreadable) {
+			return null;
 		}
 	}
 

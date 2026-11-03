@@ -5,11 +5,10 @@ import org.jspecify.annotations.Nullable;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.gravaai.core.project.EditorDefaults;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
@@ -22,58 +21,37 @@ import javafx.scene.paint.Stop;
  * Built-in wallpapers, colours and gradients of the editor background (port of
  * {@code src/lib/wallpapers.ts} + the palette constants in {@code SettingsPanel.tsx}).
  *
- * <p>Wallpaper values keep the historical project strings ({@code /wallpapers/tahoe-light.jpg})
- * so saved projects keep resolving. The files themselves are the CC0 wallpapers documented in
- * {@code ASSETS.md}; the thumbnails live under {@code resources/ui/editor/wallpapers/} (a
- * 160x120 {@code thumbs/} and a 1280x720 {@code previews/} copy of each built-in image).
+ * <p>Wallpaper values are clean {@code /wallpapers/<name>} identifiers. Values that do not
+ * resolve to a bundled image fall back to {@link EditorDefaults#DEFAULT_WALLPAPER_PATH} at
+ * render time. The files are the CC0 wallpapers documented in {@code ASSETS.md}; the thumbnails
+ * live under {@code resources/ui/editor/wallpapers/} (a 160x120 {@code thumbs/} and a 1280x720
+ * {@code previews/} copy of each built-in image).
  */
 public final class EditorWallpapers {
 
 	/** One wallpaper tile. */
 	public record Tile(String value, String label) {}
 
-	/** Built-in image wallpapers, in menu order ({@code BUILT_IN_WALLPAPERS} minus the video one). */
+	/** Built-in image wallpapers, in menu order. */
 	public static final List<String> IMAGE_FILES = List.of(
-			"tahoe-light.jpg", "tahoe-dark.jpg", "midnight-8.jpg", "ipad-17-dark.jpg",
-			"ipad-17-light.jpg", "sequoia-blue.jpg", "sequoia-blue-orange.jpg", "ventura.jpg",
-			"sonoma-clouds.jpg", "sonoma-light.jpg", "sonoma-dark.jpg", "glassmorphism-3.jpg",
-			"glassmorphism-4.jpg", "energy-19.jpg", "wallpaper3.jpg", "wallpaper4.jpg",
-			"cityscape.jpg", "levels.jpg", "wallpaper10.jpg", "ventura-dark.jpg",
-			"sonoma-evening.jpg", "sonoma-horizon.jpg", "iridescent-9.jpg", "energy-17.jpg");
+			"morning-tide.jpg", "midnight-silk.jpg", "onyx-wave.jpg", "neon-bloom.jpg",
+			"dune-ribbons.jpg", "blue-flame.jpg", "solar-drift.jpg", "velvet-current.jpg",
+			"verdant-mist.jpg", "sea-glass.jpg", "aurora-dust.jpg", "prism-glass.jpg",
+			"rose-quartz.jpg", "ember-silk.jpg", "coral-tide.jpg", "magenta-rush.jpg",
+			"cloudline-city.jpg", "white-atlas.jpg", "stormlight.jpg", "solar-vortex.jpg",
+			"harvest-dusk.jpg", "fogline.jpg", "opal-sky.jpg", "rainbow-fold.jpg",
+			"blue-rays.jpeg", "ink-bloom.jpg", "terrace-fields.jpg", "citrus-glass.jpeg",
+			"forest-light.jpg", "alpine-lake.jpg", "crimson-silk.jpg", "prism-streak.jpg",
+			"painted-current.jpg", "emerald-flow.jpg", "amber-vortex.jpg", "blue-orbit.jpg",
+			"dusk-lake.jpg", "golden-horizon.jpg");
 
-	/** Built-in video wallpapers ({@code createWallpaperEntry("wispysky.mp4", "Wispy Sky")}). */
+	/** Built-in video wallpapers. */
 	public static final List<Tile> VIDEO_TILES =
-			List.of(new Tile("/wallpapers/wispysky.mp4", "Wispy Sky"));
+			List.of(new Tile("/wallpapers/wispy-sky.mp4", "Wispy Sky"));
 
-	/**
-	 * Menu labels for the built-in images. The file names are stable project identifiers, so they
-	 * stay in the wallpaper values; the labels describe the artwork instead.
-	 */
-	private static final Map<String, String> LABELS = Map.ofEntries(
-			Map.entry("tahoe-light.jpg", "Morning Tide"),
-			Map.entry("tahoe-dark.jpg", "Midnight Silk"),
-			Map.entry("midnight-8.jpg", "Onyx Wave"),
-			Map.entry("ipad-17-dark.jpg", "Neon Bloom"),
-			Map.entry("ipad-17-light.jpg", "Dune Ribbons"),
-			Map.entry("sequoia-blue.jpg", "Blue Flame"),
-			Map.entry("sequoia-blue-orange.jpg", "Solar Drift"),
-			Map.entry("ventura.jpg", "Velvet Current"),
-			Map.entry("sonoma-clouds.jpg", "Verdant Mist"),
-			Map.entry("sonoma-light.jpg", "Sea Glass"),
-			Map.entry("sonoma-dark.jpg", "Aurora Dust"),
-			Map.entry("glassmorphism-3.jpg", "Prism Glass"),
-			Map.entry("glassmorphism-4.jpg", "Rose Quartz"),
-			Map.entry("energy-19.jpg", "Ember Silk"),
-			Map.entry("wallpaper3.jpg", "Coral Tide"),
-			Map.entry("wallpaper4.jpg", "Magenta Rush"),
-			Map.entry("cityscape.jpg", "Cloudline City"),
-			Map.entry("levels.jpg", "White Atlas"),
-			Map.entry("wallpaper10.jpg", "Stormlight"),
-			Map.entry("ventura-dark.jpg", "Solar Vortex"),
-			Map.entry("sonoma-evening.jpg", "Harvest Dusk"),
-			Map.entry("sonoma-horizon.jpg", "Fogline"),
-			Map.entry("iridescent-9.jpg", "Opal Sky"),
-			Map.entry("energy-17.jpg", "Rainbow Fold"));
+	/** Poster/thumbnail name used when a project names a wallpaper that is not bundled. */
+	private static final String DEFAULT_IMAGE =
+			EditorDefaults.DEFAULT_WALLPAPER_PATH.replaceFirst("^.*/", "");
 
 	/** Colour swatches ({@code colorPalette} in SettingsPanel.tsx). */
 	public static final List<String> COLOR_PALETTE = List.of(
@@ -118,16 +96,24 @@ public final class EditorWallpapers {
 	public static List<Tile> imageTiles() {
 		List<Tile> tiles = new ArrayList<>(IMAGE_FILES.size());
 		for (String file : IMAGE_FILES) {
-			String label = LABELS.get(file);
-			if (label == null) {
-				label = file.replaceFirst("\\.[^.]+$", "").replace('-', ' ');
-				if (!label.isEmpty()) {
-					label = label.substring(0, 1).toUpperCase(Locale.ROOT) + label.substring(1);
-				}
-			}
-			tiles.add(new Tile("/wallpapers/" + file, label));
+			tiles.add(new Tile("/wallpapers/" + file, labelFor(file)));
 		}
 		return List.copyOf(tiles);
+	}
+
+	/** Turns {@code morning-tide.jpg} into {@code Morning Tide}. */
+	private static String labelFor(String file) {
+		StringBuilder label = new StringBuilder();
+		for (String word : file.replaceFirst("\\.[^.]+$", "").split("-")) {
+			if (word.isEmpty()) {
+				continue;
+			}
+			if (!label.isEmpty()) {
+				label.append(' ');
+			}
+			label.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+		}
+		return label.toString();
 	}
 
 	/** {@code isVideoWallpaperSource}. */
@@ -169,7 +155,8 @@ public final class EditorWallpapers {
 		if (value == null || !isBundledWallpaper(value)) {
 			return null;
 		}
-		return load("/ui/editor/wallpapers/thumbs/" + fileName(value));
+		Image image = load("/ui/editor/wallpapers/thumbs/" + fileName(value));
+		return image != null ? image : load("/ui/editor/wallpapers/thumbs/" + DEFAULT_IMAGE);
 	}
 
 	/** Preview-resolution image (1280x720) for the preview stage. */
@@ -177,7 +164,9 @@ public final class EditorWallpapers {
 		if (value == null || !isBundledWallpaper(value)) {
 			return null;
 		}
-		return load("/ui/editor/wallpapers/previews/" + fileName(value));
+		Image image = load("/ui/editor/wallpapers/previews/" + fileName(value));
+		return image != null ? image
+				: load("/ui/editor/wallpapers/previews/" + DEFAULT_IMAGE);
 	}
 
 	private static @Nullable String fileName(String value) {

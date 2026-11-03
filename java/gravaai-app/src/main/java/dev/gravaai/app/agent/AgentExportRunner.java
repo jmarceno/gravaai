@@ -3,15 +3,14 @@ package dev.gravaai.app.agent;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 import dev.gravaai.app.editor.CursorTelemetryLoader;
 import dev.gravaai.app.editor.EditorSession;
 import dev.gravaai.app.export.ProjectExporter;
+import dev.gravaai.app.export.WallpaperStaging;
 import dev.gravaai.core.editor.ExportPreferences;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.ProjectEditorState;
@@ -155,27 +154,9 @@ final class AgentExportRunner {
 		return ExportPreferences.normalizeExportPreferences(raw);
 	}
 
-	/** Same wallpaper staging as {@code ProjectExporter.stageWallpapers} (private there). */
+	/** Same wallpaper staging as {@code ProjectExporter.stageWallpapers}. */
 	private static @Nullable Path stageWallpapers(@Nullable String wallpaper) {
-		if (wallpaper == null || !wallpaper.startsWith("/wallpapers/")) {
-			return null;
-		}
-		String name = wallpaper.substring("/wallpapers/".length());
-		URL resource = AgentExportRunner.class.getResource("/ui/editor/wallpapers/" + name);
-		if (resource == null) {
-			return null;
-		}
-		try {
-			Path root = Files.createTempDirectory("gravaai-agent-export-wallpapers");
-			Path target = root.resolve("wallpapers").resolve(name);
-			Files.createDirectories(target.getParent());
-			try (var stream = resource.openStream()) {
-				Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING);
-			}
-			return root;
-		} catch (IOException error) {
-			return null;
-		}
+		return WallpaperStaging.stage(wallpaper, "gravaai-agent-export-wallpapers");
 	}
 
 	private static void deleteRecursively(@Nullable Path root) {

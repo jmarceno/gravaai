@@ -96,7 +96,7 @@ class ProjectFrameInputFactoryTest {
 	void videoWallpaperLoops() throws Exception {
 		ProjectFixture.Loaded loaded = fixture("03-zoom-motion-blur");
 		Path bundled = ProjectFixture.repoRoot().resolve("java/gravaai-ui/src/main/resources/ui/editor");
-		assertTrue(Files.isRegularFile(bundled.resolve("wallpapers/wispysky.mp4")));
+		assertTrue(Files.isRegularFile(bundled.resolve("wallpapers/wispy-sky.mp4")));
 		try (ProjectFrameInputFactory images = new ProjectFrameInputFactory(
 				loaded.editor(), loaded.videoPath(), null, List.of(), 0, 0,
 				ProjectFixture.wallpaperRoot(), 60)) {
@@ -105,11 +105,11 @@ class ProjectFrameInputFactoryTest {
 		}
 		var editor = dev.gravaai.core.project.ProjectPersistence.normalizeProjectEditor(
 				dev.gravaai.core.json.Json.parseJsonWithByteOrderMark(
-						"{\"wallpaper\":\"/wallpapers/wispysky.mp4\"}"));
+						"{\"wallpaper\":\"/wallpapers/wispy-sky.mp4\"}"));
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(editor,
 				loaded.videoPath(), null, List.of(), 0, 0, bundled, 60);
 				MediaFrameReader reader = new MediaFrameReader(
-						bundled.resolve("wallpapers/wispysky.mp4"), 0, true)) {
+						bundled.resolve("wallpapers/wispy-sky.mp4"), 0, true)) {
 			double duration = reader.durationSeconds();
 			assertTrue(duration > 1, "wallpaper duration " + duration);
 			long early = hash(factory.inputAtTime(0.5).background());

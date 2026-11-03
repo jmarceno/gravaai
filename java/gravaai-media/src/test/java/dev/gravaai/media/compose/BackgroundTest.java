@@ -87,7 +87,7 @@ class BackgroundTest {
 	@DisplayName("image wallpapers must be resolved to Background.Image by the caller")
 	void imageSourcesAreRejected() {
 		assertThrows(IllegalArgumentException.class,
-				() -> Background.parse("/wallpapers/tahoe-light.jpg"));
+				() -> Background.parse("/wallpapers/morning-tide.jpg"));
 		assertThrows(IllegalArgumentException.class,
 				() -> Background.parse("file:///tmp/wallpaper.png"));
 	}
@@ -99,7 +99,7 @@ class BackgroundTest {
 		assertInstanceOf(Background.LinearGradient.class,
 				Background.fromWallpaper("linear-gradient(#ff0000, #0000ff)"));
 		assertThrows(IllegalArgumentException.class,
-				() -> Background.fromWallpaper("/wallpapers/tahoe-light.jpg"));
+				() -> Background.fromWallpaper("/wallpapers/morning-tide.jpg"));
 	}
 
 	@Test

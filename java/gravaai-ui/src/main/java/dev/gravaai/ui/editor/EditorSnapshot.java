@@ -41,7 +41,7 @@ public final class EditorSnapshot {
 
 	private static final String FIXTURE_EDITOR = """
 			{
-			  "wallpaper": "/wallpapers/tahoe-light.jpg",
+			  "wallpaper": "/wallpapers/morning-tide.jpg",
 			  "shadowIntensity": 0.67,
 			  "backgroundBlur": 0,
 			  "aspectRatio": "16:9",
@@ -238,7 +238,7 @@ public final class EditorSnapshot {
 	 * P3.6, so the classpath resource is the source of truth.
 	 */
 	static @Nullable Path bundledThumbnail() {
-		String resource = "/ui/editor/wallpapers/previews/tahoe-light.jpg";
+		String resource = "/ui/editor/wallpapers/previews/morning-tide.jpg";
 		try (java.io.InputStream stream = EditorSnapshot.class.getResourceAsStream(resource)) {
 			if (stream == null) {
 				return null;

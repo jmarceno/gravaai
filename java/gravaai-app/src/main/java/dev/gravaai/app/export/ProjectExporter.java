@@ -3,7 +3,6 @@ package dev.gravaai.app.export;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -374,30 +373,12 @@ public final class ProjectExporter {
 
 	/**
 	 * Materialises the project wallpaper resources into a temp root ({@code wallpapers/...}) so the
-	 * compositor can read them from the filesystem in the packaged app.
+	 * compositor can read them from the filesystem in the packaged app. The default wallpaper is
+	 * staged as a fallback when the project names something no longer in the bundle.
 	 */
 	private static @Nullable Path stageWallpapers(EditorSession session) {
-		String wallpaper = session.store().state().wallpaper();
-		if (wallpaper == null || !wallpaper.startsWith("/wallpapers/")) {
-			return null;
-		}
-		String name = wallpaper.substring("/wallpapers/".length());
-		URL resource = ProjectExporter.class.getResource("/ui/editor/wallpapers/" + name);
-		if (resource == null) {
-			return null;
-		}
-		try {
-			Path root = Files.createTempDirectory("gravaai-export-wallpapers");
-			Path target = root.resolve("wallpapers").resolve(name);
-			Files.createDirectories(target.getParent());
-			try (var stream = resource.openStream()) {
-				Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING);
-			}
-			return root;
-		} catch (IOException error) {
-			LOG.log(System.Logger.Level.DEBUG, "wallpaper staging failed: " + error);
-			return null;
-		}
+		return WallpaperStaging.stage(session.store().state().wallpaper(),
+				"gravaai-export-wallpapers");
 	}
 
 	/** One export run: the coordinator listener with run-id guards and FX marshalling. */

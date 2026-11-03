@@ -44,7 +44,7 @@ class PreviewFrameMapperTest {
 	void sceneMapping() {
 		ProjectEditorState state = state("""
 				{
-				  "wallpaper": "/wallpapers/tahoe-light.jpg",
+				  "wallpaper": "/wallpapers/morning-tide.jpg",
 				  "backgroundBlur": 24,
 				  "padding": {"top": 20, "bottom": 20, "left": 20, "right": 20, "linked": true},
 				  "cropRegion": {"x": 0.1, "y": 0.05, "width": 0.8, "height": 0.9}

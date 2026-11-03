@@ -29,8 +29,7 @@ final class ProjectFixture {
 
 	/**
 	 * The bundled wallpaper assets. {@code ProjectEditorInputs} expects a directory containing
-	 * {@code wallpapers/}; the Java resources keep the Electron layout under {@code ui/editor/},
-	 * and {@code public/} is removed in P3.6.
+	 * {@code wallpapers/}; the UI resources keep them under {@code ui/editor/}.
 	 */
 	static Path wallpaperRoot() {
 		return REPO_ROOT.resolve("java/gravaai-ui/src/main/resources/ui/editor");

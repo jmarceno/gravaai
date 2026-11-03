@@ -87,7 +87,7 @@ public final class GenerateFixtures {
 				List.of("wallpaper", "background blur", "padding (linked)", "shadow", "border radius",
 						"cursor style macos", "click effect spotlight", "captions / fade"),
 				editor -> {
-					editor.put("wallpaper", "/wallpapers/tahoe-light.jpg");
+					editor.put("wallpaper", "/wallpapers/morning-tide.jpg");
 					editor.put("backgroundBlur", 45);
 					editor.put("shadowIntensity", 0.85);
 					editor.put("borderRadius", 26);
@@ -102,7 +102,7 @@ public final class GenerateFixtures {
 				List.of("padding (per side)", "crop region", "aspect ratio 9:16", "border radius",
 						"cursor style tahoe", "click effect ripple", "captions / rise"),
 				editor -> {
-					editor.put("wallpaper", "/wallpapers/cityscape.jpg");
+					editor.put("wallpaper", "/wallpapers/cloudline-city.jpg");
 					editor.put("aspectRatio", "9:16");
 					editor.put("borderRadius", 42);
 					editor.set("padding", padding(12, 96, 48, 140, false));
@@ -133,7 +133,7 @@ public final class GenerateFixtures {
 		fixture("04-cursor-windows11", video, new int[] {500, 720, 1250},
 				List.of("cursor style windows11", "click effect spotlight", "captions / none"),
 				editor -> {
-					editor.put("wallpaper", "/wallpapers/sequoia-blue-orange.jpg");
+					editor.put("wallpaper", "/wallpapers/solar-drift.jpg");
 					editor.set("zoomRegions", zooms(zoom("zoom-1", 700, 1500, 2, 0.6, 0.5, "manual")));
 					cursor(editor, "windows11", "spotlight", "#2563EB", 2.0, 1.0, 900);
 					captions(editor, "none", "Static captions with a windows11 cursor");
@@ -161,7 +161,7 @@ public final class GenerateFixtures {
 				List.of("cursor style figma", "click effect none", "wallpaper (dark)",
 						"captions / rise"),
 				editor -> {
-					editor.put("wallpaper", "/wallpapers/tahoe-dark.jpg");
+					editor.put("wallpaper", "/wallpapers/midnight-silk.jpg");
 					cursor(editor, "figma", "none", "#2563EB", 1.0, 1.0, 600);
 					captions(editor, "rise", "Figma cursor with rise captions");
 				});
@@ -215,7 +215,7 @@ public final class GenerateFixtures {
 					editor.put("connectedZoomDurationMs", 500);
 					editor.put("zoomClassicMode", true);
 					editor.put("zoomMotionBlur", 0.5);
-					editor.put("wallpaper", "/wallpapers/cityscape.jpg");
+					editor.put("wallpaper", "/wallpapers/cloudline-city.jpg");
 					editor.set("padding", padding(16, 16, 16, 16, true));
 					editor.set("zoomRegions", zooms(
 							zoom("zoom-1", 300, 700, 3, 0.4, 0.4, "manual"),
@@ -262,7 +262,7 @@ public final class GenerateFixtures {
 		editor.put("borderRadius", 0);
 		editor.put("backgroundBlur", 0);
 		editor.put("shadowIntensity", 0.67);
-		editor.put("wallpaper", "/wallpapers/sequoia-blue.jpg");
+		editor.put("wallpaper", "/wallpapers/blue-flame.jpg");
 		editor.put("zoomMotionBlur", 0.0);
 		editor.put("connectZooms", false);
 		editor.put("zoomClassicMode", false);

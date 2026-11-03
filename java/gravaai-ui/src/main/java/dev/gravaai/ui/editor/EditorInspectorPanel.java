@@ -818,7 +818,7 @@ public final class EditorInspectorPanel extends VBox {
 		VBox background = new VBox(16);
 		background.getChildren().add(heading("Background", () -> apply(json -> {
 			json.put("backgroundBlur", 0);
-			json.put("wallpaper", "/wallpapers/tahoe-light.jpg");
+			json.put("wallpaper", "/wallpapers/morning-tide.jpg");
 		})));
 		background.getChildren().add(slider("Blur", state.backgroundBlur(), 0, 8, 0.25,
 				value -> String.format(java.util.Locale.ROOT, "%.1fpx", value),

@@ -39,7 +39,7 @@ class LegacyProfilePathsTest {
 				"version", 1,
 				"videoPath", LEGACY.resolve("recordings/recording-1.mp4").toString(),
 				"editor", object(
-						"wallpaper", "/wallpapers/tahoe-light.jpg",
+						"wallpaper", "/wallpapers/morning-tide.jpg",
 						"webcam", object(
 								"enabled", true,
 								"sourcePath", LEGACY.resolve("recordings/recording-1-webcam.mp4").toString()),
@@ -61,7 +61,7 @@ class LegacyProfilePathsTest {
 				"version", 1,
 				"videoPath", CURRENT.resolve("recordings/recording-1.mp4").toString(),
 				"editor", object(
-						"wallpaper", "/wallpapers/tahoe-light.jpg",
+						"wallpaper", "/wallpapers/morning-tide.jpg",
 						"webcam", object(
 								"enabled", true,
 								"sourcePath", CURRENT.resolve("recordings/recording-1-webcam.mp4").toString()),

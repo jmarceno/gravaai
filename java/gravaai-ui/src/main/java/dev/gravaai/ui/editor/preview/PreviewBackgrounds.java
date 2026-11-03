@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import dev.gravaai.core.project.EditorDefaults;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.ui.editor.EditorWallpapers;
 
@@ -20,7 +21,8 @@ import dev.gravaai.ui.editor.EditorWallpapers;
  * cached per wallpaper string because the compositor's background cache keys on object identity.
  *
  * <p>Colours and gradients go through the media layer's {@code Background.fromWallpaper} (the same
- * parser as the export renderer); plain files are read as encoded image bytes.
+ * parser as the export renderer); plain files are read as encoded image bytes. Unresolvable
+ * wallpaper values fall back to {@link EditorDefaults#DEFAULT_WALLPAPER_PATH}.
  */
 public final class PreviewBackgrounds {
 
@@ -28,6 +30,8 @@ public final class PreviewBackgrounds {
 	private static final Map<String, Background> CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, java.util.Optional<java.nio.file.Path>> VIDEO_PATHS =
 			new ConcurrentHashMap<>();
+	private static final byte @Nullable [] DEFAULT_PREVIEW =
+			loadPreviewImage(EditorDefaults.DEFAULT_WALLPAPER_PATH);
 
 	private PreviewBackgrounds() {
 	}
@@ -40,15 +44,15 @@ public final class PreviewBackgrounds {
 
 	private static Background resolve(String value) {
 		if (value.isEmpty()) {
-			return Background.black();
+			return defaultBackground();
 		}
 		if (EditorWallpapers.isVideoWallpaper(value) && !EditorWallpapers.isBundledWallpaper(value)) {
-			// A custom video has no poster; the preview decodes it per frame (videoPath).
-			return Background.black();
+			// A reachable custom video has no poster; the preview decodes it per frame (videoPath).
+			return videoPath(value) == null ? defaultBackground() : Background.black();
 		}
 		if (EditorWallpapers.isBundledWallpaper(value)) {
 			byte @Nullable [] bytes = loadPreviewImage(value);
-			return bytes == null ? Background.black() : new Background.Image(bytes);
+			return bytes == null ? defaultBackground() : new Background.Image(bytes);
 		}
 		try {
 			// Colours and the editor's gradient list: media owns the CSS parser (public since
@@ -56,8 +60,13 @@ public final class PreviewBackgrounds {
 			return Background.fromWallpaper(value);
 		} catch (IllegalArgumentException imageSource) {
 			byte @Nullable [] bytes = loadFileImage(value);
-			return bytes == null ? Background.black() : new Background.Image(bytes);
+			return bytes == null ? defaultBackground() : new Background.Image(bytes);
 		}
+	}
+
+	/** The configured default wallpaper, or black if even that resource is unavailable. */
+	private static Background defaultBackground() {
+		return DEFAULT_PREVIEW == null ? Background.black() : new Background.Image(DEFAULT_PREVIEW);
 	}
 
 	private static byte @Nullable [] loadPreviewImage(String wallpaper) {

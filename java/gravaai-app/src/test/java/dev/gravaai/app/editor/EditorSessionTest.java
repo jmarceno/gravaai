@@ -26,7 +26,7 @@ class EditorSessionTest {
 			  "updatedAt": 1700000000000,
 			  "projectName": "Session fixture",
 			  "editor": {
-			    "wallpaper": "/wallpapers/tahoe-light.jpg",
+			    "wallpaper": "/wallpapers/morning-tide.jpg",
 			    "shadowIntensity": 0.67,
 			    "backgroundBlur": 0,
 			    "aspectRatio": "16:9",

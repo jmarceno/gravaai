@@ -16,10 +16,10 @@ class PreviewBackgroundsTest {
 	@DisplayName("bundled wallpapers load the 1280x720 preview bytes and are cached")
 	@Test
 	void bundledImage() {
-		Background background = PreviewBackgrounds.of("/wallpapers/tahoe-light.jpg");
+		Background background = PreviewBackgrounds.of("/wallpapers/morning-tide.jpg");
 		assertInstanceOf(Background.Image.class, background);
 		assertTrue(((Background.Image) background).encodedImage().length > 1000);
-		assertSame(background, PreviewBackgrounds.of("/wallpapers/tahoe-light.jpg"));
+		assertSame(background, PreviewBackgrounds.of("/wallpapers/morning-tide.jpg"));
 	}
 
 	@DisplayName("hex colours map to the compositor ARGB order")
@@ -39,11 +39,17 @@ class PreviewBackgroundsTest {
 		assertEquals(2, ((Background.LinearGradient) background).argbColours().length);
 	}
 
-	@DisplayName("unknown values and missing files fall back to black")
+	@DisplayName("unknown values and missing files fall back to the default wallpaper")
 	@Test
 	void fallbacks() {
-		assertEquals(Background.black(), PreviewBackgrounds.of("/wallpapers/does-not-exist.jpg"));
-		assertEquals(Background.black(), PreviewBackgrounds.of(""));
-		assertEquals(Background.black(), PreviewBackgrounds.of("/tmp/no-such-file.jpg"));
+		Background fallback = PreviewBackgrounds.of("/wallpapers/morning-tide.jpg");
+		assertInstanceOf(Background.Image.class, fallback);
+		byte[] expected = ((Background.Image) fallback).encodedImage();
+		for (String value : new String[] {
+				"/wallpapers/does-not-exist.jpg", "", "/tmp/no-such-file.jpg"}) {
+			Background actual = PreviewBackgrounds.of(value);
+			assertInstanceOf(Background.Image.class, actual, value);
+			assertArrayEquals(expected, ((Background.Image) actual).encodedImage(), value);
+		}
 	}
 }

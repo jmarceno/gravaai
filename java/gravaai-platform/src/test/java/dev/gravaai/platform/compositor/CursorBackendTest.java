@@ -29,10 +29,10 @@ class CursorBackendTest {
 	}
 
 	@Test
-	@DisplayName("GNOME is not handed the KWin bridge, which cannot work there")
-	void gnomeDoesNotGetKwin() {
-		assertEquals(CursorBackend.EXT_IMAGE_COPY, CursorBackend.detect(wayland("GNOME")));
-		assertEquals(CursorBackend.EXT_IMAGE_COPY, CursorBackend.detect(wayland("ubuntu:GNOME")));
+	@DisplayName("GNOME reads the pointer through its shell extension bridge")
+	void gnomeUsesShellExtensionBridge() {
+		assertEquals(CursorBackend.GNOME_BRIDGE, CursorBackend.detect(wayland("GNOME")));
+		assertEquals(CursorBackend.GNOME_BRIDGE, CursorBackend.detect(wayland("ubuntu:GNOME")));
 	}
 
 	@Test

@@ -98,9 +98,14 @@ KDE Plasma 6 is verified end to end. For GNOME:
 
 1. **Capture** already selects the portal helper (`CaptureBackend` maps `GNOME` to `PORTAL`);
    check the restore token and the `Session.Closed` path against GNOME's own dialog.
-2. **Pointer** needs a new `CursorBackend` constant and helper. GNOME has no KWin scripting;
-   Mutter does fill the ScreenCast stream's `SPA_META_Cursor` metadata (`cursor_mode=4`), which
-   KWin leaves empty, so the portal helper itself is the likely source there.
+2. **Pointer** comes from `gravaai-gnome-cursor` (`CursorBackend.GNOME_BRIDGE`) and the
+   `gravaai-cursor@gravaai.dev` shell extension (`gnome-cursor/extension`, shipped as
+   `gnome-extension/` next to the helper). The helper copies the extension into
+   `~/.local/share/gnome-shell/extensions/` when missing or changed and enables it over
+   `org.gnome.Shell.Extensions`; on Wayland a new or changed extension only loads after the next
+   login. `metadata.json` must declare `session-modes`, or GNOME 51 lists it ACTIVE but never
+   calls `enable()`. The ScreenCast `SPA_META_Cursor` route was dropped: on mutter 51 the
+   metadata never reaches a consumer process.
 3. **Shortcuts** work through the same portal on GNOME 48+; older GNOME falls back to the
    `--action` commands automatically.
 

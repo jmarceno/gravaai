@@ -90,8 +90,17 @@ if pkg-config --exists dbus-1 libpipewire-0.3 2>/dev/null; then
 	say "building gravaai-kwin-cursor"
 	cc "${cc_flags[@]}" -o "$out/gravaai-kwin-cursor" \
 		"$here/kwin-cursor/main.c" $(pkg-config --cflags --libs dbus-1)
+
+	# GNOME is the same shape: the gravaai-cursor shell extension reads
+	# global.get_pointer() inside gnome-shell and calls this helper over D-Bus.
+	say "building gravaai-gnome-cursor"
+	cc "${cc_flags[@]}" -o "$out/gravaai-gnome-cursor" \
+		"$here/gnome-cursor/main.c" $(pkg-config --cflags --libs dbus-1)
+	# The helper installs this next to itself into the user's extensions dir.
+	rm -rf "$out/gnome-extension"
+	cp -r "$here/gnome-cursor/extension" "$out/gnome-extension"
 else
-	say "skipping gravaai-portal-capture and gravaai-kwin-cursor (install libpipewire-0.3-dev and libdbus-1-dev)"
+	say "skipping gravaai-portal-capture, gravaai-kwin-cursor and gravaai-gnome-cursor (install libpipewire-0.3-dev and libdbus-1-dev)"
 fi
 
 # rnnoise models for the mic noise reduction filter (plan §5.6.5): staged into the native

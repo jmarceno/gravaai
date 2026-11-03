@@ -1,0 +1,8 @@
+{
+  "uuid": "gravaai-cursor@gravaai.dev",
+  "name": "Gravaai Cursor Bridge",
+  "description": "Reports the global pointer position to the gravaai screen recorder over D-Bus.",
+  "url": "https://github.com/gravaai/gravaai",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "session-modes": ["user"]
+}

@@ -132,6 +132,8 @@ if [ -n "$NATIVE_DIR" ] && [ -d "$NATIVE_DIR" ]; then
 	# Capture/layer-shell helpers and the noise-suppression model.
 	find "$NATIVE_DIR" -maxdepth 1 -type f -name 'gravaai-*' -exec cp -a {} "$LINUX/" \;
 	if [ -d "$NATIVE_DIR/models" ]; then cp -a "$NATIVE_DIR/models" "$LINUX/models"; fi
+	# The gravaai-cursor shell extension gravaai-gnome-cursor installs on GNOME.
+	if [ -d "$NATIVE_DIR/gnome-extension" ]; then cp -a "$NATIVE_DIR/gnome-extension" "$LINUX/gnome-extension"; fi
 	# whisper-cli plus the manifest; libwhisper*/libggml* only exist when a
 	# shared backend is enabled, and then they must ship too.
 	mkdir -p "$LINUX/whisper"

@@ -69,18 +69,19 @@ class CompositorRecordingEnvironmentTest {
 	}
 
 	@Test
-	@DisplayName("GNOME captures through the portal but has no KWin to ask for the pointer")
-	void gnomeDoesNotUseTheKwinBridge(@TempDir Path nativeDir) throws IOException {
+	@DisplayName("GNOME captures through the portal and reads the pointer through its shell extension bridge")
+	void gnomeUsesTheShellExtensionBridge(@TempDir Path nativeDir) throws IOException {
 		Path cosmic = Files.createFile(nativeDir.resolve("gravaai-wayland-capture"));
 		Path portal = Files.createFile(nativeDir.resolve("gravaai-portal-capture"));
 		Files.createFile(nativeDir.resolve("gravaai-kwin-cursor"));
+		Path gnomeCursor = Files.createFile(nativeDir.resolve("gravaai-gnome-cursor"));
 		Path cursor = Path.of("/cosmic-cursor");
 		CompositorRecordingEnvironment environment =
 				environment(new RecordingDelegate(cosmic, cursor), "GNOME", nativeDir);
 
 		assertEquals(portal, environment.captureHelper());
-		assertEquals(CursorBackend.EXT_IMAGE_COPY, environment.cursorBackend());
-		assertEquals(cursor, environment.cursorHelper());
+		assertEquals(CursorBackend.GNOME_BRIDGE, environment.cursorBackend());
+		assertEquals(gnomeCursor, environment.cursorHelper());
 	}
 
 	private static Map<String, String> wayland(String desktop) {

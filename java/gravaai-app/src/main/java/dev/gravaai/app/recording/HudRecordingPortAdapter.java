@@ -203,9 +203,10 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		}
 		State current = state();
 		boolean audioOnly = meetingMode && !recordScreen;
-		if (!audioOnly && !current.hasSource()) {
+		if (!audioOnly && !current.hasSource() && !selectOnlyScreen()) {
 			// Same state machine as LaunchWindow.tsx: without a source the record button
-			// first asks for one, then the next press starts the recording.
+			// first asks for one, then the next press starts the recording. With a single
+			// monitor there is nothing to ask, so it is selected and recording starts.
 			navigation.requestSourcePick();
 			return;
 		}
@@ -596,6 +597,9 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		if (picking) {
 			return;
 		}
+		if (selectOnlyScreen()) {
+			return;
+		}
 		picking = true;
 		publish();
 		LOG.log(System.Logger.Level.INFO, "source pick requested");
@@ -654,6 +658,24 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 			LOG.log(System.Logger.Level.WARNING, "listing screens failed: " + error);
 		}
 		return screens;
+	}
+
+	/**
+	 * Selects the monitor when there is exactly one, so the user is never asked to pick it.
+	 * False when there are several (or none could be listed) and the picker has to ask.
+	 */
+	private boolean selectOnlyScreen() {
+		List<ScreenDevice> screens = screenDevices();
+		if (screens.size() != 1) {
+			return false;
+		}
+		ScreenDevice only = screens.getFirst();
+		if (!wiring.capturePicker().selectScreen(only.id())) {
+			return false;
+		}
+		LOG.log(System.Logger.Level.INFO, "single screen selected: " + only.label());
+		publish();
+		return true;
 	}
 
 	/** The HUD monitor list: selects the output directly, no click-a-screen pick. */

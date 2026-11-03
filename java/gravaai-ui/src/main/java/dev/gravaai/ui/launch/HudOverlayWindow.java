@@ -242,7 +242,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 
 			@Override
 			public void requestSourcePick() {
-				openMenu(HudMenuWindow.Menu.SCREEN);
+				pickScreen(true);
 			}
 
 			@Override
@@ -483,6 +483,23 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	}
 
 	// ── menu + drag (used by HudBar) ──────────────────────────────────────
+
+	/**
+	 * "Pick screen", or record without a source: with a single monitor there is nothing to
+	 * choose, so it is selected directly (and recording starts when {@code thenRecord});
+	 * otherwise the screen list opens.
+	 */
+	void pickScreen(boolean thenRecord) {
+		List<HudRecordingPort.ScreenDevice> screens = port.screenDevices();
+		if (screens.size() != 1) {
+			openMenu(HudMenuWindow.Menu.SCREEN);
+			return;
+		}
+		port.selectScreen(screens.getFirst().id());
+		if (thenRecord) {
+			port.toggleRecording();
+		}
+	}
 
 	/** Opens one of the HUD menus in the dedicated menu window (Linux HUD menu mode). */
 	void openMenu(HudMenuWindow.Menu menu) {

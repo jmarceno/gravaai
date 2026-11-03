@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/gravaai.svg" width="160" alt="Gravaai logo" />
+  <img src="branding/gravaai.png" width="240" alt="Gravaai logo" />
 </p>
 
 <h1 align="center">Gravaai</h1>

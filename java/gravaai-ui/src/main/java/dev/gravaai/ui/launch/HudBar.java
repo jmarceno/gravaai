@@ -193,7 +193,7 @@ public final class HudBar extends HBox {
 			if (next.audioOnly() || next.hasSource()) {
 				port.toggleRecording();
 			} else {
-				window.openMenu(HudMenuWindow.Menu.SCREEN);
+				window.pickScreen(true);
 			}
 		});
 		record.setDisable(next.countdownActive() || next.picking());
@@ -218,7 +218,7 @@ public final class HudBar extends HBox {
 		marquee.setMaxWidth(120);
 		graphic.getChildren().addAll(Icon.of(Icons.MonitorIcon, 20), marquee);
 		source.setGraphic(graphic);
-		source.setOnAction(event -> window.openMenu(HudMenuWindow.Menu.SCREEN));
+		source.setOnAction(event -> window.pickScreen(false));
 		source.setDisable(next.finalizing() || next.picking());
 		tooltip(source, next.picking()
 				? "Click anywhere on the screen you want to record"

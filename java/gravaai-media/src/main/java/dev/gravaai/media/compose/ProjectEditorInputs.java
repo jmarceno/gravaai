@@ -405,14 +405,15 @@ public final class ProjectEditorInputs {
 	/**
 	 * The webcam settings at a timeline time: a Camera layout track segment with a position moves
 	 * the camera to that preset (a bubble position or a split screen side); elsewhere the project
-	 * webcam settings apply unchanged.
+	 * webcam settings apply unchanged — gliding back to them for {@link CameraLayoutSegment#SMOOTH_MS}
+	 * after a block with a smooth switch-out ends into a gap.
 	 */
 	public static WebcamSpec webcamSpecAt(WebcamSpec base, ProjectEditorState editor,
 			double timelineMs) {
 		List<CameraLayoutSegment> segments = editor.cameraLayoutSegments();
 		Optional<CameraLayoutSegment> active = CameraLayoutSegment.at(segments, timelineMs);
 		if (active.isEmpty()) {
-			return base;
+			return exitGlide(base, segments, timelineMs);
 		}
 		CameraLayoutSegment segment = active.get();
 		WebcamSpec target = styled(base, segment);
@@ -429,6 +430,29 @@ public final class ProjectEditorInputs {
 		double t = Math.max(0, Math.min(1, elapsed / CameraLayoutSegment.SMOOTH_MS));
 		double eased = t * t * (3 - 2 * t);
 		return target.withTransition(Optional.of(new WebcamSpec.Transition(from, eased)));
+	}
+
+	/**
+	 * The first {@link CameraLayoutSegment#SMOOTH_MS} after a block with a smooth switch-out ends
+	 * into a gap: the camera glides from the block's styled spec back to the project's, so the
+	 * compositor slides the split divider back instead of cutting. When another block touches the
+	 * end, that block's switch-in governs and there is nothing to glide here.
+	 */
+	private static WebcamSpec exitGlide(WebcamSpec base, List<CameraLayoutSegment> segments,
+			double timelineMs) {
+		for (CameraLayoutSegment segment : segments) {
+			double elapsed = timelineMs - segment.endMs();
+			if (elapsed < 0 || elapsed >= CameraLayoutSegment.SMOOTH_MS
+					|| segment.transitionOut() != CameraLayoutSegment.Transition.SMOOTH
+					|| !segment.followedByGap(segments)) {
+				continue;
+			}
+			double t = Math.max(0, Math.min(1, elapsed / CameraLayoutSegment.SMOOTH_MS));
+			double eased = t * t * (3 - 2 * t);
+			return base.withTransition(
+					Optional.of(new WebcamSpec.Transition(styled(base, segment), eased)));
+		}
+		return base;
 	}
 
 	/** The project webcam spec with one segment's preset and style overrides applied. */

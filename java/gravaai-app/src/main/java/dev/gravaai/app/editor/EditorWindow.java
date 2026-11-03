@@ -90,7 +90,8 @@ public final class EditorWindow {
 	 * @param onClosed called after the window hidden (AppContext removes it from its list)
 	 * @param chooseOpenFile file-open dialog ({@code title -> path}); defaults to a JavaFX chooser
 	 * @param chooseSaveFile file-save dialog ({@code title -> path}); defaults to a JavaFX chooser
-	 * @param exporter the P3 export controller (settings, staged saves, reveal); may be {@code null}
+	 * @param exporters the P3 export controller (settings, staged saves, reveal), created after
+	 *     startup so it is looked up on use; may be {@code null}
 	 * @param recordings the recording service for the Clips panel imports; may be {@code null}
 	 * @param openRecordingsFolder reveals the recordings folder in the system file manager
 	 */
@@ -102,9 +103,14 @@ public final class EditorWindow {
 			Runnable onClosed,
 			@Nullable Function<String, Optional<Path>> chooseOpenFile,
 			@Nullable Function<String, Optional<Path>> chooseSaveFile,
-			@Nullable ProjectExporter exporter,
+			java.util.function.@Nullable Supplier<@Nullable ProjectExporter> exporters,
 			java.util.function.@Nullable Supplier<@Nullable RecordingService> recordings,
 			@Nullable Runnable openRecordingsFolder) {
+
+		/** The export controller, once the app has created it (it starts after the editor can open). */
+		public @Nullable ProjectExporter exporter() {
+			return exporters == null ? null : exporters.get();
+		}
 
 		/** Backwards-compatible constructor without the export controller. */
 		public Services(ProjectManager projects, AppSettingsStore settings, Consumer<Path> openProject,
@@ -122,7 +128,7 @@ public final class EditorWindow {
 				Function<String, Optional<Path>> chooseSaveFile,
 				ProjectExporter exporter) {
 			this(projects, settings, openProject, projectUpdated, onClosed, chooseOpenFile,
-					chooseSaveFile, exporter, null, null);
+					chooseSaveFile, () -> exporter, null, null);
 		}
 
 		public static Services bare() {

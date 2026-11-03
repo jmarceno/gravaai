@@ -724,6 +724,17 @@ public final class EditorInspectorPanel extends VBox {
 				segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
 		root.getChildren().add(row("Switch", transition));
 
+		// The switch out only matters where the project layout follows: a touching block's
+		// switch-in governs that boundary instead.
+		if (segment.followedByGap(store.state().cameraLayoutSegments())) {
+			ChoiceGroup switchOut = choice("cut", "Cut", "smooth", "Smooth");
+			switchOut.setValue(segment.transitionOut().wire());
+			switchOut.setAccessibleText("Switch out");
+			switchOut.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransitionOut(
+					segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
+			root.getChildren().add(row("Switch out", switchOut));
+		}
+
 		// This block's look; each slider starts at the project webcam value it overrides.
 		WebcamOverlaySettings webcam = store.state().webcam();
 		CameraLayoutStyle style = segment.style();
@@ -766,7 +777,9 @@ public final class EditorInspectorPanel extends VBox {
 		}
 
 		Label hint = new Label("Drag the block's edges on the Camera track to move the switch. "
-				+ "The diamond at its start toggles Cut / Smooth.");
+				+ "The diamond at its start toggles Cut / Smooth"
+				+ (segment.followedByGap(store.state().cameraLayoutSegments())
+						? ", the one at its end sets how the camera leaves." : "."));
 		hint.setWrapText(true);
 		hint.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(hint);
@@ -1715,6 +1728,8 @@ public final class EditorInspectorPanel extends VBox {
 		row.setAlignment(Pos.CENTER_LEFT);
 		Label caption = new Label(label);
 		caption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		// A wide control must not squeeze the caption down to an ellipsis.
+		caption.setMinWidth(Region.USE_PREF_SIZE);
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		row.getChildren().addAll(caption, spacer, control);

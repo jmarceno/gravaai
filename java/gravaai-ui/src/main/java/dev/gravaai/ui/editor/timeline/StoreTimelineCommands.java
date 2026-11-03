@@ -262,6 +262,17 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
+	public void toggleCameraLayoutTransitionOut(String segmentId) {
+		store.state().cameraLayoutSegments().stream()
+				.filter(segment -> segment.id().equals(segmentId)).findFirst()
+				.ifPresent(segment -> store.apply(new CameraLayoutCommands.SetTransitionOut(
+						segmentId,
+						segment.transitionOut() == CameraLayoutSegment.Transition.SMOOTH
+								? CameraLayoutSegment.Transition.CUT
+								: CameraLayoutSegment.Transition.SMOOTH)));
+	}
+
+	@Override
 	public void addZoom(double startMs, double endMs) {
 		store.apply(new ZoomCommands.Add(startMs, endMs));
 	}

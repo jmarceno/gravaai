@@ -276,6 +276,31 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("reads the camera layout switch wires; anything else is a cut")
+	void keepsCameraLayoutTransitions() {
+		ProjectEditorState state = normalize("""
+				{"clipRegions":[{"id":"a","startMs":0,"endMs":4000,"speed":1}],
+				 "cameraLayoutSegments":[
+					{"id":"camera-1","startMs":0,"endMs":1000,"layout":"split-right",
+					 "transition":"smooth","transitionOut":"smooth"},
+					{"id":"camera-2","startMs":1000,"endMs":2000,"layout":"bottom-right",
+					 "transition":"bogus","transitionOut":"instant"},
+					{"id":"camera-3","startMs":2000,"endMs":3000,"layout":"top-left"}]}
+				""");
+		assertEquals(List.of(
+				new CameraLayoutSegment("camera-1", 0, 1000,
+						new CameraLayout.Position(WebcamPositionPreset.SPLIT_RIGHT),
+						CameraLayoutStyle.INHERIT,
+						CameraLayoutSegment.Transition.SMOOTH,
+						CameraLayoutSegment.Transition.SMOOTH),
+				new CameraLayoutSegment("camera-2", 1000, 2000,
+						new CameraLayout.Position(WebcamPositionPreset.BOTTOM_RIGHT)),
+				new CameraLayoutSegment("camera-3", 2000, 3000,
+						new CameraLayout.Position(WebcamPositionPreset.TOP_LEFT))),
+				state.cameraLayoutSegments());
+	}
+
+	@Test
 	@DisplayName("keeps valid fades, clamps their duration and drops anything else")
 	void keepsValidFades() {
 		ProjectEditorState state = normalize("""

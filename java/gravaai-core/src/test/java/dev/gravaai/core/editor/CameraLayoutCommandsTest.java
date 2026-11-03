@@ -170,6 +170,32 @@ class CameraLayoutCommandsTest {
 	}
 
 	@Test
+	@DisplayName("the switch-out toggles and survives a save and load")
+	void styleAndTransitionOut() {
+		EditorStore store = store();
+		assertTrue(store.apply(new CameraLayoutCommands.SwitchAt(0, 20_000, CORNER)));
+		String id = store.state().cameraLayoutSegments().get(0).id();
+
+		assertEquals(CameraLayoutSegment.Transition.CUT,
+				store.state().cameraLayoutSegments().get(0).transitionOut());
+		assertTrue(store.apply(new CameraLayoutCommands.SetTransitionOut(id,
+				CameraLayoutSegment.Transition.SMOOTH)));
+		assertEquals(CameraLayoutSegment.Transition.SMOOTH,
+				store.state().cameraLayoutSegments().get(0).transitionOut());
+		// Setting the same value again changes nothing.
+		assertFalse(store.apply(new CameraLayoutCommands.SetTransitionOut(id,
+				CameraLayoutSegment.Transition.SMOOTH)));
+
+		ProjectEditorState reloaded = ProjectPersistence.normalizeProjectEditor(
+				ProjectDocument.writeEditor(store.state(), Json.nodeFactory().objectNode()));
+		assertEquals(CameraLayoutSegment.Transition.SMOOTH,
+				reloaded.cameraLayoutSegments().get(0).transitionOut());
+		// The switch-in keeps its default through the round trip.
+		assertEquals(CameraLayoutSegment.Transition.CUT,
+				reloaded.cameraLayoutSegments().get(0).transition());
+	}
+
+	@Test
 	@DisplayName("older per-clip camera layouts move onto the Camera layout track")
 	void migratesClipLayouts() {
 		ProjectEditorState loaded = state("""

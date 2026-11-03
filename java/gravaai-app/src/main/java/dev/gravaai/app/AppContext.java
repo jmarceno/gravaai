@@ -122,7 +122,7 @@ public final class AppContext {
 	private @Nullable MeetingIntegration meeting;
 	private @Nullable MeetingWindow meetingWindow;
 	private @Nullable AgentWiring agentWiring;
-	private @Nullable ProjectExporter exporter;
+	private volatile @Nullable ProjectExporter exporter;
 	private @Nullable ExportCoordinator exportCoordinator;
 	// P3.3 extension host (plan §5.18): userData/extensions drives the render hooks of the editor
 	// preview and the exporter. Created off the startup path; a failure disables extensions only.
@@ -1311,7 +1311,7 @@ public final class AppContext {
 				this::onEditorWindowClosed,
 				null,
 				null,
-				exporter(),
+				this::exporter,
 				this::recordingService,
 				this::openRecordingsFolder);
 	}

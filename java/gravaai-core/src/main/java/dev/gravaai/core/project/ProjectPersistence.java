@@ -970,10 +970,13 @@ public final class ProjectPersistence {
 			}
 			CameraLayoutStyle segmentStyle = style;
 			String transition = text(field(node, "transition"));
+			String transitionOut = text(field(node, "transitionOut"));
 			CameraLayout.fromWire(wire).ifPresent(layout -> segments.add(
 					new CameraLayoutSegment(id, span.startMs(), span.endMs(), layout,
 							segmentStyle, CameraLayoutSegment.Transition.fromWire(
-									transition == null ? "cut" : transition))));
+									transition == null ? "cut" : transition),
+							CameraLayoutSegment.Transition.fromWire(
+									transitionOut == null ? "cut" : transitionOut))));
 		}
 		return normalizeCameraLayoutSegments(segments);
 	}

@@ -446,6 +446,7 @@ public final class ProjectDocument {
 			node.put("endMs", segment.endMs());
 			node.put("layout", segment.layout().wire());
 			node.put("transition", segment.transition().wire());
+			node.put("transitionOut", segment.transitionOut().wire());
 			if (!segment.style().isInherit()) {
 				ObjectNode style = node.putObject("style");
 				for (String field : CameraLayoutStyle.FIELDS) {

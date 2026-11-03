@@ -1150,9 +1150,10 @@ public final class AgentPlanner {
 	// Zoom/speed/annotation/audio/caption/settings ops ---------------------------------------
 
 	/**
-	 * {@code camera_layout {from, to?, layout, transition?, size?, width?, height?, roundness?,
-	 * shadow?}}: the camera uses {@code layout} from {@code from} until {@code to} (default: the
-	 * next Camera layout switch or the end). Whatever the track had in that range is replaced.
+	 * {@code camera_layout {from, to?, layout, transition?, transitionOut?, size?, width?,
+	 * height?, roundness?, shadow?}}: the camera uses {@code layout} from {@code from} until
+	 * {@code to} (default: the next Camera layout switch or the end). Whatever the track had in
+	 * that range is replaced.
 	 */
 	private static void cameraLayout(Draft draft, ObjectNode raw) {
 		String wire = AgentOpReader.string(raw, "layout").trim();
@@ -1174,10 +1175,13 @@ public final class AgentPlanner {
 			}
 		}
 		String transition = AgentOpReader.optionalString(raw, "transition");
+		String transitionOut = AgentOpReader.optionalString(raw, "transitionOut");
 		CameraLayoutSegment added = new CameraLayoutSegment(
 				draft.ctx.createId().apply(IdKind.CAMERA), span.startMs(), span.endMs(), layout,
 				style, CameraLayoutSegment.Transition.fromWire(
-						transition == null ? "cut" : transition.trim()));
+						transition == null ? "cut" : transition.trim()),
+				CameraLayoutSegment.Transition.fromWire(
+						transitionOut == null ? "cut" : transitionOut.trim()));
 		List<CameraLayoutSegment> next = new ArrayList<>();
 		for (CameraLayoutSegment segment : segments) {
 			if (segment.endMs() <= span.startMs() || segment.startMs() >= span.endMs()) {
@@ -1190,7 +1194,7 @@ public final class AgentPlanner {
 			if (segment.endMs() > span.endMs()) {
 				next.add(new CameraLayoutSegment(draft.ctx.createId().apply(IdKind.CAMERA),
 						span.endMs(), segment.endMs(), segment.layout(), segment.style(),
-						CameraLayoutSegment.Transition.CUT));
+						CameraLayoutSegment.Transition.CUT, segment.transitionOut()));
 			}
 		}
 		next.add(added);

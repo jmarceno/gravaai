@@ -63,6 +63,63 @@ class CameraLayoutTrackTest {
 	}
 
 	@Test
+	@DisplayName("a smooth switch-out glides back to the project layout after the block ends")
+	void smoothSwitchOut() {
+		ProjectEditorState editor = ProjectPersistence.normalizeProjectEditor(
+				Json.parseJsonWithByteOrderMark("""
+						{"clipRegions":[{"id":"a","startMs":0,"endMs":30000,"speed":1}],
+						 "webcam":{"enabled":true,"positionPreset":"bottom-right","corner":"bottom-right"},
+						 "cameraLayoutSegments":[
+							{"id":"camera-1","startMs":0,"endMs":10000,"layout":"split-right",
+							 "transitionOut":"smooth"}]}
+						"""));
+		WebcamSpec base = ProjectEditorInputs.webcamSpec(editor);
+
+		// Halfway through the glide the camera sits between the split and the project bubble.
+		WebcamSpec midway = ProjectEditorInputs.webcamSpecAt(base, editor, 10_150);
+		assertEquals("bottom-right", midway.positionPreset());
+		assertEquals("split-right", midway.transition().orElseThrow().from().positionPreset());
+		assertEquals(0.5, midway.transition().orElseThrow().progress(), 1e-9);
+
+		// The glide starts exactly at the block's end and is done after SMOOTH_MS.
+		assertEquals("split-right",
+				ProjectEditorInputs.webcamSpecAt(base, editor, 10_000).transition()
+						.orElseThrow().from().positionPreset());
+		assertEquals(0.0,
+				ProjectEditorInputs.webcamSpecAt(base, editor, 10_000).transition()
+						.orElseThrow().progress(), 1e-9);
+		assertEquals(java.util.Optional.empty(),
+				ProjectEditorInputs.webcamSpecAt(base, editor, 10_400).transition());
+	}
+
+	@Test
+	@DisplayName("a cut switch-out never glides; a touching next block governs the boundary")
+	void cutSwitchOutAndTouchingBlocks() {
+		WebcamSpec base = ProjectEditorInputs.webcamSpec(EDITOR);
+		// camera-2 touches camera-1's end, so camera-2's switch-in governs: no exit glide from
+		// camera-1 even with a smooth switch-out, and camera-3's end is a camera-only exit.
+		ProjectEditorState touching = ProjectPersistence.normalizeProjectEditor(
+				Json.parseJsonWithByteOrderMark("""
+						{"clipRegions":[{"id":"a","startMs":0,"endMs":30000,"speed":1}],
+						 "webcam":{"enabled":true,"positionPreset":"top-left","corner":"top-left"},
+						 "cameraLayoutSegments":[
+							{"id":"camera-1","startMs":0,"endMs":10000,"layout":"split-right",
+							 "transitionOut":"smooth"},
+							{"id":"camera-2","startMs":10000,"endMs":20000,"layout":"bottom-right"},
+							{"id":"camera-3","startMs":20000,"endMs":25000,"layout":"camera-only"}]}
+						"""));
+		WebcamSpec touchingBase = ProjectEditorInputs.webcamSpec(touching);
+		assertEquals("bottom-right",
+				ProjectEditorInputs.webcamSpecAt(touchingBase, touching, 10_150).positionPreset());
+		assertEquals(java.util.Optional.empty(),
+				ProjectEditorInputs.webcamSpecAt(touchingBase, touching, 10_150).transition());
+
+		// The default switch-out is a cut: no glide in the gap after camera-2.
+		assertEquals(java.util.Optional.empty(),
+				ProjectEditorInputs.webcamSpecAt(base, EDITOR, 20_150).transition());
+	}
+
+	@Test
 	@DisplayName("a camera-only segment fills the frame with the camera")
 	void cameraOnlySegmentDrivesScene() {
 		assertEquals(SceneSpec.FULL, ProjectEditorInputs.sceneSpec(EDITOR, 15_000));

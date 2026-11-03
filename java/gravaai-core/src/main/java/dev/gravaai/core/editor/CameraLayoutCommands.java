@@ -91,7 +91,9 @@ public final class CameraLayoutCommands {
 				} else {
 					selected = store.nextId("camera", ids(segments));
 					next.add(segment.withSpan(segment.startMs(), at));
-					next.add(new CameraLayoutSegment(selected, at, segment.endMs(), layout));
+					next.add(new CameraLayoutSegment(selected, at, segment.endMs(), layout,
+							CameraLayoutStyle.INHERIT, CameraLayoutSegment.Transition.CUT,
+							segment.transitionOut()));
 				}
 			}
 			if (selected == null) {
@@ -187,6 +189,33 @@ public final class CameraLayoutCommands {
 			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
 					.map(segment -> segment.id().equals(id) ? segment.withTransition(transition)
 							: segment)
+					.toList());
+			return true;
+		}
+	}
+
+	/**
+	 * How the camera leaves a segment's end into the gap after it: an instant cut or a smooth
+	 * move back to the project layout.
+	 */
+	public static final class SetTransitionOut implements EditorCommand {
+		private final String id;
+		private final CameraLayoutSegment.Transition transitionOut;
+
+		public SetTransitionOut(String id, CameraLayoutSegment.Transition transitionOut) {
+			this.id = id;
+			this.transitionOut = transitionOut;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			Optional<CameraLayoutSegment> current = find(store, id);
+			if (current.isEmpty() || current.get().transitionOut() == transitionOut) {
+				return false;
+			}
+			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
+					.map(segment -> segment.id().equals(id)
+							? segment.withTransitionOut(transitionOut) : segment)
 					.toList());
 			return true;
 		}

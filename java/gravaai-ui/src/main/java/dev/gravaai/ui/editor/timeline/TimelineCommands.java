@@ -71,6 +71,12 @@ public interface TimelineCommands {
 	default void toggleCameraLayoutTransition(String segmentId) {}
 
 	/**
+	 * Flips the Camera layout switch-out of a segment (into the gap after it) between an instant
+	 * cut and a smooth move.
+	 */
+	default void toggleCameraLayoutTransitionOut(String segmentId) {}
+
+	/**
 	 * Live playhead drag (timeline milliseconds): called for every pointer move, so it must not
 	 * block; the preview shows the newest position. Defaults to a seek.
 	 */

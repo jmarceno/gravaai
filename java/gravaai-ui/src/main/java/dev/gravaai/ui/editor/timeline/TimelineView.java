@@ -193,6 +193,8 @@ public final class TimelineView extends Region {
 	private Runnable onCameraLayoutShortcut = () -> {};
 	/** Switch diamonds drawn at Camera layout segment starts (click toggles cut/smooth). */
 	private final Map<String, BlockBounds> cameraSwitchBounds = new LinkedHashMap<>();
+	/** Switch-out diamonds at Camera layout segment ends followed by a gap (click toggles). */
+	private final Map<String, BlockBounds> cameraSwitchOutBounds = new LinkedHashMap<>();
 	private List<ClipPresentation.Presentation> clipPresentation = List.of();
 	private final Map<String, BlockBounds> blockBounds = new LinkedHashMap<>();
 
@@ -703,6 +705,11 @@ public final class TimelineView extends Region {
 		Optional<String> cameraSwitch = cameraSwitchAt(x, y);
 		if (cameraSwitch.isPresent()) {
 			commands.toggleCameraLayoutTransition(cameraSwitch.get());
+			return;
+		}
+		Optional<String> cameraSwitchOut = cameraSwitchOutAt(x, y);
+		if (cameraSwitchOut.isPresent()) {
+			commands.toggleCameraLayoutTransitionOut(cameraSwitchOut.get());
 			return;
 		}
 		if (hasCaptions() && inCaptionStrip(y)) {
@@ -1696,6 +1703,7 @@ public final class TimelineView extends Region {
 		graphics.fillRect(0, 0, width, height);
 		blockBounds.clear();
 		cameraSwitchBounds.clear();
+		cameraSwitchOutBounds.clear();
 		if (agentOverlay != null) {
 			agentOverlay.range((long) range.start(), (long) range.end());
 		}
@@ -2091,6 +2099,7 @@ public final class TimelineView extends Region {
 		if (segment == null) {
 			return;
 		}
+		boolean gapAfter = segment.followedByGap(java.util.List.copyOf(cameraLayouts.values()));
 		Color fill = switch (segment.layout()) {
 			case CameraLayout.Position(var preset) when preset.isSplit() -> CAMERA_SPLIT_FILL;
 			case CameraLayout.Position(var preset) -> CAMERA_BUBBLE_FILL;
@@ -2112,12 +2121,20 @@ public final class TimelineView extends Region {
 			graphics.setFill(CAMERA_LAYOUT_RAMP);
 			graphics.fillRoundRect(x, y, Math.max(0, rampWidth), height, 8, 8);
 		}
-		// Label after the switch diamond; a dot marks a segment with its own size or style.
+		if (gapAfter && segment.transitionOut() == CameraLayoutSegment.Transition.SMOOTH) {
+			// The smooth switch-out's length, shaded in the gap after the block.
+			double rampWidth = Math.min(width - endX,
+					xForTime(display.end() + CameraLayoutSegment.SMOOTH_MS) - endX);
+			graphics.setFill(CAMERA_LAYOUT_RAMP);
+			graphics.fillRect(endX, y, Math.max(0, rampWidth), height);
+		}
+		// Label between the switch diamonds; a dot marks a segment with its own size or style.
 		String label = segment.style().isInherit() ? item.label() : item.label() + " •";
-		if (blockWidth > 34) {
+		double labelWidth = blockWidth - (gapAfter ? 44 : 22);
+		if (labelWidth > 12) {
 			graphics.setFont(BLOCK_FONT);
 			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(label, blockWidth - 22, BLOCK_FONT), x + 16,
+			graphics.fillText(fitText(label, labelWidth, BLOCK_FONT), x + 16,
 					y + height / 2 + 4);
 		}
 		if (isSelected(TimelineSelection.CAMERA_LAYOUT, item.id())) {
@@ -2125,6 +2142,9 @@ public final class TimelineView extends Region {
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 		drawCameraSwitch(graphics, segment, startX, y + height / 2);
+		if (gapAfter) {
+			drawCameraSwitchOut(graphics, segment, endX, y + height / 2);
+		}
 	}
 
 	/**
@@ -2132,12 +2152,28 @@ public final class TimelineView extends Region {
 	 * it toggles between the two.
 	 */
 	private void drawCameraSwitch(GraphicsContext graphics, CameraLayoutSegment segment,
-			double centerX, double centerY) {
+			double startX, double centerY) {
+		drawSwitchDiamond(graphics, segment.transition(), startX + 7, centerY,
+				cameraSwitchBounds, segment.id());
+	}
+
+	/**
+	 * The switch-out diamond at a segment end followed by a gap: hollow for a cut, filled for a
+	 * smooth move back to the project layout. Clicking it toggles between the two.
+	 */
+	private void drawCameraSwitchOut(GraphicsContext graphics, CameraLayoutSegment segment,
+			double endX, double centerY) {
+		drawSwitchDiamond(graphics, segment.transitionOut(), endX - 7, centerY,
+				cameraSwitchOutBounds, segment.id());
+	}
+
+	private void drawSwitchDiamond(GraphicsContext graphics,
+			CameraLayoutSegment.Transition transition, double cx, double centerY,
+			Map<String, BlockBounds> bounds, String segmentId) {
 		double half = 5;
-		double cx = centerX + half + 2;
 		double[] xs = {cx, cx + half, cx, cx - half};
 		double[] ys = {centerY - half, centerY, centerY + half, centerY};
-		if (segment.transition() == CameraLayoutSegment.Transition.SMOOTH) {
+		if (transition == CameraLayoutSegment.Transition.SMOOTH) {
 			graphics.setFill(CAMERA_LAYOUT_BORDER);
 			graphics.fillPolygon(xs, ys, 4);
 		} else {
@@ -2147,16 +2183,26 @@ public final class TimelineView extends Region {
 			graphics.setLineWidth(1.2);
 			graphics.strokePolygon(xs, ys, 4);
 		}
-		cameraSwitchBounds.put(segment.id(),
+		bounds.put(segmentId,
 				new BlockBounds(cx - half - 2, centerY - half - 2, half * 2 + 4, half * 2 + 4));
 	}
 
 	/** The segment whose switch diamond is under the point, if any. */
 	private Optional<String> cameraSwitchAt(double x, double y) {
-		for (var entry : cameraSwitchBounds.entrySet()) {
-			BlockBounds bounds = entry.getValue();
-			if (x >= bounds.minX() && x <= bounds.minX() + bounds.width() && y >= bounds.minY()
-					&& y <= bounds.minY() + bounds.height()) {
+		return cameraSwitchAt(x, y, cameraSwitchBounds);
+	}
+
+	/** The segment whose switch-out diamond is under the point, if any. */
+	private Optional<String> cameraSwitchOutAt(double x, double y) {
+		return cameraSwitchAt(x, y, cameraSwitchOutBounds);
+	}
+
+	private Optional<String> cameraSwitchAt(double x, double y,
+			Map<String, BlockBounds> bounds) {
+		for (var entry : bounds.entrySet()) {
+			BlockBounds block = entry.getValue();
+			if (x >= block.minX() && x <= block.minX() + block.width() && y >= block.minY()
+					&& y <= block.minY() + block.height()) {
 				return Optional.of(entry.getKey());
 			}
 		}

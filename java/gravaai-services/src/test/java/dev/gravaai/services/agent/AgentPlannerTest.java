@@ -153,14 +153,17 @@ class AgentPlannerTest {
 	void cameraLayoutOps() {
 		Ok result = ok(apply(baseState(), """
 				[{"op":"camera_layout","from":0,"layout":"split-right"},
-				 {"op":"camera_layout","from":20,"to":30,"layout":"bottom-right","transition":"smooth","size":30},
+				 {"op":"camera_layout","from":20,"to":30,"layout":"bottom-right","transition":"smooth",
+				  "transitionOut":"smooth","size":30},
 				 {"op":"cut","from":0,"to":10}]"""));
 		List<String> segments = result.state().cameraLayoutSegments().stream()
 				.map(segment -> segment.startMs() + "-" + segment.endMs() + ":"
-						+ segment.layout().wire() + ":" + segment.transition().wire())
+						+ segment.layout().wire() + ":" + segment.transition().wire()
+						+ ":" + segment.transitionOut().wire())
 				.toList();
-		assertEquals(List.of("0-10000:split-right:cut", "10000-20000:bottom-right:smooth",
-				"20000-50000:split-right:cut"), segments);
+		assertEquals(List.of("0-10000:split-right:cut:cut",
+				"10000-20000:bottom-right:smooth:smooth", "20000-50000:split-right:cut:cut"),
+				segments);
 		assertEquals(30, result.state().cameraLayoutSegments().get(1).style().size()
 				.getAsDouble(), 1e-9);
 

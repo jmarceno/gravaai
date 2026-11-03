@@ -54,6 +54,7 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	private int latencyMicros;
 	private double volume = 1;
 	private double rate = 1;
+	private @Nullable ClickSoundTrack clickTrack;
 	private volatile boolean closed;
 	private volatile boolean paused;
 
@@ -93,16 +94,30 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	/** Production factory: libpulse-simple sink + the bundled ffmpeg CLI PCM source. */
 	public static PlaybackAudioProducer openWithPulse(
 			String mediaPath, List<ClipRegion> clips, Path ffmpegPath) {
+		return openWithPulse(mediaPath, clips, ffmpegPath, null);
+	}
+
+	/** Production factory with a click-sound track mixed into every chunk. */
+	public static PlaybackAudioProducer openWithPulse(
+			String mediaPath, List<ClipRegion> clips, Path ffmpegPath,
+			@Nullable ClickSoundTrack clickTrack) {
 		if (ffmpegPath == null) {
 			throw new IllegalArgumentException("ffmpegPath must not be null");
 		}
 		Path ffmpeg = ffmpegPath;
-		return new PlaybackAudioProducer(
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(
 				mediaPath,
 				clips,
 				PulseAudio.openPlayback(),
 				(path, start, duration, filters) -> FfmpegCliPcmSource.open(
 						ffmpeg, path, start, duration, filters));
+		producer.setClickTrack(clickTrack);
+		return producer;
+	}
+
+	/** Swaps the click-sound track in/out at once (no decoder reopen); {@code null} removes it. */
+	public synchronized void setClickTrack(@Nullable ClickSoundTrack clickTrack) {
+		this.clickTrack = clickTrack;
 	}
 
 	@Override
@@ -133,6 +148,10 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 				return;
 			}
 			if (frames > 0) {
+				ClickSoundTrack track = clickTrack;
+				if (track != null) {
+					track.mix(chunk, frames, chunkStartSeconds);
+				}
 				applyVolumeLocked(frames);
 				fadeGain.apply(chunk, frames, CHANNELS, chunkStartSeconds);
 				sink.write(chunk, frames);
@@ -157,6 +176,13 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 		if (nextStart >= 0) {
 			framesToWrite = (int) Math.max(1,
 					Math.min(chunkFrames, Math.ceil((nextStart - timelineSeconds) * SAMPLE_RATE)));
+		}
+		// The shared silence array is never written otherwise: clear the samples about to go out,
+		// then mix, so click residue cannot repeat across gaps.
+		java.util.Arrays.fill(silence, 0, framesToWrite * CHANNELS, 0f);
+		ClickSoundTrack track = clickTrack;
+		if (track != null) {
+			track.mix(silence, framesToWrite, timelineSeconds);
 		}
 		sink.write(silence, framesToWrite);
 		samplesWritten += framesToWrite;

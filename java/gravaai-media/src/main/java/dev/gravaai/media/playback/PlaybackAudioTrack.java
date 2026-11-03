@@ -1,5 +1,7 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * The audio side of the preview engine (plan §5.9): decodes/filters (atempo for clip speed regions)
  * and writes stereo float32 48 kHz PCM to the output, exposing the counters the audio-master clock
@@ -32,6 +34,10 @@ public interface PlaybackAudioTrack extends AutoCloseable {
 	}
 
 	default void setVolume(double volume) {
+	}
+
+	/** Swaps the click-sound track in/out at once (no decoder reopen); {@code null} removes it. */
+	default void setClickTrack(@Nullable ClickSoundTrack track) {
 	}
 
 	@Override

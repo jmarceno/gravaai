@@ -74,7 +74,7 @@ final class AgentFrameRenderer {
 				Json.nodeFactory().objectNode().put("exportQuality", "source"));
 		Path placeholder = Path.of(System.getProperty("java.io.tmpdir"), "agent-frames.mp4");
 		ProjectExport.Input probe = new ProjectExport.Input(state, videoPath, webcamPath, List.of(),
-				preferences, placeholder, false, true, editedMs / 1000.0);
+				preferences, placeholder, false, true, editedMs / 1000.0, List.of());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(probe);
 		int height = Math.max(2, (int) Math.round(
 				(double) width * prepared.outputHeight() / prepared.outputWidth()));

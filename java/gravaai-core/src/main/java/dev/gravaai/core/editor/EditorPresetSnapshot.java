@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 import dev.gravaai.core.project.AutoCaptionSettings;
+import dev.gravaai.core.project.ClickSoundSettings;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
@@ -55,4 +56,5 @@ public record EditorPresetSnapshot(
 		WebcamPresetSettings webcam,
 		CropRegion cropRegion,
 		AutoCaptionSettings autoCaptionSettings,
-		KeystrokeOverlaySettings keystrokeOverlay) {}
+		KeystrokeOverlaySettings keystrokeOverlay,
+		ClickSoundSettings clickSound) {}

@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.AutoCaptionSettings;
+import dev.gravaai.core.project.ClickSoundSettings;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.Padding;
@@ -93,6 +94,8 @@ public final class EditorPresets {
 				singleField(raw, "autoCaptionSettings")).autoCaptionSettings();
 		KeystrokeOverlaySettings keystrokeOverlay = ProjectPersistence.normalizeProjectEditor(
 				singleField(raw, "keystrokeOverlay")).keystrokeOverlay();
+		ClickSoundSettings clickSound = ProjectPersistence.normalizeProjectEditor(
+				singleField(raw, "clickSound")).clickSound();
 
 		return new EditorPresetSnapshot(
 				preferences.wallpaper(), preferences.shadowIntensity(), preferences.backgroundBlur(),
@@ -114,7 +117,7 @@ public final class EditorPresets {
 				preferences.cursorSway(), preferences.borderRadius(), preferences.padding(),
 				preferences.aspectRatio(), "percent",
 				WebcamPresetSettings.from(preferences.webcam()), cropRegion, autoCaptionSettings,
-				keystrokeOverlay);
+				keystrokeOverlay, clickSound);
 	}
 
 	/** One-field object for the project normaliser; {@code raw} is null when nothing is stored. */
@@ -223,6 +226,7 @@ public final class EditorPresets {
 		node.set("cropRegion", cropRegionToJson(snapshot.cropRegion()));
 		node.set("autoCaptionSettings", autoCaptionSettingsToJson(snapshot.autoCaptionSettings()));
 		node.set("keystrokeOverlay", keystrokeOverlayToJson(snapshot.keystrokeOverlay()));
+		node.set("clickSound", clickSoundToJson(snapshot.clickSound()));
 		return node;
 	}
 
@@ -290,6 +294,14 @@ public final class EditorPresets {
 		node.put("fadeMs", settings.fadeMs());
 		node.put("groupingMs", settings.groupingMs());
 		node.put("bottomOffset", settings.bottomOffset());
+		return node;
+	}
+
+	private static ObjectNode clickSoundToJson(ClickSoundSettings settings) {
+		ObjectNode node = Json.nodeFactory().objectNode();
+		node.put("enabled", settings.enabled());
+		node.put("sound", settings.sound().wire());
+		node.put("volume", settings.volume());
 		return node;
 	}
 }

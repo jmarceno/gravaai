@@ -85,6 +85,21 @@ style names (`macos`, `tahoe`, `windows11`, `golden-gate`, `figma`) are picker l
 sprite comes from the same CC0 pack. The pack's license is reproduced in
 `java/gravaai-media/src/main/resources/dev/gravaai/media/cursors/LICENSE.txt`.
 
+## Click sounds
+
+The click sounds under `java/gravaai-media/src/main/resources/dev/gravaai/media/sounds/`
+are three selected OGGs from Kenney's [UI Audio](https://kenney.nl/assets/ui-audio) and
+[Interface Sounds](https://kenney.nl/assets/interface-sounds) packs, both released under
+**CC0 1.0**. They are shipped as downloaded, renamed only. The packs' license texts are
+reproduced in
+`java/gravaai-media/src/main/resources/dev/gravaai/media/sounds/LICENSE.txt`.
+
+| File | Label | Creator | License | Source |
+| --- | --- | --- | --- | --- |
+| `click-crisp.ogg` | Crisp | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`mouseclick1.ogg`) |
+| `click-tick.ogg` | Tick | Kenney | CC0 1.0 | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) (`tick_001.ogg`) |
+| `click-soft.ogg` | Soft | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`click2.ogg`) |
+
 ## Logo
 
 `branding/gravaai.png` and `app-icons/gravaai-*.png` are the Gravaai logo and application

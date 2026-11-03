@@ -105,15 +105,16 @@ final class AgentExportRunner {
 		Path webcamPath = session.webcamPath();
 		Path wallpaperRoot = stageWallpapers(state.wallpaper());
 		try {
-			ProjectExport.Input input = new ProjectExport.Input(state, videoPath, webcamPath,
-					List.of(), preferences, destination, false, true, durationSeconds);
-			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			List<CursorSample> cursorSamples;
 			try {
 				cursorSamples = CursorTelemetryLoader.load(session.videoPath());
 			} catch (RuntimeException error) {
 				cursorSamples = List.of();
 			}
+			ProjectExport.Input input = new ProjectExport.Input(state, videoPath, webcamPath,
+					List.of(), preferences, destination, false, true, durationSeconds,
+					cursorSamples);
+			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state,
 					prepared.videoPath(), prepared.webcamPath(), cursorSamples,
 					prepared.durationSeconds(), 0, wallpaperRoot, prepared.frameRate());

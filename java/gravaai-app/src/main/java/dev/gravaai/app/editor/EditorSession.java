@@ -18,6 +18,7 @@ import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.ClickSoundSettings;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
@@ -25,7 +26,10 @@ import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.result.Result;
+import dev.gravaai.media.audio.ClickSoundHits;
+import dev.gravaai.media.audio.ClickSounds;
 import dev.gravaai.media.playback.AudioMediaClock;
+import dev.gravaai.media.playback.ClickSoundTrack;
 import dev.gravaai.media.playback.DecoderFrameSourceProvider;
 import dev.gravaai.media.playback.PlaybackAudioProducer;
 import dev.gravaai.media.playback.PlaybackAudioTrack;
@@ -85,6 +89,8 @@ public final class EditorSession implements AutoCloseable {
 	private volatile boolean closed;
 	/** The clips playback was last given; null until media is attached. */
 	private volatile @Nullable List<ClipRegion> playbackClips;
+	/** The click-sound settings the audio track was last given (change detection). */
+	private volatile @Nullable ClickSoundSettings appliedClickSound;
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
@@ -99,6 +105,8 @@ public final class EditorSession implements AutoCloseable {
 		this.engine = new PlaybackEngine(PlaybackEngine.Dependencies.production(
 				DecoderFrameSourceProvider.ffmpegBacked(), new AudioMediaClock(), true));
 		this.playback = new PlaybackControllerPort(engine);
+		// Decode the bundled clicks off-thread: the first audition and the first playback are warm.
+		ClickSounds.preload();
 		this.timeSubscription = engine.onTime(time -> {
 			long ms = Math.round(time.timelineSeconds() * 1000);
 			playheadMs.set(ms);
@@ -113,6 +121,7 @@ public final class EditorSession implements AutoCloseable {
 		this.changeSubscription = store.onChange(changed -> {
 			dirty.set(true);
 			syncPlaybackClips();
+			syncClickSound();
 		});
 		this.dataSource = new StoreTimelineDataSource(store, this::timelineDurationMs,
 				() -> (double) playheadMs.get(), WaveformProvider.empty());
@@ -180,9 +189,12 @@ public final class EditorSession implements AutoCloseable {
 				"editor media attached, duration=" + media.sourceDurationMs() + " ms");
 		try {
 			LOG.log(System.Logger.Level.INFO, "editor audio attach start");
+			ClickSoundSettings clickSound = store.state().clickSound();
 			PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
-					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"));
+					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+					clickTrackFor(clickSound, media.videoPath(), media.clips()));
+			appliedClickSound = clickSound;
 			if (mediaGeneration.get() != generation) {
 				// Superseded while the audio producer opened: keep the replacement's track.
 				closeQuietly(audio);
@@ -233,9 +245,12 @@ public final class EditorSession implements AutoCloseable {
 		PlaybackAudioTrack previous = audioTrack;
 		PlaybackAudioTrack audio = null;
 		try {
+			ClickSoundSettings clickSound = store.state().clickSound();
 			audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
-					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"));
+					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+					clickTrackFor(clickSound, media.videoPath(), media.clips()));
+			appliedClickSound = clickSound;
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "audio playback unavailable after replace: " + error);
 		}
@@ -285,8 +300,11 @@ public final class EditorSession implements AutoCloseable {
 			}
 			PlaybackAudioTrack previous = audioTrack;
 			try {
+				ClickSoundSettings clickSound = store.state().clickSound();
 				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(video, clips,
-						NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"));
+						NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+						clickTrackFor(clickSound, video, clips));
+				appliedClickSound = clickSound;
 				if (audio != null) {
 					// setAudioTrack seeks the new track to the playhead; the engine tick pumps it.
 					engine.setAudioTrack(audio);
@@ -297,6 +315,44 @@ public final class EditorSession implements AutoCloseable {
 				LOG.log(System.Logger.Level.WARNING, "audio playback not updated after an edit: " + error);
 			}
 		});
+	}
+
+	/**
+	 * Swaps the click-sound track when the setting changed: the producer stays open, only the
+	 * track is replaced. The rebuild runs on the clip-sync executor so the sidecar read never
+	 * touches the FX thread and lands after any clip reopen.
+	 */
+	private void syncClickSound() {
+		ClickSoundSettings clickSound = store.state().clickSound();
+		if (clickSound.equals(appliedClickSound)) {
+			return;
+		}
+		appliedClickSound = clickSound;
+		clipSync.execute(() -> {
+			if (closed) {
+				return;
+			}
+			PlaybackAudioTrack track = audioTrack;
+			String video = mediaSource.videoPath();
+			if (track == null || video == null || video.isBlank()) {
+				return;
+			}
+			track.setClickTrack(clickTrackFor(clickSound, video, store.state().clipRegions()));
+		});
+	}
+
+	/** The preview click track for these settings, or {@code null} when off / no clicks on screen. */
+	private @Nullable ClickSoundTrack clickTrackFor(
+			ClickSoundSettings clickSound, String videoPath, List<ClipRegion> clips) {
+		if (!clickSound.enabled()) {
+			return null;
+		}
+		long[] timesMs = ClickSoundHits.timesMs(
+				clickSound, CursorTelemetryLoader.load(videoPath), clips);
+		if (timesMs.length == 0) {
+			return null;
+		}
+		return new ClickSoundTrack(clickSound.sound(), clickSound.volume(), timesMs);
 	}
 
 	/** Loads a project through the canonical persistence path and starts a playback session. */

@@ -1083,8 +1083,60 @@ public final class EditorInspectorPanel extends VBox {
 		root.getChildren().add(slider("Effect duration", state.cursorClickEffectDurationMs(), 120,
 				1200, 10, value -> Math.round(value) + "ms",
 				value -> apply(json -> json.put("cursorClickEffectDurationMs", value))));
+		root.getChildren().add(clickSoundBlock(state.clickSound()));
 		root.getChildren().add(keystrokesBlock(state.keystrokeOverlay()));
 		return root;
+	}
+
+	/**
+	 * "Click sound" block of the cursor section: a switch, the sound choice (auditioned on
+	 * change) and volume. Global on purpose — the sound belongs to the click, like the visual
+	 * effect, so one setting covers every recorded click and the timeline stays clean.
+	 */
+	private VBox clickSoundBlock(dev.gravaai.core.project.ClickSoundSettings settings) {
+		var sound = settings == null
+				? dev.gravaai.core.project.ClickSoundSettings.DEFAULT : settings;
+		VBox block = new VBox(12);
+		block.getStyleClass().add("editor-keystrokes");
+		Label title = new Label("Click sound");
+		title.getStyleClass().add("editor-section__label");
+		Switch enabled = new Switch("Click sounds");
+		enabled.setChecked(sound.enabled());
+		enabled.onCheckedChange(value -> applyClickSound(json -> json.put("enabled", value)));
+		block.getChildren().addAll(title, enabled);
+
+		if (ClickEvents.count(recordingPath.get()) == 0) {
+			enabled.setDisable(true);
+			Label empty = new Label("No clicks were recorded in this recording's cursor"
+					+ " telemetry, so there is nothing to sound.");
+			empty.setWrapText(true);
+			empty.getStyleClass().add("editor-keystrokes__empty");
+			empty.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			block.getChildren().add(empty);
+			return block;
+		}
+
+		ChoiceGroup style = choice("crisp", "Crisp", "tick", "Tick", "soft", "Soft");
+		style.setValue(sound.sound().wire());
+		style.onValueChange(value -> {
+			var picked = dev.gravaai.core.project.ClickSoundStyle.fromWire(value);
+			applyClickSound(json -> json.put("sound", picked.wire()));
+			dev.gravaai.media.audio.ClickSoundAudition.play(picked, sound.volume());
+		});
+		style.setAccessibleText("Click sound");
+		block.getChildren().add(style);
+		block.getChildren().add(slider("Volume", sound.volume(), 0, 1, 0.01,
+				value -> Math.round(value * 100) + "%",
+				value -> applyClickSound(json -> json.put("volume", value))));
+		return block;
+	}
+
+	private void applyClickSound(java.util.function.Consumer<tools.jackson.databind.node.ObjectNode> mutation) {
+		apply(json -> {
+			tools.jackson.databind.JsonNode existing = json.get("clickSound");
+			mutation.accept(existing instanceof tools.jackson.databind.node.ObjectNode object
+					? object : json.putObject("clickSound"));
+		});
 	}
 
 	/**

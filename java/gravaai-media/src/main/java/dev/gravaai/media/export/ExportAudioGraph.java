@@ -84,7 +84,9 @@ public final class ExportAudioGraph {
 			chain.append('[').append(inputIndex).append(":a]")
 					.append("atrim=duration=").append(seconds(regionDurationSec * 1000))
 					.append(",asetpts=PTS-STARTPTS")
-					.append(",adelay=").append(delayMs).append('|').append(delayMs);
+					// ":all=1" delays every channel: the recording mixer's form, so a mono
+					// region (the click bus) lands on both channels.
+					.append(",adelay=").append(delayMs).append(":all=1");
 			if (needsVolume(region.gain())) {
 				chain.append(",volume=").append(number(region.gain()));
 			}

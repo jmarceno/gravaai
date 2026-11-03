@@ -18,7 +18,12 @@ import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.media.audio.ClickSoundHits;
+import dev.gravaai.media.audio.ClickSounds;
+import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.export.CaptionSidecars;
+import dev.gravaai.media.export.ClickSoundWav;
 import dev.gravaai.media.export.ExportAudioGraph;
 import dev.gravaai.media.export.ExportAudioPlan;
 import dev.gravaai.media.export.ExportAudioRouting;
@@ -57,10 +62,12 @@ public final class ProjectExport {
 	/** Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video. */
 	public record Input(ProjectEditorState editor, Path videoPath, @Nullable Path webcamPath,
 			List<Path> companionAudioPaths, ExportPreferences preferences, Path destination,
-			boolean reveal, boolean overwrite, double sourceDurationSeconds) {
+			boolean reveal, boolean overwrite, double sourceDurationSeconds,
+			List<CursorSample> cursorSamples) {
 		public Input {
 			companionAudioPaths = companionAudioPaths == null ? List.of()
 					: List.copyOf(companionAudioPaths);
+			cursorSamples = cursorSamples == null ? List.of() : List.copyOf(cursorSamples);
 			if (editor == null || videoPath == null || preferences == null
 					|| destination == null) {
 				throw new IllegalArgumentException(
@@ -71,7 +78,7 @@ public final class ProjectExport {
 		public static Input of(ProjectEditorState editor, Path videoPath,
 				ExportPreferences preferences, Path destination) {
 			return new Input(editor, videoPath, null, List.of(), preferences, destination, false,
-					false, 0);
+					false, 0, List.of());
 		}
 	}
 
@@ -175,9 +182,13 @@ public final class ProjectExport {
 	public static ExportRunner.Outcome run(Input input, ExportFrameProvider provider,
 			ExportPublisher publisher) throws IOException {
 		Prepared prepared = prepare(input);
-		return ExportRunner.run(prepared.request().toSpec(), provider,
-				dev.gravaai.media.export.ExportProgressListener.NONE,
-				dev.gravaai.media.export.ExportCancellation.NONE, publisher);
+		try {
+			return ExportRunner.run(prepared.request().toSpec(), provider,
+					dev.gravaai.media.export.ExportProgressListener.NONE,
+					dev.gravaai.media.export.ExportCancellation.NONE, publisher);
+		} finally {
+			Files.deleteIfExists(clickBusFor(input.destination()));
+		}
 	}
 
 	private static long timelineDurationMs(ProjectEditorState editor, long sourceDurationMs) {
@@ -242,8 +253,41 @@ public final class ProjectExport {
 				}
 			}
 		}
+		appendClickBus(input, regions);
 		return ExportAudioGraph.build(new ExportAudioGraph.GraphInput(tracks, regions, segments,
 				fades, timelineDurationMs, resolved.masterGain(), muted));
+	}
+
+	/**
+	 * Appends the pre-rendered click bus as one region (MP4 only; GIF has no audio). The render
+	 * is capped at the last hit plus the sound length, and muted clips do not silence clicks —
+	 * the bus is a region, by design.
+	 */
+	private static void appendClickBus(Input input, List<ExportAudioGraph.RegionInput> regions) {
+		if (input.preferences().exportFormat() == ExportFormat.GIF) {
+			return;
+		}
+		long[] timesMs = ClickSoundHits.timesMs(input.editor().clickSound(),
+				input.cursorSamples(), input.editor().clipRegions());
+		if (timesMs.length == 0) {
+			return;
+		}
+		ClickSoundStyle style = input.editor().clickSound().sound();
+		int soundFrames = ClickSounds.frames(style);
+		long lastHitEndMs = timesMs[timesMs.length - 1] + (soundFrames * 1000L + 47_999) / 48_000;
+		Path destination = input.destination().toAbsolutePath().normalize();
+		Path clickBus = destination.resolveSibling(destination.getFileName() + ".clicks.wav");
+		if (ClickSoundWav.write(clickBus, style, input.editor().clickSound().volume(), timesMs)
+				== null) {
+			return;
+		}
+		regions.add(new ExportAudioGraph.RegionInput(clickBus.toString(), 0, lastHitEndMs, 1));
+	}
+
+	/** The sidecar the click bus writes next to a destination (deleted after the run). */
+	private static Path clickBusFor(Path destination) {
+		Path absolute = destination.toAbsolutePath().normalize();
+		return absolute.resolveSibling(absolute.getFileName() + ".clicks.wav");
 	}
 
 	private static List<ExportAudioSegments.Segment> buildSegments(ProjectEditorState editor,

@@ -64,6 +64,13 @@ class ProjectDocumentTest {
 				&& !editor.has("cameraLayoutSegments")) {
 			editor.set("cameraLayoutSegments", Json.nodeFactory().arrayNode());
 		}
+		// Same for the click sound setting introduced with the bundled sounds: the canonical
+		// save always carries the normalised default.
+		if (expected.get("editor") instanceof ObjectNode editor
+				&& !editor.has("clickSound")) {
+			editor.set("clickSound",
+					ProjectDocument.writeClickSound(ClickSoundSettings.DEFAULT));
+		}
 
 		assertEquals(2, saved.get("version").intValue());
 		assertSemanticallyEqual(expected, saved, "$");

@@ -67,6 +67,10 @@ class ProjectExportTest {
 
 	/** A 2 s project: one clip 0-2000 ms of the 2 s H.264 fixture. */
 	private static ProjectEditorState twoSecondProject(String videoPath) {
+		return ProjectPersistence.normalizeProjectEditor(twoSecondEditor());
+	}
+
+	private static ObjectNode twoSecondEditor() {
 		ObjectNode editor = Json.nodeFactory().objectNode();
 		editor.put("aspectRatio", "16:9");
 		var clips = editor.putArray("clipRegions");
@@ -78,7 +82,7 @@ class ProjectExportTest {
 		editor.putArray("speedRegions");
 		editor.putArray("audioRegions");
 		editor.putArray("autoCaptions");
-		return ProjectPersistence.normalizeProjectEditor(editor);
+		return editor;
 	}
 
 	@Test
@@ -89,7 +93,7 @@ class ProjectExportTest {
 				ExportEncodingMode.FAST, ExportFormat.MP4, false);
 		ProjectExport.Input input = new ProjectExport.Input(
 				twoSecondProject(video.toString()), video, null, List.of(media("aac-48k-stereo.m4a")),
-				preferences, tempDir.resolve("two-seconds.mp4"), false, false, 0);
+				preferences, tempDir.resolve("two-seconds.mp4"), false, false, 0, List.of());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		assertEquals(ExportFormat.MP4, prepared.format());
 		assertEquals(1152, prepared.outputWidth());
@@ -122,7 +126,7 @@ class ProjectExportTest {
 				ProjectPersistence.normalizeProjectEditor(editor), video, null,
 				List.of(media("aac-48k-stereo.m4a")),
 				preferences(ExportQuality.MEDIUM, ExportEncodingMode.FAST, ExportFormat.MP4, false),
-				tempDir.resolve("clips.mp4"), false, false, 0);
+				tempDir.resolve("clips.mp4"), false, false, 0, List.of());
 		String graph = ProjectExport.prepare(input).audioPlan().filterComplex();
 		assertTrue(graph.contains("atrim=start=0.000:end=0.500"), graph);
 		assertTrue(graph.contains("atrim=start=1.000:end=2.000,asetpts=PTS-STARTPTS,atempo=2"), graph);
@@ -150,7 +154,7 @@ class ProjectExportTest {
 		editor.putArray("autoCaptions");
 		ProjectExport.Input input = new ProjectExport.Input(
 				ProjectPersistence.normalizeProjectEditor(editor), video, null, List.of(),
-				preferences, tempDir.resolve("two-seconds.gif"), false, false, 0);
+				preferences, tempDir.resolve("two-seconds.gif"), false, false, 0, List.of());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		assertEquals(ExportFormat.GIF, prepared.format());
 		// React: calculateOutputDimensions(1920, 1080, medium) → 1280x720 (the 1:1 aspect would
@@ -171,7 +175,7 @@ class ProjectExportTest {
 		Path destination = tempDir.resolve("encoded.mp4");
 		ProjectExport.Input input = new ProjectExport.Input(
 				twoSecondProject(video.toString()), video, null,
-				List.of(media("aac-48k-stereo.m4a")), preferences, destination, false, false, 0);
+				List.of(media("aac-48k-stereo.m4a")), preferences, destination, false, false, 0, List.of());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		ExportRunner.Outcome outcome = ProjectExport.run(input,
 				new SyntheticFrameProvider(prepared.outputWidth(), prepared.outputHeight(),
@@ -190,6 +194,42 @@ class ProjectExportTest {
 	}
 
 	@Test
+	@DisplayName("appends the click bus region when click sounds are on")
+	void appendsClickBusWhenOn() {
+		Path video = media("h264-1080p60.mp4");
+		ObjectNode editor = twoSecondEditor();
+		editor.putObject("clickSound").put("enabled", true).put("sound", "tick").put("volume", 0.8);
+		ProjectExport.Input input = new ProjectExport.Input(
+				ProjectPersistence.normalizeProjectEditor(editor), video, null,
+				List.of(media("aac-48k-stereo.m4a")),
+				preferences(ExportQuality.MEDIUM, ExportEncodingMode.FAST, ExportFormat.MP4, false),
+				tempDir.resolve("clicks.mp4"), false, false, 0,
+				List.of(new dev.gravaai.media.compose.CursorSample(1.0, 0.5, 0.5, null, "click")));
+		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
+		assertTrue(prepared.audioInputs().stream()
+						.anyMatch(path -> path.getFileName().toString().endsWith(".clicks.wav")),
+				"the click bus joins the inputs: " + prepared.audioInputs());
+		assertTrue(prepared.audioPlan().filterComplex().contains("adelay=0:all=1"),
+				prepared.audioPlan().filterComplex());
+	}
+
+	@Test
+	@DisplayName("adds no click region when click sounds are off")
+	void noClickBusWhenOff() {
+		Path video = media("h264-1080p60.mp4");
+		ProjectExport.Input input = new ProjectExport.Input(
+				twoSecondProject(video.toString()), video, null,
+				List.of(media("aac-48k-stereo.m4a")),
+				preferences(ExportQuality.MEDIUM, ExportEncodingMode.FAST, ExportFormat.MP4, false),
+				tempDir.resolve("silent-clicks.mp4"), false, false, 0,
+				List.of(new dev.gravaai.media.compose.CursorSample(1.0, 0.5, 0.5, null, "click")));
+		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
+		assertTrue(prepared.audioInputs().stream()
+						.noneMatch(path -> path.getFileName().toString().endsWith(".clicks.wav")),
+				"a disabled setting exports no click bus: " + prepared.audioInputs());
+	}
+
+	@Test
 	@DisplayName("prepares the 2-minute acceptance fixture with its embedded main audio")
 	void preparesAcceptanceFixture() throws Exception {
 		Path projectFile = fixturesDirectory().resolve("..").resolve("projects")
@@ -199,7 +239,7 @@ class ProjectExportTest {
 		Path video = Path.of(document.videoPath());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(new ProjectExport.Input(
 				document.editor(), video, null, List.of(), ExportPreferences.defaults(),
-				tempDir.resolve("acceptance.mp4"), false, false, 0));
+				tempDir.resolve("acceptance.mp4"), false, false, 0, List.of()));
 		assertEquals(ExportFormat.MP4, prepared.format());
 		assertEquals(1280, prepared.outputWidth());
 		assertEquals(720, prepared.outputHeight());
@@ -220,7 +260,7 @@ class ProjectExportTest {
 				ExportEncodingMode.FAST, ExportFormat.MP4, false);
 		Path destination = tempDir.resolve("acceptance-2min.mp4");
 		ProjectExport.Input input = new ProjectExport.Input(document.editor(), video, null,
-				List.of(), preferences, destination, false, false, 0);
+				List.of(), preferences, destination, false, false, 0, List.of());
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		ExportRunner.Outcome outcome = ProjectExport.run(input,
 				new SyntheticFrameProvider(prepared.outputWidth(), prepared.outputHeight(),

@@ -319,4 +319,39 @@ class ProjectPersistenceNormalizerTest {
 				editor("{\"version\":2,\"videoPath\":\"/tmp/a.mp4\"}")));
 		assertFalse(ProjectPersistence.validateProjectData(editor("[]")));
 	}
+
+	@Test
+	@DisplayName("clickSound defaults to off / crisp / 0.8 when missing")
+	void clickSoundDefaults() {
+		assertEquals(ClickSoundSettings.DEFAULT, normalize("{}").clickSound());
+		assertEquals(new ClickSoundSettings(false, ClickSoundStyle.CRISP, 0.8),
+				normalize("{\"clickSound\":\"not-an-object\"}").clickSound());
+	}
+
+	@Test
+	@DisplayName("clickSound normalises an unknown sound wire to crisp")
+	void clickSoundUnknownWireBecomesCrisp() {
+		ProjectEditorState state = normalize("{\"clickSound\":{\"sound\":\"whoosh\"}}");
+		assertEquals(ClickSoundStyle.CRISP, state.clickSound().sound());
+		assertEquals(ClickSoundStyle.SOFT,
+				normalize("{\"clickSound\":{\"sound\":\"soft\"}}").clickSound().sound());
+	}
+
+	@Test
+	@DisplayName("clickSound clamps volume to 0..1")
+	void clickSoundVolumeClamp() {
+		assertEquals(1, normalize("{\"clickSound\":{\"volume\":3}}").clickSound().volume());
+		assertEquals(0, normalize("{\"clickSound\":{\"volume\":-2}}").clickSound().volume());
+		assertEquals(0.8, normalize("{\"clickSound\":{\"volume\":\"loud\"}}")
+				.clickSound().volume());
+	}
+
+	@Test
+	@DisplayName("round-trips the nested click sound through the project document writer")
+	void roundTripsClickSound() {
+		ClickSoundSettings settings = new ClickSoundSettings(true, ClickSoundStyle.TICK, 0.4);
+		String json = ProjectDocument.writeClickSound(settings).toString();
+		ProjectEditorState state = normalize("{\"clickSound\":" + json + "}");
+		assertEquals(settings, state.clickSound());
+	}
 }

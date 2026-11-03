@@ -93,9 +93,21 @@ class ExportAudioGraphTest {
 				List.of(new RegionInput("/tmp/music.wav", 500, 1_500, 0.8)), List.of(), List.of(),
 				2_000, 1.0));
 		String graph = plan.filterComplex();
-		assertTrue(graph.contains("[2:a]atrim=duration=1.000,asetpts=PTS-STARTPTS,adelay=500|500,volume=0.800"),
+		assertTrue(graph.contains("[2:a]atrim=duration=1.000,asetpts=PTS-STARTPTS,adelay=500:all=1,volume=0.800"),
 				graph);
 		assertTrue(graph.contains("amix=inputs=2:duration=longest:normalize=0"), graph);
+	}
+
+	@Test
+	@DisplayName("a mono region at timeline 0 (the click bus) lands on both channels")
+	void monoRegionAtZeroDelaysAllChannels() {
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0)),
+				List.of(new RegionInput("/tmp/clicks.wav", 0, 1_500, 1.0)), List.of(), List.of(),
+				2_000, 1.0));
+		String graph = plan.filterComplex();
+		assertTrue(graph.contains("[2:a]atrim=duration=1.500,asetpts=PTS-STARTPTS,adelay=0:all=1"),
+				graph);
 	}
 
 	@Test

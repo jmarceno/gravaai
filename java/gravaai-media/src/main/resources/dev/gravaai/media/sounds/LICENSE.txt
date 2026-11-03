@@ -1,0 +1,54 @@
+Click sound assets (click-crisp.ogg, click-tick.ogg, click-soft.ogg) are selected
+files from two Kenney packs, redistributed under their original CC0 terms:
+
+  - click-crisp.ogg = ui-audio/Audio/mouseclick1.ogg  (UI SFX Set)
+  - click-tick.ogg  = interface-sounds/Audio/tick_001.ogg (Interface Sounds)
+  - click-soft.ogg  = ui-audio/Audio/click2.ogg       (UI SFX Set)
+
+The two packs' license texts, verbatim:
+
+============================================================
+
+	UI SFX Set
+
+	by  Kenney Vleugels (Kenney.nl)
+
+			------------------------------
+
+	License (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	You may use these assets in personal and commercial projects.
+	Credit (Kenney or www.kenney.nl) would be nice but is not mandatory.
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Request:  http://request.kenney.nl
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL
+
+============================================================
+
+	Interface Sounds (1.0)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 11-02-2020
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Patreon:  http://patreon.com/kenney/
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL

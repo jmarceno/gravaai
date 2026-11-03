@@ -29,12 +29,15 @@ class PlaybackAudioProducerTest {
 		int latency = 0;
 		final List<Integer> framesPerWrite = new ArrayList<>();
 		final List<Float> firstSamples = new ArrayList<>();
+		/** Full copies of each written window (for click-sound checks). */
+		final List<float[]> snapshots = new ArrayList<>();
 
 		@Override
 		public void write(float[] interleavedStereo, int frameCount) {
 			writes++;
 			framesPerWrite.add(frameCount);
 			firstSamples.add(interleavedStereo[0]);
+			snapshots.add(java.util.Arrays.copyOf(interleavedStereo, frameCount * 2));
 		}
 
 		@Override
@@ -262,6 +265,79 @@ class PlaybackAudioProducerTest {
 		producer.resume();
 		producer.pump();
 		assertTrue(sink.writes > writes, "resume lets the pump write again");
+	}
+
+	@Test
+	@DisplayName("the click sound mixes over clip audio and through the preview volume")
+	void clickMixesOverClipAudio() {
+		FakeSink sink = new FakeSink();
+		FakeFactory factory = new FakeFactory(48_000, 0.5f);
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(
+				MEDIA, List.of(clip("a", 0, 1_000, 0L, 1)), sink, factory);
+		producer.setClickTrack(new ClickSoundTrack(
+				dev.gravaai.core.project.ClickSoundStyle.CRISP, 1, new long[] {500}));
+		producer.seek(0);
+		for (int index = 0; index < 14; index++) {
+			producer.pump();
+		}
+
+		// The 500 ms chunk (pump #13 covers 480-520 ms) carries the click on top of the audio.
+		float peak = 0;
+		for (float sample : sink.snapshots.get(12)) {
+			peak = Math.max(peak, Math.abs(sample));
+		}
+		assertTrue(peak > 0.5f, "the click rides above the 0.5 audio, peak " + peak);
+
+		// The producer volume applies to clicks too (mixed before applyVolumeLocked).
+		FakeSink quietSink = new FakeSink();
+		PlaybackAudioProducer quiet = new PlaybackAudioProducer(
+				MEDIA, List.of(clip("a", 0, 1_000, 0L, 1)), quietSink,
+				new FakeFactory(48_000, 0.5f));
+		quiet.setClickTrack(new ClickSoundTrack(
+				dev.gravaai.core.project.ClickSoundStyle.CRISP, 1, new long[] {500}));
+		quiet.setVolume(0.5);
+		quiet.seek(0);
+		for (int index = 0; index < 14; index++) {
+			quiet.pump();
+		}
+		float quietPeak = 0;
+		for (float sample : quietSink.snapshots.get(12)) {
+			quietPeak = Math.max(quietPeak, Math.abs(sample));
+		}
+		assertTrue(quietPeak <= peak * 0.55f + 0.05f, "the volume gain halves the click too");
+	}
+
+	@Test
+	@DisplayName("clicks play over timeline gaps, and the silence path never repeats residue")
+	void clickPlaysOverSilenceGaps() {
+		FakeSink sink = new FakeSink();
+		FakeFactory factory = new FakeFactory(0, 0.5f);
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(
+				MEDIA,
+				List.of(clip("a", 0, 1_000, 0L, 1), clip("b", 3_000, 4_000, 0L, 1)),
+				sink, factory);
+		producer.setClickTrack(new ClickSoundTrack(
+				dev.gravaai.core.project.ClickSoundStyle.CRISP, 1, new long[] {1_500}));
+		producer.seek(0);
+		boolean heard = false;
+		for (int index = 0; index < 90 && sink.snapshots.size() < 90; index++) {
+			producer.pump();
+			for (int write = sink.snapshots.size() - 1; write >= 0; write--) {
+				float peak = 0;
+				for (float sample : sink.snapshots.get(write)) {
+					peak = Math.max(peak, Math.abs(sample));
+				}
+				if (peak > 0) {
+					heard = true;
+					break;
+				}
+			}
+			if (heard) {
+				break;
+			}
+		}
+		assertTrue(heard, "a click inside the gap is audible through the silence path");
+		assertTrue(sink.writes > 3, "the gap keeps producing chunks");
 	}
 
 	@Test

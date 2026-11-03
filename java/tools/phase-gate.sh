@@ -14,7 +14,7 @@
 # time as the Java app (plan §7).
 set -euo pipefail
 
-REPO="$(cd "$(dirname "\${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNS=5
 TESTS=1
 while [ $# -gt 0 ]; do

@@ -207,11 +207,15 @@ public final class AudioDecoder implements AutoCloseable {
 				}
 			}
 			int available = Math.min(stagingCount, capacity - written);
-			MemorySegment.copy(staging, ValueLayout.JAVA_FLOAT,
-					(long) stagingStart * OUTPUT_CHANNELS,
-					MemorySegment.ofArray(interleaved), ValueLayout.JAVA_FLOAT,
-					(long) written * OUTPUT_CHANNELS,
-					(long) available * OUTPUT_CHANNELS);
+			// Byte-granularity copy on purpose: the element-indexed JAVA_FLOAT overload requires
+			// the heap destination's byte offset to be 16-byte aligned, and swr_convert can return
+			// an odd frame count (e.g. a mono OGG's 139-sample tail), which lands the write at a
+			// mid-float offset the index overload rejects.
+			MemorySegment.copy(staging,
+					(long) stagingStart * OUTPUT_CHANNELS * Float.BYTES,
+					MemorySegment.ofArray(interleaved),
+					(long) written * OUTPUT_CHANNELS * Float.BYTES,
+					(long) available * OUTPUT_CHANNELS * Float.BYTES);
 			stagingStart += available;
 			stagingCount -= available;
 			written += available;

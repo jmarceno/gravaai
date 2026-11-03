@@ -27,6 +27,9 @@ public final class EditorDefaults {
 	public static final double DEFAULT_ZOOM_OUT_DURATION_MS = 1015.05;
 	public static final double DEFAULT_CONNECTED_ZOOM_GAP_MS = 1500;
 	public static final double DEFAULT_CONNECTED_ZOOM_DURATION_MS = 1000;
+	public static final boolean DEFAULT_CLICK_SOUND_ENABLED = false;
+	public static final ClickSoundStyle DEFAULT_CLICK_SOUND_STYLE = ClickSoundStyle.CRISP;
+	public static final double DEFAULT_CLICK_SOUND_VOLUME = 0.8;
 	public static final ZoomTransitionEasing DEFAULT_ZOOM_IN_EASING = ZoomTransitionEasing.GRAAVAI;
 	public static final ZoomTransitionEasing DEFAULT_ZOOM_OUT_EASING = ZoomTransitionEasing.GRAAVAI;
 	public static final ZoomTransitionEasing DEFAULT_CONNECTED_ZOOM_EASING = ZoomTransitionEasing.GLIDE;

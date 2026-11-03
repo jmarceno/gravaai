@@ -16,6 +16,7 @@ import dev.gravaai.core.editor.ExportPreferences;
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.app.editor.CursorTelemetryLoader;
 import dev.gravaai.media.compose.CompositorExportFrameProvider;
+import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 import dev.gravaai.media.compose.ProjectFrameInputFactory;
 import dev.gravaai.services.extensions.ExtensionFrameOverlayHooks;
@@ -127,15 +128,16 @@ public final class ProjectExporter {
 					: preferences.exportFormat();
 			Path staged = stagingDir.resolve("export-" + System.currentTimeMillis()
 					+ (format == ExportFormat.GIF ? ".gif" : ".mp4"));
+			List<CursorSample> cursorSamples = CursorTelemetryLoader.load(session.videoPath());
 			ProjectExport.Input input = new ProjectExport.Input(session.store().state(),
 					Path.of(session.videoPath()), session.webcamPath(), List.of(), preferences,
 					staged, false, true,
-					session.timelineDataSource().totalDurationMs() / 1000.0);
+					session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
 			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			Path wallpaperRoot = stageWallpapers(session);
 			ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 					session.store().state(), prepared.videoPath(), prepared.webcamPath(),
-					CursorTelemetryLoader.load(session.videoPath()), prepared.durationSeconds(), 0,
+					cursorSamples, prepared.durationSeconds(), 0,
 					wallpaperRoot, prepared.frameRate());
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
@@ -354,15 +356,16 @@ public final class ProjectExporter {
 				"gif".equalsIgnoreCase(format) ? ExportFormat.GIF : ExportFormat.MP4,
 				defaults.gifFrameRate(), defaults.gifLoop(), defaults.gifSizePreset(),
 				defaults.publishDestination(), defaults.includeCaptionSidecar());
+		List<CursorSample> cursorSamples = CursorTelemetryLoader.load(session.videoPath());
 		ProjectExport.Input input = new ProjectExport.Input(session.store().state(),
 				Path.of(session.videoPath()), session.webcamPath(), List.of(), preferences,
 				destination, false, false,
-				session.timelineDataSource().totalDurationMs() / 1000.0);
+				session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		FrameOverlayHooks hooks = overlayHooks(prepared.durationSeconds());
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 				session.store().state(), prepared.videoPath(), prepared.webcamPath(),
-				CursorTelemetryLoader.load(session.videoPath()), prepared.durationSeconds(), 0,
+				cursorSamples, prepared.durationSeconds(), 0,
 				stageWallpapers(session), prepared.frameRate());
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),

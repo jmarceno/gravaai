@@ -122,6 +122,10 @@ Gravaai works offline. It goes online only when you ask it to:
 
 Gravaai is licensed under the **MIT**. See [LICENSE.md](LICENSE.md).
 
+The bundled wallpapers, animated wallpaper and recording icon are either original Gravaai
+artwork or CC0 1.0 public-domain works. See [ASSETS.md](ASSETS.md) for the per-asset
+provenance and licenses.
+
 ## Credits
 
 Gravaai was inspired by [@webadderall](https://github.com/webadderall) by [OpenScreen](https://github.com/siddharthvaddem/openscreen) by Siddharth Vaddem.

@@ -14,11 +14,12 @@ import org.junit.jupiter.api.Test;
 import dev.gravaai.ui.editor.EditorWallpapers;
 
 /**
- * Regression gate for the Electron assets migrated into {@code gravaai-ui} resources (P3.6).
+ * Regression gate for the bundled UI assets.
  *
- * <p>Every path here was a {@code public/} file in the Electron tree. The Java app loads it from
- * the classpath, so a missing resource is a silent visual regression (tray recording icon,
- * announcement banner) or a black export background.
+ * <p>Every path here is loaded from the classpath, so a missing resource is a silent visual
+ * regression (tray recording icon, announcement banner) or a black export background. The
+ * wallpapers and the animated wallpaper are the CC0 works documented in {@code ASSETS.md};
+ * the recording icon is original Gravaai artwork.
  */
 class BundledAssetsTest {
 
@@ -36,11 +37,13 @@ class BundledAssetsTest {
 	}
 
 	@Test
-	@DisplayName("the tray recording icon (public/rec-button.png) is packaged for AppIcons")
+	@DisplayName("the tray recording icon and its SVG source are packaged for AppIcons")
 	void trayRecordingIconIsBundled() throws IOException {
 		byte[] png = bytes("/app-icons/rec-button.png");
 		assertArrayEquals(PNG_MAGIC, java.util.Arrays.copyOf(png, 4));
 		assertTrue(png.length > 0);
+		String svg = text("/app-icons/rec-button.svg");
+		assertTrue(svg.startsWith("<svg "), "rec-button.svg is not an SVG document");
 	}
 
 	@Test

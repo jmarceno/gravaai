@@ -16,6 +16,7 @@ import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorCommand;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.CameraLayoutCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.SourceAudioCommands;
@@ -93,6 +94,8 @@ public final class StoreTimelineCommands implements TimelineCommands {
 			case TimelineSelection.CAPTION -> store.apply(new CaptionCommands.Select(selection.id()));
 			case TimelineSelection.KEYSTROKE ->
 				store.apply(new KeystrokeCommands.Select(selection.id()));
+			case TimelineSelection.CAMERA_LAYOUT ->
+				store.apply(new CameraLayoutCommands.Select(selection.id()));
 			default -> store.clearSelectionsExcept(null, null, null, null, null);
 		}
 	}
@@ -129,6 +132,10 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		}
 		if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
 			store.apply(new KeystrokeCommands.ChangeSpan(itemId, span.start(), span.end()));
+			return;
+		}
+		if (TimelineConstants.CAMERA_LAYOUT_ROW_ID.equals(rowId)) {
+			store.apply(new CameraLayoutCommands.ChangeSpan(itemId, span.start(), span.end()));
 			return;
 		}
 		if (TimelineConstants.CAPTION_ROW_ID.equals(rowId)) {
@@ -235,6 +242,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		String keystroke = store.selectedKeystrokeId();
 		if (keystroke != null) {
 			store.apply(new KeystrokeCommands.Delete(keystroke));
+			return;
+		}
+		String cameraLayout = store.selectedCameraLayoutId();
+		if (cameraLayout != null) {
+			store.apply(new CameraLayoutCommands.Delete(cameraLayout));
 		}
 	}
 
@@ -348,6 +360,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		for (var keystroke : store.state().keystrokeElements()) {
 			if (keystroke.id().equals(itemId)) {
 				return TimelineConstants.KEYSTROKE_ROW_ID;
+			}
+		}
+		for (var segment : store.state().cameraLayoutSegments()) {
+			if (segment.id().equals(itemId)) {
+				return TimelineConstants.CAMERA_LAYOUT_ROW_ID;
 			}
 		}
 		return "";

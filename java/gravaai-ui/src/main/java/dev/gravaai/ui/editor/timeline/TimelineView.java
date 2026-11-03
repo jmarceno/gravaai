@@ -11,6 +11,8 @@ import java.util.Optional;
 
 import dev.gravaai.core.project.AnnotationRegion;
 import dev.gravaai.core.project.AudioRegion;
+import dev.gravaai.core.project.CameraLayout;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.CaptionTimeline;
 import dev.gravaai.core.project.ClipRegion;
@@ -107,6 +109,13 @@ public final class TimelineView extends Region {
 	private static final Color KEYSTROKE_FILL = Color.web("#3b2a63");
 	private static final Color KEYSTROKE_BORDER = Color.web("#8b5cf6");
 	private static final Color KEYSTROKE_SELECTED = Color.web("#a78bfa");
+	private static final Color CAMERA_SPLIT_FILL = Color.web("#14532d");
+	private static final Color CAMERA_BUBBLE_FILL = Color.web("#134e4a");
+	private static final Color CAMERA_ONLY_FILL = Color.web("#713f12");
+	private static final Color CAMERA_HIDDEN_FILL = Color.web("#3f3f46");
+	private static final Color CAMERA_LAYOUT_BORDER = Color.web("#2dd4bf");
+	private static final Color CAMERA_LAYOUT_SELECTED = Color.web("#5eead4");
+	private static final Color CAMERA_LAYOUT_LANE = Color.web("#2dd4bf", 0.35);
 	private static final Color CAPTION_FILL = Color.web("#b58b12");
 	private static final Color CAPTION_BORDER = Color.web("#facc15");
 	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
@@ -178,6 +187,8 @@ public final class TimelineView extends Region {
 	private double currentTimeMs;
 	private List<RowLayout> rowLayouts = List.of();
 	private List<TimelineRenderItem> items = List.of();
+	/** Camera layout segment id to its layout, for the block tint. */
+	private java.util.Map<String, CameraLayout> cameraLayouts = java.util.Map.of();
 	private List<ClipPresentation.Presentation> clipPresentation = List.of();
 	private final Map<String, BlockBounds> blockBounds = new LinkedHashMap<>();
 
@@ -432,7 +443,11 @@ public final class TimelineView extends Region {
 				project.zoomRegions(), project.clipRegions(), project.annotationRegions(),
 				project.audioRegions(), project.autoCaptions(),
 				project.sourceAudioTrackSettings(), sourceAudioTracks,
-				project.keystrokeElements()));
+				project.keystrokeElements(), project.cameraLayoutSegments()));
+		cameraLayouts = new java.util.HashMap<>();
+		for (CameraLayoutSegment segment : project.cameraLayoutSegments()) {
+			cameraLayouts.put(segment.id(), segment.layout());
+		}
 		sourceAudioTracks = dataSource.sourceAudioTracks();
 		FilmstripProvider provider = dataSource.filmstripProvider();
 		filmstripProvider = provider == null ? FilmstripProvider.empty() : provider;
@@ -534,11 +549,19 @@ public final class TimelineView extends Region {
 		long keystrokeLanes = items.stream()
 				.filter(item -> TimelineRows.isKeystrokeLaneRowId(item.rowId()))
 				.map(TimelineRenderItem::rowId).distinct().count();
-		long extras = annotationTracks + audioTracks + keystrokeLanes + sourceAudioTracks.size();
+		boolean cameraLayoutRow = !cameraLayouts.isEmpty();
+		long extras = annotationTracks + audioTracks + keystrokeLanes + sourceAudioTracks.size()
+				+ (cameraLayoutRow ? 1 : 0);
 
 		double top = AXIS_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.CLIP_ROW_ID, top, CLIP_ROW_HEIGHT));
 		top += CLIP_ROW_HEIGHT + ROW_GAP;
+		// The Camera layout track sits right under the clips it re-frames; it appears once the
+		// first layout switch exists (Camera layout in the toolbar).
+		if (cameraLayoutRow) {
+			rows.add(new RowLayout(TimelineConstants.CAMERA_LAYOUT_ROW_ID, top, COMPACT_ROW_HEIGHT));
+			top += COMPACT_ROW_HEIGHT + ROW_GAP;
+		}
 		for (TimelineSourceAudioTrack track : sourceAudioTracks) {
 			rows.add(new RowLayout(TimelineRows.getSourceAudioTrackRowId(track.id()), top,
 					COMPACT_ROW_HEIGHT));
@@ -1638,6 +1661,7 @@ public final class TimelineView extends Region {
 			case AUDIO -> TimelineSelection.AUDIO;
 			case CAPTION -> TimelineSelection.CAPTION;
 			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
+			case CAMERA_LAYOUT -> TimelineSelection.CAMERA_LAYOUT;
 			case TRIM, SPEED -> TimelineSelection.CLIP;
 		};
 	}
@@ -1719,6 +1743,13 @@ public final class TimelineView extends Region {
 				for (TimelineRenderItem item : items) {
 					if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
 						drawZoom(graphics, item, row, width);
+					}
+				}
+			} else if (TimelineConstants.CAMERA_LAYOUT_ROW_ID.equals(row.id())) {
+				drawProjectLayoutLane(graphics, row, width);
+				for (TimelineRenderItem item : items) {
+					if (row.id().equals(item.rowId())) {
+						drawCameraLayout(graphics, item, row, width);
 					}
 				}
 			} else if (TimelineRows.isKeystrokeLaneRowId(row.id())) {
@@ -2006,6 +2037,61 @@ public final class TimelineView extends Region {
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
 
+	/**
+	 * The Camera layout lane behind its blocks: a dashed outline over the whole timeline, so the
+	 * gaps read as "the project layout applies here".
+	 */
+	private void drawProjectLayoutLane(GraphicsContext graphics, RowLayout row, double width) {
+		double startX = Math.max(0, xForTime(fullRange.start()));
+		double endX = Math.min(width, xForTime(fullRange.end()));
+		if (endX <= startX) {
+			return;
+		}
+		double height = row.height() * 0.85;
+		double y = row.top() + (row.height() - height) / 2;
+		graphics.setStroke(CAMERA_LAYOUT_LANE);
+		graphics.setLineWidth(1);
+		graphics.setLineDashes(4, 4);
+		graphics.strokeRoundRect(startX + 0.5, y + 0.5, endX - startX - 1, height - 1, 8, 8);
+		graphics.setLineDashes();
+	}
+
+	/** One Camera layout block: tinted by kind (split, bubble, camera only, no camera), named. */
+	private void drawCameraLayout(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
+			double width) {
+		Span display = getRegionDisplaySpan(item.span());
+		double startX = xForTime(display.start());
+		double endX = xForTime(display.end());
+		double blockWidth = Math.max(6, endX - startX);
+		if (endX < 0 || startX > width) {
+			return;
+		}
+		Color fill = switch (cameraLayouts.getOrDefault(item.id(), new CameraLayout.HideCamera())) {
+			case CameraLayout.Position(var preset) when preset.isSplit() -> CAMERA_SPLIT_FILL;
+			case CameraLayout.Position(var preset) -> CAMERA_BUBBLE_FILL;
+			case CameraLayout.CameraOnly() -> CAMERA_ONLY_FILL;
+			case CameraLayout.HideCamera() -> CAMERA_HIDDEN_FILL;
+		};
+		double x = Math.max(-blockWidth, startX);
+		double height = row.height() * 0.85;
+		double y = row.top() + (row.height() - height) / 2;
+		graphics.setFill(fill);
+		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.setStroke(CAMERA_LAYOUT_BORDER);
+		graphics.setLineWidth(1);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		if (blockWidth > 24) {
+			graphics.setFont(BLOCK_FONT);
+			graphics.setFill(BLOCK_TEXT);
+			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 6,
+					y + height / 2 + 4);
+		}
+		if (isSelected(TimelineSelection.CAMERA_LAYOUT, item.id())) {
+			drawSelection(graphics, x, y, blockWidth, height, CAMERA_LAYOUT_SELECTED);
+		}
+		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
 	/** The Keystrokes track: a keycap-chip block whose label is the pressed key combination. */
 	private void drawKeystroke(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
 			double width) {
@@ -2270,6 +2356,7 @@ public final class TimelineView extends Region {
 				case TimelineConstants.CLIP_ROW_ID -> "CLIP";
 				case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
 				case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
+				case TimelineConstants.CAMERA_LAYOUT_ROW_ID -> "CAMERA";
 				default -> {
 					if (TimelineRows.isSourceAudioTrackRowId(row.id())) {
 						yield sourceAudioTrackFor(row.id())

@@ -1376,6 +1376,12 @@ public final class EditorWindow {
 		}
 
 		@Override
+		public void switchCameraLayout(dev.gravaai.core.project.CameraLayout layout) {
+			session.store().apply(new dev.gravaai.core.editor.CameraLayoutCommands.SwitchAt(
+					playheadMs(), session.timelineDataSource().totalDurationMs(), layout));
+		}
+
+		@Override
 		public void toggleClips(boolean open) {
 			LOG.log(System.Logger.Level.INFO, "clips panel " + (open ? "open" : "closed"));
 		}

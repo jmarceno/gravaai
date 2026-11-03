@@ -43,6 +43,8 @@ public record TimelineRenderItem(
 		SPEED,
 		AUDIO,
 		CAPTION,
+		/** A Camera layout track segment; the label is the layout name. */
+		CAMERA_LAYOUT,
 		KEYSTROKE
 	}
 }

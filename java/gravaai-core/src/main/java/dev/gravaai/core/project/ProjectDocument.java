@@ -39,7 +39,7 @@ public final class ProjectDocument {
 			"clipRegions", "autoFullTrackClipId", "autoFullTrackClipEndMs", "speedRegions",
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "aspectRatio", "sourceAudioTrackSettingsByClip",
-			"defaultSourceAudioTrackSettings", "keystrokeElements");
+			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments");
 
 	private final ObjectNode raw;
 	private final String videoPath;
@@ -189,6 +189,7 @@ public final class ProjectDocument {
 		editor.set("sourceAudioTrackSettingsByClip", state.sourceAudioTrackSettingsByClip().deepCopy());
 		editor.set("defaultSourceAudioTrackSettings", state.defaultSourceAudioTrackSettings().deepCopy());
 		editor.set("keystrokeElements", writeKeystrokeElements(state.keystrokeElements()));
+		editor.set("cameraLayoutSegments", writeCameraLayoutSegments(state.cameraLayoutSegments()));
 
 		// Keep the fields this build does not know; drop retired preferences and dev-only tuning.
 		ObjectNode persistedRaw = ProjectPersistence.stripPersistedDevMotionBlurSettings(
@@ -426,6 +427,19 @@ public final class ProjectDocument {
 	}
 
 	/** Serialises the editable key-press elements (the timeline Keystrokes track). */
+	public static ArrayNode writeCameraLayoutSegments(List<CameraLayoutSegment> segments) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (CameraLayoutSegment segment : segments) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("id", segment.id());
+			node.put("startMs", segment.startMs());
+			node.put("endMs", segment.endMs());
+			node.put("layout", segment.layout().wire());
+			array.add(node);
+		}
+		return array;
+	}
+
 	public static ArrayNode writeKeystrokeElements(List<KeystrokeElement> elements) {
 		ArrayNode array = Json.nodeFactory().arrayNode();
 		for (KeystrokeElement element : elements == null ? List.<KeystrokeElement>of() : elements) {

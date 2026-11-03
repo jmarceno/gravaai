@@ -173,6 +173,9 @@ public interface EditorViewActions {
 	/** Timeline toolbar: split the selected clip at the playhead. */
 	default void splitClip() {}
 
+	/** Timeline toolbar: switch the camera layout from the playhead on (Camera track). */
+	default void switchCameraLayout(dev.gravaai.core.project.CameraLayout layout) {}
+
 	/** Editor Settings section: auto-apply auto-zooms to a fresh recording. */
 	default boolean autoApplyFreshRecordingAutoZooms() {
 		return true;

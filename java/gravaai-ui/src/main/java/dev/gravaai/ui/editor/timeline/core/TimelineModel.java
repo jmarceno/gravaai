@@ -13,6 +13,7 @@ import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClipSpeedChanges;
 import dev.gravaai.core.project.ClipTransitions;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.Clips;
@@ -37,9 +38,11 @@ public final class TimelineModel {
 			List<CaptionCue> captionCues,
 			java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
 			List<TimelineSourceAudioTrack> sourceAudioTracks,
-			List<KeystrokeElement> keystrokeElements) {
+			List<KeystrokeElement> keystrokeElements,
+			List<CameraLayoutSegment> cameraLayoutSegments) {
 
 		public ItemsRequest {
+			cameraLayoutSegments = List.copyOf(cameraLayoutSegments);
 			zoomRegions = zoomRegions == null ? List.of() : List.copyOf(zoomRegions);
 			clipRegions = clipRegions == null ? List.of() : List.copyOf(clipRegions);
 			annotationRegions = annotationRegions == null ? List.of() : List.copyOf(annotationRegions);
@@ -57,7 +60,18 @@ public final class TimelineModel {
 				List<AnnotationRegion> annotationRegions, List<AudioRegion> audioRegions,
 				List<CaptionCue> captionCues) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					java.util.Map.of(), List.of(), List.of());
+					java.util.Map.of(), List.of(), List.of(), List.of());
+		}
+
+		/** Backwards-compatible request without camera layout segments. */
+		public ItemsRequest(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
+				List<AnnotationRegion> annotationRegions, List<AudioRegion> audioRegions,
+				List<CaptionCue> captionCues,
+				java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
+				List<TimelineSourceAudioTrack> sourceAudioTracks,
+				List<KeystrokeElement> keystrokeElements) {
+			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
+					sourceAudioTrackSettings, sourceAudioTracks, keystrokeElements, List.of());
 		}
 
 		/** Backwards-compatible request without keystroke elements. */
@@ -67,7 +81,7 @@ public final class TimelineModel {
 				java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
 				List<TimelineSourceAudioTrack> sourceAudioTracks) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					sourceAudioTrackSettings, sourceAudioTracks, List.of());
+					sourceAudioTrackSettings, sourceAudioTracks, List.of(), List.of());
 		}
 	}
 
@@ -233,6 +247,13 @@ public final class TimelineModel {
 		}
 
 		buildKeystrokeItems(items, request.keystrokeElements());
+
+		for (CameraLayoutSegment segment : request.cameraLayoutSegments()) {
+			items.add(new TimelineRenderItem(segment.id(), TimelineConstants.CAMERA_LAYOUT_ROW_ID,
+					new Span(segment.startMs(), segment.endMs()), null, segment.layout().label(),
+					null, null, null, null, null, null, null, null, null, null, null,
+					TimelineRenderItem.Variant.CAMERA_LAYOUT));
+		}
 
 		return List.copyOf(items);
 	}

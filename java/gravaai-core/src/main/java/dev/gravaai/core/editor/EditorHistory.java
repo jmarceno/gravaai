@@ -40,7 +40,9 @@ public final class EditorHistory {
 			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip,
 			List<String> multiSelectedIds,
 			List<dev.gravaai.core.project.KeystrokeElement> keystrokeElements,
-			@Nullable String selectedKeystrokeId) {
+			@Nullable String selectedKeystrokeId,
+			List<dev.gravaai.core.project.CameraLayoutSegment> cameraLayoutSegments,
+			@Nullable String selectedCameraLayoutId) {
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
@@ -70,7 +72,7 @@ public final class EditorHistory {
 			List<String> multiSelectedIds) {
 			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
-				sourceAudio, multiSelectedIds, List.of(), null);
+				sourceAudio, multiSelectedIds, List.of(), null, List.of(), null);
 		}
 		}
 
@@ -147,7 +149,9 @@ public final class EditorHistory {
 						: snapshot.sourceAudioTrackSettingsByClip().deepCopy(),
 				List.copyOf(snapshot.multiSelectedIds()),
 				List.copyOf(snapshot.keystrokeElements()),
-				snapshot.selectedKeystrokeId());
+				snapshot.selectedKeystrokeId(),
+				List.copyOf(snapshot.cameraLayoutSegments()),
+				snapshot.selectedCameraLayoutId());
 	}
 
 	/** {@code areEditorHistorySnapshotsEqual}: records compare their lists element by element. */

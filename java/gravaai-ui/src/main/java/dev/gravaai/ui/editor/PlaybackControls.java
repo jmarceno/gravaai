@@ -91,7 +91,31 @@ public final class PlaybackControls extends GridPane {
 		Button zoom = iconButton(Icons.MagnifyingGlassPlus, "Add zoom", actions::addZoom);
 		Button suggest = iconButton(Icons.MagicWand, "Suggest zooms", actions::suggestZooms);
 		Button split = iconButton(Icons.Scissors, "Split clip", actions::splitClip);
-		tools.getChildren().addAll(addLayer, zoom, suggest, split);
+
+		// Camera layout from the playhead on: a split screen, a bubble position, camera only or
+		// no camera, shown as a block on the Camera track.
+		Button cameraLayout = new Button("", Button.Variant.GHOST, Button.Size.SM);
+		HBox cameraLayoutGraphic = new HBox(4);
+		cameraLayoutGraphic.setAlignment(Pos.CENTER_LEFT);
+		cameraLayoutGraphic.getChildren().addAll(Icon.of(Icons.VideoCamera, 14),
+				Icon.of(Icons.CaretDown, 10));
+		cameraLayout.setGraphic(cameraLayoutGraphic);
+		dev.gravaai.ui.kit.Tooltip.install(cameraLayout, "Camera layout from the playhead");
+		DropdownMenu cameraMenu = new DropdownMenu(cameraLayout);
+		cameraMenu.label("Camera layout from here");
+		boolean afterSplits = false;
+		for (dev.gravaai.core.project.CameraLayout layout
+				: dev.gravaai.core.project.CameraLayout.all()) {
+			boolean splitLayout =
+					layout instanceof dev.gravaai.core.project.CameraLayout.Position(var preset)
+							&& preset.isSplit();
+			if (!splitLayout && !afterSplits) {
+				cameraMenu.separator();
+				afterSplits = true;
+			}
+			cameraMenu.item(layout.label(), () -> actions.switchCameraLayout(layout));
+		}
+		tools.getChildren().addAll(addLayer, zoom, suggest, split, cameraLayout);
 
 		// ---- centre: time / transport / duration ------------------------------
 		HBox centerBox = new HBox(6);

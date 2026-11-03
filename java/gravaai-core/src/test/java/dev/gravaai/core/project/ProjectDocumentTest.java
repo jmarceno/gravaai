@@ -59,6 +59,11 @@ class ProjectDocumentTest {
 		if (expected.get("editor") instanceof ObjectNode editor && !editor.has("keystrokeElements")) {
 			editor.set("keystrokeElements", Json.nodeFactory().arrayNode());
 		}
+		// Same for the Camera layout track.
+		if (expected.get("editor") instanceof ObjectNode editor
+				&& !editor.has("cameraLayoutSegments")) {
+			editor.set("cameraLayoutSegments", Json.nodeFactory().arrayNode());
+		}
 
 		assertEquals(2, saved.get("version").intValue());
 		assertSemanticallyEqual(expected, saved, "$");

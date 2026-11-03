@@ -29,6 +29,8 @@ public final class ClipCommands {
 				before, next, ClipSequence.ANNOTATION_SPAN));
 		store.setAudioRegions(ClipSequence.rippleRegionAnchors(store.state().audioRegions(), before,
 				next, ClipSequence.AUDIO_SPAN));
+		store.setCameraLayoutSegments(ClipSequence.rippleRegions(store.state().cameraLayoutSegments(),
+				before, next, ClipSequence.CAMERA_LAYOUT_SPAN));
 	}
 
 	private static List<String> ids(List<ClipRegion> clips) {

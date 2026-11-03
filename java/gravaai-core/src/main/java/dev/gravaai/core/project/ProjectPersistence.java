@@ -441,7 +441,12 @@ public final class ProjectPersistence {
 						? text(field(editor, "aspectRatio")) : "16:9",
 				objectOrEmpty(field(editor, "sourceAudioTrackSettingsByClip")),
 				objectOrEmpty(field(editor, "defaultSourceAudioTrackSettings")),
-				normalizeKeystrokeElements(field(editor, "keystrokeElements")));
+				normalizeKeystrokeElements(field(editor, "keystrokeElements")),
+				sequenceChanged
+						? normalizeCameraLayoutSegments(ClipSequence.rippleRegions(
+								normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")),
+								normalizedClipRegions, sequenceClips, ClipSequence.CAMERA_LAYOUT_SPAN))
+						: normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")));
 	}
 
 
@@ -891,6 +896,44 @@ public final class ProjectPersistence {
 				Math.round(clampSetting(field(settings, "fadeMs"), 0, 1000, defaults.fadeMs())),
 				Math.round(clampSetting(field(settings, "groupingMs"), 0, 3000, defaults.groupingMs())),
 				clampSetting(field(settings, "bottomOffset"), 0, 90, defaults.bottomOffset()));
+	}
+
+	/**
+	 * Normalises the camera layout track: drops entries with an unknown layout, sorts by start and
+	 * trims each segment so it ends where the next begins (segments never overlap).
+	 */
+	private static List<CameraLayoutSegment> normalizeCameraLayoutSegments(@Nullable JsonNode rawSegments) {
+		if (rawSegments == null || !rawSegments.isArray()) {
+			return List.of();
+		}
+		List<CameraLayoutSegment> segments = new ArrayList<>();
+		for (JsonNode node : rawSegments) {
+			String id = text(field(node, "id"));
+			String wire = text(field(node, "layout"));
+			if (id == null || id.isBlank() || wire == null) {
+				continue;
+			}
+			Span span = normalizeSpan(node);
+			CameraLayout.fromWire(wire).ifPresent(layout -> segments.add(
+					new CameraLayoutSegment(id, span.startMs(), span.endMs(), layout)));
+		}
+		return normalizeCameraLayoutSegments(segments);
+	}
+
+	/** Sorted, non-overlapping, no empty segments. */
+	public static List<CameraLayoutSegment> normalizeCameraLayoutSegments(
+			List<CameraLayoutSegment> segments) {
+		List<CameraLayoutSegment> sorted = new ArrayList<>(segments);
+		sorted.sort(java.util.Comparator.comparingLong(CameraLayoutSegment::startMs));
+		List<CameraLayoutSegment> result = new ArrayList<>(sorted.size());
+		for (CameraLayoutSegment segment : sorted) {
+			long start = result.isEmpty() ? segment.startMs()
+					: Math.max(segment.startMs(), result.getLast().endMs());
+			if (segment.endMs() > start) {
+				result.add(segment.withSpan(start, segment.endMs()));
+			}
+		}
+		return List.copyOf(result);
 	}
 
 	/** Same cap as the keystroke sidecar (KeystrokeCapture.MAX_KEYSTROKE_EVENTS). */

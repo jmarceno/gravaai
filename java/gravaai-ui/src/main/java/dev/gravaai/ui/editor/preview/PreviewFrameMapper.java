@@ -292,10 +292,13 @@ public final class PreviewFrameMapper {
 		SceneSpec sceneSpec = scene.editor() == null ? SceneSpec.FULL
 				: ProjectEditorInputs.sceneSpec(scene.editor(),
 						frame.timelineSeconds() * 1000);
+		WebcamSpec webcam = scene.editor() == null ? scene.webcam()
+				: ProjectEditorInputs.webcamSpecAt(scene.webcam(), scene.editor(),
+						frame.timelineSeconds() * 1000);
 		return new FrameInput(frame.frameIndex(), frame.timelineSeconds(), frame.sourceFrame(),
 				frame.webcamFrame(), scene.cursor().around(sourceSeconds), background,
 				scene.backgroundBlur(), scene.layout(), scene.zoom(), scene.style(),
-				scene.cursorSpec(), scene.webcam(), scene.annotations(), scene.captions(),
+				scene.cursorSpec(), webcam, scene.annotations(), scene.captions(),
 				keystrokes, scene.fade(), sceneSpec, sourceSeconds);
 	}
 

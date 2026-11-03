@@ -236,6 +236,8 @@ public final class RecordingImportController {
 		annotations.addAll(addedLoupes);
 		List<AudioRegion> audios = ClipSequence.rippleRegionAnchors(
 				state.audioRegions(), before, sequence, ClipSequence.AUDIO_SPAN);
+		var cameraLayouts = ClipSequence.rippleRegions(state.cameraLayoutSegments(), before,
+				sequence, ClipSequence.CAMERA_LAYOUT_SPAN);
 		WebcamOverlaySettings committedWebcam = media.webcam() != null ? webcam : null;
 		List<ClipRegion> committedSequence = sequence;
 
@@ -244,6 +246,8 @@ public final class RecordingImportController {
 			json.set("zoomRegions", ProjectDocument.writeZoomRegions(zooms));
 			json.set("annotationRegions", ProjectDocument.writeAnnotationRegions(annotations));
 			json.set("audioRegions", ProjectDocument.writeAudioRegions(audios));
+			json.set("cameraLayoutSegments",
+					ProjectDocument.writeCameraLayoutSegments(cameraLayouts));
 			json.putNull("autoFullTrackClipId");
 			json.putNull("autoFullTrackClipEndMs");
 			if (committedWebcam != null) {

@@ -201,6 +201,23 @@ public final class ClipSequence {
 		}
 	};
 
+	public static final Span<CameraLayoutSegment> CAMERA_LAYOUT_SPAN = new Span<>() {
+		@Override
+		public long startMs(CameraLayoutSegment value) {
+			return value.startMs();
+		}
+
+		@Override
+		public long endMs(CameraLayoutSegment value) {
+			return value.endMs();
+		}
+
+		@Override
+		public CameraLayoutSegment withSpan(CameraLayoutSegment value, long startMs, long endMs) {
+			return value.withSpan(startMs, endMs);
+		}
+	};
+
 	public static final Span<AnnotationRegion> ANNOTATION_SPAN = new Span<>() {
 		@Override
 		public long startMs(AnnotationRegion value) {

@@ -81,6 +81,7 @@ public final class SelectionCommands {
 		public static final String CLIP = "clip";
 		public static final String CAPTION = "caption";
 		public static final String KEYSTROKE = "keystroke";
+		public static final String CAMERA_LAYOUT = "camera-layout";
 
 		private TimelineSelections() {}
 	}
@@ -115,6 +116,11 @@ public final class SelectionCommands {
 		for (var element : store.state().keystrokeElements()) {
 			if (element.id().equals(id)) {
 				return TimelineSelections.KEYSTROKE;
+			}
+		}
+		for (var segment : store.state().cameraLayoutSegments()) {
+			if (segment.id().equals(id)) {
+				return TimelineSelections.CAMERA_LAYOUT;
 			}
 		}
 		return null;

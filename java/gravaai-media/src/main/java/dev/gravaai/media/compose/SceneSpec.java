@@ -2,6 +2,8 @@ package dev.gravaai.media.compose;
 
 import java.util.List;
 
+import dev.gravaai.core.project.CameraLayout;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
@@ -46,6 +48,61 @@ public record SceneSpec(double cameraOpacity, double cameraFill, double screenOp
 			spans.add(new Span(clip.startMs(), clip.endMs(), layout));
 		}
 		return List.copyOf(spans);
+	}
+
+	/**
+	 * The clip spans with the Camera layout track laid over them: a camera-only or no camera
+	 * segment wins over the clip layout it covers (a position segment keeps the clip's). The
+	 * timeline is cut at every boundary and equal neighbours merge, so the 300 ms blend runs only
+	 * where the layout really changes.
+	 */
+	public static List<Span> spans(List<ClipRegion> clips, List<CameraLayoutSegment> segments) {
+		List<Span> clipSpans = spans(clips);
+		if (segments.isEmpty()) {
+			return clipSpans;
+		}
+		java.util.TreeSet<Long> cuts = new java.util.TreeSet<>();
+		for (Span span : clipSpans) {
+			cuts.add(span.startMs());
+			cuts.add(span.endMs());
+		}
+		for (CameraLayoutSegment segment : segments) {
+			cuts.add(segment.startMs());
+			cuts.add(segment.endMs());
+		}
+		List<Long> bounds = List.copyOf(cuts);
+		List<Span> merged = new java.util.ArrayList<>();
+		for (int index = 1; index < bounds.size(); index++) {
+			long start = bounds.get(index - 1);
+			long end = bounds.get(index);
+			ClipCameraLayout layout = layoutAt(clipSpans, segments, (start + end) / 2.0);
+			if (!merged.isEmpty() && merged.getLast().layout() == layout) {
+				merged.set(merged.size() - 1, new Span(merged.getLast().startMs(), end, layout));
+			} else {
+				merged.add(new Span(start, end, layout));
+			}
+		}
+		return List.copyOf(merged);
+	}
+
+	private static ClipCameraLayout layoutAt(List<Span> clipSpans,
+			List<CameraLayoutSegment> segments, double timeMs) {
+		ClipCameraLayout segmentLayout = CameraLayoutSegment.at(segments, timeMs)
+				.map(segment -> switch (segment.layout()) {
+					case CameraLayout.CameraOnly() -> ClipCameraLayout.CAMERA_ONLY;
+					case CameraLayout.HideCamera() -> ClipCameraLayout.HIDE_CAMERA;
+					case CameraLayout.Position(var preset) -> ClipCameraLayout.DEFAULT;
+				})
+				.orElse(ClipCameraLayout.DEFAULT);
+		if (segmentLayout != ClipCameraLayout.DEFAULT) {
+			return segmentLayout;
+		}
+		for (Span span : clipSpans) {
+			if (timeMs >= span.startMs() && timeMs < span.endMs()) {
+				return span.layout();
+			}
+		}
+		return ClipCameraLayout.DEFAULT;
 	}
 
 	private static SceneSpec stateOf(ClipCameraLayout layout) {

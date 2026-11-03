@@ -53,6 +53,7 @@ public final class EditorStore {
 	private @Nullable String selectedAudioId;
 	private @Nullable String selectedCaptionId;
 	private @Nullable String selectedKeystrokeId;
+	private @Nullable String selectedCameraLayoutId;
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
 	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
 	private String activeEffectSection = SECTION_SCENE;
@@ -124,6 +125,12 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	public void setCameraLayoutSegments(List<dev.gravaai.core.project.CameraLayoutSegment> segments) {
+		ObjectNode json = editorJson();
+		json.set("cameraLayoutSegments", ProjectDocument.writeCameraLayoutSegments(segments));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
 	public void setKeystrokeElements(java.util.List<dev.gravaai.core.project.KeystrokeElement> elements) {
 		ObjectNode json = editorJson();
 		json.set("keystrokeElements", ProjectDocument.writeKeystrokeElements(elements));
@@ -167,7 +174,8 @@ public final class EditorStore {
 				selectedAudioId,
 				state.sourceAudioTrackSettingsByClip() == null ? null
 						: state.sourceAudioTrackSettingsByClip().deepCopy(),
-				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId);
+				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId,
+				state.cameraLayoutSegments(), selectedCameraLayoutId);
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -179,11 +187,13 @@ public final class EditorStore {
 				"snapshot audio regions"));
 		setAutoCaptions(snapshot.autoCaptions());
 		setKeystrokeElements(snapshot.keystrokeElements());
+		setCameraLayoutSegments(snapshot.cameraLayoutSegments());
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();
 		selectedAnnotationId = snapshot.selectedAnnotationId();
 		selectedAudioId = snapshot.selectedAudioId();
 		selectedKeystrokeId = snapshot.selectedKeystrokeId();
+		selectedCameraLayoutId = snapshot.selectedCameraLayoutId();
 		multiSelection.clear();
 		multiSelection.addAll(snapshot.multiSelectedIds());
 		setSourceAudioTrackSettingsByClip(snapshot.sourceAudioTrackSettingsByClip() == null
@@ -258,6 +268,15 @@ public final class EditorStore {
 		this.selectedKeystrokeId = id;
 	}
 
+	public @Nullable String selectedCameraLayoutId() {
+		return selectedCameraLayoutId;
+	}
+
+	/** Selects a camera layout segment; call after {@link #clearSelectionsExcept}, which clears it. */
+	public void setSelectedCameraLayoutId(@Nullable String id) {
+		this.selectedCameraLayoutId = id;
+	}
+
 	public String activeEffectSection() {
 		return activeEffectSection;
 	}
@@ -281,6 +300,7 @@ public final class EditorStore {
 		selectedAudioId = keepAudio;
 		selectedCaptionId = keepCaption;
 		selectedKeystrokeId = keepKeystroke;
+		selectedCameraLayoutId = null;
 		multiSelection.clear();
 	}
 

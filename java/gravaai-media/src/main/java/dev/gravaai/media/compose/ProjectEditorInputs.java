@@ -7,7 +7,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import dev.gravaai.core.project.CameraLayout;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeGrouping;
@@ -358,12 +361,35 @@ public final class ProjectEditorInputs {
 				settings.fadeMs(), settings.groupingMs(), settings.bottomOffset(), presses);
 	}
 
-	/** Resolves the per-clip camera layout state (camera opacity/fill, screen opacity). */
+	/**
+	 * Resolves the camera layout state (camera opacity/fill, screen opacity) from the per-clip
+	 * layouts, with Camera layout track segments for camera-only or no camera winning over them.
+	 */
 	public static SceneSpec sceneSpec(ProjectEditorState editor, double timelineMs) {
 		List<dev.gravaai.core.project.ClipRegion> clips = editor.clipRegions() == null
 				? List.of()
 				: editor.clipRegions();
-		return SceneSpec.resolve(SceneSpec.spans(clips), timelineMs);
+		return SceneSpec.resolve(SceneSpec.spans(clips, editor.cameraLayoutSegments()),
+				timelineMs);
+	}
+
+	/**
+	 * The webcam settings at a timeline time: a Camera layout track segment with a position moves
+	 * the camera to that preset (a bubble position or a split screen side); elsewhere the project
+	 * webcam settings apply unchanged.
+	 */
+	public static WebcamSpec webcamSpecAt(WebcamSpec base, ProjectEditorState editor,
+			double timelineMs) {
+		return CameraLayoutSegment.at(editor.cameraLayoutSegments(), timelineMs)
+				.map(CameraLayoutSegment::layout)
+				.flatMap(layout -> layout instanceof CameraLayout.Position(var preset)
+						? Optional.of(preset) : Optional.empty())
+				.map(preset -> new WebcamSpec(base.enabled(), preset.wire(),
+						preset.isCorner() ? preset.wire() : base.corner(), base.positionX(),
+						base.positionY(), base.size(), base.width(), base.height(), base.mirror(),
+						base.roundness(), base.shadow(), base.margin(), base.reactToZoom(),
+						base.cropRegion(), base.visibleRanges(), base.timeOffsetMs()))
+				.orElse(base);
 	}
 
 	/** Maps the project's fade-through-black clip transitions (stage 11). */

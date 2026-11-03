@@ -142,7 +142,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				zoom,
 				style,
 				cursorSpec,
-				webcamSpec,
+				ProjectEditorInputs.webcamSpecAt(webcamSpec, editor, timelineMs),
 				annotations,
 				captions,
 				keystrokes,

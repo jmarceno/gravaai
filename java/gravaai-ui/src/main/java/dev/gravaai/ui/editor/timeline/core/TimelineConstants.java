@@ -10,6 +10,7 @@ public final class TimelineConstants {
 	public static final String SOURCE_AUDIO_ROW_ID = "row-source-audio";
 	public static final String CAPTION_ROW_ID = "row-captions";
 	public static final String KEYSTROKE_ROW_ID = "row-keystrokes";
+	public static final String CAMERA_LAYOUT_ROW_ID = "row-camera-layout";
 	public static final String ANNOTATION_ROW_PREFIX = ANNOTATION_ROW_ID + "-";
 	public static final String AUDIO_ROW_PREFIX = AUDIO_ROW_ID + "-";
 	public static final String KEYSTROKE_ROW_PREFIX = KEYSTROKE_ROW_ID + "-";

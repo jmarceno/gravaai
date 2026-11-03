@@ -9,6 +9,7 @@ import java.util.function.DoubleFunction;
 
 import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
+import dev.gravaai.core.editor.CameraLayoutCommands;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
@@ -18,6 +19,8 @@ import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.AutoCaptionAnimation;
 import dev.gravaai.core.project.AutoCaptionSettings;
+import dev.gravaai.core.project.CameraLayout;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.CropRegion;
@@ -72,6 +75,7 @@ public final class EditorInspectorPanel extends VBox {
 		AUDIO,
 		CAPTION,
 		KEYSTROKE,
+		CAMERA_LAYOUT,
 		MULTI
 	}
 
@@ -196,6 +200,13 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	/** Shows the editor for the selected camera layout segment. */
+	public void showCameraLayoutSettings() {
+		this.annotationMode = false;
+		this.selectionEditor = SelectionEditor.CAMERA_LAYOUT;
+		rebuild();
+	}
+
 	/** Shows the editor for a mixed multi-selection (count + batched delete). */
 	public void showMultiSelection() {
 		this.annotationMode = false;
@@ -239,6 +250,8 @@ public final class EditorInspectorPanel extends VBox {
 			showCaptionSettings();
 		} else if (store.selectedKeystrokeId() != null) {
 			showKeystrokeSettings();
+		} else if (store.selectedCameraLayoutId() != null) {
+			showCameraLayoutSettings();
 		} else if (isSelectionMode()) {
 			show(section);
 		}
@@ -341,6 +354,7 @@ public final class EditorInspectorPanel extends VBox {
 			case AUDIO -> "Audio";
 			case CAPTION -> "Caption";
 			case KEYSTROKE -> "Keystroke";
+			case CAMERA_LAYOUT -> "Camera layout";
 			case MULTI -> "Multiple";
 			case NONE -> section.label();
 		};
@@ -369,6 +383,9 @@ public final class EditorInspectorPanel extends VBox {
 	}
 	if (selectionEditor == SelectionEditor.KEYSTROKE) {
 		return keystrokeSelectionSection();
+	}
+	if (selectionEditor == SelectionEditor.CAMERA_LAYOUT) {
+		return cameraLayoutSelectionSection();
 	}
 	if (selectionEditor == SelectionEditor.MULTI) {
 		return multiSelectionSection();
@@ -673,6 +690,41 @@ public final class EditorInspectorPanel extends VBox {
 			}
 		}
 		return null;
+	}
+
+	/** The Camera layout segment editor: its time span, the layout to switch to, remove. */
+	private Node cameraLayoutSelectionSection() {
+		java.util.Optional<CameraLayoutSegment> selected = store.state().cameraLayoutSegments()
+				.stream().filter(segment -> segment.id().equals(store.selectedCameraLayoutId()))
+				.findFirst();
+		if (selected.isEmpty()) {
+			return emptySelection("Select a camera layout block to change or remove it.");
+		}
+		CameraLayoutSegment segment = selected.get();
+		VBox root = new VBox(14);
+		Label span = new Label(PlaybackControls.formatTime(segment.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatTime(segment.endMs() / 1000.0));
+		span.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		root.getChildren().add(span);
+
+		Select layout = new Select();
+		for (CameraLayout choice : CameraLayout.all()) {
+			layout.item(choice.wire(), choice.label());
+		}
+		layout.value(segment.layout().wire());
+		layout.onValueChange(value -> CameraLayout.fromWire(value).ifPresent(choice ->
+				store.apply(new CameraLayoutCommands.ChangeLayout(segment.id(), choice))));
+		root.getChildren().add(row("Layout", layout));
+
+		Label hint = new Label("Drag the block's edges on the Camera track to change when the "
+				+ "layout switches. Size and style come from the Webcam settings.");
+		hint.setWrapText(true);
+		hint.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		root.getChildren().add(hint);
+
+		root.getChildren().add(deleteSelectionButton("Remove (use project layout)",
+				() -> store.apply(new CameraLayoutCommands.Delete(segment.id()))));
+		return root;
 	}
 
 	private Label emptySelection(String message) {

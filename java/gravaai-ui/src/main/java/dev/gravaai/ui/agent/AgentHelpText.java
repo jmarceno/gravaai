@@ -54,7 +54,9 @@ public final class AgentHelpText {
 			split {at} — split the clip containing that time.
 			delete_clip {id}
 			move_clip {id,toIndex} — 0-based sequence index.
-			clip {id, speed?, muted?, cameraLayout?:default|hide-camera|camera-only, transition?:{kind:"fade-black",ms}|null}
+			clip {id, speed?, muted?, transition?:{kind:"fade-black",ms}|null}
+			camera_layout {from, to?, layout, transition?:cut|smooth, size?, width?, height?, roundness?, shadow?} — the camera uses layout from "from" until "to" (default: the next camera switch or the end). layout: split-right|split-left|split-top|split-bottom|top-left|top-center|top-right|center-left|center|center-right|bottom-left|bottom-center|bottom-right|camera-only|hide-camera. size/width/height 10–100 (width/height are the split share), roundness 0–100, shadow 0–1; omitted ones use the webcam settings.
+			delete_camera_layout {at} | {all:true} — that stretch goes back to the project webcam layout.
 			trim_clip {id, start?, end?} — timeline seconds; reveals/hides footage.
 			Clips are always re-packed: you never create gaps. Zoom/speed/annotation/audio regions follow the footage they cover.""".stripTrailing();
 

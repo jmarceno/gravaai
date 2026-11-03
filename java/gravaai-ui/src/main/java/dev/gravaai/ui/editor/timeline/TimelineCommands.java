@@ -67,6 +67,9 @@ public interface TimelineCommands {
 	/** Move the playhead (timeline milliseconds). */
 	void seek(double timeMs);
 
+	/** Flips a Camera layout switch between an instant cut and a smooth move. */
+	default void toggleCameraLayoutTransition(String segmentId) {}
+
 	/**
 	 * Live playhead drag (timeline milliseconds): called for every pointer move, so it must not
 	 * block; the preview shows the newest position. Defaults to a seek.

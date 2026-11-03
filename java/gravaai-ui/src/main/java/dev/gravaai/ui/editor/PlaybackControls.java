@@ -36,6 +36,7 @@ public final class PlaybackControls extends GridPane {
 
 	private final EditorPlaybackPort port;
 	private final EditorViewActions actions;
+	private final DropdownMenu cameraMenu;
 	private final Label currentTime = new Label("0:00");
 	private final Label duration = new Label("0:00");
 	private final Button playButton;
@@ -101,7 +102,7 @@ public final class PlaybackControls extends GridPane {
 				Icon.of(Icons.CaretDown, 10));
 		cameraLayout.setGraphic(cameraLayoutGraphic);
 		dev.gravaai.ui.kit.Tooltip.install(cameraLayout, "Camera layout from the playhead");
-		DropdownMenu cameraMenu = new DropdownMenu(cameraLayout);
+		cameraMenu = new DropdownMenu(cameraLayout);
 		cameraMenu.label("Camera layout from here");
 		boolean afterSplits = false;
 		for (dev.gravaai.core.project.CameraLayout layout
@@ -256,6 +257,11 @@ public final class PlaybackControls extends GridPane {
 		rateHintSlowerKey.setText(Shortcuts.formatBinding(
 				actions.shortcuts().get(Shortcuts.Action.PLAYBACK_SLOWER),
 				Shortcuts.isMacPlatform()));
+	}
+
+	/** Opens the Camera layout menu (the timeline's L shortcut). */
+	public void showCameraLayoutMenu() {
+		cameraMenu.show();
 	}
 
 	/** Re-renders from the playback seam. */

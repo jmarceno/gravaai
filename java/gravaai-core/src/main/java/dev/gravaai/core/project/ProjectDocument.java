@@ -435,6 +435,13 @@ public final class ProjectDocument {
 			node.put("startMs", segment.startMs());
 			node.put("endMs", segment.endMs());
 			node.put("layout", segment.layout().wire());
+			node.put("transition", segment.transition().wire());
+			if (!segment.style().isInherit()) {
+				ObjectNode style = node.putObject("style");
+				for (String field : CameraLayoutStyle.FIELDS) {
+					segment.style().get(field).ifPresent(value -> style.put(field, value));
+				}
+			}
 			array.add(node);
 		}
 		return array;

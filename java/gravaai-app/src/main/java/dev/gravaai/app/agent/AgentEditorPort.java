@@ -332,6 +332,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 					.map(annotation -> annotation.id()).toList();
 			case AUDIO -> state.audioRegions().stream().map(audio -> audio.id()).toList();
 			case SPEED -> state.speedRegions().stream().map(speed -> speed.id()).toList();
+			case CAMERA -> state.cameraLayoutSegments().stream()
+					.map(segment -> segment.id()).toList();
 		};
 	}
 

@@ -364,7 +364,7 @@ public final class ProjectPersistence {
 				text(field(editor, "cursorClickEffectColor")),
 				EditorDefaults.DEFAULT_CURSOR_CLICK_EFFECT_COLOR);
 
-		return new ProjectEditorState(
+		return migrateClipCameraLayouts(new ProjectEditorState(
 				text(field(editor, "wallpaper")) != null
 						? text(field(editor, "wallpaper")) : EditorDefaults.DEFAULT_WALLPAPER_PATH,
 				numberOr(field(editor, "shadowIntensity"), 0.67),
@@ -446,7 +446,41 @@ public final class ProjectPersistence {
 						? normalizeCameraLayoutSegments(ClipSequence.rippleRegions(
 								normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")),
 								normalizedClipRegions, sequenceClips, ClipSequence.CAMERA_LAYOUT_SPAN))
-						: normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")));
+						: normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments"))));
+	}
+
+	/**
+	 * Folds the older per-clip camera layouts (hide camera / camera only) into the Camera layout
+	 * track, so there is one place that says what the camera does: each such clip becomes a
+	 * segment over its span (where no segment exists yet) and the clip goes back to default.
+	 */
+	private static ProjectEditorState migrateClipCameraLayouts(ProjectEditorState state) {
+		List<CameraLayoutSegment> segments = new ArrayList<>(state.cameraLayoutSegments());
+		List<ClipRegion> clips = new ArrayList<>(state.clipRegions().size());
+		boolean changed = false;
+		for (ClipRegion clip : state.clipRegions()) {
+			ClipCameraLayout layout = clip.cameraLayout();
+			if (layout == null || layout == ClipCameraLayout.DEFAULT) {
+				clips.add(clip);
+				continue;
+			}
+			changed = true;
+			clips.add(new ClipRegion(clip.id(), clip.startMs(), clip.endMs(), clip.sourceStartMs(),
+					clip.sourceMinMs(), clip.sourceMaxMs(), clip.speed(), clip.muted(),
+					clip.showSourceAudio(), null, clip.transitionOut()));
+			boolean covered = state.cameraLayoutSegments().stream().anyMatch(segment ->
+					segment.startMs() < clip.endMs() && segment.endMs() > clip.startMs());
+			if (!covered && clip.endMs() > clip.startMs()) {
+				segments.add(new CameraLayoutSegment("camera-" + clip.id(), clip.startMs(),
+						clip.endMs(), layout == ClipCameraLayout.CAMERA_ONLY
+								? new CameraLayout.CameraOnly() : new CameraLayout.HideCamera()));
+			}
+		}
+		if (!changed) {
+			return state;
+		}
+		return state.toBuilder().clipRegions(List.copyOf(clips))
+				.cameraLayoutSegments(normalizeCameraLayoutSegments(segments)).build();
 	}
 
 
@@ -914,8 +948,20 @@ public final class ProjectPersistence {
 				continue;
 			}
 			Span span = normalizeSpan(node);
+			CameraLayoutStyle style = CameraLayoutStyle.INHERIT;
+			JsonNode rawStyle = field(node, "style");
+			for (String name : CameraLayoutStyle.FIELDS) {
+				Double value = finite(field(rawStyle, name));
+				if (value != null) {
+					style = style.with(name, java.util.OptionalDouble.of(value));
+				}
+			}
+			CameraLayoutStyle segmentStyle = style;
+			String transition = text(field(node, "transition"));
 			CameraLayout.fromWire(wire).ifPresent(layout -> segments.add(
-					new CameraLayoutSegment(id, span.startMs(), span.endMs(), layout)));
+					new CameraLayoutSegment(id, span.startMs(), span.endMs(), layout,
+							segmentStyle, CameraLayoutSegment.Transition.fromWire(
+									transition == null ? "cut" : transition))));
 		}
 		return normalizeCameraLayoutSegments(segments);
 	}

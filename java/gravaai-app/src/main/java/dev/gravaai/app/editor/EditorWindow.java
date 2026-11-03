@@ -268,6 +268,7 @@ public final class EditorWindow {
 				() -> Platform.runLater(timeline::refreshData));
 		this.shell = new EditorShellView(session.store(), actions, session.playbackPort());
 		timeline.onItemPressed(() -> shell.setClipsOpen(false));
+		timeline.setOnCameraLayoutShortcut(() -> shell.playbackControls().showCameraLayoutMenu());
 		shell.setTimelineContent(timeline);
 		// The timeline playhead is drawn from TimelineView.currentTimeMs; nothing else feeds it, so
 		// subscribe to the engine clock here (React: useTimelineState currentTime). Coalesce the

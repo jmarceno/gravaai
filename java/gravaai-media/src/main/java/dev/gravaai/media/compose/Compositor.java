@@ -495,7 +495,54 @@ public final class Compositor implements AutoCloseable {
 		SceneSpec scene = input.scene();
 		double fill = clamp01(scene.cameraFill());
 		double opacity = clamp01(scene.cameraOpacity());
-		SplitScreenLayout.Regions split = splitRegions(input);
+		WebcamBox placed = webcamBox(spec, input, frame);
+		double shadow = spec.shadow();
+		if (spec.transition().isPresent()) {
+			// A smooth Camera layout switch: glide from the previous layout's box.
+			WebcamSpec.Transition transition = spec.transition().get();
+			WebcamBox from = webcamBox(transition.from(), input, frame);
+			float t = (float) transition.progress();
+			placed = new WebcamBox(lerpRect(from.box(), placed.box(), t),
+					from.radius() + (placed.radius() - from.radius()) * t);
+			shadow = transition.from().shadow() + (spec.shadow() - transition.from().shadow()) * t;
+		}
+		Rect box = placed.box();
+		double radius = placed.radius();
+		if (fill > 0) {
+			box = lerpRect(box, Rect.makeWH(width, height), (float) fill);
+			radius *= 1 - fill;
+		}
+		WebcamOverlay.CropRect crop = WebcamOverlay.cropSourceRect(spec.cropRegion(),
+				frame.width(), frame.height());
+		Rect source = Rect.makeXYWH((float) crop.sx(), (float) crop.sy(), (float) crop.sw(),
+				(float) crop.sh());
+		boolean layered = opacity < 1;
+		if (layered) {
+			canvas.saveLayerAlpha(Rect.makeWH(width, height),
+					(int) Math.round(opacity * 255));
+		}
+		SkiaGlSurface target = currentTarget();
+		try {
+			try (Image image = frameTextures.image(target,
+					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
+				drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
+						Math.min(box.getWidth(), box.getHeight()));
+				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
+						radius, WEBCAM_SAMPLING);
+			}
+		} finally {
+			if (layered) {
+				canvas.restore();
+			}
+		}
+	}
+
+	/** Where one webcam spec puts the camera this frame, before the scene fill/fade. */
+	private record WebcamBox(Rect box, double radius) {
+	}
+
+	private WebcamBox webcamBox(WebcamSpec spec, FrameInput input, RgbaFrame frame) {
+		SplitScreenLayout.Regions split = splitRegions(spec, input);
 		Rect box;
 		double radius;
 		if (split != null) {
@@ -521,33 +568,7 @@ public final class Compositor implements AutoCloseable {
 			box = Rect.makeXYWH((float) position.x(), (float) position.y(),
 					(float) size.width(), (float) size.height());
 		}
-		if (fill > 0) {
-			box = lerpRect(box, Rect.makeWH(width, height), (float) fill);
-			radius *= 1 - fill;
-		}
-		WebcamOverlay.CropRect crop = WebcamOverlay.cropSourceRect(spec.cropRegion(),
-				frame.width(), frame.height());
-		Rect source = Rect.makeXYWH((float) crop.sx(), (float) crop.sy(), (float) crop.sw(),
-				(float) crop.sh());
-		boolean layered = opacity < 1;
-		if (layered) {
-			canvas.saveLayerAlpha(Rect.makeWH(width, height),
-					(int) Math.round(opacity * 255));
-		}
-		SkiaGlSurface target = currentTarget();
-		try {
-			try (Image image = frameTextures.image(target,
-					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
-				drawWebcamShadowLayers(canvas, box, radius, spec.shadow() * (1 - fill),
-						Math.min(box.getWidth(), box.getHeight()));
-				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
-						radius, WEBCAM_SAMPLING);
-			}
-		} finally {
-			if (layered) {
-				canvas.restore();
-			}
-		}
+		return new WebcamBox(box, radius);
 	}
 
 	/**
@@ -557,8 +578,7 @@ public final class Compositor implements AutoCloseable {
 	 * from the webcam width percent, stacked ones from the height percent (the size percent as
 	 * the fallback), so the existing webcam sliders drive the split.
 	 */
-	private SplitScreenLayout.@Nullable Regions splitRegions(FrameInput input) {
-		WebcamSpec spec = input.webcam();
+	private SplitScreenLayout.@Nullable Regions splitRegions(WebcamSpec spec, FrameInput input) {
 		if (!SplitScreenLayout.isSplit(spec.positionPreset())
 				|| !spec.isVisibleAt(input.sourceTimeSeconds() * 1000)) {
 			return null;
@@ -577,7 +597,18 @@ public final class Compositor implements AutoCloseable {
 	 * camera out ({@code cameraOpacity}), and the full frame for the overlay mode.
 	 */
 	private Rect splitContentRect(FrameInput input) {
-		SplitScreenLayout.Regions split = splitRegions(input);
+		WebcamSpec spec = input.webcam();
+		if (spec.transition().isEmpty()) {
+			return splitContentRect(spec, input);
+		}
+		// A smooth Camera layout switch also slides the split divider.
+		WebcamSpec.Transition transition = spec.transition().get();
+		return lerpRect(splitContentRect(transition.from(), input), splitContentRect(spec, input),
+				(float) transition.progress());
+	}
+
+	private Rect splitContentRect(WebcamSpec spec, FrameInput input) {
+		SplitScreenLayout.Regions split = splitRegions(spec, input);
 		if (split == null) {
 			return Rect.makeWH(width, height);
 		}

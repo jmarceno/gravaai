@@ -12,6 +12,10 @@ import java.util.Set;
 import java.util.function.Function;
 
 import dev.gravaai.core.project.ClipSpanChanges;
+import dev.gravaai.core.project.CameraLayout;
+import dev.gravaai.core.project.CameraLayoutSegment;
+import dev.gravaai.core.project.CameraLayoutStyle;
+import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.editor.TranscriptCut;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.AnnotationPosition;
@@ -73,7 +77,8 @@ public final class AgentPlanner {
 
 	/** Region kinds that can be created by an op; each has its own id counter. */
 	public enum IdKind {
-		ZOOM("zoom"), CLIP("clip"), ANNOTATION("annotation"), AUDIO("audio"), SPEED("speed");
+		ZOOM("zoom"), CLIP("clip"), ANNOTATION("annotation"), AUDIO("audio"), SPEED("speed"),
+		CAMERA("camera");
 
 		private final String wire;
 
@@ -454,6 +459,9 @@ public final class AgentPlanner {
 				before, after);
 		List<AudioRegion> audio = remapAnchors(draft.state.audioRegions(), before, after);
 		draft.state = draft.state.toBuilder()
+				.cameraLayoutSegments(ProjectPersistence.normalizeCameraLayoutSegments(
+						ClipSequence.rippleRegions(draft.state.cameraLayoutSegments(), before, after,
+								ClipSequence.CAMERA_LAYOUT_SPAN)))
 				.clipRegions(after)
 				.zoomRegions(zooms)
 				.speedRegions(speeds)
@@ -801,6 +809,8 @@ public final class AgentPlanner {
 			case "cut_fillers" -> cutFillers(draft, raw);
 			case "cut_pauses" -> cutPauses(draft, raw);
 			case "cut_range_src" -> cutRangeSource(draft, raw);
+			case "camera_layout" -> cameraLayout(draft, raw);
+			case "delete_camera_layout" -> deleteCameraLayout(draft, raw);
 			case "zoom" -> addZoom(draft, raw);
 			case "update_zoom" -> updateZoom(draft, raw);
 			case "delete_zoom" -> deleteZoom(draft, raw);
@@ -1138,6 +1148,82 @@ public final class AgentPlanner {
 	}
 
 	// Zoom/speed/annotation/audio/caption/settings ops ---------------------------------------
+
+	/**
+	 * {@code camera_layout {from, to?, layout, transition?, size?, width?, height?, roundness?,
+	 * shadow?}}: the camera uses {@code layout} from {@code from} until {@code to} (default: the
+	 * next Camera layout switch or the end). Whatever the track had in that range is replaced.
+	 */
+	private static void cameraLayout(Draft draft, ObjectNode raw) {
+		String wire = AgentOpReader.string(raw, "layout").trim();
+		CameraLayout layout = CameraLayout.fromWire(wire).orElseThrow(() -> fail(
+				"unknown layout \"" + wire + "\"; use one of " + CameraLayout.all().stream()
+						.map(CameraLayout::wire).toList()));
+		long from = toMs(AgentOpReader.number(raw, "from"));
+		Double toSeconds = AgentOpReader.optionalNumber(raw, "to");
+		List<CameraLayoutSegment> segments = draft.state.cameraLayoutSegments();
+		long to = toSeconds != null ? toMs(toSeconds)
+				: segments.stream().mapToLong(CameraLayoutSegment::startMs)
+						.filter(start -> start > from).min().orElse(timelineDurationMs(draft));
+		Span span = clampTimelineSpan(draft, from, to);
+		CameraLayoutStyle style = CameraLayoutStyle.INHERIT;
+		for (String field : CameraLayoutStyle.FIELDS) {
+			Double value = AgentOpReader.optionalNumber(raw, field);
+			if (value != null) {
+				style = style.with(field, java.util.OptionalDouble.of(value));
+			}
+		}
+		String transition = AgentOpReader.optionalString(raw, "transition");
+		CameraLayoutSegment added = new CameraLayoutSegment(
+				draft.ctx.createId().apply(IdKind.CAMERA), span.startMs(), span.endMs(), layout,
+				style, CameraLayoutSegment.Transition.fromWire(
+						transition == null ? "cut" : transition.trim()));
+		List<CameraLayoutSegment> next = new ArrayList<>();
+		for (CameraLayoutSegment segment : segments) {
+			if (segment.endMs() <= span.startMs() || segment.startMs() >= span.endMs()) {
+				next.add(segment);
+				continue;
+			}
+			if (segment.startMs() < span.startMs()) {
+				next.add(segment.withSpan(segment.startMs(), span.startMs()));
+			}
+			if (segment.endMs() > span.endMs()) {
+				next.add(new CameraLayoutSegment(draft.ctx.createId().apply(IdKind.CAMERA),
+						span.endMs(), segment.endMs(), segment.layout(), segment.style(),
+						CameraLayoutSegment.Transition.CUT));
+			}
+		}
+		next.add(added);
+		draft.state = draft.state.toBuilder()
+				.cameraLayoutSegments(ProjectPersistence.normalizeCameraLayoutSegments(next))
+				.build();
+		draft.summary.add("camera " + layout.wire() + " " + AgentIds.formatSeconds(span.startMs())
+				+ "–" + AgentIds.formatSeconds(span.endMs()) + "s");
+		push(draft, Highlight.Kind.ADDED, span.startMs(), span.endMs(), "camera layout");
+	}
+
+	/** {@code delete_camera_layout {at} | {all: true}}: back to the project webcam layout. */
+	private static void deleteCameraLayout(Draft draft, ObjectNode raw) {
+		if (Boolean.TRUE.equals(AgentOpReader.optionalBoolean(raw, "all"))) {
+			int count = draft.state.cameraLayoutSegments().size();
+			draft.state = draft.state.toBuilder().cameraLayoutSegments(List.of()).build();
+			draft.summary.add("deleted " + count + " camera layouts");
+			return;
+		}
+		Double at = AgentOpReader.optionalNumber(raw, "at");
+		if (at == null) {
+			throw fail("delete_camera_layout needs \"at\" (seconds) or \"all\": true");
+		}
+		CameraLayoutSegment segment = CameraLayoutSegment
+				.at(draft.state.cameraLayoutSegments(), toMs(at))
+				.orElseThrow(() -> fail("no camera layout at " + at + "s"));
+		draft.state = draft.state.toBuilder().cameraLayoutSegments(
+				draft.state.cameraLayoutSegments().stream()
+						.filter(candidate -> !candidate.id().equals(segment.id())).toList())
+				.build();
+		draft.summary.add("deleted camera " + segment.layout().wire() + " at "
+				+ AgentIds.formatSeconds(segment.startMs()) + "s");
+	}
 
 	private static void addZoom(Draft draft, ObjectNode raw) {
 		double[] range = AgentOpReader.readRange(raw, "from", "to");

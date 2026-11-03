@@ -5,10 +5,34 @@ import java.util.Optional;
 
 /**
  * A stretch of the timeline where the camera uses {@code layout} instead of the project's webcam
- * settings (the Camera layout track). Segments never overlap; the gaps between them use the
- * project layout.
+ * settings (the Camera layout track), with optional {@code style} overrides of the webcam look.
+ * Segments never overlap; the gaps between them use the project layout. {@code transition} is
+ * how the camera arrives at this segment's start: an instant cut or a smooth move.
  */
-public record CameraLayoutSegment(String id, long startMs, long endMs, CameraLayout layout) {
+public record CameraLayoutSegment(String id, long startMs, long endMs, CameraLayout layout,
+		CameraLayoutStyle style, Transition transition) {
+
+	/** How the camera gets from the previous layout to this one. */
+	public enum Transition {
+		CUT("cut"), SMOOTH("smooth");
+
+		private final String wire;
+
+		Transition(String wire) {
+			this.wire = wire;
+		}
+
+		public String wire() {
+			return wire;
+		}
+
+		public static Transition fromWire(String value) {
+			return "smooth".equals(value) ? SMOOTH : CUT;
+		}
+	}
+
+	/** Length of a smooth switch. */
+	public static final long SMOOTH_MS = 300;
 
 	public CameraLayoutSegment {
 		if (id.isBlank()) {
@@ -19,12 +43,24 @@ public record CameraLayoutSegment(String id, long startMs, long endMs, CameraLay
 		}
 	}
 
+	public CameraLayoutSegment(String id, long startMs, long endMs, CameraLayout layout) {
+		this(id, startMs, endMs, layout, CameraLayoutStyle.INHERIT, Transition.CUT);
+	}
+
 	public CameraLayoutSegment withSpan(long nextStartMs, long nextEndMs) {
-		return new CameraLayoutSegment(id, nextStartMs, nextEndMs, layout);
+		return new CameraLayoutSegment(id, nextStartMs, nextEndMs, layout, style, transition);
 	}
 
 	public CameraLayoutSegment withLayout(CameraLayout nextLayout) {
-		return new CameraLayoutSegment(id, startMs, endMs, nextLayout);
+		return new CameraLayoutSegment(id, startMs, endMs, nextLayout, style, transition);
+	}
+
+	public CameraLayoutSegment withStyle(CameraLayoutStyle nextStyle) {
+		return new CameraLayoutSegment(id, startMs, endMs, layout, nextStyle, transition);
+	}
+
+	public CameraLayoutSegment withTransition(Transition nextTransition) {
+		return new CameraLayoutSegment(id, startMs, endMs, layout, style, nextTransition);
 	}
 
 	public boolean contains(double timeMs) {

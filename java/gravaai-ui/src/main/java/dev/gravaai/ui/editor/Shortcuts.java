@@ -74,6 +74,7 @@ public final class Shortcuts {
 
 	/** {@code FIXED_SHORTCUTS}. */
 	public static final List<FixedShortcut> FIXED_SHORTCUTS = List.of(
+			new FixedShortcut("Camera Layout Menu", "L", List.of(Binding.of("l"))),
 			new FixedShortcut("Cycle Annotations Forward", "Tab", List.of(Binding.of("tab"))),
 			new FixedShortcut("Cycle Annotations Backward", "Shift + Tab",
 					List.of(new Binding("tab", false, true, false))),

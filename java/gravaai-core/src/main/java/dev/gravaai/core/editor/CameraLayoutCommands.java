@@ -3,11 +3,13 @@ package dev.gravaai.core.editor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
+import dev.gravaai.core.project.CameraLayoutStyle;
 
 /**
  * The Camera layout track operations (one class per command, like {@link ZoomCommands}). Segments
@@ -129,6 +131,62 @@ public final class CameraLayoutCommands {
 			}
 			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
 					.map(segment -> segment.id().equals(id) ? segment.withLayout(layout) : segment)
+					.toList());
+			return true;
+		}
+	}
+
+	/** Overrides (or with an empty value, clears) one webcam style field of a segment. */
+	public static final class SetStyle implements EditorCommand {
+		private final String id;
+		private final String field;
+		private final OptionalDouble value;
+
+		public SetStyle(String id, String field, OptionalDouble value) {
+			if (!CameraLayoutStyle.FIELDS.contains(field)) {
+				throw new IllegalArgumentException("unknown camera style field " + field);
+			}
+			this.id = id;
+			this.field = field;
+			this.value = value;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			Optional<CameraLayoutSegment> current = find(store, id);
+			if (current.isEmpty()) {
+				return false;
+			}
+			CameraLayoutStyle next = current.get().style().with(field, value);
+			if (next.equals(current.get().style())) {
+				return false;
+			}
+			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
+					.map(segment -> segment.id().equals(id) ? segment.withStyle(next) : segment)
+					.toList());
+			return true;
+		}
+	}
+
+	/** How the camera arrives at a segment's start: an instant cut or a smooth move. */
+	public static final class SetTransition implements EditorCommand {
+		private final String id;
+		private final CameraLayoutSegment.Transition transition;
+
+		public SetTransition(String id, CameraLayoutSegment.Transition transition) {
+			this.id = id;
+			this.transition = transition;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			Optional<CameraLayoutSegment> current = find(store, id);
+			if (current.isEmpty() || current.get().transition() == transition) {
+				return false;
+			}
+			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
+					.map(segment -> segment.id().equals(id) ? segment.withTransition(transition)
+							: segment)
 					.toList());
 			return true;
 		}

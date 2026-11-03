@@ -37,6 +37,32 @@ class CameraLayoutTrackTest {
 	}
 
 	@Test
+	@DisplayName("a smooth switch glides from the previous layout; style overrides apply")
+	void smoothSwitchAndStyle() {
+		ProjectEditorState editor = ProjectPersistence.normalizeProjectEditor(
+				Json.parseJsonWithByteOrderMark("""
+						{"clipRegions":[{"id":"a","startMs":0,"endMs":30000,"speed":1}],
+						 "webcam":{"enabled":true,"positionPreset":"top-left","size":40},
+						 "cameraLayoutSegments":[
+							{"id":"camera-1","startMs":0,"endMs":10000,"layout":"split-right"},
+							{"id":"camera-2","startMs":10000,"endMs":20000,
+							 "layout":"bottom-right","transition":"smooth","style":{"size":25}}]}
+						"""));
+		WebcamSpec base = ProjectEditorInputs.webcamSpec(editor);
+
+		WebcamSpec midway = ProjectEditorInputs.webcamSpecAt(base, editor, 10_150);
+		assertEquals("bottom-right", midway.positionPreset());
+		assertEquals(25, midway.size(), 1e-9);
+		assertEquals("split-right", midway.transition().orElseThrow().from().positionPreset());
+		assertEquals(0.5, midway.transition().orElseThrow().progress(), 1e-9);
+
+		assertEquals(java.util.Optional.empty(),
+				ProjectEditorInputs.webcamSpecAt(base, editor, 10_400).transition());
+		assertEquals(java.util.Optional.empty(),
+				ProjectEditorInputs.webcamSpecAt(base, editor, 5_000).transition());
+	}
+
+	@Test
 	@DisplayName("a camera-only segment fills the frame with the camera")
 	void cameraOnlySegmentDrivesScene() {
 		assertEquals(SceneSpec.FULL, ProjectEditorInputs.sceneSpec(EDITOR, 15_000));

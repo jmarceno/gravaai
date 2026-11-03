@@ -21,6 +21,7 @@ import dev.gravaai.core.project.AutoCaptionAnimation;
 import dev.gravaai.core.project.AutoCaptionSettings;
 import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
+import dev.gravaai.core.project.CameraLayoutStyle;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.CropRegion;
@@ -716,8 +717,56 @@ public final class EditorInspectorPanel extends VBox {
 				store.apply(new CameraLayoutCommands.ChangeLayout(segment.id(), choice))));
 		root.getChildren().add(row("Layout", layout));
 
-		Label hint = new Label("Drag the block's edges on the Camera track to change when the "
-				+ "layout switches. Size and style come from the Webcam settings.");
+		ChoiceGroup transition = choice("cut", "Cut", "smooth", "Smooth");
+		transition.setValue(segment.transition().wire());
+		transition.setAccessibleText("Switch");
+		transition.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransition(
+				segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
+		root.getChildren().add(row("Switch", transition));
+
+		// This block's look; each slider starts at the project webcam value it overrides.
+		WebcamOverlaySettings webcam = store.state().webcam();
+		CameraLayoutStyle style = segment.style();
+		if (segment.layout() instanceof CameraLayout.Position(var preset)) {
+			if (preset.isSplit()) {
+				boolean stacked = preset == WebcamPositionPreset.SPLIT_TOP
+						|| preset == WebcamPositionPreset.SPLIT_BOTTOM;
+				String field = stacked ? "height" : "width";
+				root.getChildren().add(styleSlider(segment, "Camera share", field,
+						style.get(field).orElse(stacked ? webcam.height() : webcam.width()),
+						10, 90, 1, EditorInspectorPanel::formatPercent));
+			} else {
+				root.getChildren().add(styleSlider(segment, "Size", "size",
+						style.size().orElse(webcam.size()), 10, 100, 1,
+						EditorInspectorPanel::formatPercent));
+				root.getChildren().add(styleSlider(segment, "Width", "width",
+						style.width().orElse(webcam.width()), 10, 100, 1,
+						EditorInspectorPanel::formatPercent));
+				root.getChildren().add(styleSlider(segment, "Height", "height",
+						style.height().orElse(webcam.height()), 10, 100, 1,
+						EditorInspectorPanel::formatPercent));
+			}
+			root.getChildren().add(styleSlider(segment, "Roundness", "roundness",
+					style.roundness().orElse(webcam.roundness()), 0, 100, 1,
+					EditorInspectorPanel::formatPercent));
+			root.getChildren().add(styleSlider(segment, "Shadow", "shadow",
+					style.shadow().orElse(webcam.shadow()) * 100, 0, 100, 1,
+					EditorInspectorPanel::formatPercent));
+			if (!style.isInherit()) {
+				Button reset = new Button("Use the Webcam settings", Button.Variant.GHOST,
+						Button.Size.SM);
+				reset.setOnAction(event -> {
+					for (String field : CameraLayoutStyle.FIELDS) {
+						store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
+								java.util.OptionalDouble.empty()));
+					}
+				});
+				root.getChildren().add(reset);
+			}
+		}
+
+		Label hint = new Label("Drag the block's edges on the Camera track to move the switch. "
+				+ "The diamond at its start toggles Cut / Smooth.");
 		hint.setWrapText(true);
 		hint.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(hint);
@@ -725,6 +774,15 @@ public final class EditorInspectorPanel extends VBox {
 		root.getChildren().add(deleteSelectionButton("Remove (use project layout)",
 				() -> store.apply(new CameraLayoutCommands.Delete(segment.id()))));
 		return root;
+	}
+
+	/** A slider that overrides one webcam style field for one Camera layout block. */
+	private Slider styleSlider(CameraLayoutSegment segment, String label, String field,
+			double value, double min, double max, double step, DoubleFunction<String> formatter) {
+		double scale = "shadow".equals(field) ? 100 : 1;
+		return slider(label, value, min, max, step, formatter,
+				next -> store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
+						java.util.OptionalDouble.of(next / scale))));
 	}
 
 	private Label emptySelection(String message) {

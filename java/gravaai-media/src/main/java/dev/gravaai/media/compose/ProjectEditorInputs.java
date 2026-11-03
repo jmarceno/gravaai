@@ -380,16 +380,43 @@ public final class ProjectEditorInputs {
 	 */
 	public static WebcamSpec webcamSpecAt(WebcamSpec base, ProjectEditorState editor,
 			double timelineMs) {
-		return CameraLayoutSegment.at(editor.cameraLayoutSegments(), timelineMs)
-				.map(CameraLayoutSegment::layout)
-				.flatMap(layout -> layout instanceof CameraLayout.Position(var preset)
-						? Optional.of(preset) : Optional.empty())
-				.map(preset -> new WebcamSpec(base.enabled(), preset.wire(),
-						preset.isCorner() ? preset.wire() : base.corner(), base.positionX(),
-						base.positionY(), base.size(), base.width(), base.height(), base.mirror(),
-						base.roundness(), base.shadow(), base.margin(), base.reactToZoom(),
-						base.cropRegion(), base.visibleRanges(), base.timeOffsetMs()))
+		List<CameraLayoutSegment> segments = editor.cameraLayoutSegments();
+		Optional<CameraLayoutSegment> active = CameraLayoutSegment.at(segments, timelineMs);
+		if (active.isEmpty()) {
+			return base;
+		}
+		CameraLayoutSegment segment = active.get();
+		WebcamSpec target = styled(base, segment);
+		double elapsed = timelineMs - segment.startMs();
+		if (segment.transition() != CameraLayoutSegment.Transition.SMOOTH
+				|| elapsed >= CameraLayoutSegment.SMOOTH_MS) {
+			return target;
+		}
+		// Where the camera was just before the switch: the segment ending here, or the project.
+		WebcamSpec from = CameraLayoutSegment.at(segments, segment.startMs() - 1)
+				.filter(previous -> previous.endMs() == segment.startMs())
+				.map(previous -> styled(base, previous))
 				.orElse(base);
+		double t = Math.max(0, Math.min(1, elapsed / CameraLayoutSegment.SMOOTH_MS));
+		double eased = t * t * (3 - 2 * t);
+		return target.withTransition(Optional.of(new WebcamSpec.Transition(from, eased)));
+	}
+
+	/** The project webcam spec with one segment's preset and style overrides applied. */
+	private static WebcamSpec styled(WebcamSpec base, CameraLayoutSegment segment) {
+		String preset = base.positionPreset();
+		String corner = base.corner();
+		if (segment.layout() instanceof CameraLayout.Position(var position)) {
+			preset = position.wire();
+			corner = position.isCorner() ? position.wire() : base.corner();
+		}
+		var style = segment.style();
+		return new WebcamSpec(base.enabled(), preset, corner, base.positionX(), base.positionY(),
+				style.size().orElse(base.size()), style.width().orElse(base.width()),
+				style.height().orElse(base.height()), base.mirror(),
+				style.roundness().orElse(base.roundness()), style.shadow().orElse(base.shadow()),
+				base.margin(), base.reactToZoom(), base.cropRegion(), base.visibleRanges(),
+				base.timeOffsetMs());
 	}
 
 	/** Maps the project's fade-through-black clip transitions (stage 11). */

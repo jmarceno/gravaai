@@ -18,6 +18,7 @@ import dev.gravaai.core.editor.EditorCommand;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.CameraLayoutCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
+import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.SourceAudioCommands;
 import dev.gravaai.core.editor.ZoomCommands;
@@ -248,6 +249,16 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		if (cameraLayout != null) {
 			store.apply(new CameraLayoutCommands.Delete(cameraLayout));
 		}
+	}
+
+	@Override
+	public void toggleCameraLayoutTransition(String segmentId) {
+		store.state().cameraLayoutSegments().stream()
+				.filter(segment -> segment.id().equals(segmentId)).findFirst()
+				.ifPresent(segment -> store.apply(new CameraLayoutCommands.SetTransition(segmentId,
+						segment.transition() == CameraLayoutSegment.Transition.SMOOTH
+								? CameraLayoutSegment.Transition.CUT
+								: CameraLayoutSegment.Transition.SMOOTH)));
 	}
 
 	@Override

@@ -116,6 +116,7 @@ public final class TimelineView extends Region {
 	private static final Color CAMERA_LAYOUT_BORDER = Color.web("#2dd4bf");
 	private static final Color CAMERA_LAYOUT_SELECTED = Color.web("#5eead4");
 	private static final Color CAMERA_LAYOUT_LANE = Color.web("#2dd4bf", 0.35);
+	private static final Color CAMERA_LAYOUT_RAMP = Color.web("#2dd4bf", 0.25);
 	private static final Color CAPTION_FILL = Color.web("#b58b12");
 	private static final Color CAPTION_BORDER = Color.web("#facc15");
 	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
@@ -188,7 +189,10 @@ public final class TimelineView extends Region {
 	private List<RowLayout> rowLayouts = List.of();
 	private List<TimelineRenderItem> items = List.of();
 	/** Camera layout segment id to its layout, for the block tint. */
-	private java.util.Map<String, CameraLayout> cameraLayouts = java.util.Map.of();
+	private java.util.Map<String, CameraLayoutSegment> cameraLayouts = java.util.Map.of();
+	private Runnable onCameraLayoutShortcut = () -> {};
+	/** Switch diamonds drawn at Camera layout segment starts (click toggles cut/smooth). */
+	private final Map<String, BlockBounds> cameraSwitchBounds = new LinkedHashMap<>();
 	private List<ClipPresentation.Presentation> clipPresentation = List.of();
 	private final Map<String, BlockBounds> blockBounds = new LinkedHashMap<>();
 
@@ -446,7 +450,7 @@ public final class TimelineView extends Region {
 				project.keystrokeElements(), project.cameraLayoutSegments()));
 		cameraLayouts = new java.util.HashMap<>();
 		for (CameraLayoutSegment segment : project.cameraLayoutSegments()) {
-			cameraLayouts.put(segment.id(), segment.layout());
+			cameraLayouts.put(segment.id(), segment);
 		}
 		sourceAudioTracks = dataSource.sourceAudioTracks();
 		FilmstripProvider provider = dataSource.filmstripProvider();
@@ -694,6 +698,11 @@ public final class TimelineView extends Region {
 			// PlaybackCursor cap drag: scrub without changing the selection.
 			scrubbing = true;
 			redraw();
+			return;
+		}
+		Optional<String> cameraSwitch = cameraSwitchAt(x, y);
+		if (cameraSwitch.isPresent()) {
+			commands.toggleCameraLayoutTransition(cameraSwitch.get());
 			return;
 		}
 		if (hasCaptions() && inCaptionStrip(y)) {
@@ -1201,6 +1210,12 @@ public final class TimelineView extends Region {
 			consume(event);
 			return;
 		}
+		if (code == KeyCode.L && !ctrl && !meta && !alt && !shift) {
+			// L: the Camera layout menu, to switch the layout from the playhead on.
+			onCameraLayoutShortcut.run();
+			consume(event);
+			return;
+		}
 		if (code == KeyCode.ESCAPE) {
 			selectedIds.clear();
 			setSelection(null);
@@ -1412,6 +1427,11 @@ public final class TimelineView extends Region {
 	/** The mounted agent overlay, or null (tests/shell inspection). */
 	public @Nullable AgentTimelineHighlights agentOverlay() {
 		return agentOverlay;
+	}
+
+	/** What the L key does (opens the Camera layout menu in the editor). */
+	public void setOnCameraLayoutShortcut(Runnable action) {
+		this.onCameraLayoutShortcut = action;
 	}
 
 	/** Reports the source cue when a caption block is selected on the timeline. */
@@ -1675,6 +1695,7 @@ public final class TimelineView extends Region {
 		graphics.setFill(Color.web("#121418"));
 		graphics.fillRect(0, 0, width, height);
 		blockBounds.clear();
+		cameraSwitchBounds.clear();
 		if (agentOverlay != null) {
 			agentOverlay.range((long) range.start(), (long) range.end());
 		}
@@ -2066,7 +2087,11 @@ public final class TimelineView extends Region {
 		if (endX < 0 || startX > width) {
 			return;
 		}
-		Color fill = switch (cameraLayouts.getOrDefault(item.id(), new CameraLayout.HideCamera())) {
+		CameraLayoutSegment segment = cameraLayouts.get(item.id());
+		if (segment == null) {
+			return;
+		}
+		Color fill = switch (segment.layout()) {
 			case CameraLayout.Position(var preset) when preset.isSplit() -> CAMERA_SPLIT_FILL;
 			case CameraLayout.Position(var preset) -> CAMERA_BUBBLE_FILL;
 			case CameraLayout.CameraOnly() -> CAMERA_ONLY_FILL;
@@ -2080,16 +2105,62 @@ public final class TimelineView extends Region {
 		graphics.setStroke(CAMERA_LAYOUT_BORDER);
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 24) {
+		if (segment.transition() == CameraLayoutSegment.Transition.SMOOTH) {
+			// The smooth move's length, shaded at the block start.
+			double rampWidth = Math.min(blockWidth,
+					xForTime(display.start() + CameraLayoutSegment.SMOOTH_MS) - startX);
+			graphics.setFill(CAMERA_LAYOUT_RAMP);
+			graphics.fillRoundRect(x, y, Math.max(0, rampWidth), height, 8, 8);
+		}
+		// Label after the switch diamond; a dot marks a segment with its own size or style.
+		String label = segment.style().isInherit() ? item.label() : item.label() + " •";
+		if (blockWidth > 34) {
 			graphics.setFont(BLOCK_FONT);
 			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 6,
+			graphics.fillText(fitText(label, blockWidth - 22, BLOCK_FONT), x + 16,
 					y + height / 2 + 4);
 		}
 		if (isSelected(TimelineSelection.CAMERA_LAYOUT, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, CAMERA_LAYOUT_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+		drawCameraSwitch(graphics, segment, startX, y + height / 2);
+	}
+
+	/**
+	 * The switch diamond at a segment start: hollow for a cut, filled for a smooth move. Clicking
+	 * it toggles between the two.
+	 */
+	private void drawCameraSwitch(GraphicsContext graphics, CameraLayoutSegment segment,
+			double centerX, double centerY) {
+		double half = 5;
+		double cx = centerX + half + 2;
+		double[] xs = {cx, cx + half, cx, cx - half};
+		double[] ys = {centerY - half, centerY, centerY + half, centerY};
+		if (segment.transition() == CameraLayoutSegment.Transition.SMOOTH) {
+			graphics.setFill(CAMERA_LAYOUT_BORDER);
+			graphics.fillPolygon(xs, ys, 4);
+		} else {
+			graphics.setFill(CAMERA_HIDDEN_FILL);
+			graphics.fillPolygon(xs, ys, 4);
+			graphics.setStroke(CAMERA_LAYOUT_BORDER);
+			graphics.setLineWidth(1.2);
+			graphics.strokePolygon(xs, ys, 4);
+		}
+		cameraSwitchBounds.put(segment.id(),
+				new BlockBounds(cx - half - 2, centerY - half - 2, half * 2 + 4, half * 2 + 4));
+	}
+
+	/** The segment whose switch diamond is under the point, if any. */
+	private Optional<String> cameraSwitchAt(double x, double y) {
+		for (var entry : cameraSwitchBounds.entrySet()) {
+			BlockBounds bounds = entry.getValue();
+			if (x >= bounds.minX() && x <= bounds.minX() + bounds.width() && y >= bounds.minY()
+					&& y <= bounds.minY() + bounds.height()) {
+				return Optional.of(entry.getKey());
+			}
+		}
+		return Optional.empty();
 	}
 
 	/** The Keystrokes track: a keycap-chip block whose label is the pressed key combination. */

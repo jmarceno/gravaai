@@ -268,8 +268,11 @@ class ProjectPersistenceNormalizerTest {
 				{"id":"c","startMs":2000,"endMs":3000,"speed":1,"cameraLayout":"default"},
 				{"id":"d","startMs":3000,"endMs":4000,"speed":1}]}
 				""");
-		assertEquals(java.util.Arrays.asList(ClipCameraLayout.CAMERA_ONLY, null, null, null),
+		// Known non-default layouts move onto the Camera layout track; the rest drop.
+		assertEquals(java.util.Arrays.asList(null, null, null, null),
 				state.clipRegions().stream().map(ClipRegion::cameraLayout).toList());
+		assertEquals(List.of(new CameraLayoutSegment("camera-a", 0, 1000,
+				new CameraLayout.CameraOnly())), state.cameraLayoutSegments());
 	}
 
 	@Test

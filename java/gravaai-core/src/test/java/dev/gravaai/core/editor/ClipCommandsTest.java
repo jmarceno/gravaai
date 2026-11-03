@@ -122,7 +122,10 @@ class ClipCommandsTest {
 
 		ClipRegion clip = store.state().clipRegions().get(0);
 		assertEquals(true, clip.muted());
-		assertEquals(dev.gravaai.core.project.ClipCameraLayout.CAMERA_ONLY, clip.cameraLayout());
+		// The per-clip camera layout lands on the Camera layout track over the clip.
+		assertEquals(null, clip.cameraLayout());
+		assertEquals("camera-only",
+				store.state().cameraLayoutSegments().get(0).layout().wire());
 		assertEquals(500, clip.transitionOut().durationMs());
 		assertEquals(true, clip.showSourceAudio());
 	}

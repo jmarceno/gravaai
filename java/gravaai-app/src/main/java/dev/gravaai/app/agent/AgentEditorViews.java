@@ -151,6 +151,21 @@ final class AgentEditorViews {
 			lines.add("  (none in window)");
 		}
 
+		lines.add("camera layouts (gaps use the webcam settings):");
+		boolean anyCamera = false;
+		for (var segment : state.cameraLayoutSegments()) {
+			if (!overlaps(segment.startMs(), segment.endMs(), fromMs, toMs)) {
+				continue;
+			}
+			anyCamera = true;
+			lines.add("  " + seconds(segment.startMs()) + "–" + seconds(segment.endMs()) + " "
+					+ segment.layout().wire() + " " + segment.transition().wire()
+					+ (segment.style().isInherit() ? "" : " (custom style)"));
+		}
+		if (!anyCamera) {
+			lines.add("  (none in window)");
+		}
+
 		lines.add("zooms:");
 		List<ZoomRegion> zooms = new ArrayList<>(state.zoomRegions());
 		zooms.sort(Comparator.comparingLong(ZoomRegion::startMs));

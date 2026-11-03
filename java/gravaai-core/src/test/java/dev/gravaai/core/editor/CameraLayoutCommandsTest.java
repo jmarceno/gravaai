@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.OptionalDouble;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,56 @@ class CameraLayoutCommandsTest {
 		store.apply(new ClipCommands.Delete(first));
 
 		assertEquals(List.of("5000-15000:bottom-right"), layouts(store));
+	}
+
+	@Test
+	@DisplayName("speeding a clip up squeezes the segments over it")
+	void ripplesWithSpeedChanges() {
+		EditorStore store = store();
+		store.apply(new CameraLayoutCommands.SwitchAt(10_000, 20_000, CORNER));
+		store.apply(new ClipCommands.Select(store.state().clipRegions().get(0).id()));
+
+		store.apply(new ClipCommands.ChangeSpeed(2));
+
+		assertEquals(List.of("5000-10000:bottom-right"), layouts(store));
+	}
+
+	@Test
+	@DisplayName("style overrides and the smooth switch persist; clearing a field inherits again")
+	void styleAndTransition() {
+		EditorStore store = store();
+		store.apply(new CameraLayoutCommands.SwitchAt(0, 20_000, CORNER));
+		String id = store.state().cameraLayoutSegments().get(0).id();
+
+		store.apply(new CameraLayoutCommands.SetStyle(id, "size", OptionalDouble.of(250)));
+		store.apply(new CameraLayoutCommands.SetStyle(id, "shadow", OptionalDouble.of(0.5)));
+		store.apply(new CameraLayoutCommands.SetTransition(id,
+				CameraLayoutSegment.Transition.SMOOTH));
+
+		ProjectEditorState reloaded = ProjectPersistence.normalizeProjectEditor(
+				ProjectDocument.writeEditor(store.state(), Json.nodeFactory().objectNode()));
+		CameraLayoutSegment segment = reloaded.cameraLayoutSegments().get(0);
+		assertEquals(OptionalDouble.of(100), segment.style().size());
+		assertEquals(OptionalDouble.of(0.5), segment.style().shadow());
+		assertEquals(CameraLayoutSegment.Transition.SMOOTH, segment.transition());
+
+		store.apply(new CameraLayoutCommands.SetStyle(id, "size", OptionalDouble.empty()));
+		assertEquals(OptionalDouble.empty(),
+				store.state().cameraLayoutSegments().get(0).style().size());
+	}
+
+	@Test
+	@DisplayName("older per-clip camera layouts move onto the Camera layout track")
+	void migratesClipLayouts() {
+		ProjectEditorState loaded = state("""
+				{"clipRegions":[
+					{"id":"a","startMs":0,"endMs":4000,"speed":1,"cameraLayout":"camera-only"},
+					{"id":"b","startMs":4000,"endMs":9000,"speed":1}]}
+				""");
+
+		assertEquals(List.of(new CameraLayoutSegment("camera-a", 0, 4000,
+				new CameraLayout.CameraOnly())), loaded.cameraLayoutSegments());
+		assertNull(loaded.clipRegions().get(0).cameraLayout());
 	}
 
 	@Test

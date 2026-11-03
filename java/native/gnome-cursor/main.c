@@ -107,6 +107,10 @@ static void discover_input_devices(void) {
  * after PRESS_HOLD_MS anyway. A release that comes while its press is still held waits
  * with it, so the pair keeps its order. */
 #define PRESS_HOLD_MS 60
+/* A position report already in flight when the press happened still carries the old
+ * position: the shell had not seen the move yet. Only a report this long after the
+ * press may release it. */
+#define PRESS_MIN_AGE_MS 20
 static int pending_press;
 static bool pending_release;
 static long long pending_press_deadline;
@@ -216,7 +220,8 @@ static DBusHandlerResult on_message(DBusConnection *connection, DBusMessage *mes
 	}
 
 	printf("POS:%s:%s\n", x, y);
-	flush_press();
+	if (pending_press != 0 && now_ms() >= pending_press_deadline - PRESS_HOLD_MS + PRESS_MIN_AGE_MS)
+		flush_press();
 	if (!ready_printed) {
 		/* The first position means the extension is live inside gnome-shell. */
 		ready_printed = true;

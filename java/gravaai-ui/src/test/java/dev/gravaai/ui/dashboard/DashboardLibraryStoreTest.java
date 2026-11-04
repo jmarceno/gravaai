@@ -112,4 +112,38 @@ class DashboardLibraryStoreTest {
 		assertEquals(data.rawNames(), moved.rawNames());
 		assertEquals(data.colors(), moved.colors());
 	}
+
+	@Test
+	@DisplayName("drag and drop adds paths to one folder without removing the ones already inside")
+	void addsDroppedPathsToOneFolder() {
+		DashboardLibraryData data = new DashboardLibraryData(
+				List.of(
+						new ProjectFolder("f1", "Work", "#de85ac", List.of("/p/a.gravaai")),
+						new ProjectFolder("f2", "Play", "#70ad8a", List.of())),
+				List.of(),
+				Map.of(),
+				List.of());
+
+		DashboardLibraryData next = DashboardLibraryStore.addProjectFolderPaths(data,
+				List.of("/p/b.gravaai", "/p/a.gravaai", "/p/c.gravaai"), "f1");
+
+		// "a" was dropped twice across the selection; it stays once and is not toggled out.
+		assertEquals(List.of("/p/a.gravaai", "/p/b.gravaai", "/p/c.gravaai"),
+				next.folders().get(0).paths());
+		assertEquals(List.of(), next.folders().get(1).paths());
+	}
+
+	@Test
+	@DisplayName("drag and drop ignores unknown folders, empty paths and keeps the other preferences")
+	void ignoresUnknownFolderAndEmptyDrop() {
+		DashboardLibraryData data = new DashboardLibraryData(
+				List.of(new ProjectFolder("f1", "Work", "#de85ac", List.of("/p/a.gravaai"))),
+				List.of("/raw/a.mkv"),
+				Map.of("/raw/a.mkv", "Test"),
+				List.of("#a68ccc"));
+
+		assertEquals(data, DashboardLibraryStore.addProjectFolderPaths(data,
+				List.of("/p/b.gravaai"), "missing-folder"));
+		assertEquals(data, DashboardLibraryStore.addProjectFolderPaths(data, List.of(), "f1"));
+	}
 }

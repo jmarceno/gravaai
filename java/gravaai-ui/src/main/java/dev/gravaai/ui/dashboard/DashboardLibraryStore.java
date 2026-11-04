@@ -9,8 +9,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -107,6 +109,31 @@ public final class DashboardLibraryStore {
 		store.put(METADATA_KEY, metadata);
 
 		writeAtomically(store);
+	}
+
+	/**
+	 * Adds project paths to one folder for the drag-and-drop drop; paths already inside stay put,
+	 * unlike the {@code assignFolder} toggle. Paths and folder ids that do not match a folder are
+	 * ignored, so a stale drop cannot invent memberships.
+	 */
+	public static DashboardLibraryData addProjectFolderPaths(DashboardLibraryData data,
+			List<String> paths, String folderId) {
+		Set<String> dropped = new LinkedHashSet<>(paths);
+		List<ProjectFolder> folders = new ArrayList<>();
+		for (ProjectFolder folder : data.folders()) {
+			if (!folder.id().equals(folderId)) {
+				folders.add(folder);
+				continue;
+			}
+			List<String> merged = new ArrayList<>(folder.paths());
+			for (String path : dropped) {
+				if (!merged.contains(path)) {
+					merged.add(path);
+				}
+			}
+			folders.add(new ProjectFolder(folder.id(), folder.name(), folder.color(), merged));
+		}
+		return new DashboardLibraryData(folders, data.hiddenRawPaths(), data.rawNames(), data.colors());
 	}
 
 	/** Port of {@code moveProjectFolderReferences}: replaces a project path in every folder. */

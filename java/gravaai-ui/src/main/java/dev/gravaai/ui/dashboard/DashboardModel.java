@@ -46,6 +46,14 @@ public final class DashboardModel {
 	public static final String MEETINGS_NOT_DELETED =
 			"Meetings that are still being processed were not deleted.";
 
+	/**
+	 * Drag payload format for library cards (the dashboard counterpart of
+	 * {@code RecordingLibraryPanel.RECORDING_DRAG}): a JSON array of entry paths, read by
+	 * {@link DashboardSidebar}'s folder-row drop target.
+	 */
+	public static final javafx.scene.input.DataFormat PROJECT_DRAG =
+			new javafx.scene.input.DataFormat("application/x-gravaai-project");
+
 	private static final java.util.regex.Pattern HEX_COLOR =
 			java.util.regex.Pattern.compile("^#[0-9a-f]{6}$", java.util.regex.Pattern.CASE_INSENSITIVE);
 
@@ -413,6 +421,17 @@ public final class DashboardModel {
 			next.add(new ProjectFolder(folder.id(), folder.name(), folder.color(), paths));
 		}
 		saveFolders(next);
+	}
+
+	/**
+	 * Adds library entries to a folder (the drag-and-drop drop); unlike {@link #assignFolder} this
+	 * never removes, so dropping a project that is already inside keeps it there.
+	 */
+	public void addProjectsToFolder(List<String> paths, String folderId) {
+		if (paths == null || paths.isEmpty() || folderId == null) {
+			return;
+		}
+		applyPreferences(DashboardLibraryStore.addProjectFolderPaths(preferences, paths, folderId));
 	}
 
 	/** Changes one folder's colour (the FolderColors swatch picker). */

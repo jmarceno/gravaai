@@ -99,6 +99,15 @@
 	-fx-background-color: -g-default-soft;
 }
 
+/* A library card is dragged over this folder row (drag-and-drop into folders). */
+.folder-row--drop {
+	-fx-background-color: -g-accent-soft-hover;
+	-fx-border-color: -g-accent;
+	-fx-border-radius: 8;
+	-fx-border-width: 1;
+	-fx-border-insets: 0;
+}
+
 .folder-row__name {
 	-fx-font-size: 13px;
 	-fx-padding: 0 0 0 2;

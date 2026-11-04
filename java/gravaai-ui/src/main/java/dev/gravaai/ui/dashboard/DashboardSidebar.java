@@ -5,6 +5,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
+import tools.jackson.databind.JsonNode;
+
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -141,6 +145,30 @@ public final class DashboardSidebar extends VBox {
 		}
 	}
 
+	/** {@code JSON.parse} of the drag payload; {@code null} when it is not a non-empty path list. */
+	private static java.util.@Nullable List<String> draggedPaths(Object content) {
+		if (!(content instanceof String json)) {
+			return null;
+		}
+		JsonNode parsed;
+		try {
+			parsed = dev.gravaai.core.json.Json.parseJsonWithByteOrderMark(json);
+		} catch (RuntimeException malformed) {
+			return null;
+		}
+		if (!parsed.isArray() || parsed.isEmpty()) {
+			return null;
+		}
+		List<String> paths = new ArrayList<>();
+		for (JsonNode node : parsed) {
+			if (!node.isString() || node.asString().isEmpty()) {
+				return null;
+			}
+			paths.add(node.asString());
+		}
+		return paths;
+	}
+
 	private void rebuildFolders() {
 		List<Node> rows = new ArrayList<>();
 		for (ProjectFolder folder : model.folders()) {
@@ -211,6 +239,41 @@ public final class DashboardSidebar extends VBox {
 			optionsPopover.content(menu);
 
 			getChildren().addAll(colorPicker, name, options);
+			attachDropTarget();
+		}
+
+		/**
+		 * Accepts {@link DashboardModel#PROJECT_DRAG} drops from the dashboard cards and files the
+		 * dropped paths into this folder ({@link DashboardModel#addProjectsToFolder}, add-only).
+		 */
+		private void attachDropTarget() {
+			setOnDragOver(event -> {
+				if (event.getDragboard().hasContent(DashboardModel.PROJECT_DRAG)) {
+					event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+					event.consume();
+				}
+			});
+			setOnDragEntered(event -> {
+				if (event.getDragboard().hasContent(DashboardModel.PROJECT_DRAG)) {
+					Kit.setClass(this, "folder-row--drop", true);
+					event.consume();
+				}
+			});
+			setOnDragExited(event -> {
+				Kit.setClass(this, "folder-row--drop", false);
+				event.consume();
+			});
+			setOnDragDropped(event -> {
+				Kit.setClass(this, "folder-row--drop", false);
+				List<String> paths = draggedPaths(event.getDragboard()
+						.getContent(DashboardModel.PROJECT_DRAG));
+				if (paths == null) {
+					return;
+				}
+				event.setDropCompleted(true);
+				event.consume();
+				model.addProjectsToFolder(paths, folder.id());
+			});
 		}
 
 		ProjectFolder folder() {

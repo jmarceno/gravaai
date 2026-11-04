@@ -2,7 +2,9 @@ package dev.gravaai.ui.dashboard;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javafx.animation.PauseTransition;
 
@@ -96,6 +98,7 @@ final class ProjectCardView extends VBox {
 		getChildren().add(caption);
 
 		attachHoverPreview();
+		attachDragSource();
 	}
 
 	private StackPane buildThumbnail() {
@@ -238,6 +241,39 @@ final class ProjectCardView extends VBox {
 		setHovering(false);
 		stopHoverTimer();
 		stopHoverPreview();
+	}
+
+	// ── drag source (drop on the sidebar folder rows) ───────────────────────────────
+
+	/**
+	 * Starts a {@link DashboardModel#PROJECT_DRAG} drag with this card's path, or with every selected
+	 * path when the card is selected inside the trash-selection mode (the
+	 * {@code RecordingLibraryPanel} rows behave the same). The rename field keeps its own
+	 * text-selection drag.
+	 */
+	private void attachDragSource() {
+		setOnDragDetected(event -> {
+			Node pressed = event.getTarget() instanceof Node node ? node : null;
+			for (Node node = pressed; node != null; node = node.getParent()) {
+				if (node instanceof javafx.scene.control.TextInputControl) {
+					return;
+				}
+			}
+			List<String> paths = new ArrayList<>();
+			if (model.selectingProperty().get() && model.isSelected(entry.path())) {
+				for (ProjectLibraryEntry visible : model.visibleEntries()) {
+					if (model.isSelected(visible.path())) {
+						paths.add(visible.path());
+					}
+				}
+			} else {
+				paths.add(entry.path());
+			}
+			javafx.scene.input.Dragboard dragboard = startDragAndDrop(javafx.scene.input.TransferMode.COPY);
+			dragboard.setContent(Map.of(DashboardModel.PROJECT_DRAG,
+					dev.gravaai.core.json.Json.stringify(paths)));
+			event.consume();
+		});
 	}
 
 	private Node buildArtwork() {

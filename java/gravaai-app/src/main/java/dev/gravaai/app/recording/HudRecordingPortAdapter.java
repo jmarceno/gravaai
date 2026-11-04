@@ -69,6 +69,13 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 		/** {@code switchToEditor} after a finished recording: opens it in the main window. */
 		void openRecordingInEditor(String videoPath);
+
+		/**
+		 * Stop was pressed and the take is still being written: {@code true} reverts the tray to
+		 * idle at once and, when {@code showWindow}, shows the main window with a "finalizing" placeholder; {@code false} ends
+		 * it when no editor replaced the placeholder (failure or meeting recording).
+		 */
+		default void recordingFinalizing(boolean finalizing, boolean showWindow) {}
 	}
 
 	/** The values persisted in {@code recordings-settings.json}. */
@@ -365,6 +372,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	private void stopRecording() {
 		finalizing = true;
 		paused = false;
+		navigation.recordingFinalizing(true, !meetingMode);
 		publish();
 		Thread.ofVirtual().name("gravaai-hud-stop").start(() -> {
 			try {
@@ -375,6 +383,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				LOG.log(System.Logger.Level.WARNING, "recording stop failed: " + error);
 				wiring.recording().setRecordingState(false);
 				finalizing = false;
+				navigation.recordingFinalizing(false, false);
 				publish();
 			}
 		});
@@ -423,9 +432,12 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				// finalizeRecordingSession → switchToEditor. Meeting recordings go to the
 				// meeting library instead (registerRecording in AppContext).
 				navigation.openRecordingInEditor(result.path());
+			} else {
+				navigation.recordingFinalizing(false, false);
 			}
 		} else {
 			LOG.log(System.Logger.Level.WARNING, "recording stop failed: " + result.error());
+			navigation.recordingFinalizing(false, false);
 		}
 		publish();
 	}

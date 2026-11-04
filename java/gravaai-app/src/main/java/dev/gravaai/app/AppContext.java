@@ -423,6 +423,11 @@ public final class AppContext {
 						}
 
 						@Override
+						public void recordingFinalizing(boolean finalizing, boolean showWindow) {
+							Platform.runLater(() -> onRecordingFinalizing(finalizing, showWindow));
+						}
+
+						@Override
 						public void openRecordingInEditor(String videoPath) {
 							if (videoPath != null && !videoPath.isBlank()) {
 								openProjectInEditor(Path.of(videoPath));
@@ -891,6 +896,41 @@ public final class AppContext {
 		}
 	}
 
+	private boolean finalizingSceneShown;
+
+	/**
+	 * Stop was pressed: the tray reverts to idle at once and the main window shows a busy
+	 * placeholder while the take is written; the editor (or the dashboard on failure) replaces it.
+	 */
+	private void onRecordingFinalizing(boolean finalizing, boolean showWindow) {
+		if (finalizing) {
+			applyTrayRecordingState(false, "");
+			Stage stage = primaryStage;
+			if (!showWindow || stage == null || shutdown || activeEditor != null) {
+				return;
+			}
+			javafx.scene.control.ProgressIndicator spinner = new javafx.scene.control.ProgressIndicator();
+			javafx.scene.control.Label label = new javafx.scene.control.Label(
+					"Finalizing your recording\u2026 this can take a few seconds.");
+			label.setStyle("-fx-text-fill: white; -fx-font-size: 15px;");
+			javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(16, spinner, label);
+			box.setAlignment(javafx.geometry.Pos.CENTER);
+			box.setStyle("-fx-background-color: #14141a;");
+			StageScenes.setSceneKeepingSize(stage, new Scene(box));
+			finalizingSceneShown = true;
+			if (!stage.isShowing()) {
+				stage.show();
+			}
+			stage.setIconified(false);
+			stage.toFront();
+			return;
+		}
+		if (finalizingSceneShown && activeEditor == null) {
+			finalizingSceneShown = false;
+			showDashboardScene();
+		}
+	}
+
 	private void stopRecordingFromTray() {
 		RecordingWiring wiring = recordingWiring;
 		if (wiring == null) {
@@ -1319,6 +1359,7 @@ public final class AppContext {
 	/** Shows {@code window} as the main window content; {@code path} is null for an unsaved recording. */
 	private void hostEditor(EditorWindow window, @Nullable Path path, boolean startup) {
 		window.setOnGoHome(() -> javafx.application.Platform.runLater(this::openDashboard));
+		finalizingSceneShown = false;
 		activeEditor = window;
 		editorWindows.add(window);
 		window.show();

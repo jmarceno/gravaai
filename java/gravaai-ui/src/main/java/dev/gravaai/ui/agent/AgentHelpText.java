@@ -18,7 +18,7 @@ public final class AgentHelpText {
 
 	/** {@code HELP_TOPICS}: the topic names in help order. */
 	public static final List<String> TOPICS = List.of("clips", "zoom", "transcript", "speed",
-			"annotations", "audio", "captions", "settings", "sources", "history", "inspect",
+			"annotations", "elements", "audio", "captions", "settings", "sources", "history", "inspect",
 			"project", "export", "meeting", "frames", "jobs", "conventions");
 
 	/** {@code HELP_INDEX}. */
@@ -31,6 +31,7 @@ public final class AgentHelpText {
 			transcript   cut_words restore_words cut_fillers cut_pauses cut_range_src
 			speed        speed delete_speed
 			annotations  text image figure blur update_annotation delete_annotation
+			elements     component delete_component element update_element delete_element — animated JS components (title cards, lower thirds, anything you can draw)
 			audio        audio update_audio delete_audio source_audio
 			captions     caption update_caption split_caption merge_captions delete_caption captions_style
 			settings     set {key: value} — any key from inspect {view:"settings"}
@@ -44,7 +45,7 @@ public final class AgentHelpText {
 
 	private static final String CONVENTIONS = """
 			Times are seconds on the EDITED timeline (2 decimals) unless an op says src/transcript.
-			Short ids are stable per read: c1 clip, z1 zoom, s1 speed, a1 annotation, m1 audio, q1 caption cue, w1 transcript word. Within one edit batch every id means what your last read showed, even after earlier ops renumber things; re-read after the batch.
+			Short ids are stable per read: c1 clip, z1 zoom, s1 speed, a1 annotation, e1 element, m1 audio, q1 caption cue, w1 transcript word. Within one edit batch every id means what your last read showed, even after earlier ops renumber things; re-read after the batch.
 			Every read returns rev. edit accepts rev; if the project changed since you read it, the edit fails with STALE + a fresh overview — re-read and retry.
 			edit ops run in order on a copy; one failing op rolls the whole batch back and names its index.""".stripTrailing();
 
@@ -119,10 +120,38 @@ public final class AgentHelpText {
 			revert_ai — restore the full project (timeline AND settings) from before the last AI batch.
 			These three must be the only op in their batch, and they are applied by the editor, not by the op core.""".stripTrailing();
 
+	private static final String ELEMENTS = """
+			Elements are animated graphics drawn by code (Remotion-style): a COMPONENT is a JS module you write; an ELEMENT places it on the timeline with props.
+			component {name, source, description?} — create/replace a project component. It is compiled and test-rendered before the batch commits (0%, 50%, last frame, plus a determinism check); errors come back with line:column.
+			delete_component {name} — refused while elements use it.
+			element {component, from, to?, x?, y?, w?, h?, props?, layer?} — place one; returns its e id. to defaults to the component's durationInFrames. x,y = centre, w,h = size, as 0–1 fractions (default: whole frame). layer = z order (default: on top).
+			update_element {id, component?, from?, to?, x?, y?, w?, h?, props?, layer?} — props merge into the old ones; a null prop removes it.
+			delete_element {id} | {all:true}
+			Built-ins (read any with inspect {view:"components", topic:"gravaai/title-card"} and fork it): gravaai/title-card, gravaai/lower-third, gravaai/counter, gravaai/callout.
+
+			Module contract (plain JS ES module, no JSX, no imports):
+			  export const fps = 30;               // nominal; frame = ms on the element * fps / 1000 (fractional between frames)
+			  export const durationInFrames = 90;  // default element length
+			  export const defaultProps = {title: "Hi"};
+			  export const propsSchema = {title: "string", size: {type: "number", min: 10, max: 200}, mode: {type: "enum", values: ["a","b"]}};  // types: string number boolean color enum object array any
+			  export const description = "one line";
+			  export function render(ctx, {frame, fps, durationInFrames, timeMs, width, height, props, random}) { … }
+			render must be a pure function of its arguments: it is called for frames in any order, on several threads, maybe twice. No module-level state that changes, no timers/promises/fetch/imports. Math.random, Date.now and performance.now are frozen per frame; prefer random("seed").
+			width/height = the element box in design pixels (a 1920-wide frame), so sizes look the same at every export resolution. ctx is translated and clipped to the box.
+			Globals (same semantics as Remotion): interpolate(input, inRange, outRange, {easing?, extrapolateLeft?, extrapolateRight?: "extend"|"clamp"|"identity"|"wrap"}), spring({frame, fps, config?:{mass, damping, stiffness, overshootClamping}, from?, to?, delay?, durationInFrames?, reverse?}), measureSpring({fps, config}), Easing.{linear, ease, quad, cubic, sin, circle, exp, bounce, poly(n), back(s), elastic(b), bezier(x1,y1,x2,y2), steps(n), in(f), out(f), inOut(f)}, random(seed), sequence(frame, from, durationInFrames, fn(localFrame)), series(frame, [{durationInFrames, render(localFrame)}…]).
+			ctx is HTML Canvas 2D: fillStyle strokeStyle (CSS colours or gradients) lineWidth lineCap lineJoin miterLimit globalAlpha globalCompositeOperation shadowColor shadowBlur shadowOffsetX/Y font ("bold 48px sans-serif") textAlign textBaseline filter ("blur(4px)") lineDashOffset; save restore translate rotate scale transform setTransform resetTransform; beginPath closePath moveTo lineTo quadraticCurveTo bezierCurveTo arc ellipse rect roundRect(x,y,w,h,r|[r…]) fill stroke clip setLineDash getLineDash; fillRect strokeRect clearRect fillText strokeText measureText (width, actualBoundingBox*); createLinearGradient createRadialGradient (addColorStop).
+			Not available: DOM, images from URLs, createPattern, putImageData.
+			A component that throws draws a red error box in preview and frames, is listed under "element errors" in inspect overview, and fails exports. Fix it with component (same name) and look again.
+			Workflow: write component → element → frames {from,to,count:6} over its span → adjust → export.
+			Example:
+			  component {name:"badge", source:"export const defaultProps={text:'NEW'};\\nexport function render(ctx,{frame,fps,width,height,props}){const s=spring({frame,fps,config:{damping:12}});ctx.translate(width/2,height/2);ctx.scale(s,s);ctx.fillStyle='#ff3b6b';ctx.beginPath();ctx.arc(0,0,Math.min(width,height)*0.4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 64px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(props.text,0,0);}"}
+			  element {component:"badge", from:2, to:4, x:0.85, y:0.2, w:0.2, h:0.3, props:{text:"HOT"}}""".stripTrailing();
+
 	private static final String INSPECT = """
 			inspect {view?, from?, to?, topic?}
 			overview (default) project, source/edited duration, aspect, counts, webcam, rev
-			timeline  one line per clip/zoom/speed/annotation/audio in from–to (seconds)
+			timeline  one line per clip/zoom/speed/annotation/element/audio in from–to (seconds)
+			components element components (built-in + project): fps, length, props; topic:<name> returns its source
 			transcript words grouped by cue, cut words marked ~, pause markers, paged by from–to (source seconds)
 			settings  flat key=value list; add topic to narrow and see ranges
 			library   projects + unprojected recordings and meetings, newest first
@@ -160,7 +189,8 @@ public final class AgentHelpText {
 			at:[12.4,30]   one image per time
 			from,to,count  count evenly spaced frames (1-9, default 4) tiled into one contact sheet
 			width          output width per frame, default 640
-			It shows the preview as the user sees it: wallpaper, padding, zoom, cursor, webcam, annotations, captions.
+			It shows the preview as the user sees it: wallpaper, padding, zoom, cursor, webcam, annotations, elements, captions.
+			To review an animation, use from/to/count over the element span (a contact sheet shows the curve).
 			The playhead is restored afterwards; the preview shows "AI is looking" while it captures.
 			Use it after an edit batch, or before deciding where to cut.""".stripTrailing();
 
@@ -200,6 +230,7 @@ public final class AgentHelpText {
 			case "transcript" -> TRANSCRIPT;
 			case "speed" -> SPEED;
 			case "annotations" -> ANNOTATIONS;
+			case "elements" -> ELEMENTS;
 			case "audio" -> AUDIO;
 			case "captions" -> CAPTIONS;
 			case "settings" -> SETTINGS;

@@ -45,6 +45,8 @@ public record TimelineRenderItem(
 		CAPTION,
 		/** A Camera layout track segment; the label is the layout name. */
 		CAMERA_LAYOUT,
+		/** An animated element (JS component) on the elements lane; the label is the component. */
+		ELEMENT,
 		KEYSTROKE
 	}
 }

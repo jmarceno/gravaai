@@ -87,14 +87,23 @@ public interface FrameOverlayHooks {
 	 * @param width output width in pixels
 	 * @param height output height in pixels
 	 * @param timeMs the timeline time of the frame in milliseconds
+	 * @param exactTimeMs the same time without rounding (33.33 ms at 30 fps), for the element
+	 *        layer whose curves are sampled at fractional frames
 	 */
-	record FrameInfo(int width, int height, long timeMs) {
+	record FrameInfo(int width, int height, long timeMs, double exactTimeMs) {
 
 		public FrameInfo {
 			if (width <= 0 || height <= 0) {
 				throw new IllegalArgumentException(
 						"invalid frame size: " + width + "x" + height);
 			}
+			if (!Double.isFinite(exactTimeMs)) {
+				exactTimeMs = timeMs;
+			}
+		}
+
+		public FrameInfo(int width, int height, long timeMs) {
+			this(width, height, timeMs, timeMs);
 		}
 	}
 }

@@ -65,6 +65,18 @@ public record AgentIds(List<String> clipIds, List<String> zoomIds, List<String> 
 				wordKeyByShort);
 	}
 
+	/** Element short ids: {@code e1}, {@code e2} … in start order (internal id → short id). */
+	public static Map<String, String> elementShortById(ProjectEditorState state) {
+		return shortMaps("e", dev.gravaai.core.project.SceneElement.byStart(state.elements())
+				.stream().map(dev.gravaai.core.project.SceneElement::id).toList()).shortById();
+	}
+
+	/** Element short ids: short id → internal id. */
+	public static Map<String, String> elementIdByShort(ProjectEditorState state) {
+		return shortMaps("e", dev.gravaai.core.project.SceneElement.byStart(state.elements())
+				.stream().map(dev.gravaai.core.project.SceneElement::id).toList()).idByShort();
+	}
+
 	/** {@code describeShorts}: "none", "z1" or "z1–z3" for error messages. */
 	public static String describeShorts(List<String> shortIds, String prefix) {
 		if (shortIds.isEmpty()) {

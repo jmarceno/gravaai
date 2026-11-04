@@ -21,6 +21,7 @@ import dev.gravaai.media.compose.ProjectFrameInputFactory;
 import dev.gravaai.media.export.ExportPublisher;
 import dev.gravaai.media.export.ExportRunner;
 import dev.gravaai.services.export.ProjectExport;
+import dev.gravaai.services.elements.ElementOverlayHooks;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -115,14 +116,23 @@ final class AgentExportRunner {
 					List.of(), preferences, destination, false, true, durationSeconds,
 					cursorSamples);
 			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
-			try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state,
+			try (ElementOverlayHooks elements = new ElementOverlayHooks(FrameOverlayHooks.NONE,
+					session.elementDiagnostics(), () -> state);
+					ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state,
 					prepared.videoPath(), prepared.webcamPath(), cursorSamples,
 					prepared.durationSeconds(), 0, wallpaperRoot, prepared.frameRate());
 					CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 							prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
-							factory, FrameOverlayHooks.NONE)) {
+							factory, elements)) {
 				ExportRunner.Outcome outcome = ProjectExport.run(input, provider,
 						new ExportPublisher(null));
+				try {
+					elements.requireNoFailures();
+				} catch (IllegalStateException error) {
+					// The export must match frames/preview: a broken element is a failed export.
+					Files.deleteIfExists(outcome.path());
+					throw error;
+				}
 				return new ExportResult(outcome.path(), outcome.bytes(), outcome.frames(), format,
 						outcome.durationSeconds());
 			}

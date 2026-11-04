@@ -54,6 +54,7 @@ public final class EditorStore {
 	private @Nullable String selectedCaptionId;
 	private @Nullable String selectedKeystrokeId;
 	private @Nullable String selectedCameraLayoutId;
+	private java.util.Optional<String> selectedElementId = java.util.Optional.empty();
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
 	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
 	private String activeEffectSection = SECTION_SCENE;
@@ -131,6 +132,28 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	public void setElementComponents(List<dev.gravaai.core.project.ElementComponent> components) {
+		ObjectNode json = editorJson();
+		json.set("elementComponents", ProjectDocument.writeElementComponents(components));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
+	public void setElements(List<dev.gravaai.core.project.SceneElement> elements) {
+		ObjectNode json = editorJson();
+		json.set("elements", ProjectDocument.writeElements(elements));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
+	/** The selected element on the elements lane, if any. */
+	public java.util.Optional<String> selectedElementId() {
+		return selectedElementId;
+	}
+
+	/** Selects an element; call after {@link #clearSelectionsExcept}, which clears it. */
+	public void setSelectedElementId(java.util.Optional<String> id) {
+		this.selectedElementId = id;
+	}
+
 	public void setKeystrokeElements(java.util.List<dev.gravaai.core.project.KeystrokeElement> elements) {
 		ObjectNode json = editorJson();
 		json.set("keystrokeElements", ProjectDocument.writeKeystrokeElements(elements));
@@ -175,7 +198,8 @@ public final class EditorStore {
 				state.sourceAudioTrackSettingsByClip() == null ? null
 						: state.sourceAudioTrackSettingsByClip().deepCopy(),
 				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId,
-				state.cameraLayoutSegments(), selectedCameraLayoutId);
+				state.cameraLayoutSegments(), selectedCameraLayoutId, state.elementComponents(),
+				state.elements(), selectedElementId);
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -188,6 +212,9 @@ public final class EditorStore {
 		setAutoCaptions(snapshot.autoCaptions());
 		setKeystrokeElements(snapshot.keystrokeElements());
 		setCameraLayoutSegments(snapshot.cameraLayoutSegments());
+		setElementComponents(snapshot.elementComponents());
+		setElements(snapshot.elements());
+		selectedElementId = snapshot.selectedElementId();
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();
 		selectedAnnotationId = snapshot.selectedAnnotationId();
@@ -301,6 +328,7 @@ public final class EditorStore {
 		selectedCaptionId = keepCaption;
 		selectedKeystrokeId = keepKeystroke;
 		selectedCameraLayoutId = null;
+		selectedElementId = java.util.Optional.empty();
 		multiSelection.clear();
 	}
 

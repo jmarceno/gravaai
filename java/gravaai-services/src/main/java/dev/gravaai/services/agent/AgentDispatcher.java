@@ -237,6 +237,7 @@ public final class AgentDispatcher implements AutoCloseable {
 			case "timeline":
 			case "transcript":
 			case "settings":
+			case "components":
 				return awaitEditor("inspect", args, INSPECT_TIMEOUT_MS);
 			default:
 				return failure("unknown view \"" + view

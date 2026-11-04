@@ -13,9 +13,9 @@ class AgentHelpTextTest {
 	@DisplayName("the topic list matches help.ts order")
 	@Test
 	void topics() {
-		assertEquals(17, AgentHelpText.TOPICS.size());
+		assertEquals(18, AgentHelpText.TOPICS.size());
 		assertEquals("clips", AgentHelpText.TOPICS.get(0));
-		assertEquals("conventions", AgentHelpText.TOPICS.get(16));
+		assertEquals("conventions", AgentHelpText.TOPICS.get(17));
 		assertTrue(AgentHelpText.TOPICS.contains("export"));
 		assertTrue(AgentHelpText.TOPICS.contains("jobs"));
 	}

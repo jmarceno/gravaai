@@ -31,6 +31,8 @@ public final class ClipCommands {
 				next, ClipSequence.AUDIO_SPAN));
 		store.setCameraLayoutSegments(ClipSequence.rippleRegions(store.state().cameraLayoutSegments(),
 				before, next, ClipSequence.CAMERA_LAYOUT_SPAN));
+		store.setElements(ClipSequence.rippleRegions(store.state().elements(), before, next,
+				ClipSequence.ELEMENT_SPAN));
 	}
 
 	private static List<String> ids(List<ClipRegion> clips) {

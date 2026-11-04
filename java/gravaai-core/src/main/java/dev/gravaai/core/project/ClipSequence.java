@@ -218,6 +218,23 @@ public final class ClipSequence {
 		}
 	};
 
+	public static final Span<SceneElement> ELEMENT_SPAN = new Span<>() {
+		@Override
+		public long startMs(SceneElement value) {
+			return value.startMs();
+		}
+
+		@Override
+		public long endMs(SceneElement value) {
+			return value.endMs();
+		}
+
+		@Override
+		public SceneElement withSpan(SceneElement value, long startMs, long endMs) {
+			return value.withSpan(startMs, Math.max(endMs, startMs + 1));
+		}
+	};
+
 	public static final Span<AnnotationRegion> ANNOTATION_SPAN = new Span<>() {
 		@Override
 		public long startMs(AnnotationRegion value) {

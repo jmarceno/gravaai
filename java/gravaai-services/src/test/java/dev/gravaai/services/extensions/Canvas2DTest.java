@@ -18,6 +18,28 @@ import dev.gravaai.services.extensions.canvas.CanvasImage;
  */
 class Canvas2DTest {
 
+	@Test
+	@DisplayName("arc + lineTo and roundRect fill as one connected shape")
+	void arcsJoinTheCurrentContour() {
+		try (RasterCanvas raster = new RasterCanvas(120, 60)) {
+			Canvas2D ctx = raster.canvas();
+			ctx.setFillStyle("#ff0000");
+			ctx.beginPath();
+			ctx.roundRect(10, 10, 100, 40, org.graalvm.polyglot.Value.asValue(20));
+			ctx.fill();
+			assertEquals(0xFFFF0000, raster.argb(60, 30), "pill centre");
+			assertEquals(0xFFFF0000, raster.argb(60, 12), "pill top edge");
+			assertEquals(0xFFFF0000, raster.argb(14, 30), "left cap");
+			assertTrue(raster.transparent(11, 11), "rounded corner stays empty");
+			ctx.beginPath();
+			ctx.moveTo(5, 55);
+			ctx.arc(5, 55, 4, -Math.PI / 2, 0);
+			ctx.closePath();
+			ctx.fill();
+			assertEquals(0xFFFF0000, raster.argb(6, 53), "pie slice filled");
+		}
+	}
+
 	private static boolean near(int actual, int expected, int tolerance) {
 		return Math.abs(actual - expected) <= tolerance;
 	}

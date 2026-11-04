@@ -97,6 +97,8 @@ public final class StoreTimelineCommands implements TimelineCommands {
 				store.apply(new KeystrokeCommands.Select(selection.id()));
 			case TimelineSelection.CAMERA_LAYOUT ->
 				store.apply(new CameraLayoutCommands.Select(selection.id()));
+			case TimelineSelection.ELEMENT ->
+				store.apply(new dev.gravaai.core.editor.ElementCommands.Select(selection.id()));
 			default -> store.clearSelectionsExcept(null, null, null, null, null);
 		}
 	}
@@ -133,6 +135,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		}
 		if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
 			store.apply(new KeystrokeCommands.ChangeSpan(itemId, span.start(), span.end()));
+			return;
+		}
+		if (rowId.startsWith(TimelineConstants.ELEMENTS_ROW_ID)) {
+			store.apply(new dev.gravaai.core.editor.ElementCommands.ChangeSpan(itemId, span.start(),
+					span.end()));
 			return;
 		}
 		if (TimelineConstants.CAMERA_LAYOUT_ROW_ID.equals(rowId)) {
@@ -248,6 +255,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		String cameraLayout = store.selectedCameraLayoutId();
 		if (cameraLayout != null) {
 			store.apply(new CameraLayoutCommands.Delete(cameraLayout));
+			return;
+		}
+		java.util.Optional<String> element = store.selectedElementId();
+		if (element.isPresent()) {
+			store.apply(new dev.gravaai.core.editor.ElementCommands.Delete(element.get()));
 		}
 	}
 
@@ -382,6 +394,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		for (var keystroke : store.state().keystrokeElements()) {
 			if (keystroke.id().equals(itemId)) {
 				return TimelineConstants.KEYSTROKE_ROW_ID;
+			}
+		}
+		for (var element : store.state().elements()) {
+			if (element.id().equals(itemId)) {
+				return TimelineConstants.ELEMENTS_ROW_ID;
 			}
 		}
 		for (var segment : store.state().cameraLayoutSegments()) {

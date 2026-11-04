@@ -26,6 +26,7 @@ import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 import dev.gravaai.media.compose.ProjectFrameInputFactory;
 import dev.gravaai.services.export.ProjectExport;
+import dev.gravaai.services.elements.ElementOverlayHooks;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -36,7 +37,8 @@ import tools.jackson.databind.node.ObjectNode;
  * capture the visible preview widget. It builds the same {@link ProjectFrameInputFactory} +
  * {@link CompositorExportFrameProvider} pipeline the exporter uses, renders the requested timeline
  * times, and encodes each frame as a PNG so the MCP client can look at the edit. Extension render
- * hooks are not installed here (the app owns the extension host); with no extensions enabled the
+ * hooks are not installed here (the app owns the extension host), but the elements lane is, so the
+ * agent sees exactly what an export draws; with no extensions enabled the
  * output is identical to the export frames.
  */
 final class AgentFrameRenderer {
@@ -88,10 +90,12 @@ final class AgentFrameRenderer {
 			cursorSamples = List.of();
 		}
 		List<FrameImage> frames = new ArrayList<>();
-		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state, videoPath,
+		try (ElementOverlayHooks elements = new ElementOverlayHooks(FrameOverlayHooks.NONE,
+				session.elementDiagnostics(), () -> state);
+				ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state, videoPath,
 				webcamPath, cursorSamples, editedMs / 1000.0, 0, wallpaperRoot, FRAME_RATE);
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(width,
-						height, FRAME_RATE, factory, FrameOverlayHooks.NONE)) {
+						height, FRAME_RATE, factory, elements)) {
 			ByteBuffer buffer = ByteBuffer.allocate(width * height * 4);
 			long index = 0;
 			for (double time : timesSeconds) {

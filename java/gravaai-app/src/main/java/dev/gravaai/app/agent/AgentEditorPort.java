@@ -181,13 +181,18 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		ProjectEditorState state = session.store().state();
 		AgentEditorViews.Meta meta = new AgentEditorViews.Meta(session.displayName(),
 				session.projectPath() == null ? null : session.projectPath().toString(),
-				session.videoPath(), sourceMs, session.dirty(), rev);
+				session.videoPath(), sourceMs, session.dirty(), rev,
+				session.elementDiagnostics().current(state));
 		return switch (view) {
 			case "timeline" -> AgentEditorViews.timeline(state, sourceMs, number(args, "from"),
 					number(args, "to"), rev);
 			case "transcript" -> AgentEditorViews.transcript(state, sourceMs, number(args, "from"),
 					number(args, "to"), rev);
 			case "settings" -> AgentEditorViews.settings(state,
+					args != null && args.path("topic").isString() ? args.path("topic").asString()
+							: null,
+					rev);
+			case "components" -> AgentEditorViews.components(state,
 					args != null && args.path("topic").isString() ? args.path("topic").asString()
 							: null,
 					rev);
@@ -332,6 +337,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 					.map(annotation -> annotation.id()).toList();
 			case AUDIO -> state.audioRegions().stream().map(audio -> audio.id()).toList();
 			case SPEED -> state.speedRegions().stream().map(speed -> speed.id()).toList();
+			case ELEMENT -> state.elements().stream().map(element -> element.id()).toList();
 			case CAMERA -> state.cameraLayoutSegments().stream()
 					.map(segment -> segment.id()).toList();
 		};
@@ -754,7 +760,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	private AgentEditorViews.Meta meta(EditorSession session, long rev) {
 		return new AgentEditorViews.Meta(session.displayName(),
 				session.projectPath() == null ? null : session.projectPath().toString(),
-				session.videoPath(), sourceDurationMs(session), session.dirty(), rev);
+				session.videoPath(), sourceDurationMs(session), session.dirty(), rev,
+				session.elementDiagnostics().current(session.store().state()));
 	}
 
 	/** Source duration cached per session; a probe failure falls back to the edited duration. */

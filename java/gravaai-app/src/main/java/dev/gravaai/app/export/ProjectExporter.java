@@ -20,6 +20,7 @@ import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 import dev.gravaai.media.compose.ProjectFrameInputFactory;
 import dev.gravaai.services.extensions.ExtensionFrameOverlayHooks;
+import dev.gravaai.services.elements.ElementOverlayHooks;
 import dev.gravaai.services.extensions.ExtensionHost;
 import dev.gravaai.media.export.ExportProgress;
 import dev.gravaai.media.export.ExportPublisher;
@@ -72,7 +73,7 @@ public final class ProjectExporter {
 	}
 
 	/** The extension hooks for one export, bound to the prepared timeline duration. */
-	private FrameOverlayHooks overlayHooks(double durationSeconds) {
+	private FrameOverlayHooks extensionHooks(double durationSeconds) {
 		ExtensionHost host = extensionHost;
 		if (host == null) {
 			return FrameOverlayHooks.NONE;
@@ -135,14 +136,16 @@ public final class ProjectExporter {
 					session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
 			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			Path wallpaperRoot = stageWallpapers(session);
+			ElementOverlayHooks elementHooks = elementHooks(session, prepared.durationSeconds());
 			ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 					session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 					cursorSamples, prepared.durationSeconds(), 0,
 					wallpaperRoot, prepared.frameRate());
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
-					overlayHooks(prepared.durationSeconds()));
-			Run run = new Run(session, model, runId, prepared, stagingDir, owner, provider, factory);
+					elementHooks);
+			Run run = new Run(session, model, runId, prepared, stagingDir, owner, provider, factory,
+					elementHooks);
 			boolean started = coordinator.start(prepared.request(), provider, run);
 			if (!started) {
 				run.closeFactory();
@@ -362,7 +365,7 @@ public final class ProjectExporter {
 				destination, false, false,
 				session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
-		FrameOverlayHooks hooks = overlayHooks(prepared.durationSeconds());
+		ElementOverlayHooks hooks = elementHooks(session, prepared.durationSeconds());
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 				session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 				cursorSamples, prepared.durationSeconds(), 0,
@@ -370,8 +373,22 @@ public final class ProjectExporter {
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 						factory, hooks)) {
-			return ProjectExport.run(input, provider, publisher);
+			ExportRunner.Outcome outcome = ProjectExport.run(input, provider, publisher);
+			hooks.requireNoFailures();
+			return outcome;
+		} finally {
+			hooks.close();
 		}
+	}
+
+	/**
+	 * The elements lane (drawn from the state at export start) followed by the extension hooks.
+	 * The caller closes it when the export ends.
+	 */
+	private ElementOverlayHooks elementHooks(EditorSession session, double durationSeconds) {
+		dev.gravaai.core.project.ProjectEditorState state = session.store().state();
+		return new ElementOverlayHooks(extensionHooks(durationSeconds),
+				session.elementDiagnostics(), () -> state);
 	}
 
 	/**
@@ -396,10 +413,13 @@ public final class ProjectExporter {
 		private final CompositorExportFrameProvider provider;
 		private final ProjectFrameInputFactory factory;
 		private final AtomicBoolean factoryClosed = new AtomicBoolean();
+		private final ElementOverlayHooks elementHooks;
 
 		Run(EditorSession session, ExportSessionModel model, int runId,
 				ProjectExport.Prepared prepared, Path stagingDir, Window owner,
-				CompositorExportFrameProvider provider, ProjectFrameInputFactory factory) {
+				CompositorExportFrameProvider provider, ProjectFrameInputFactory factory,
+				ElementOverlayHooks elementHooks) {
+			this.elementHooks = elementHooks;
 			this.session = session;
 			this.model = model;
 			this.runId = runId;
@@ -424,8 +444,20 @@ public final class ProjectExporter {
 		@Override
 		public void onCompleted(ExportRunner.Outcome outcome) {
 			Platform.runLater(() -> {
+				// Read before closing: a broken element fails the export instead of silently
+				// missing from it (preview shows the same error box).
+				java.util.Optional<String> elementError = elementHooks.runtime().failures().stream()
+						.findFirst().map(error -> "Element " + error.elementId() + " failed at "
+								+ String.format(java.util.Locale.ROOT, "%.2f", error.timeMs() / 1000.0)
+								+ "s: " + error.message());
 				closeFactory();
 				if (!model.isCurrentRun(runId)) {
+					return;
+				}
+				if (elementError.isPresent()) {
+					model.setExporting(false);
+					model.setError(elementError.get());
+					deleteRecursively(stagingDir);
 					return;
 				}
 				finishRender(outcome);
@@ -476,6 +508,7 @@ public final class ProjectExporter {
 			} catch (RuntimeException ignored) {
 				// The coordinator normally closes it; best effort here too.
 			}
+			elementHooks.close();
 		}
 	}
 }

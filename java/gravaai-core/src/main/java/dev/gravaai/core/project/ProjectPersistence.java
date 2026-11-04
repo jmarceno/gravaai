@@ -448,7 +448,12 @@ public final class ProjectPersistence {
 						? normalizeCameraLayoutSegments(ClipSequence.rippleRegions(
 								normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")),
 								normalizedClipRegions, sequenceClips, ClipSequence.CAMERA_LAYOUT_SPAN))
-						: normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments"))));
+						: normalizeCameraLayoutSegments(field(editor, "cameraLayoutSegments")),
+				normalizeElementComponents(field(editor, "elementComponents")),
+				sequenceChanged
+						? ClipSequence.rippleRegions(normalizeElements(field(editor, "elements")),
+								normalizedClipRegions, sequenceClips, ClipSequence.ELEMENT_SPAN)
+						: normalizeElements(field(editor, "elements"))));
 	}
 
 	/**
@@ -954,6 +959,73 @@ public final class ProjectPersistence {
 				ClickSoundStyle.normalize(text(field(settings, "sound")),
 						EditorDefaults.DEFAULT_CLICK_SOUND_STYLE),
 				clampSetting(field(settings, "volume"), 0, 1, EditorDefaults.DEFAULT_CLICK_SOUND_VOLUME));
+	}
+
+	/** Largest component source kept (characters). */
+	public static final int MAX_COMPONENT_SOURCE_CHARS = 256 * 1024;
+	private static final int MAX_ELEMENT_COMPONENTS = 200;
+	private static final int MAX_ELEMENTS = 1000;
+
+	/**
+	 * Element components: valid names, non-empty sources under the size cap, no built-in
+	 * ({@code gravaai/}) names and no duplicates (the first one wins).
+	 */
+	private static List<ElementComponent> normalizeElementComponents(@Nullable JsonNode raw) {
+		if (raw == null || !raw.isArray()) {
+			return List.of();
+		}
+		List<ElementComponent> components = new ArrayList<>();
+		java.util.Set<String> names = new java.util.HashSet<>();
+		for (JsonNode node : raw) {
+			String name = text(field(node, "name"));
+			String source = text(field(node, "source"));
+			if (name == null || source == null || source.isBlank()
+					|| source.length() > MAX_COMPONENT_SOURCE_CHARS
+					|| !ElementComponent.isValidName(name.trim())
+					|| name.trim().startsWith(ElementComponent.BUILTIN_PREFIX)
+					|| !names.add(name.trim())) {
+				continue;
+			}
+			String description = text(field(node, "description"));
+			components.add(new ElementComponent(name, source, description == null ? "" : description));
+			if (components.size() >= MAX_ELEMENT_COMPONENTS) {
+				break;
+			}
+		}
+		return List.copyOf(components);
+	}
+
+	/** Elements: id + component required, span normalised, box clamped, props an object. */
+	private static List<SceneElement> normalizeElements(@Nullable JsonNode raw) {
+		if (raw == null || !raw.isArray()) {
+			return List.of();
+		}
+		List<SceneElement> elements = new ArrayList<>();
+		java.util.Set<String> ids = new java.util.HashSet<>();
+		for (JsonNode node : raw) {
+			String id = text(field(node, "id"));
+			String component = text(field(node, "component"));
+			if (id == null || id.isBlank() || component == null
+					|| !ElementComponent.isValidName(component.trim()) || !ids.add(id)) {
+				continue;
+			}
+			Span span = normalizeSpan(node);
+			JsonNode box = field(node, "box");
+			SceneElement.Box normalizedBox = new SceneElement.Box(
+					numberOr(field(box, "x"), 0), numberOr(field(box, "y"), 0),
+					numberOr(field(box, "width"), 100), numberOr(field(box, "height"), 100));
+			JsonNode zIndex = field(node, "zIndex");
+			elements.add(new SceneElement(id, component.trim(), span.startMs(),
+					Math.max(span.endMs(), span.startMs() + 1), normalizedBox,
+					objectOrEmpty(field(node, "props")),
+					isFiniteNumber(zIndex) ? (int) clamp(zIndex.doubleValue(), -1000, 1000) : 0));
+			if (elements.size() >= MAX_ELEMENTS) {
+				break;
+			}
+		}
+		elements.sort(java.util.Comparator.comparingLong(SceneElement::startMs)
+				.thenComparing(SceneElement::id));
+		return List.copyOf(elements);
 	}
 
 	/**

@@ -78,7 +78,7 @@ public final class AgentPlanner {
 	/** Region kinds that can be created by an op; each has its own id counter. */
 	public enum IdKind {
 		ZOOM("zoom"), CLIP("clip"), ANNOTATION("annotation"), AUDIO("audio"), SPEED("speed"),
-		CAMERA("camera");
+		CAMERA("camera"), ELEMENT("element");
 
 		private final String wire;
 
@@ -216,6 +216,52 @@ public final class AgentPlanner {
 			for (AgentTranscript.Word word : words) {
 				wordByKey.put(word.key(), word);
 			}
+			this.elementIdByShort = AgentIds.elementIdByShort(state);
+		}
+
+		/** Element short ids of the state the batch started from (like the other kinds). */
+		final Map<String, String> elementIdByShort;
+
+		/** The view the element ops work through. */
+		AgentElementOps.Session elements() {
+			Draft draft = this;
+			return new AgentElementOps.Session() {
+				@Override
+				public ProjectEditorState state() {
+					return draft.state;
+				}
+
+				@Override
+				public void state(ProjectEditorState next) {
+					draft.state = next;
+				}
+
+				@Override
+				public void summary(String line) {
+					draft.summary.add(line);
+				}
+
+				@Override
+				public void highlight(boolean added, long startMs, long endMs, String label) {
+					push(draft, added ? Highlight.Kind.ADDED : Highlight.Kind.CHANGED, startMs,
+							endMs, label);
+				}
+
+				@Override
+				public String newElementId() {
+					return draft.ctx.createId().apply(IdKind.ELEMENT);
+				}
+
+				@Override
+				public long timelineDurationMs() {
+					return AgentPlanner.timelineDurationMs(draft);
+				}
+
+				@Override
+				public Map<String, String> elementIdByShort() {
+					return draft.elementIdByShort;
+				}
+			};
 		}
 	}
 
@@ -368,6 +414,38 @@ public final class AgentPlanner {
 		return List.copyOf(next);
 	}
 
+	/** Elements follow the footage they cover, like annotations (source-based, survives splits). */
+	private static List<dev.gravaai.core.project.SceneElement> remapElements(
+			List<dev.gravaai.core.project.SceneElement> elements, List<ClipRegion> before,
+			List<ClipRegion> after) {
+		if (before.isEmpty()) {
+			return elements;
+		}
+		List<dev.gravaai.core.project.SceneElement> next = new ArrayList<>();
+		for (dev.gravaai.core.project.SceneElement element : elements) {
+			List<Span> pieces = new ArrayList<>();
+			for (ClipRegion clip : before) {
+				long startMs = Math.max(element.startMs(), clip.startMs());
+				long endMs = Math.min(element.endMs(), clip.endMs());
+				if (endMs <= startMs) {
+					continue;
+				}
+				Span piece = mapSourcePiece(toSourceMs(startMs, clip), toSourceMs(endMs, clip),
+						after);
+				if (piece != null) {
+					pieces.add(piece);
+				}
+			}
+			if (pieces.isEmpty()) {
+				continue;
+			}
+			long start = pieces.stream().mapToLong(Span::startMs).min().orElse(element.startMs());
+			long end = pieces.stream().mapToLong(Span::endMs).max().orElse(element.endMs());
+			next.add(element.withSpan(start, Math.max(start + 1, end)));
+		}
+		return next;
+	}
+
 	private static List<AnnotationRegion> remapAnnotations(List<AnnotationRegion> regions,
 			List<ClipRegion> before, List<ClipRegion> after) {
 		if (before.isEmpty()) {
@@ -462,6 +540,7 @@ public final class AgentPlanner {
 				.cameraLayoutSegments(ProjectPersistence.normalizeCameraLayoutSegments(
 						ClipSequence.rippleRegions(draft.state.cameraLayoutSegments(), before, after,
 								ClipSequence.CAMERA_LAYOUT_SPAN)))
+				.elements(remapElements(draft.state.elements(), before, after))
 				.clipRegions(after)
 				.zoomRegions(zooms)
 				.speedRegions(speeds)
@@ -765,6 +844,9 @@ public final class AgentPlanner {
 		}
 		AgentIds map = AgentIds.of(state);
 		String result = text;
+		for (Map.Entry<String, String> entry : AgentIds.elementShortById(state).entrySet()) {
+			result = result.replace("{{e:" + entry.getKey() + "}}", entry.getValue());
+		}
 		for (String kind : List.of("z", "s", "a", "m", "q")) {
 			Map<String, String> lookup = switch (kind) {
 				case "z" -> map.zoomShortById();
@@ -811,6 +893,11 @@ public final class AgentPlanner {
 			case "cut_range_src" -> cutRangeSource(draft, raw);
 			case "camera_layout" -> cameraLayout(draft, raw);
 			case "delete_camera_layout" -> deleteCameraLayout(draft, raw);
+			case "component" -> AgentElementOps.component(draft.elements(), raw);
+			case "delete_component" -> AgentElementOps.deleteComponent(draft.elements(), raw);
+			case "element" -> AgentElementOps.addElement(draft.elements(), raw);
+			case "update_element" -> AgentElementOps.updateElement(draft.elements(), raw);
+			case "delete_element" -> AgentElementOps.deleteElement(draft.elements(), raw);
 			case "zoom" -> addZoom(draft, raw);
 			case "update_zoom" -> updateZoom(draft, raw);
 			case "delete_zoom" -> deleteZoom(draft, raw);

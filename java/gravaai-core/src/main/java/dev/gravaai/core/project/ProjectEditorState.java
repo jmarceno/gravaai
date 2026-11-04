@@ -74,7 +74,9 @@ public record ProjectEditorState(
 		ObjectNode sourceAudioTrackSettingsByClip,
 		ObjectNode defaultSourceAudioTrackSettings,
 		List<KeystrokeElement> keystrokeElements,
-		List<CameraLayoutSegment> cameraLayoutSegments) {
+		List<CameraLayoutSegment> cameraLayoutSegments,
+		List<ElementComponent> elementComponents,
+		List<SceneElement> elements) {
 
 	/**
 	 * Copy with a new caption list, without re-normalising the rest of the state. The editor needs
@@ -96,7 +98,8 @@ public record ProjectEditorState(
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, sourceAudioTrackSettingsByClip,
-				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments);
+				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
+				elementComponents, elements);
 	}
 
 	/**
@@ -121,7 +124,8 @@ public record ProjectEditorState(
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, normalized,
-				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments);
+				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
+				elementComponents, elements);
 	}
 
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
@@ -200,6 +204,8 @@ public record ProjectEditorState(
 		private ObjectNode defaultSourceAudioTrackSettings;
 		private List<KeystrokeElement> keystrokeElements;
 		private List<CameraLayoutSegment> cameraLayoutSegments;
+		private List<ElementComponent> elementComponents;
+		private List<SceneElement> elements;
 
 		private Builder(ProjectEditorState state) {
 			wallpaper = state.wallpaper;
@@ -260,6 +266,8 @@ public record ProjectEditorState(
 			defaultSourceAudioTrackSettings = state.defaultSourceAudioTrackSettings;
 			keystrokeElements = state.keystrokeElements;
 			cameraLayoutSegments = state.cameraLayoutSegments;
+			elementComponents = state.elementComponents;
+			elements = state.elements;
 		}
 
 		public Builder wallpaper(String value) {
@@ -552,6 +560,16 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder elementComponents(List<ElementComponent> value) {
+			elementComponents = List.copyOf(value);
+			return this;
+		}
+
+		public Builder elements(List<SceneElement> value) {
+			elements = List.copyOf(value);
+			return this;
+		}
+
 		/**
 		 * Copies one component, named as in the project JSON, from another state. Agent settings
 		 * paths name components at run time; the switch keeps every copy type-checked.
@@ -616,6 +634,8 @@ public record ProjectEditorState(
 				case "defaultSourceAudioTrackSettings" -> defaultSourceAudioTrackSettings = from.defaultSourceAudioTrackSettings;
 				case "keystrokeElements" -> keystrokeElements = from.keystrokeElements;
 				case "cameraLayoutSegments" -> cameraLayoutSegments = from.cameraLayoutSegments;
+				case "elementComponents" -> elementComponents = from.elementComponents;
+				case "elements" -> elements = from.elements;
 				default -> throw new IllegalArgumentException("unknown editor component " + component);
 			}
 			return this;
@@ -680,7 +700,9 @@ public record ProjectEditorState(
 					sourceAudioTrackSettingsByClip,
 					defaultSourceAudioTrackSettings,
 					keystrokeElements,
-					cameraLayoutSegments);
+					cameraLayoutSegments,
+					elementComponents,
+					elements);
 		}
 	}
 }

@@ -93,13 +93,16 @@ fi
 "$SCRIPT_DIR/trim-icu.sh" --jar "$INPUT"/icu4j-*.jar --work-dir "$WORK/icu-trim"
 
 echo "package-dist.sh: jlink runtime"
+# java.sql: GraalJS host interop references java.sql.Date whenever a host object (a canvas
+# gradient, measureText metrics) is handed to component code; without it those calls throw
+# NoClassDefFoundError in the packaged app only.
 # jdk.localedata ships CLDR data for the whole world (~26 MB). The UI text is
 # English and the java.text formatters follow the user's system locale, so keep
 # only en and pt (root data is always included); any other system locale falls
 # back to English formats instead of crashing.
 "$JDK/bin/jlink" \
 	--module-path "$JMODS" \
-	--add-modules java.base,java.logging,java.net.http,jdk.unsupported,javafx.controls,jdk.crypto.ec,jdk.localedata,jdk.security.auth \
+	--add-modules java.base,java.logging,java.net.http,java.sql,jdk.unsupported,javafx.controls,jdk.crypto.ec,jdk.localedata,jdk.security.auth \
 	--include-locales=en,pt \
 	--strip-debug --no-header-files --no-man-pages \
 	--output "$RUNTIME"

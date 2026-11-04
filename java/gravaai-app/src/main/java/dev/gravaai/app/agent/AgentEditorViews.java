@@ -70,7 +70,14 @@ final class AgentEditorViews {
 
 	/** Formatting inputs the editor session provides (kept explicit so the views stay testable). */
 	record Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
-			boolean dirty, long rev) {}
+			boolean dirty, long rev,
+			List<dev.gravaai.services.elements.ElementDiagnostics.ElementError> elementErrors) {
+
+		Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
+				boolean dirty, long rev) {
+			this(projectName, projectPath, sourcePath, sourceDurationMs, dirty, rev, List.of());
+		}
+	}
 
 	private AgentEditorViews() {}
 
@@ -96,8 +103,64 @@ final class AgentEditorViews {
 						+ Math.round(state.webcam().size()) + "%)"
 				: "off") + " \u2022 cursor " + (state.showCursor() ? "on" : "off")
 				+ " \u2022 wallpaper " + state.wallpaper());
+		if (!state.elements().isEmpty() || !state.elementComponents().isEmpty()) {
+			lines.add("elements " + count(state.elements()) + " • project components "
+					+ count(state.elementComponents()));
+		}
+		if (!meta.elementErrors().isEmpty()) {
+			java.util.Map<String, String> shorts = AgentIds.elementShortById(state);
+			lines.add("element errors (red box in preview; exports fail until fixed):");
+			for (var error : meta.elementErrors()) {
+				lines.add("  " + shorts.getOrDefault(error.elementId(), error.elementId()) + " at "
+						+ seconds(Math.round(error.timeMs())) + "s: " + error.message());
+			}
+		}
 		lines.add("rev " + meta.rev());
 		return String.join("\n", lines);
+	}
+
+	/**
+	 * The {@code components} view: built-ins then project components, one line each; with a
+	 * topic, that component's full source (so an agent can read a built-in and fork it).
+	 */
+	static String components(ProjectEditorState state, @Nullable String topic, long rev) {
+		List<dev.gravaai.core.project.ElementComponent> all = new ArrayList<>(
+				dev.gravaai.services.elements.BuiltinComponents.all());
+		all.addAll(state.elementComponents());
+		if (topic != null && !topic.isBlank()) {
+			String name = topic.trim();
+			return all.stream().filter(component -> component.name().equals(name)).findFirst()
+					.map(component -> "component " + component.name() + (component.builtin()
+							? " (built-in, read-only; fork it under another name)" : "") + "\n"
+							+ component.source() + "\nrev " + rev)
+					.orElse("unknown component \"" + name + "\"; components: " + String.join(", ",
+							all.stream().map(dev.gravaai.core.project.ElementComponent::name)
+									.toList()));
+		}
+		List<String> lines = new ArrayList<>();
+		lines.add("components (element {component:<name>} places one; topic:<name> shows the source):");
+		for (var component : all) {
+			String details;
+			try {
+				var info = dev.gravaai.services.elements.ComponentValidator.describe(component);
+				details = String.format(Locale.ROOT, "%s fps, %s frames (%.2fs) props: %s",
+						trim(info.fps()), trim(info.durationInFrames()),
+						info.defaultDurationMs() / 1000.0,
+						dev.gravaai.services.elements.PropsCheck.describe(info.propsSchema()));
+			} catch (dev.gravaai.services.elements.ComponentException error) {
+				details = "does not compile: " + error.describe();
+			}
+			lines.add("  " + component.name() + (component.builtin() ? " [built-in]" : "")
+					+ " — " + (component.description().isEmpty() ? "(no description)"
+							: component.description()) + "; " + details);
+		}
+		lines.add("rev " + rev);
+		return String.join("\n", lines);
+	}
+
+	private static String trim(double value) {
+		return value == Math.rint(value) ? Long.toString((long) value)
+				: String.format(Locale.ROOT, "%.2f", value);
 	}
 
 	/**
@@ -226,6 +289,29 @@ final class AgentEditorViews {
 		}
 		if (!anyAnnotation) {
 			lines.add("  (none in window)");
+		}
+
+		List<dev.gravaai.core.project.SceneElement> visibleElements =
+				dev.gravaai.core.project.SceneElement.byStart(state.elements()).stream()
+						.filter(element -> overlaps(element.startMs(), element.endMs(), windowFrom,
+								windowTo))
+						.toList();
+		if (!state.elements().isEmpty()) {
+			lines.add("elements:");
+			java.util.Map<String, String> elementShorts = AgentIds.elementShortById(state);
+			for (var element : visibleElements) {
+				lines.add("  " + elementShorts.getOrDefault(element.id(), "?") + " "
+						+ seconds(element.startMs()) + "–" + seconds(element.endMs()) + " "
+						+ element.component() + " " + element.props().toString()
+						+ " x " + frac((element.box().x() + element.box().width() / 2) / 100)
+						+ " y " + frac((element.box().y() + element.box().height() / 2) / 100)
+						+ " w " + frac(element.box().width() / 100)
+						+ " h " + frac(element.box().height() / 100)
+						+ " layer " + element.zIndex());
+			}
+			if (visibleElements.isEmpty()) {
+				lines.add("  (none in window)");
+			}
 		}
 
 		List<AudioRegion> audio = new ArrayList<>(state.audioRegions());

@@ -549,9 +549,14 @@ public final class AppContext {
 	 * Extension render hooks for one editor's preview, bound to that project's timeline duration
 	 * (plan §5.18). Dispatched from the compositor on the preview GL thread.
 	 */
-	private ExtensionFrameOverlayHooks previewOverlayHooks(EditorSession session) {
-		return new ExtensionFrameOverlayHooks(extensionHost(),
+	private dev.gravaai.media.compose.FrameOverlayHooks previewOverlayHooks(EditorSession session) {
+		ExtensionFrameOverlayHooks extensions = new ExtensionFrameOverlayHooks(extensionHost(),
 				() -> session.timelineDataSource().totalDurationMs());
+		dev.gravaai.services.elements.ElementOverlayHooks hooks =
+				new dev.gravaai.services.elements.ElementOverlayHooks(extensions,
+						session.elementDiagnostics(), () -> session.store().state());
+		session.own(hooks);
+		return hooks;
 	}
 
 	private @Nullable ProjectExporter exporter() {

@@ -42,7 +42,29 @@ public final class EditorHistory {
 			List<dev.gravaai.core.project.KeystrokeElement> keystrokeElements,
 			@Nullable String selectedKeystrokeId,
 			List<dev.gravaai.core.project.CameraLayoutSegment> cameraLayoutSegments,
+			@Nullable String selectedCameraLayoutId,
+			List<dev.gravaai.core.project.ElementComponent> elementComponents,
+			List<dev.gravaai.core.project.SceneElement> elements,
+			java.util.Optional<String> selectedElementId) {
+
+		/** The snapshot shape before the element layer: no components, elements or selection. */
+		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
+			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
+			@Nullable List<AudioRegion> audioRegions, List<CaptionCue> autoCaptions,
+			@Nullable String selectedZoomId, @Nullable String selectedClipId,
+			@Nullable String selectedAnnotationId, @Nullable String selectedAudioId,
+			tools.jackson.databind.node.@Nullable ObjectNode sourceAudioTrackSettingsByClip,
+			List<String> multiSelectedIds,
+			List<dev.gravaai.core.project.KeystrokeElement> keystrokeElements,
+			@Nullable String selectedKeystrokeId,
+			List<dev.gravaai.core.project.CameraLayoutSegment> cameraLayoutSegments,
 			@Nullable String selectedCameraLayoutId) {
+			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
+				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
+				sourceAudioTrackSettingsByClip, multiSelectedIds, keystrokeElements,
+				selectedKeystrokeId, cameraLayoutSegments, selectedCameraLayoutId, List.of(),
+				List.of(), java.util.Optional.empty());
+		}
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
 			List<SpeedRegion> speedRegions, List<AnnotationRegion> annotationRegions,
@@ -151,7 +173,10 @@ public final class EditorHistory {
 				List.copyOf(snapshot.keystrokeElements()),
 				snapshot.selectedKeystrokeId(),
 				List.copyOf(snapshot.cameraLayoutSegments()),
-				snapshot.selectedCameraLayoutId());
+				snapshot.selectedCameraLayoutId(),
+				List.copyOf(snapshot.elementComponents()),
+				List.copyOf(snapshot.elements()),
+				snapshot.selectedElementId());
 	}
 
 	/** {@code areEditorHistorySnapshotsEqual}: records compare their lists element by element. */

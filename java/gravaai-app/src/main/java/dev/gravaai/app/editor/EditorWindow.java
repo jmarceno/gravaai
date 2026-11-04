@@ -540,6 +540,27 @@ public final class EditorWindow {
 	 */
 	public void setOverlayHooks(FrameOverlayHooks hooks) {
 		shell.setOverlayHooks(hooks);
+		bindElementErrors();
+	}
+
+	private boolean elementErrorsBound;
+
+	/**
+	 * Keeps the elements lane's error badges in sync with the session's element diagnostics:
+	 * errors come from any render path (preview, agent frames, exports) and go stale when the
+	 * element or its component changes.
+	 */
+	private void bindElementErrors() {
+		if (elementErrorsBound) {
+			return;
+		}
+		elementErrorsBound = true;
+		Runnable push = () -> javafx.application.Platform.runLater(() -> timeline.setElementErrors(
+				session.elementDiagnostics().current(session.store().state()).stream()
+						.map(dev.gravaai.services.elements.ElementDiagnostics.ElementError::elementId)
+						.collect(java.util.stream.Collectors.toSet())));
+		session.elementDiagnostics().subscribe(diagnostics -> push.run());
+		session.store().onChange(store -> push.run());
 	}
 
 	public EditorShellView shell() {

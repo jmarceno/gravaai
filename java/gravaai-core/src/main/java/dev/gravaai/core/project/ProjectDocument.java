@@ -39,7 +39,8 @@ public final class ProjectDocument {
 			"clipRegions", "autoFullTrackClipId", "autoFullTrackClipEndMs", "speedRegions",
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "clickSound", "keySound", "aspectRatio", "sourceAudioTrackSettingsByClip",
-			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments");
+			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments",
+			"elementComponents", "elements");
 
 	private final ObjectNode raw;
 	private final String videoPath;
@@ -192,6 +193,13 @@ public final class ProjectDocument {
 		editor.set("defaultSourceAudioTrackSettings", state.defaultSourceAudioTrackSettings().deepCopy());
 		editor.set("keystrokeElements", writeKeystrokeElements(state.keystrokeElements()));
 		editor.set("cameraLayoutSegments", writeCameraLayoutSegments(state.cameraLayoutSegments()));
+		// Only projects that use the element layer carry its keys (older files round-trip as-is).
+		if (!state.elementComponents().isEmpty()) {
+			editor.set("elementComponents", writeElementComponents(state.elementComponents()));
+		}
+		if (!state.elements().isEmpty()) {
+			editor.set("elements", writeElements(state.elements()));
+		}
 
 		// Keep the fields this build does not know; drop retired preferences and dev-only tuning.
 		ObjectNode persistedRaw = ProjectPersistence.stripPersistedDevMotionBlurSettings(
@@ -463,6 +471,42 @@ public final class ProjectDocument {
 					segment.style().get(field).ifPresent(value -> style.put(field, value));
 				}
 			}
+			array.add(node);
+		}
+		return array;
+	}
+
+	/** Serialises the project's element components (name, source, description). */
+	public static ArrayNode writeElementComponents(List<ElementComponent> components) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (ElementComponent component : components) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("name", component.name());
+			node.put("source", component.source());
+			if (!component.description().isEmpty()) {
+				node.put("description", component.description());
+			}
+			array.add(node);
+		}
+		return array;
+	}
+
+	/** Serialises the elements lane. */
+	public static ArrayNode writeElements(List<SceneElement> elements) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (SceneElement element : elements) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("id", element.id());
+			node.put("component", element.component());
+			node.put("startMs", element.startMs());
+			node.put("endMs", element.endMs());
+			ObjectNode box = node.putObject("box");
+			box.put("x", element.box().x());
+			box.put("y", element.box().y());
+			box.put("width", element.box().width());
+			box.put("height", element.box().height());
+			node.set("props", element.props().deepCopy());
+			node.put("zIndex", element.zIndex());
 			array.add(node);
 		}
 		return array;

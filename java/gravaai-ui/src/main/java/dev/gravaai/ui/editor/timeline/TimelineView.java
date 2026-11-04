@@ -117,6 +117,10 @@ public final class TimelineView extends Region {
 	private static final Color CAMERA_LAYOUT_SELECTED = Color.web("#5eead4");
 	private static final Color CAMERA_LAYOUT_LANE = Color.web("#2dd4bf", 0.35);
 	private static final Color CAMERA_LAYOUT_RAMP = Color.web("#2dd4bf", 0.25);
+	private static final Color ELEMENT_FILL = Color.web("#4c1d95");
+	private static final Color ELEMENT_BORDER = Color.web("#a78bfa");
+	private static final Color ELEMENT_SELECTED = Color.web("#ddd6fe");
+	private static final Color ELEMENT_ERROR = Color.web("#ef4444");
 	private static final Color CAPTION_FILL = Color.web("#b58b12");
 	private static final Color CAPTION_BORDER = Color.web("#facc15");
 	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
@@ -191,6 +195,8 @@ public final class TimelineView extends Region {
 	/** Camera layout segment id to its layout, for the block tint. */
 	private java.util.Map<String, CameraLayoutSegment> cameraLayouts = java.util.Map.of();
 	private Runnable onCameraLayoutShortcut = () -> {};
+	private java.util.Map<String, dev.gravaai.core.project.SceneElement> elementsById = java.util.Map.of();
+	private java.util.Set<String> elementErrorIds = java.util.Set.of();
 	/** Switch diamonds drawn at Camera layout segment starts (click toggles cut/smooth). */
 	private final Map<String, BlockBounds> cameraSwitchBounds = new LinkedHashMap<>();
 	/** Switch-out diamonds at Camera layout segment ends followed by a gap (click toggles). */
@@ -450,6 +456,7 @@ public final class TimelineView extends Region {
 				project.audioRegions(), project.autoCaptions(),
 				project.sourceAudioTrackSettings(), sourceAudioTracks,
 				project.keystrokeElements(), project.cameraLayoutSegments()));
+		items = withElementItems(items, project.elements());
 		cameraLayouts = new java.util.HashMap<>();
 		for (CameraLayoutSegment segment : project.cameraLayoutSegments()) {
 			cameraLayouts.put(segment.id(), segment);
@@ -556,8 +563,12 @@ public final class TimelineView extends Region {
 				.filter(item -> TimelineRows.isKeystrokeLaneRowId(item.rowId()))
 				.map(TimelineRenderItem::rowId).distinct().count();
 		boolean cameraLayoutRow = !cameraLayouts.isEmpty();
+		// Animated elements get their own lanes (overlaps stack), right under the clip rows.
+		List<String> elementLanes = items.stream()
+				.filter(item -> item.variant() == TimelineRenderItem.Variant.ELEMENT)
+				.map(TimelineRenderItem::rowId).distinct().sorted().toList();
 		long extras = annotationTracks + audioTracks + keystrokeLanes + sourceAudioTracks.size()
-				+ (cameraLayoutRow ? 1 : 0);
+				+ (cameraLayoutRow ? 1 : 0) + elementLanes.size();
 
 		double top = AXIS_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.CLIP_ROW_ID, top, CLIP_ROW_HEIGHT));
@@ -566,6 +577,10 @@ public final class TimelineView extends Region {
 		// first layout switch exists (Camera layout in the toolbar).
 		if (cameraLayoutRow) {
 			rows.add(new RowLayout(TimelineConstants.CAMERA_LAYOUT_ROW_ID, top, COMPACT_ROW_HEIGHT));
+			top += COMPACT_ROW_HEIGHT + ROW_GAP;
+		}
+		for (String lane : elementLanes) {
+			rows.add(new RowLayout(lane, top, COMPACT_ROW_HEIGHT));
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
 		for (TimelineSourceAudioTrack track : sourceAudioTracks) {
@@ -1689,6 +1704,7 @@ public final class TimelineView extends Region {
 			case CAPTION -> TimelineSelection.CAPTION;
 			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
 			case CAMERA_LAYOUT -> TimelineSelection.CAMERA_LAYOUT;
+			case ELEMENT -> TimelineSelection.ELEMENT;
 			case TRIM, SPEED -> TimelineSelection.CLIP;
 		};
 	}
@@ -1772,6 +1788,12 @@ public final class TimelineView extends Region {
 				for (TimelineRenderItem item : items) {
 					if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
 						drawZoom(graphics, item, row, width);
+					}
+				}
+			} else if (row.id().startsWith(TimelineConstants.ELEMENTS_ROW_ID)) {
+				for (TimelineRenderItem item : items) {
+					if (row.id().equals(item.rowId())) {
+						drawElement(graphics, item, row, width);
 					}
 				}
 			} else if (TimelineConstants.CAMERA_LAYOUT_ROW_ID.equals(row.id())) {
@@ -2083,6 +2105,113 @@ public final class TimelineView extends Region {
 		graphics.setLineDashes(4, 4);
 		graphics.strokeRoundRect(startX + 0.5, y + 0.5, endX - startX - 1, height - 1, 8, 8);
 		graphics.setLineDashes();
+	}
+
+	/**
+	 * Marks the elements whose component failed (red badge on their blocks); the app feeds this
+	 * from the session's element diagnostics.
+	 */
+	public void setElementErrors(java.util.Set<String> elementIds) {
+		elementErrorIds = java.util.Set.copyOf(elementIds);
+		redraw();
+	}
+
+	/** Adds one block per element, greedily packed into lanes so overlaps stay readable. */
+	private List<TimelineRenderItem> withElementItems(List<TimelineRenderItem> base,
+			List<dev.gravaai.core.project.SceneElement> elements) {
+		java.util.Map<String, dev.gravaai.core.project.SceneElement> byId = new java.util.HashMap<>();
+		if (elements.isEmpty()) {
+			elementsById = byId;
+			return base;
+		}
+		List<TimelineRenderItem> result = new ArrayList<>(base);
+		List<Long> laneEnds = new ArrayList<>();
+		for (dev.gravaai.core.project.SceneElement element
+				: dev.gravaai.core.project.SceneElement.byStart(elements)) {
+			byId.put(element.id(), element);
+			int lane = 0;
+			while (lane < laneEnds.size() && laneEnds.get(lane) > element.startMs()) {
+				lane++;
+			}
+			if (lane == laneEnds.size()) {
+				laneEnds.add(element.endMs());
+			} else {
+				laneEnds.set(lane, element.endMs());
+			}
+			String label = element.component().startsWith(
+					dev.gravaai.core.project.ElementComponent.BUILTIN_PREFIX)
+							? element.component().substring(
+									dev.gravaai.core.project.ElementComponent.BUILTIN_PREFIX.length())
+							: element.component();
+			result.add(new TimelineRenderItem(element.id(), TimelineConstants.ELEMENTS_ROW_ID + "-"
+					+ lane, new Span(element.startMs(), element.endMs()), null, label + elementHint(element),
+					null, null, null, null, null, null, null, null, null, null, null,
+					TimelineRenderItem.Variant.ELEMENT));
+		}
+		elementsById = byId;
+		return List.copyOf(result);
+	}
+
+	/** The first string prop (title, name, label, text) as a hint after the component name. */
+	private static String elementHint(dev.gravaai.core.project.SceneElement element) {
+		for (String key : List.of("title", "name", "label", "text")) {
+			var value = element.props().get(key);
+			if (value != null && value.isString() && !value.asString().isBlank()) {
+				return " · " + value.asString();
+			}
+		}
+		return "";
+	}
+
+	private void drawElement(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
+			double width) {
+		Span display = getRegionDisplaySpan(item.span());
+		double startX = xForTime(display.start());
+		double endX = xForTime(display.end());
+		if (endX < 0 || startX > width) {
+			return;
+		}
+		double blockWidth = Math.max(6, endX - startX);
+		double x = Math.max(-blockWidth, startX);
+		double height = row.height() * 0.85;
+		double y = row.top() + (row.height() - height) / 2;
+		boolean failing = elementErrorIds.contains(item.id());
+		graphics.setFill(ELEMENT_FILL);
+		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		// A spark glyph marks animated content; the block border turns red when it fails.
+		graphics.setStroke(failing ? ELEMENT_ERROR : ELEMENT_BORDER);
+		graphics.setLineWidth(failing ? 2 : 1);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		double labelX = x + 6;
+		if (blockWidth > 18) {
+			graphics.setFill(ELEMENT_BORDER);
+			double cx = x + 10;
+			double cy = y + height / 2;
+			graphics.fillPolygon(new double[] {cx, cx + 2, cx + 5, cx + 2, cx, cx - 2, cx - 5, cx - 2},
+					new double[] {cy - 5, cy - 2, cy, cy + 2, cy + 5, cy + 2, cy, cy - 2}, 8);
+			labelX = x + 18;
+		}
+		double badge = failing ? 16 : 0;
+		double labelWidth = blockWidth - (labelX - x) - 6 - badge;
+		if (labelWidth > 12) {
+			graphics.setFont(BLOCK_FONT);
+			graphics.setFill(BLOCK_TEXT);
+			graphics.fillText(fitText(item.label(), labelWidth, BLOCK_FONT), labelX,
+					y + height / 2 + 4);
+		}
+		if (failing && blockWidth > 14) {
+			double cx = x + blockWidth - 10;
+			double cy = y + height / 2;
+			graphics.setFill(ELEMENT_ERROR);
+			graphics.fillOval(cx - 6, cy - 6, 12, 12);
+			graphics.setFill(Color.WHITE);
+			graphics.setFont(BLOCK_FONT);
+			graphics.fillText("!", cx - 2, cy + 4);
+		}
+		if (isSelected(TimelineSelection.ELEMENT, item.id())) {
+			drawSelection(graphics, x, y, blockWidth, height, ELEMENT_SELECTED);
+		}
+		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
 
 	/** One Camera layout block: tinted by kind (split, bubble, camera only, no camera), named. */
@@ -2474,7 +2603,11 @@ public final class TimelineView extends Region {
 				case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
 				case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
 				case TimelineConstants.CAMERA_LAYOUT_ROW_ID -> "CAMERA";
+				case TimelineConstants.ELEMENTS_ROW_ID + "-0" -> "ANIM";
 				default -> {
+					if (row.id().startsWith(TimelineConstants.ELEMENTS_ROW_ID + "-")) {
+						yield "";
+					}
 					if (TimelineRows.isSourceAudioTrackRowId(row.id())) {
 						yield sourceAudioTrackFor(row.id())
 								.map(track -> track.label().toUpperCase(java.util.Locale.ROOT))

@@ -11,9 +11,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.Value;
 
 import io.github.humbleui.skija.BlendMode;
 import io.github.humbleui.skija.Canvas;
+import io.github.humbleui.skija.FilterTileMode;
 import io.github.humbleui.skija.Font;
 import io.github.humbleui.skija.FontMgr;
 import io.github.humbleui.skija.FontStyle;
@@ -25,6 +27,7 @@ import io.github.humbleui.skija.PaintStrokeCap;
 import io.github.humbleui.skija.PaintStrokeJoin;
 import io.github.humbleui.skija.Path;
 import io.github.humbleui.skija.PathBuilder;
+import io.github.humbleui.skija.PathEffect;
 import io.github.humbleui.skija.SamplingMode;
 import io.github.humbleui.skija.Shader;
 import io.github.humbleui.skija.TextLine;
@@ -50,6 +53,8 @@ public final class Canvas2D implements AutoCloseable {
 
 	private static final Pattern FONT = Pattern.compile(
 			"(?i)^\\s*(?:(italic|oblique)\\s+)?(?:(bold|[0-9]{3})\\s+)?([0-9]*\\.?[0-9]+)px(?:/[^\\s]+)?\\s+(.+?)\\s*$");
+
+	private static final Pattern BLUR = Pattern.compile("^blur\\(\\s*([0-9]*\\.?[0-9]+)\\s*(?:px)?\\s*\\)$");
 
 	/** System typefaces resolved by family/style; Skia owns them, so they stay cached. */
 	private static final Map<String, Typeface> TYPEFACES = new ConcurrentHashMap<>();
@@ -83,6 +88,11 @@ public final class Canvas2D implements AutoCloseable {
 	private PaintStrokeCap lineCap = PaintStrokeCap.BUTT;
 	private PaintStrokeJoin lineJoin = PaintStrokeJoin.MITER;
 	private double miterLimit = 10.0;
+	private float[] lineDash = new float[0];
+	private double lineDashOffset;
+	private double filterBlur;
+	private String filterCss = "none";
+	private final Deque<Extras> savedExtras = new ArrayDeque<>();
 
 	private boolean closed;
 
@@ -316,6 +326,7 @@ public final class Canvas2D implements AutoCloseable {
 	public void save() {
 		canvas.save();
 		savedStates.push(snapshot());
+		savedExtras.push(new Extras(lineDash, lineDashOffset, filterBlur, filterCss));
 	}
 
 	@HostAccess.Export
@@ -325,6 +336,13 @@ public final class Canvas2D implements AutoCloseable {
 			return;
 		}
 		apply(snapshot);
+		Extras extras = savedExtras.poll();
+		if (extras != null) {
+			lineDash = extras.lineDash();
+			lineDashOffset = extras.lineDashOffset();
+			filterBlur = extras.filterBlur();
+			filterCss = extras.filterCss();
+		}
 		canvas.restore();
 	}
 
@@ -475,11 +493,18 @@ public final class Canvas2D implements AutoCloseable {
 		if (sweepDegrees == 0) {
 			return;
 		}
-		builder().addArc(
-				Rect.makeXYWH((float) (cx - radius), (float) (cy - radius),
-						(float) (radius * 2), (float) (radius * 2)),
-				(float) startDegrees,
-				(float) sweepDegrees);
+		// arcTo (not addArc) keeps the arc in the current contour, so arc + lineTo shapes such as
+		// pies and rounded rectangles fill as one shape, like the browser canvas. A full turn is
+		// drawn as two halves because Skia treats a 360° arcTo as degenerate.
+		Rect oval = Rect.makeXYWH((float) (cx - radius), (float) (cy - radius),
+				(float) (radius * 2), (float) (radius * 2));
+		if (Math.abs(sweepDegrees) >= 359.999) {
+			double half = sweepDegrees / 2;
+			builder().arcTo(oval, (float) startDegrees, (float) half, false);
+			builder().arcTo(oval, (float) (startDegrees + half), (float) half, false);
+		} else {
+			builder().arcTo(oval, (float) startDegrees, (float) sweepDegrees, false);
+		}
 		double endX = cx + radius * Math.cos(endAngle);
 		double endY = cy + radius * Math.sin(endAngle);
 		lastX = endX;
@@ -595,6 +620,186 @@ public final class Canvas2D implements AutoCloseable {
 		drawImageRect(image, sx, sy, sw, sh, dx, dy, dw, dh);
 	}
 
+	/** {@code measureText(text)}: advance width and bounding-box metrics in the current font. */
+	@HostAccess.Export
+	public TextMetrics measureText(String text) {
+		String value = text == null ? "" : text;
+		try (Font skFont = createFont(); TextLine line = TextLine.make(value, skFont)) {
+			double width = line.getWidth();
+			double ascent = -line.getAscent();
+			double descent = line.getDescent();
+			double left = switch (textAlign) {
+				case "right", "end" -> width;
+				case "center" -> width / 2.0;
+				default -> 0;
+			};
+			double baselineShift = switch (textBaseline) {
+				case "top", "hanging" -> -ascent;
+				case "middle" -> (descent - ascent) / 2.0;
+				case "bottom", "ideographic" -> descent;
+				default -> 0;
+			};
+			return new TextMetrics(width, left, width - left, ascent + baselineShift,
+					descent - baselineShift, ascent, descent);
+		}
+	}
+
+	/** {@code ellipse(x, y, rx, ry, rotation, startAngle, endAngle, anticlockwise?)}. */
+	@HostAccess.Export
+	public void ellipse(double x, double y, double radiusX, double radiusY, double rotation,
+			double startAngle, double endAngle) {
+		ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle, false);
+	}
+
+	@HostAccess.Export
+	public void ellipse(double x, double y, double radiusX, double radiusY, double rotation,
+			double startAngle, double endAngle, boolean anticlockwise) {
+		if (!finite(x, y, radiusX, radiusY, rotation, startAngle, endAngle) || radiusX < 0
+				|| radiusY < 0) {
+			return;
+		}
+		double sweep = endAngle - startAngle;
+		double full = Math.PI * 2;
+		if (anticlockwise) {
+			while (sweep > 0) {
+				sweep -= full;
+			}
+			sweep = Math.max(sweep, -full);
+		} else {
+			while (sweep < 0) {
+				sweep += full;
+			}
+			sweep = Math.min(sweep, full);
+		}
+		// Sampled in the ellipse's own frame, then rotated: exact enough at 64 segments per turn
+		// and it keeps the current-point bookkeeping identical to lineTo.
+		int segments = Math.max(4, (int) Math.ceil(Math.abs(sweep) / full * 64));
+		double cos = Math.cos(rotation);
+		double sin = Math.sin(rotation);
+		for (int index = 0; index <= segments; index++) {
+			double angle = startAngle + sweep * index / segments;
+			double ex = radiusX * Math.cos(angle);
+			double ey = radiusY * Math.sin(angle);
+			double px = x + ex * cos - ey * sin;
+			double py = y + ex * sin + ey * cos;
+			if (index == 0 && !contourOpen) {
+				moveTo(px, py);
+			} else {
+				lineTo(px, py);
+			}
+		}
+	}
+
+	/**
+	 * {@code roundRect(x, y, w, h, radii)}: {@code radii} is a number or an array of 1–4 numbers
+	 * (top-left, top-right, bottom-right, bottom-left), clamped to half the shorter side.
+	 */
+	@HostAccess.Export
+	public void roundRect(double x, double y, double w, double h, Value radii) {
+		double[] corners = cornerRadii(radii);
+		if (!finite(x, y, w, h)) {
+			return;
+		}
+		double left = Math.min(x, x + w);
+		double top = Math.min(y, y + h);
+		double width = Math.abs(w);
+		double height = Math.abs(h);
+		double max = Math.min(width, height) / 2.0;
+		double tl = Math.min(max, corners[0]);
+		double tr = Math.min(max, corners[1]);
+		double br = Math.min(max, corners[2]);
+		double bl = Math.min(max, corners[3]);
+		moveTo(left + tl, top);
+		lineTo(left + width - tr, top);
+		quarter(left + width - tr, top + tr, tr, -Math.PI / 2);
+		lineTo(left + width, top + height - br);
+		quarter(left + width - br, top + height - br, br, 0);
+		lineTo(left + bl, top + height);
+		quarter(left + bl, top + height - bl, bl, Math.PI / 2);
+		lineTo(left, top + tl);
+		quarter(left + tl, top + tl, tl, Math.PI);
+		closePath();
+	}
+
+	@HostAccess.Export
+	public void roundRect(double x, double y, double w, double h) {
+		roundRect(x, y, w, h, Value.asValue(0));
+	}
+
+	/** {@code setLineDash([on, off, …])}; an odd-length list is repeated, like the browser. */
+	@HostAccess.Export
+	public void setLineDash(Value segments) {
+		if (segments == null || !segments.hasArrayElements()) {
+			return;
+		}
+		int size = (int) Math.min(64, segments.getArraySize());
+		float[] values = new float[size];
+		for (int index = 0; index < size; index++) {
+			Value element = segments.getArrayElement(index);
+			if (!element.isNumber()) {
+				return;
+			}
+			double number = element.asDouble();
+			if (!Double.isFinite(number) || number < 0) {
+				return;
+			}
+			values[index] = (float) number;
+		}
+		if (values.length % 2 == 1) {
+			float[] doubled = new float[values.length * 2];
+			System.arraycopy(values, 0, doubled, 0, values.length);
+			System.arraycopy(values, 0, doubled, values.length, values.length);
+			values = doubled;
+		}
+		double total = 0;
+		for (float value : values) {
+			total += value;
+		}
+		lineDash = total > 0 ? values : new float[0];
+	}
+
+	@HostAccess.Export
+	public double[] getLineDash() {
+		double[] copy = new double[lineDash.length];
+		for (int index = 0; index < lineDash.length; index++) {
+			copy[index] = lineDash[index];
+		}
+		return copy;
+	}
+
+	@HostAccess.Export
+	public double getLineDashOffset() {
+		return lineDashOffset;
+	}
+
+	@HostAccess.Export
+	public void setLineDashOffset(double value) {
+		if (Double.isFinite(value)) {
+			lineDashOffset = value;
+		}
+	}
+
+	/** {@code filter}: {@code none} or {@code blur(<px>px)}; other CSS filters are ignored. */
+	@HostAccess.Export
+	public String getFilter() {
+		return filterCss;
+	}
+
+	@HostAccess.Export
+	public void setFilter(String value) {
+		String css = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+		if (css.equals("none") || css.isEmpty()) {
+			filterBlur = 0;
+			filterCss = "none";
+			return;
+		}
+		Matcher matcher = BLUR.matcher(css);
+		if (matcher.matches()) {
+			filterBlur = Double.parseDouble(matcher.group(1));
+			filterCss = css;
+		}
+	}
+
 	@HostAccess.Export
 	public CanvasGradient createLinearGradient(double x0, double y0, double x1, double y1) {
 		return CanvasGradient.linear(x0, y0, x1, y1);
@@ -619,6 +824,38 @@ public final class Canvas2D implements AutoCloseable {
 	// ------------------------------------------------------------------------
 	// Internals
 	// ------------------------------------------------------------------------
+
+	private static double[] cornerRadii(@Nullable Value radii) {
+		if (radii == null || radii.isNull()) {
+			return new double[4];
+		}
+		if (radii.isNumber()) {
+			double value = Math.max(0, radii.asDouble());
+			return new double[] {value, value, value, value};
+		}
+		if (!radii.hasArrayElements() || radii.getArraySize() == 0) {
+			return new double[4];
+		}
+		double[] values = new double[(int) Math.min(4, radii.getArraySize())];
+		for (int index = 0; index < values.length; index++) {
+			Value element = radii.getArrayElement(index);
+			values[index] = element.isNumber() && Double.isFinite(element.asDouble())
+					? Math.max(0, element.asDouble()) : 0;
+		}
+		return switch (values.length) {
+			case 1 -> new double[] {values[0], values[0], values[0], values[0]};
+			case 2 -> new double[] {values[0], values[1], values[0], values[1]};
+			case 3 -> new double[] {values[0], values[1], values[2], values[1]};
+			default -> values;
+		};
+	}
+
+	/** A clockwise quarter arc of radius {@code r} centred on (cx, cy) from {@code start}. */
+	private void quarter(double cx, double cy, double r, double start) {
+		if (r > 0) {
+			arc(cx, cy, r, start, start + Math.PI / 2);
+		}
+	}
 
 	private void drawRect(double x, double y, double w, double h, Style style, boolean stroke) {
 		if (!finite(x, y, w, h)) {
@@ -724,6 +961,7 @@ public final class Canvas2D implements AutoCloseable {
 		Paint paint = new Paint();
 		Shader shader = null;
 		ImageFilter filter = null;
+		PathEffect effect = null;
 		try {
 			paint.setAntiAlias(true);
 			if (stroke) {
@@ -760,10 +998,21 @@ public final class Canvas2D implements AutoCloseable {
 						shadowColor);
 				paint.setImageFilter(filter);
 			}
-			return new PaintResources(paint, shader, filter);
+			if (filterBlur > 0) {
+				closeQuietly(filter);
+				float sigma = (float) filterBlur;
+				filter = ImageFilter.makeBlur(sigma, sigma, FilterTileMode.DECAL);
+				paint.setImageFilter(filter);
+			}
+			if (stroke && lineDash.length > 0) {
+				effect = PathEffect.makeDash(lineDash, (float) lineDashOffset);
+				paint.setPathEffect(effect);
+			}
+			return new PaintResources(paint, shader, filter, effect);
 		} catch (RuntimeException error) {
 			closeQuietly(shader);
 			closeQuietly(filter);
+			closeQuietly(effect);
 			paint.close();
 			throw error;
 		}
@@ -861,16 +1110,21 @@ public final class Canvas2D implements AutoCloseable {
 	}
 
 	/** The paint plus the Skija resources backing it; closing releases all three. */
-	private record PaintResources(Paint paint, @Nullable Shader shader, @Nullable ImageFilter filter) implements AutoCloseable {
+	private record PaintResources(Paint paint, @Nullable Shader shader, @Nullable ImageFilter filter,
+			@Nullable PathEffect effect) implements AutoCloseable {
 		@Override
 		public void close() {
 			paint.close();
 			closeQuietly(shader);
 			closeQuietly(filter);
+			closeQuietly(effect);
 		}
 	}
 
 	private record Style(int color, @Nullable CanvasGradient gradient) {}
+
+	/** State added with the element layer; saved and restored with the rest. */
+	private record Extras(float[] lineDash, double lineDashOffset, double filterBlur, String filterCss) {}
 
 	private record Snapshot(
 			int fillColor,

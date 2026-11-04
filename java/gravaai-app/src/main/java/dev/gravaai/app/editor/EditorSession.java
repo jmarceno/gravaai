@@ -74,6 +74,10 @@ public final class EditorSession implements AutoCloseable {
 	private ProjectDocument document;
 	private ProjectDocument mediaSource;
 	private final EditorStore store;
+	private final dev.gravaai.services.elements.ElementDiagnostics elementDiagnostics =
+			new dev.gravaai.services.elements.ElementDiagnostics();
+	private final java.util.List<AutoCloseable> ownedResources =
+			new java.util.concurrent.CopyOnWriteArrayList<>();
 	private final PlaybackEngine engine;
 	private final PlaybackControllerPort playback;
 	private final AtomicBoolean dirty = new AtomicBoolean();
@@ -589,6 +593,16 @@ public final class EditorSession implements AutoCloseable {
 		return store;
 	}
 
+	/** Element errors of this session, reported by every render path (preview, frames, export). */
+	public dev.gravaai.services.elements.ElementDiagnostics elementDiagnostics() {
+		return elementDiagnostics;
+	}
+
+	/** Closes {@code resource} with the session (e.g. the preview's element runtime). */
+	public void own(AutoCloseable resource) {
+		ownedResources.add(resource);
+	}
+
 	public PlaybackControllerPort playbackPort() {
 		return playback;
 	}
@@ -673,6 +687,9 @@ public final class EditorSession implements AutoCloseable {
 		closeQuietly(changeSubscription);
 		closeQuietly(playback);
 		engine.close();
+		for (AutoCloseable resource : ownedResources) {
+			closeQuietly(resource);
+		}
 	}
 
 	private static void closeQuietly(AutoCloseable handle) {

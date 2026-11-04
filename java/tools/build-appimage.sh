@@ -60,6 +60,9 @@ cp -a "$IMAGE"/. "$APPDIR/usr/"
 
 cp "$ICON" "$APPDIR/$NAME.png"
 cp "$ICON" "$APPDIR/.DirIcon"
+# Every icon size ships so the launcher never falls back to a stale size from an older install.
+mkdir -p "$APPDIR/icons"
+cp "$SCRIPT_DIR"/../../icons/icons/png/{16x16,24x24,32x32,48x48,64x64,128x128,256x256,512x512}.png "$APPDIR/icons/"
 cat > "$APPDIR/$NAME.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
@@ -71,7 +74,7 @@ Icon=$NAME
 Terminal=false
 Categories=AudioVideo;Recorder;
 MimeType=application/x-gravaai;
-StartupWMClass=GravaaiApp
+StartupWMClass=dev.gravaai.app.GravaaiApp
 DESKTOP
 
 # Build the runtime class path from the jpackage launcher config. Keeping jpackage's order
@@ -117,8 +120,14 @@ if [ -n "${APPIMAGE:-}" ] && [ -z "${GRAVAAI_NO_DESKTOP_INTEGRATION:-}" ]; then
 		*)
 			_data="${XDG_DATA_HOME:-$HOME/.local/share}"
 			_desktop="$_data/applications/gravaai.desktop"
-			mkdir -p "$_data/applications" "$_data/mime/packages" "$_data/icons/hicolor/256x256/apps" 2>/dev/null
-			cp "$APPDIR/Gravaai.png" "$_data/icons/hicolor/256x256/apps/gravaai.png" 2>/dev/null
+			mkdir -p "$_data/applications" "$_data/mime/packages" 2>/dev/null
+			for _icon in "$APPDIR"/icons/*.png; do
+				_size="$(basename "$_icon" .png)"
+				mkdir -p "$_data/icons/hicolor/$_size/apps" 2>/dev/null
+				cp "$_icon" "$_data/icons/hicolor/$_size/apps/gravaai.png" 2>/dev/null
+			done
+			# A scalable icon from an older install outranks every PNG above.
+			rm -f "$_data/icons/hicolor/scalable/apps/gravaai.svg" 2>/dev/null
 			# Rewritten whenever the AppImage moves or the entry format changes (an older build
 			# skipped the write when the Exec line matched, leaving entries without MimeType).
 			cat > "$_desktop.tmp" 2>/dev/null <<DESKTOP
@@ -133,7 +142,7 @@ Icon=gravaai
 Terminal=false
 Categories=AudioVideo;Recorder;
 MimeType=application/x-gravaai;
-StartupWMClass=GravaaiApp
+StartupWMClass=dev.gravaai.app.GravaaiApp
 DESKTOP
 			if ! cmp -s "$_desktop.tmp" "$_desktop" 2>/dev/null; then
 				mv "$_desktop.tmp" "$_desktop" 2>/dev/null

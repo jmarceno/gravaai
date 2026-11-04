@@ -968,6 +968,7 @@ public final class AppContext {
 		LOG.log(System.Logger.Level.INFO, "open dashboard requested");
 		EditorWindow editor = activeEditor;
 		if (editor != null) {
+			revealMainWindow();
 			// Single window: going Home closes the editor inside the same window.
 			switchingViews = true;
 			editor.requestHostClose(() -> {
@@ -1576,12 +1577,19 @@ public final class AppContext {
 		}
 	}
 
-	private static void installCloseToTray(Stage stage) {
+	private void installCloseToTray(Stage stage) {
 		if (stage == null) {
 			return;
 		}
 		stage.setOnCloseRequest(event -> {
 			event.consume();
+			EditorWindow editor = activeEditor;
+			if (editor != null && editor.isExportRunning()) {
+				// Hiding the window would leave the export running with nothing to show it (and the
+				// confirmation dialog invisible): ask to cancel and quit, or keep the window open.
+				quit();
+				return;
+			}
 			stage.hide();
 		});
 	}
@@ -1666,9 +1674,23 @@ public final class AppContext {
 		}
 	}
 
+	/** Shows and raises the main window, e.g. so a confirmation dialog is visible. */
+	private void revealMainWindow() {
+		Stage stage = primaryStage;
+		if (stage == null) {
+			return;
+		}
+		if (!stage.isShowing()) {
+			stage.show();
+		}
+		stage.setIconified(false);
+		stage.toFront();
+	}
+
 	private void quit() {
 		EditorWindow editor = activeEditor;
 		if (editor != null && editor.isExportRunning()) {
+			revealMainWindow();
 			// Never kill a running render silently: confirm first, cancel on approval.
 			switchingViews = true;
 			editor.requestHostClose(() -> {

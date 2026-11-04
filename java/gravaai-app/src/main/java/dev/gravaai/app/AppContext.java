@@ -423,8 +423,15 @@ public final class AppContext {
 						}
 
 						@Override
-						public void recordingFinalizing(boolean finalizing, boolean showWindow) {
-							Platform.runLater(() -> onRecordingFinalizing(finalizing, showWindow));
+						public void recordingFinalizing(boolean finalizing) {
+							Platform.runLater(() -> onRecordingFinalizing(finalizing));
+						}
+
+						@Override
+						public void openMeeting(String mediaPath) {
+							if (mediaPath != null && !mediaPath.isBlank()) {
+								Platform.runLater(() -> openMeetingWindow(Path.of(mediaPath)));
+							}
 						}
 
 						@Override
@@ -685,6 +692,7 @@ public final class AppContext {
 			return;
 		}
 		try {
+			finalizingSceneShown = false;
 			if (meetingWindow == null) {
 				meetingWindow = MeetingWindow.createIn(stage, integration.service(),
 						this::closeMeetingWindow);
@@ -902,11 +910,11 @@ public final class AppContext {
 	 * Stop was pressed: the tray reverts to idle at once and the main window shows a busy
 	 * placeholder while the take is written; the editor (or the dashboard on failure) replaces it.
 	 */
-	private void onRecordingFinalizing(boolean finalizing, boolean showWindow) {
+	private void onRecordingFinalizing(boolean finalizing) {
 		if (finalizing) {
 			applyTrayRecordingState(false, "");
 			Stage stage = primaryStage;
-			if (!showWindow || stage == null || shutdown || activeEditor != null) {
+			if (stage == null || shutdown || activeEditor != null) {
 				return;
 			}
 			javafx.scene.control.ProgressIndicator spinner = new javafx.scene.control.ProgressIndicator();

@@ -72,10 +72,13 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 		/**
 		 * Stop was pressed and the take is still being written: {@code true} reverts the tray to
-		 * idle at once and, when {@code showWindow}, shows the main window with a "finalizing" placeholder; {@code false} ends
+		 * idle and shows the main window with a "finalizing" placeholder at once; {@code false} ends
 		 * it when no editor replaced the placeholder (failure or meeting recording).
 		 */
-		default void recordingFinalizing(boolean finalizing, boolean showWindow) {}
+		default void recordingFinalizing(boolean finalizing) {}
+
+		/** A finished meeting recording: opens it in the meeting view of the main window. */
+		default void openMeeting(String mediaPath) {}
 	}
 
 	/** The values persisted in {@code recordings-settings.json}. */
@@ -372,7 +375,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	private void stopRecording() {
 		finalizing = true;
 		paused = false;
-		navigation.recordingFinalizing(true, !meetingMode);
+		navigation.recordingFinalizing(true);
 		publish();
 		Thread.ofVirtual().name("gravaai-hud-stop").start(() -> {
 			try {
@@ -383,7 +386,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				LOG.log(System.Logger.Level.WARNING, "recording stop failed: " + error);
 				wiring.recording().setRecordingState(false);
 				finalizing = false;
-				navigation.recordingFinalizing(false, false);
+				navigation.recordingFinalizing(false);
 				publish();
 			}
 		});
@@ -433,11 +436,11 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				// meeting library instead (registerRecording in AppContext).
 				navigation.openRecordingInEditor(result.path());
 			} else {
-				navigation.recordingFinalizing(false, false);
+				navigation.openMeeting(result.path());
 			}
 		} else {
 			LOG.log(System.Logger.Level.WARNING, "recording stop failed: " + result.error());
-			navigation.recordingFinalizing(false, false);
+			navigation.recordingFinalizing(false);
 		}
 		publish();
 	}

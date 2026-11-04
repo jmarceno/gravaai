@@ -29,6 +29,15 @@ double width = stage.getWidth();
 double height = stage.getHeight();
 double x = stage.getX();
 double y = stage.getY();
+if (restore && !maximized) {
+// JavaFX resizes a showing window to the new scene's own size inside setScene whenever the
+// window's width/height were never set programmatically (a user drag does not count), which
+// is what made the window jump — going Home re-applied the dashboard scene's 1280x800, e.g.
+// after opening a project straight from the HUD, whose stage was still hidden at editor open.
+// Marking the size explicit first keeps setScene from touching the window bounds at all.
+stage.setWidth(width);
+stage.setHeight(height);
+}
 stage.setScene(scene);
 if (!restore) {
 return;
@@ -38,7 +47,7 @@ if (maximized) {
 stage.setMaximized(true);
 return;
 }
-// setScene can apply the new scene's preferred/minimum size; restore the user's bounds.
+// Same values as above, so this only fires if the peer moved the window anyway.
 stage.setWidth(width);
 stage.setHeight(height);
 stage.setX(x);

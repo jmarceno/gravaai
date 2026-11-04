@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.core.project.KeySoundStyle;
 import dev.gravaai.media.audio.ClickSounds;
 
 /**
@@ -35,10 +36,20 @@ public final class ClickSoundWav {
 	 */
 	public static @Nullable Path write(Path destination, ClickSoundStyle style, double volume,
 			long[] timesMs) {
+		return write(destination, ClickSounds.pcm(style), volume, timesMs);
+	}
+
+	/** Same bus for key-press sounds. */
+	public static @Nullable Path write(Path destination, KeySoundStyle style, double volume,
+			long[] timesMs) {
+		return write(destination, ClickSounds.pcm(style), volume, timesMs);
+	}
+
+	private static @Nullable Path write(Path destination, float @Nullable [] pcm, double volume,
+			long[] timesMs) {
 		if (timesMs == null || timesMs.length == 0) {
 			return null;
 		}
-		float[] pcm = ClickSounds.pcm(style);
 		if (pcm == null || pcm.length == 0) {
 			return null;
 		}

@@ -379,4 +379,18 @@ class ProjectPersistenceNormalizerTest {
 		ProjectEditorState state = normalize("{\"clickSound\":" + json + "}");
 		assertEquals(settings, state.clickSound());
 	}
+
+	@Test
+	@DisplayName("keySound defaults, unknown wire, volume clamp and round trip")
+	void keySoundNormalisation() {
+		assertEquals(KeySoundSettings.DEFAULT, normalize("{}").keySound());
+		assertEquals(KeySoundStyle.CLACK,
+				normalize("{\"keySound\":{\"sound\":\"whoosh\"}}").keySound().sound());
+		assertEquals(KeySoundStyle.TAP,
+				normalize("{\"keySound\":{\"sound\":\"tap\"}}").keySound().sound());
+		assertEquals(1, normalize("{\"keySound\":{\"volume\":3}}").keySound().volume());
+		KeySoundSettings settings = new KeySoundSettings(true, KeySoundStyle.SOFT, 0.3);
+		String json = ProjectDocument.writeKeySound(settings).toString();
+		assertEquals(settings, normalize("{\"keySound\":" + json + "}").keySound());
+	}
 }

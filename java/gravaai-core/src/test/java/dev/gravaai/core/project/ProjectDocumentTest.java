@@ -71,6 +71,11 @@ class ProjectDocumentTest {
 			editor.set("clickSound",
 					ProjectDocument.writeClickSound(ClickSoundSettings.DEFAULT));
 		}
+		// And the key sound setting: same canonical default on save.
+		if (expected.get("editor") instanceof ObjectNode editor
+				&& !editor.has("keySound")) {
+			editor.set("keySound", ProjectDocument.writeKeySound(KeySoundSettings.DEFAULT));
+		}
 
 		assertEquals(2, saved.get("version").intValue());
 		assertSemanticallyEqual(expected, saved, "$");

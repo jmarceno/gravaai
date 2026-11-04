@@ -55,6 +55,7 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	private double volume = 1;
 	private double rate = 1;
 	private @Nullable ClickSoundTrack clickTrack;
+	private @Nullable ClickSoundTrack keyTrack;
 	private volatile boolean closed;
 	private volatile boolean paused;
 
@@ -101,6 +102,13 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	public static PlaybackAudioProducer openWithPulse(
 			String mediaPath, List<ClipRegion> clips, Path ffmpegPath,
 			@Nullable ClickSoundTrack clickTrack) {
+		return openWithPulse(mediaPath, clips, ffmpegPath, clickTrack, null);
+	}
+
+	/** Production factory with click and key-press sound tracks mixed into every chunk. */
+	public static PlaybackAudioProducer openWithPulse(
+			String mediaPath, List<ClipRegion> clips, Path ffmpegPath,
+			@Nullable ClickSoundTrack clickTrack, @Nullable ClickSoundTrack keyTrack) {
 		if (ffmpegPath == null) {
 			throw new IllegalArgumentException("ffmpegPath must not be null");
 		}
@@ -112,12 +120,19 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 				(path, start, duration, filters) -> FfmpegCliPcmSource.open(
 						ffmpeg, path, start, duration, filters));
 		producer.setClickTrack(clickTrack);
+		producer.setKeyTrack(keyTrack);
 		return producer;
 	}
 
 	/** Swaps the click-sound track in/out at once (no decoder reopen); {@code null} removes it. */
 	public synchronized void setClickTrack(@Nullable ClickSoundTrack clickTrack) {
 		this.clickTrack = clickTrack;
+	}
+
+	/** Swaps the key-press sound track in/out at once; {@code null} removes it. */
+	@Override
+	public synchronized void setKeyTrack(@Nullable ClickSoundTrack keyTrack) {
+		this.keyTrack = keyTrack;
 	}
 
 	@Override
@@ -152,6 +167,10 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 				if (track != null) {
 					track.mix(chunk, frames, chunkStartSeconds);
 				}
+				ClickSoundTrack keys = keyTrack;
+				if (keys != null) {
+					keys.mix(chunk, frames, chunkStartSeconds);
+				}
 				applyVolumeLocked(frames);
 				fadeGain.apply(chunk, frames, CHANNELS, chunkStartSeconds);
 				sink.write(chunk, frames);
@@ -183,6 +202,10 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 		ClickSoundTrack track = clickTrack;
 		if (track != null) {
 			track.mix(silence, framesToWrite, timelineSeconds);
+		}
+		ClickSoundTrack keys = keyTrack;
+		if (keys != null) {
+			keys.mix(silence, framesToWrite, timelineSeconds);
 		}
 		sink.write(silence, framesToWrite);
 		samplesWritten += framesToWrite;

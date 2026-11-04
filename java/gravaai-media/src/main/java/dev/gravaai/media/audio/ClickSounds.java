@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.core.project.KeySoundStyle;
 import dev.gravaai.media.ffmpeg.AudioDecoder;
 
 /**
@@ -30,30 +31,46 @@ public final class ClickSounds {
 	private static final String RESOURCE_ROOT = "/dev/gravaai/media/sounds/";
 	private static final int STAGING_FRAMES = 4096;
 
-	private static final Map<ClickSoundStyle, float[]> CACHE = new ConcurrentHashMap<>();
-	private static final Set<ClickSoundStyle> UNAVAILABLE = ConcurrentHashMap.newKeySet();
+	private static final Map<String, float[]> CACHE = new ConcurrentHashMap<>();
+	private static final Set<String> UNAVAILABLE = ConcurrentHashMap.newKeySet();
 
 	private ClickSounds() {}
 
 	/** Interleaved stereo samples, or {@code null} when the sound failed to load. */
 	public static float @Nullable [] pcm(ClickSoundStyle style) {
-		float @Nullable [] cached = CACHE.get(style);
+		return pcm("click-" + style.wire());
+	}
+
+	/** Key-press sound samples ({@code key-<name>.ogg}); same cache and failure rules. */
+	public static float @Nullable [] pcm(KeySoundStyle style) {
+		return pcm("key-" + style.wire());
+	}
+
+	/** Stereo frames of a key-press sound; 0 when unavailable. */
+	public static int frames(KeySoundStyle style) {
+		float @Nullable [] pcm = pcm(style);
+		return pcm == null ? 0 : pcm.length / AudioDecoder.OUTPUT_CHANNELS;
+	}
+
+	/** Samples of the bundled sound with this resource base name, or {@code null}. */
+	public static float @Nullable [] pcm(String name) {
+		float @Nullable [] cached = CACHE.get(name);
 		if (cached != null) {
 			return cached;
 		}
-		if (UNAVAILABLE.contains(style)) {
+		if (UNAVAILABLE.contains(name)) {
 			return null;
 		}
 		synchronized (ClickSounds.class) {
-			if (UNAVAILABLE.contains(style)) {
+			if (UNAVAILABLE.contains(name)) {
 				return null;
 			}
-			float @Nullable [] decoded = decode(style);
+			float @Nullable [] decoded = decode(name);
 			if (decoded == null) {
-				UNAVAILABLE.add(style);
+				UNAVAILABLE.add(name);
 				return null;
 			}
-			CACHE.put(style, decoded);
+			CACHE.put(name, decoded);
 			return decoded;
 		}
 	}
@@ -75,17 +92,20 @@ public final class ClickSounds {
 			for (ClickSoundStyle style : ClickSoundStyle.values()) {
 				pcm(style);
 			}
+			for (KeySoundStyle style : KeySoundStyle.values()) {
+				pcm(style);
+			}
 		});
 	}
 
-	private static float @Nullable [] decode(ClickSoundStyle style) {
-		String resource = RESOURCE_ROOT + "click-" + style.wire() + ".ogg";
+	private static float @Nullable [] decode(String name) {
+		String resource = RESOURCE_ROOT + name + ".ogg";
 		try (InputStream in = ClickSounds.class.getResourceAsStream(resource)) {
 			if (in == null) {
 				LOG.log(System.Logger.Level.WARNING, "click sound resource missing: " + resource);
 				return null;
 			}
-			Path temp = Files.createTempFile("gravaai-click-" + style.wire(), ".ogg");
+			Path temp = Files.createTempFile("gravaai-" + name, ".ogg");
 			Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
 			temp.toFile().deleteOnExit();
 			try (AudioDecoder decoder = AudioDecoder.open(temp)) {

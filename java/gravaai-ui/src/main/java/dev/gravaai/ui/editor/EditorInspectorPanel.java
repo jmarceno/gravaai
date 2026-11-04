@@ -289,7 +289,7 @@ public final class EditorInspectorPanel extends VBox {
 		return switch (section) {
 			// Only sections with controls rendered behind the Advanced switch. Cursor and
 			// Settings currently have no advanced-only rows, so showing the toggle there is inert.
-			case SCENE, WEBCAM, CAPTIONS -> true;
+			case SCENE, WEBCAM, CAPTIONS, KEYSTROKES -> true;
 			case CURSOR, TRANSCRIPT, MEETING, SETTINGS -> false;
 		};
 	}
@@ -394,6 +394,7 @@ public final class EditorInspectorPanel extends VBox {
 		return switch (section) {
 			case SCENE -> sceneSection();
 			case CURSOR -> cursorSection();
+			case KEYSTROKES -> keystrokesSection();
 			case WEBCAM -> webcamSection();
 			case CAPTIONS -> captionsSection();
 			case TRANSCRIPT -> transcriptSection();
@@ -1097,8 +1098,65 @@ public final class EditorInspectorPanel extends VBox {
 				1200, 10, value -> Math.round(value) + "ms",
 				value -> apply(json -> json.put("cursorClickEffectDurationMs", value))));
 		root.getChildren().add(clickSoundBlock(state.clickSound()));
-		root.getChildren().add(keystrokesBlock(state.keystrokeOverlay()));
 		return root;
+	}
+
+	/** The Keystrokes tab: the on-screen key press overlay and the typing sounds. */
+	private VBox keystrokesSection() {
+		var state = store.state();
+		VBox root = new VBox(14);
+		root.getChildren().add(keystrokesBlock(state.keystrokeOverlay()));
+		root.getChildren().add(keySoundBlock(state.keySound()));
+		return root;
+	}
+
+	/**
+	 * "Typing sound" block: a switch, the sound choice (auditioned on change) and volume. Only
+	 * character keys sound, so Ctrl/Shift/arrows stay silent and the track is not noisy.
+	 */
+	private VBox keySoundBlock(dev.gravaai.core.project.KeySoundSettings settings) {
+		var sound = settings == null
+				? dev.gravaai.core.project.KeySoundSettings.DEFAULT : settings;
+		VBox block = new VBox(12);
+		block.getStyleClass().add("editor-keystrokes");
+		Label title = new Label("Typing sound");
+		title.getStyleClass().add("editor-section__label");
+		Switch enabled = new Switch("Typing sounds");
+		enabled.setChecked(sound.enabled());
+		enabled.onCheckedChange(value -> applyKeySound(json -> json.put("enabled", value)));
+		block.getChildren().addAll(title, enabled);
+
+		if (KeystrokeEvents.count(recordingPath.get()) == 0) {
+			enabled.setDisable(true);
+			Label empty = new Label("No key presses were recorded, so there is nothing to sound.");
+			empty.setWrapText(true);
+			empty.getStyleClass().add("editor-keystrokes__empty");
+			empty.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			block.getChildren().add(empty);
+			return block;
+		}
+
+		ChoiceGroup style = choice("clack", "Clack", "tap", "Tap", "soft", "Soft");
+		style.setValue(sound.sound().wire());
+		style.onValueChange(value -> {
+			var picked = dev.gravaai.core.project.KeySoundStyle.fromWire(value);
+			applyKeySound(json -> json.put("sound", picked.wire()));
+			dev.gravaai.media.audio.ClickSoundAudition.play(picked, sound.volume());
+		});
+		style.setAccessibleText("Typing sound");
+		block.getChildren().add(style);
+		block.getChildren().add(slider("Volume", sound.volume(), 0, 1, 0.01,
+				value -> Math.round(value * 100) + "%",
+				value -> applyKeySound(json -> json.put("volume", value))));
+		return block;
+	}
+
+	private void applyKeySound(java.util.function.Consumer<tools.jackson.databind.node.ObjectNode> mutation) {
+		apply(json -> {
+			tools.jackson.databind.JsonNode existing = json.get("keySound");
+			mutation.accept(existing instanceof tools.jackson.databind.node.ObjectNode object
+					? object : json.putObject("keySound"));
+		});
 	}
 
 	/**
@@ -1209,7 +1267,8 @@ public final class EditorInspectorPanel extends VBox {
 	/** The recording whose {@code .keys.json} sidecar holds the key presses (preview media). */
 	public void setRecordingPath(java.util.function.Supplier<java.nio.file.Path> path) {
 		this.recordingPath = path == null ? () -> null : path;
-		if (section == EditorSidebarRail.Section.CURSOR) {
+		if (section == EditorSidebarRail.Section.CURSOR
+				|| section == EditorSidebarRail.Section.KEYSTROKES) {
 			rebuild();
 		}
 	}

@@ -19,6 +19,7 @@ import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClickSoundSettings;
+import dev.gravaai.core.project.KeySoundSettings;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
@@ -27,6 +28,7 @@ import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.media.audio.ClickSoundHits;
+import dev.gravaai.media.audio.KeySoundHits;
 import dev.gravaai.media.audio.ClickSounds;
 import dev.gravaai.media.playback.AudioMediaClock;
 import dev.gravaai.media.playback.ClickSoundTrack;
@@ -40,6 +42,7 @@ import dev.gravaai.media.playback.PlaybackMedia;
 import dev.gravaai.media.playback.PlaybackMediaLoader;
 import dev.gravaai.services.projects.ProjectManager;
 import dev.gravaai.services.projects.ProjectMediaSources;
+import dev.gravaai.services.recording.KeystrokePresses;
 import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.ui.editor.preview.PlaybackControllerPort;
@@ -91,6 +94,8 @@ public final class EditorSession implements AutoCloseable {
 	private volatile @Nullable List<ClipRegion> playbackClips;
 	/** The click-sound settings the audio track was last given (change detection). */
 	private volatile @Nullable ClickSoundSettings appliedClickSound;
+	/** The key-sound settings the audio track was last given (change detection). */
+	private volatile @Nullable KeySoundSettings appliedKeySound;
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
@@ -122,6 +127,7 @@ public final class EditorSession implements AutoCloseable {
 			dirty.set(true);
 			syncPlaybackClips();
 			syncClickSound();
+			syncKeySound();
 		});
 		this.dataSource = new StoreTimelineDataSource(store, this::timelineDurationMs,
 				() -> (double) playheadMs.get(), WaveformProvider.empty());
@@ -190,11 +196,14 @@ public final class EditorSession implements AutoCloseable {
 		try {
 			LOG.log(System.Logger.Level.INFO, "editor audio attach start");
 			ClickSoundSettings clickSound = store.state().clickSound();
+			KeySoundSettings keySound = store.state().keySound();
 			PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
 					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
-					clickTrackFor(clickSound, media.videoPath(), media.clips()));
+					clickTrackFor(clickSound, media.videoPath(), media.clips()),
+					keyTrackFor(keySound, media.videoPath(), media.clips()));
 			appliedClickSound = clickSound;
+			appliedKeySound = keySound;
 			if (mediaGeneration.get() != generation) {
 				// Superseded while the audio producer opened: keep the replacement's track.
 				closeQuietly(audio);
@@ -246,11 +255,14 @@ public final class EditorSession implements AutoCloseable {
 		PlaybackAudioTrack audio = null;
 		try {
 			ClickSoundSettings clickSound = store.state().clickSound();
+			KeySoundSettings keySound = store.state().keySound();
 			audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
 					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
-					clickTrackFor(clickSound, media.videoPath(), media.clips()));
+					clickTrackFor(clickSound, media.videoPath(), media.clips()),
+					keyTrackFor(keySound, media.videoPath(), media.clips()));
 			appliedClickSound = clickSound;
+			appliedKeySound = keySound;
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "audio playback unavailable after replace: " + error);
 		}
@@ -301,10 +313,13 @@ public final class EditorSession implements AutoCloseable {
 			PlaybackAudioTrack previous = audioTrack;
 			try {
 				ClickSoundSettings clickSound = store.state().clickSound();
+				KeySoundSettings keySound = store.state().keySound();
 				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(video, clips,
 						NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
-						clickTrackFor(clickSound, video, clips));
+						clickTrackFor(clickSound, video, clips),
+						keyTrackFor(keySound, video, clips));
 				appliedClickSound = clickSound;
+				appliedKeySound = keySound;
 				if (audio != null) {
 					// setAudioTrack seeks the new track to the playhead; the engine tick pumps it.
 					engine.setAudioTrack(audio);
@@ -339,6 +354,39 @@ public final class EditorSession implements AutoCloseable {
 			}
 			track.setClickTrack(clickTrackFor(clickSound, video, store.state().clipRegions()));
 		});
+	}
+
+	/** Swaps the key-press sound track when its setting changed (see {@link #syncClickSound}). */
+	private void syncKeySound() {
+		KeySoundSettings keySound = store.state().keySound();
+		if (keySound.equals(appliedKeySound)) {
+			return;
+		}
+		appliedKeySound = keySound;
+		clipSync.execute(() -> {
+			if (closed) {
+				return;
+			}
+			PlaybackAudioTrack track = audioTrack;
+			String video = mediaSource.videoPath();
+			if (track == null || video == null || video.isBlank()) {
+				return;
+			}
+			track.setKeyTrack(keyTrackFor(keySound, video, store.state().clipRegions()));
+		});
+	}
+
+	/** The preview key-sound track, or {@code null} when off / nothing audible was typed. */
+	private @Nullable ClickSoundTrack keyTrackFor(
+			KeySoundSettings keySound, String videoPath, List<ClipRegion> clips) {
+		if (!keySound.enabled()) {
+			return null;
+		}
+		long[] timesMs = KeySoundHits.timesMs(keySound, KeystrokePresses.load(videoPath), clips);
+		if (timesMs.length == 0) {
+			return null;
+		}
+		return ClickSoundTrack.forKeys(keySound.sound(), keySound.volume(), timesMs);
 	}
 
 	/** The preview click track for these settings, or {@code null} when off / no clicks on screen. */

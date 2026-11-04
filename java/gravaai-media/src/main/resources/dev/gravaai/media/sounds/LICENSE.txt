@@ -4,6 +4,9 @@ files from two Kenney packs, redistributed under their original CC0 terms:
   - click-crisp.ogg = ui-audio/Audio/mouseclick1.ogg  (UI SFX Set)
   - click-tick.ogg  = interface-sounds/Audio/tick_001.ogg (Interface Sounds)
   - click-soft.ogg  = ui-audio/Audio/click2.ogg       (UI SFX Set)
+  - key-clack.ogg   = ui-audio/Audio/click4.ogg       (UI SFX Set)
+  - key-tap.ogg     = interface-sounds/Audio/tick_004.ogg (Interface Sounds)
+  - key-soft.ogg    = ui-audio/Audio/click3.ogg       (UI SFX Set)
 
 The two packs' license texts, verbatim:
 

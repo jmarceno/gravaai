@@ -19,8 +19,10 @@ import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.core.project.KeySoundSettings;
 import dev.gravaai.media.audio.ClickSoundHits;
 import dev.gravaai.media.audio.ClickSounds;
+import dev.gravaai.media.audio.KeySoundHits;
 import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.export.CaptionSidecars;
 import dev.gravaai.media.export.ClickSoundWav;
@@ -38,6 +40,7 @@ import dev.gravaai.media.ffmpeg.MediaInfo;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.media.ffmpeg.VideoStreamInfo;
 import dev.gravaai.services.export.ExportCoordinator;
+import dev.gravaai.services.recording.KeystrokePresses;
 import dev.gravaai.core.json.Json;
 import tools.jackson.databind.JsonNode;
 
@@ -188,6 +191,7 @@ public final class ProjectExport {
 					dev.gravaai.media.export.ExportCancellation.NONE, publisher);
 		} finally {
 			Files.deleteIfExists(clickBusFor(input.destination()));
+			Files.deleteIfExists(keyBusFor(input.destination()));
 		}
 	}
 
@@ -259,9 +263,9 @@ public final class ProjectExport {
 	}
 
 	/**
-	 * Appends the pre-rendered click bus as one region (MP4 only; GIF has no audio). The render
-	 * is capped at the last hit plus the sound length, and muted clips do not silence clicks —
-	 * the bus is a region, by design.
+	 * Appends the pre-rendered click and key-press buses as regions (MP4 only; GIF has no audio).
+	 * Each render is capped at the last hit plus the sound length, and muted clips do not silence
+	 * them — a bus is a region, by design.
 	 */
 	private static void appendClickBus(Input input, List<ExportAudioGraph.RegionInput> regions) {
 		if (input.preferences().exportFormat() == ExportFormat.GIF) {
@@ -269,19 +273,39 @@ public final class ProjectExport {
 		}
 		long[] timesMs = ClickSoundHits.timesMs(input.editor().clickSound(),
 				input.cursorSamples(), input.editor().clipRegions());
-		if (timesMs.length == 0) {
+		if (timesMs.length > 0) {
+			ClickSoundStyle style = input.editor().clickSound().sound();
+			Path clickBus = clickBusFor(input.destination());
+			if (ClickSoundWav.write(clickBus, style, input.editor().clickSound().volume(), timesMs)
+					!= null) {
+				regions.add(new ExportAudioGraph.RegionInput(clickBus.toString(), 0,
+						lastHitEndMs(timesMs, ClickSounds.frames(style)), 1));
+			}
+		}
+		KeySoundSettings keySound = input.editor().keySound();
+		if (!keySound.enabled()) {
 			return;
 		}
-		ClickSoundStyle style = input.editor().clickSound().sound();
-		int soundFrames = ClickSounds.frames(style);
-		long lastHitEndMs = timesMs[timesMs.length - 1] + (soundFrames * 1000L + 47_999) / 48_000;
-		Path destination = input.destination().toAbsolutePath().normalize();
-		Path clickBus = destination.resolveSibling(destination.getFileName() + ".clicks.wav");
-		if (ClickSoundWav.write(clickBus, style, input.editor().clickSound().volume(), timesMs)
-				== null) {
+		long[] keyTimesMs = KeySoundHits.timesMs(keySound,
+				KeystrokePresses.load(input.videoPath().toString()), input.editor().clipRegions());
+		if (keyTimesMs.length == 0) {
 			return;
 		}
-		regions.add(new ExportAudioGraph.RegionInput(clickBus.toString(), 0, lastHitEndMs, 1));
+		Path keyBus = keyBusFor(input.destination());
+		if (ClickSoundWav.write(keyBus, keySound.sound(), keySound.volume(), keyTimesMs) != null) {
+			regions.add(new ExportAudioGraph.RegionInput(keyBus.toString(), 0,
+					lastHitEndMs(keyTimesMs, ClickSounds.frames(keySound.sound())), 1));
+		}
+	}
+
+	private static long lastHitEndMs(long[] timesMs, int soundFrames) {
+		return timesMs[timesMs.length - 1] + (soundFrames * 1000L + 47_999) / 48_000;
+	}
+
+	/** The sidecar the key bus writes next to a destination (deleted after the run). */
+	private static Path keyBusFor(Path destination) {
+		Path absolute = destination.toAbsolutePath().normalize();
+		return absolute.resolveSibling(absolute.getFileName() + ".keys.wav");
 	}
 
 	/** The sidecar the click bus writes next to a destination (deleted after the run). */

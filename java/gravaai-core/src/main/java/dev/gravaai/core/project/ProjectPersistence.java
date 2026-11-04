@@ -438,6 +438,7 @@ public final class ProjectPersistence {
 				normalizeKeystrokeOverlaySettings(field(editor, "keystrokeOverlay")),
 				normalizeWebcam(webcamNode, webcamSourcePath, legacyZoomScaleEffect),
 				normalizeClickSoundSettings(field(editor, "clickSound")),
+				normalizeKeySoundSettings(field(editor, "keySound")),
 				AspectRatios.isValidAspectRatio(text(field(editor, "aspectRatio")))
 						? text(field(editor, "aspectRatio")) : "16:9",
 				objectOrEmpty(field(editor, "sourceAudioTrackSettingsByClip")),
@@ -931,6 +932,17 @@ public final class ProjectPersistence {
 				Math.round(clampSetting(field(settings, "fadeMs"), 0, 1000, defaults.fadeMs())),
 				Math.round(clampSetting(field(settings, "groupingMs"), 0, 3000, defaults.groupingMs())),
 				clampSetting(field(settings, "bottomOffset"), 0, 90, defaults.bottomOffset()));
+	}
+
+	/** Normalises the nested key-sound object; missing/invalid fields fall back to defaults. */
+	private static KeySoundSettings normalizeKeySoundSettings(JsonNode rawSettings) {
+		JsonNode settings = rawSettings != null && rawSettings.isObject()
+				? rawSettings : Json.nodeFactory().objectNode();
+		return new KeySoundSettings(
+				booleanOr(field(settings, "enabled"), EditorDefaults.DEFAULT_KEY_SOUND_ENABLED),
+				KeySoundStyle.normalize(text(field(settings, "sound")),
+						EditorDefaults.DEFAULT_KEY_SOUND_STYLE),
+				clampSetting(field(settings, "volume"), 0, 1, EditorDefaults.DEFAULT_KEY_SOUND_VOLUME));
 	}
 
 	/** Normalises the nested click-sound object; missing/invalid fields fall back to defaults. */

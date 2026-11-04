@@ -1,6 +1,7 @@
 package dev.gravaai.media.playback;
 
 import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.core.project.KeySoundStyle;
 import dev.gravaai.media.audio.ClickSounds;
 
 /**
@@ -12,18 +13,28 @@ import dev.gravaai.media.audio.ClickSounds;
  */
 public final class ClickSoundTrack {
 
-	private final ClickSoundStyle sound;
+	private final String soundName;
 	private final double volume;
 	private final long[] timesMs;
 
 	public ClickSoundTrack(ClickSoundStyle sound, double volume, long[] timesMs) {
-		this.sound = sound;
+		this("click-" + sound.wire(), volume, timesMs);
+	}
+
+	private ClickSoundTrack(String soundName, double volume, long[] timesMs) {
+		this.soundName = soundName;
 		this.volume = Double.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
 		this.timesMs = timesMs.clone();
 	}
 
-	public ClickSoundStyle sound() {
-		return sound;
+	/** A track of key-press sounds: same placement and mixing as clicks, different sample. */
+	public static ClickSoundTrack forKeys(KeySoundStyle sound, double volume, long[] timesMs) {
+		return new ClickSoundTrack("key-" + sound.wire(), volume, timesMs);
+	}
+
+	/** Resource base name of the sound this track plays (e.g. {@code click-crisp}). */
+	public String soundName() {
+		return soundName;
 	}
 
 	/** Adds the intersecting click windows to {@code interleaved} (stereo float32 48 kHz). */
@@ -31,7 +42,7 @@ public final class ClickSoundTrack {
 		if (timesMs.length == 0 || frames <= 0) {
 			return;
 		}
-		float @org.jspecify.annotations.Nullable [] pcm = ClickSounds.pcm(sound);
+		float @org.jspecify.annotations.Nullable [] pcm = ClickSounds.pcm(soundName);
 		if (pcm == null || pcm.length == 0) {
 			return;
 		}

@@ -99,6 +99,9 @@ reproduced in
 | `click-crisp.ogg` | Crisp | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`mouseclick1.ogg`) |
 | `click-tick.ogg` | Tick | Kenney | CC0 1.0 | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) (`tick_001.ogg`) |
 | `click-soft.ogg` | Soft | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`click2.ogg`) |
+| `key-clack.ogg` | Clack (key press) | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`click4.ogg`) |
+| `key-tap.ogg` | Tap (key press) | Kenney | CC0 1.0 | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) (`tick_004.ogg`) |
+| `key-soft.ogg` | Soft (key press) | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`click3.ogg`) |
 
 ## Logo
 

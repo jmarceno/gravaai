@@ -40,6 +40,10 @@ public interface PlaybackAudioTrack extends AutoCloseable {
 	default void setClickTrack(@Nullable ClickSoundTrack track) {
 	}
 
+	/** Swaps the key-press sound track in/out at once; {@code null} removes it. */
+	default void setKeyTrack(@Nullable ClickSoundTrack track) {
+	}
+
 	@Override
 	void close();
 }

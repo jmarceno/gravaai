@@ -6,6 +6,7 @@ import java.util.List;
 
 import dev.gravaai.core.project.AutoCaptionSettings;
 import dev.gravaai.core.project.ClickSoundSettings;
+import dev.gravaai.core.project.KeySoundSettings;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
@@ -57,4 +58,5 @@ public record EditorPresetSnapshot(
 		CropRegion cropRegion,
 		AutoCaptionSettings autoCaptionSettings,
 		KeystrokeOverlaySettings keystrokeOverlay,
-		ClickSoundSettings clickSound) {}
+		ClickSoundSettings clickSound,
+		KeySoundSettings keySound) {}

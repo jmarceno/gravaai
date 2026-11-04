@@ -3,6 +3,7 @@ package dev.gravaai.media.audio;
 import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.core.project.ClickSoundStyle;
+import dev.gravaai.core.project.KeySoundStyle;
 
 /**
  * Plays one bundled click through the libpulse sink, so picking a sound in the inspector is
@@ -20,7 +21,15 @@ public final class ClickSoundAudition {
 
 	/** Schedules the sound on a virtual thread; returns as soon as the decode state is known. */
 	public static void play(ClickSoundStyle style, double volume) {
-		float @Nullable [] pcm = ClickSounds.pcm(style);
+		play(ClickSounds.pcm(style), volume);
+	}
+
+	/** Plays one key-press sound (the key-sound picker's audition). */
+	public static void play(KeySoundStyle style, double volume) {
+		play(ClickSounds.pcm(style), volume);
+	}
+
+	private static void play(float @Nullable [] pcm, double volume) {
 		if (pcm == null || pcm.length == 0) {
 			return;
 		}

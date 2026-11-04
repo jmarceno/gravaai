@@ -86,6 +86,18 @@ class BundledAssetsTest {
 	}
 
 	@Test
+	@DisplayName("the three CC0 key sounds are packaged as small OGGs")
+	void keySoundsAreBundled() throws IOException {
+		byte[] oggMagic = "OggS".getBytes(StandardCharsets.US_ASCII);
+		for (String name : new String[] {"key-clack.ogg", "key-tap.ogg", "key-soft.ogg"}) {
+			byte[] ogg = bytes("/dev/gravaai/media/sounds/" + name);
+			assertArrayEquals(oggMagic, java.util.Arrays.copyOf(ogg, 4), name + " is not an OGG");
+			assertTrue(ogg.length > 500, name + " carries a real transient");
+			assertTrue(ogg.length <= 9 * 1024, name + " stays within 9 KB");
+		}
+	}
+
+	@Test
 	@DisplayName("the three CC0 click sounds are packaged as small OGGs with their license")
 	void clickSoundsAreBundled() throws IOException {
 		byte[] oggMagic = "OggS".getBytes(StandardCharsets.US_ASCII);

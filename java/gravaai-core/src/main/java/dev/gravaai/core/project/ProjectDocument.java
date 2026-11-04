@@ -38,7 +38,7 @@ public final class ProjectDocument {
 			"cursorSway", "borderRadius", "padding", "cropRegion", "zoomRegions", "trimRegions",
 			"clipRegions", "autoFullTrackClipId", "autoFullTrackClipEndMs", "speedRegions",
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
-			"keystrokeOverlay", "webcam", "clickSound", "aspectRatio", "sourceAudioTrackSettingsByClip",
+			"keystrokeOverlay", "webcam", "clickSound", "keySound", "aspectRatio", "sourceAudioTrackSettingsByClip",
 			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments");
 
 	private final ObjectNode raw;
@@ -186,6 +186,7 @@ public final class ProjectDocument {
 		editor.set("keystrokeOverlay", writeKeystrokeOverlay(state.keystrokeOverlay()));
 		editor.set("webcam", writeWebcam(state.webcam()));
 		editor.set("clickSound", writeClickSound(state.clickSound()));
+		editor.set("keySound", writeKeySound(state.keySound()));
 		editor.put("aspectRatio", state.aspectRatio());
 		editor.set("sourceAudioTrackSettingsByClip", state.sourceAudioTrackSettingsByClip().deepCopy());
 		editor.set("defaultSourceAudioTrackSettings", state.defaultSourceAudioTrackSettings().deepCopy());
@@ -424,6 +425,15 @@ public final class ProjectDocument {
 		node.put("fadeMs", settings.fadeMs());
 		node.put("groupingMs", settings.groupingMs());
 		node.put("bottomOffset", settings.bottomOffset());
+		return node;
+	}
+
+	/** Serialises the nested key-sound settings. */
+	static ObjectNode writeKeySound(KeySoundSettings settings) {
+		ObjectNode node = Json.nodeFactory().objectNode();
+		node.put("enabled", settings.enabled());
+		node.put("sound", settings.sound().wire());
+		node.put("volume", settings.volume());
 		return node;
 	}
 

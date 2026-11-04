@@ -19,6 +19,7 @@ public final class EditorSidebarRail extends VBox {
 	public enum Section {
 		SCENE("Scene", Icons.FrameCorners),
 		CURSOR("Cursor", Icons.Cursor),
+		KEYSTROKES("Keystrokes", Icons.Keyboard),
 		WEBCAM("Webcam", Icons.Camera),
 		CAPTIONS("Captions", Icons.ClosedCaptioning),
 		TRANSCRIPT("Transcript editing", Icons.TextT),

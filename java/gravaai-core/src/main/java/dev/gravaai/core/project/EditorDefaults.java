@@ -30,6 +30,9 @@ public final class EditorDefaults {
 	public static final boolean DEFAULT_CLICK_SOUND_ENABLED = false;
 	public static final ClickSoundStyle DEFAULT_CLICK_SOUND_STYLE = ClickSoundStyle.CRISP;
 	public static final double DEFAULT_CLICK_SOUND_VOLUME = 0.8;
+	public static final boolean DEFAULT_KEY_SOUND_ENABLED = false;
+	public static final KeySoundStyle DEFAULT_KEY_SOUND_STYLE = KeySoundStyle.CLACK;
+	public static final double DEFAULT_KEY_SOUND_VOLUME = 0.5;
 	public static final ZoomTransitionEasing DEFAULT_ZOOM_IN_EASING = ZoomTransitionEasing.GRAAVAI;
 	public static final ZoomTransitionEasing DEFAULT_ZOOM_OUT_EASING = ZoomTransitionEasing.GRAAVAI;
 	public static final ZoomTransitionEasing DEFAULT_CONNECTED_ZOOM_EASING = ZoomTransitionEasing.GLIDE;

@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.ClickSoundSettings;
+import dev.gravaai.core.project.KeySoundSettings;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.Padding;
@@ -68,6 +69,7 @@ public record EditorPreferences(
 		Padding padding,
 		WebcamOverlaySettings webcam,
 		ClickSoundSettings clickSound,
+		KeySoundSettings keySound,
 		String aspectRatio,
 		ExportPreferences.ExportEncodingMode exportEncodingMode,
 		ExportPreferences.ExportBackendPreference exportBackendPreference,
@@ -112,7 +114,7 @@ public record EditorPreferences(
 				controls.cursorClickEffectOpacity(), controls.cursorClickEffectDurationMs(),
 				controls.cursorClickBounce(), controls.cursorClickBounceDuration(),
 				controls.cursorSway(), controls.borderRadius(), controls.padding(),
-				controls.webcam(), controls.clickSound(), controls.aspectRatio(),
+				controls.webcam(), controls.clickSound(), controls.keySound(), controls.aspectRatio(),
 				export.exportEncodingMode(), export.exportBackendPreference(),
 				export.exportPipelineModel(), export.exportQuality(), export.mp4FrameRate(),
 				export.exportFormat(), export.gifFrameRate(), export.gifLoop(),
@@ -158,7 +160,7 @@ public record EditorPreferences(
 				controls.cursorClickEffectOpacity(), controls.cursorClickEffectDurationMs(),
 				controls.cursorClickBounce(), controls.cursorClickBounceDuration(),
 				controls.cursorSway(), controls.borderRadius(), controls.padding(),
-				controls.webcam(), controls.clickSound(), controls.aspectRatio(),
+				controls.webcam(), controls.clickSound(), controls.keySound(), controls.aspectRatio(),
 				export.exportEncodingMode(), export.exportBackendPreference(),
 				export.exportPipelineModel(), export.exportQuality(), export.mp4FrameRate(),
 				export.exportFormat(), export.gifFrameRate(), export.gifLoop(),
@@ -265,6 +267,7 @@ public record EditorPreferences(
 		node.set("padding", paddingToJson(padding));
 		node.set("webcam", webcamToJson(webcam));
 		node.set("clickSound", clickSoundToJson(clickSound));
+		node.set("keySound", keySoundToJson(keySound));
 		node.put("aspectRatio", aspectRatio);
 		return node;
 	}
@@ -276,6 +279,14 @@ public record EditorPreferences(
 		node.put("left", padding.left());
 		node.put("right", padding.right());
 		node.put("linked", Boolean.TRUE.equals(padding.linked()));
+		return node;
+	}
+
+	private static ObjectNode keySoundToJson(KeySoundSettings keySound) {
+		ObjectNode node = Json.nodeFactory().objectNode();
+		node.put("enabled", keySound.enabled());
+		node.put("sound", keySound.sound().wire());
+		node.put("volume", keySound.volume());
 		return node;
 	}
 
@@ -342,7 +353,7 @@ public record EditorPreferences(
 				state.cursorClickEffectScale(), state.cursorClickEffectOpacity(),
 				state.cursorClickEffectDurationMs(), state.cursorClickBounce(),
 				state.cursorClickBounceDuration(), state.cursorSway(), state.borderRadius(),
-				state.padding(), state.webcam(), state.clickSound(), state.aspectRatio(),
+				state.padding(), state.webcam(), state.clickSound(), state.keySound(), state.aspectRatio(),
 				exportEncodingMode, exportBackendPreference, exportPipelineModel, exportQuality,
 				mp4FrameRate, exportFormat, gifFrameRate, gifLoop, gifSizePreset,
 				publishDestination, includeCaptionSidecar, borderRadiusUnit, customAspectWidth,

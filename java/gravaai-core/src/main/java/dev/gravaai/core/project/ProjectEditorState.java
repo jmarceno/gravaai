@@ -69,6 +69,7 @@ public record ProjectEditorState(
 		KeystrokeOverlaySettings keystrokeOverlay,
 		WebcamOverlaySettings webcam,
 		ClickSoundSettings clickSound,
+		KeySoundSettings keySound,
 		String aspectRatio,
 		ObjectNode sourceAudioTrackSettingsByClip,
 		ObjectNode defaultSourceAudioTrackSettings,
@@ -94,7 +95,7 @@ public record ProjectEditorState(
 				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
-				keystrokeOverlay, webcam, clickSound, aspectRatio, sourceAudioTrackSettingsByClip,
+				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, sourceAudioTrackSettingsByClip,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments);
 	}
 
@@ -119,7 +120,7 @@ public record ProjectEditorState(
 				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
-				keystrokeOverlay, webcam, clickSound, aspectRatio, normalized,
+				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, normalized,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments);
 	}
 
@@ -193,6 +194,7 @@ public record ProjectEditorState(
 		private KeystrokeOverlaySettings keystrokeOverlay;
 		private WebcamOverlaySettings webcam;
 		private ClickSoundSettings clickSound;
+		private KeySoundSettings keySound;
 		private String aspectRatio;
 		private ObjectNode sourceAudioTrackSettingsByClip;
 		private ObjectNode defaultSourceAudioTrackSettings;
@@ -252,6 +254,7 @@ public record ProjectEditorState(
 			keystrokeOverlay = state.keystrokeOverlay;
 			webcam = state.webcam;
 			clickSound = state.clickSound;
+			keySound = state.keySound;
 			aspectRatio = state.aspectRatio;
 			sourceAudioTrackSettingsByClip = state.sourceAudioTrackSettingsByClip;
 			defaultSourceAudioTrackSettings = state.defaultSourceAudioTrackSettings;
@@ -514,6 +517,11 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder keySound(KeySoundSettings value) {
+			keySound = value;
+			return this;
+		}
+
 		public Builder clickSound(ClickSoundSettings value) {
 			clickSound = value;
 			return this;
@@ -602,6 +610,7 @@ public record ProjectEditorState(
 				case "keystrokeOverlay" -> keystrokeOverlay = from.keystrokeOverlay;
 				case "webcam" -> webcam = from.webcam;
 				case "clickSound" -> clickSound = from.clickSound;
+				case "keySound" -> keySound = from.keySound;
 				case "aspectRatio" -> aspectRatio = from.aspectRatio;
 				case "sourceAudioTrackSettingsByClip" -> sourceAudioTrackSettingsByClip = from.sourceAudioTrackSettingsByClip;
 				case "defaultSourceAudioTrackSettings" -> defaultSourceAudioTrackSettings = from.defaultSourceAudioTrackSettings;
@@ -666,6 +675,7 @@ public record ProjectEditorState(
 					keystrokeOverlay,
 					webcam,
 					clickSound,
+					keySound,
 					aspectRatio,
 					sourceAudioTrackSettingsByClip,
 					defaultSourceAudioTrackSettings,

@@ -529,7 +529,7 @@ public final class Canvas2D implements AutoCloseable {
 		if (!finite(x, y, w, h)) {
 			return;
 		}
-		builder().addRect(Rect.makeXYWH((float) x, (float) y, (float) w, (float) h));
+		builder().addRect(normalizedRect(x, y, w, h));
 		lastX = x;
 		lastY = y;
 		subpathStartX = x;
@@ -591,7 +591,7 @@ public final class Canvas2D implements AutoCloseable {
 		}
 		canvas.save();
 		try {
-			canvas.clipRect(Rect.makeXYWH((float) x, (float) y, (float) w, (float) h));
+			canvas.clipRect(normalizedRect(x, y, w, h));
 			canvas.clear(0);
 		} finally {
 			canvas.restore();
@@ -902,7 +902,7 @@ public final class Canvas2D implements AutoCloseable {
 			return;
 		}
 		try (PaintResources resources = paint(style, stroke)) {
-			canvas.drawRect(Rect.makeXYWH((float) x, (float) y, (float) w, (float) h), resources.paint());
+			canvas.drawRect(normalizedRect(x, y, w, h), resources.paint());
 		}
 	}
 
@@ -1229,5 +1229,11 @@ public final class Canvas2D implements AutoCloseable {
 			}
 			return first.isEmpty() ? "sans-serif" : first;
 		}
+	}
+
+	/** A rectangle like the HTML canvas takes it: a negative width or height extends left or up. */
+	private static Rect normalizedRect(double x, double y, double w, double h) {
+		return Rect.makeLTRB((float) Math.min(x, x + w), (float) Math.min(y, y + h),
+				(float) Math.max(x, x + w), (float) Math.max(y, y + h));
 	}
 }

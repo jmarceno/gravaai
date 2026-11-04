@@ -127,6 +127,19 @@ class ElementPhase2Test {
 	}
 
 	@Test
+	void negativeRectSizesExtendLeftAndUpLikeHtmlCanvas() {
+		String source = """
+				export function render(ctx, { width, height }) {
+				  ctx.fillStyle = '#fff';
+				  ctx.fillRect(width / 2, height / 2, -200, -200);
+				}
+				""";
+		byte[] pixels = render(element("neg"), List.of(new ElementComponent("neg", source, "")), List.of(),
+				500, Optional.empty());
+		assertTrue(opaque(pixels) > 300, "the square is drawn up and to the left");
+	}
+
+	@Test
 	void setTransformIsRelativeToTheElementBox() {
 		String source = """
 				export function render(ctx) {

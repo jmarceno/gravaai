@@ -77,10 +77,12 @@ public final class EditorInspectorPanel extends VBox {
 		CAPTION,
 		KEYSTROKE,
 		CAMERA_LAYOUT,
+		ELEMENT,
 		MULTI
 	}
 
 	private final EditorStore store;
+	private @Nullable ElementSettingsPanel elementPanel;
 	private final EditorViewActions actions;
 	private final EditorPlaybackPort playback;
 	private final Label title = new Label("Scene");
@@ -208,6 +210,13 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	/** Shows the editor for the selected animated element. */
+	public void showElementSettings() {
+		this.annotationMode = false;
+		this.selectionEditor = SelectionEditor.ELEMENT;
+		rebuild();
+	}
+
 	/** Shows the editor for a mixed multi-selection (count + batched delete). */
 	public void showMultiSelection() {
 		this.annotationMode = false;
@@ -253,6 +262,8 @@ public final class EditorInspectorPanel extends VBox {
 			showKeystrokeSettings();
 		} else if (store.selectedCameraLayoutId() != null) {
 			showCameraLayoutSettings();
+		} else if (store.selectedElementId().isPresent()) {
+			showElementSettings();
 		} else if (isSelectionMode()) {
 			show(section);
 		}
@@ -356,6 +367,7 @@ public final class EditorInspectorPanel extends VBox {
 			case CAPTION -> "Caption";
 			case KEYSTROKE -> "Keystroke";
 			case CAMERA_LAYOUT -> "Camera layout";
+			case ELEMENT -> "Element";
 			case MULTI -> "Multiple";
 			case NONE -> section.label();
 		};
@@ -387,6 +399,14 @@ public final class EditorInspectorPanel extends VBox {
 	}
 	if (selectionEditor == SelectionEditor.CAMERA_LAYOUT) {
 		return cameraLayoutSelectionSection();
+	}
+	if (selectionEditor == SelectionEditor.ELEMENT) {
+		if (elementPanel == null) {
+			elementPanel = new ElementSettingsPanel(store);
+		} else {
+			elementPanel.refresh();
+		}
+		return elementPanel;
 	}
 	if (selectionEditor == SelectionEditor.MULTI) {
 		return multiSelectionSection();

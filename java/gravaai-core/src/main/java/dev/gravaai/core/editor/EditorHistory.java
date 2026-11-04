@@ -45,6 +45,7 @@ public final class EditorHistory {
 			@Nullable String selectedCameraLayoutId,
 			List<dev.gravaai.core.project.ElementComponent> elementComponents,
 			List<dev.gravaai.core.project.SceneElement> elements,
+			List<dev.gravaai.core.project.ElementAsset> elementAssets,
 			java.util.Optional<String> selectedElementId) {
 
 		/** The snapshot shape before the element layer: no components, elements or selection. */
@@ -63,7 +64,7 @@ public final class EditorHistory {
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
 				sourceAudioTrackSettingsByClip, multiSelectedIds, keystrokeElements,
 				selectedKeystrokeId, cameraLayoutSegments, selectedCameraLayoutId, List.of(),
-				List.of(), java.util.Optional.empty());
+				List.of(), List.of(), java.util.Optional.empty());
 		}
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
@@ -176,6 +177,7 @@ public final class EditorHistory {
 				snapshot.selectedCameraLayoutId(),
 				List.copyOf(snapshot.elementComponents()),
 				List.copyOf(snapshot.elements()),
+				List.copyOf(snapshot.elementAssets()),
 				snapshot.selectedElementId());
 	}
 

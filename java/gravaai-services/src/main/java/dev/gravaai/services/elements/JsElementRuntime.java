@@ -18,8 +18,12 @@ import io.github.humbleui.skija.PaintMode;
 import io.github.humbleui.skija.Typeface;
 import io.github.humbleui.types.Rect;
 
+import dev.gravaai.core.project.ElementAsset;
 import dev.gravaai.core.project.ElementComponent;
+import dev.gravaai.core.project.ElementMotion;
 import dev.gravaai.core.project.SceneElement;
+import dev.gravaai.media.compose.anim.MotionEvaluator;
+import dev.gravaai.media.gl.SkiaGlSurface;
 import dev.gravaai.services.extensions.canvas.Canvas2D;
 
 /**
@@ -44,6 +48,7 @@ public final class JsElementRuntime implements AutoCloseable {
 	private static final System.Logger LOG = System.getLogger(JsElementRuntime.class.getName());
 
 	private final Engine engine = CompiledComponent.newEngine();
+	private final ElementHost host = new ElementHost();
 	private final ElementDiagnostics diagnostics;
 	private final ThreadLocal<Map<String, Slot>> slots = ThreadLocal.withInitial(HashMap::new);
 	private final List<CompiledComponent> all = new CopyOnWriteArrayList<>();
@@ -58,6 +63,21 @@ public final class JsElementRuntime implements AutoCloseable {
 		this.diagnostics = diagnostics;
 	}
 
+	/** What one render call draws. {@code space} empty draws both spaces (raster probes). */
+	public record Request(List<SceneElement> elements, List<ElementComponent> components,
+			List<ElementAsset> assets, Optional<SkiaGlSurface> gpu, Optional<SceneElement.Space> space) {
+
+		public Request {
+			elements = List.copyOf(elements);
+			components = List.copyOf(components);
+			assets = List.copyOf(assets);
+		}
+
+		public static Request of(List<SceneElement> elements, List<ElementComponent> components) {
+			return new Request(elements, components, List.of(), Optional.empty(), Optional.empty());
+		}
+	}
+
 	/**
 	 * Draws every element active at {@code timeMs} in draw order.
 	 *
@@ -70,18 +90,35 @@ public final class JsElementRuntime implements AutoCloseable {
 	 */
 	public void render(Canvas canvas, int outputWidth, int outputHeight, double timeMs,
 			List<SceneElement> elements, List<ElementComponent> components) {
-		if (closed || elements.isEmpty()) {
+		render(canvas, outputWidth, outputHeight, timeMs, Request.of(elements, components));
+	}
+
+	/** Draws the active elements of {@code request} (filtered by its space when set). */
+	public void render(Canvas canvas, int outputWidth, int outputHeight, double timeMs,
+			Request request) {
+		if (closed || request.elements().isEmpty()) {
 			return;
 		}
 		List<SceneElement> active = new ArrayList<>();
-		for (SceneElement element : elements) {
-			if (element.isActiveAt(timeMs)) {
+		for (SceneElement element : request.elements()) {
+			if (element.isActiveAt(timeMs)
+					&& request.space().map(space -> space == element.space()).orElse(true)) {
 				active.add(element);
 			}
 		}
+		if (active.isEmpty()) {
+			return;
+		}
 		active.sort(SceneElement.DRAW_ORDER);
-		for (SceneElement element : active) {
-			renderElement(canvas, outputWidth, outputHeight, timeMs, element, components);
+		host.enter(new ElementHost.Scope(request.assets(), request.gpu()));
+		try {
+			for (SceneElement element : active) {
+				long started = System.nanoTime();
+				renderElement(canvas, outputWidth, outputHeight, timeMs, element, request.components());
+				diagnostics.recordTiming(element.id(), System.nanoTime() - started);
+			}
+		} finally {
+			host.exit();
 		}
 	}
 
@@ -110,8 +147,6 @@ public final class JsElementRuntime implements AutoCloseable {
 				components);
 		int saveCount = canvas.save();
 		try {
-			canvas.translate(left, top);
-			canvas.clipRect(Rect.makeWH(boxWidth, boxHeight));
 			if (component.isEmpty()) {
 				throw new ComponentException("unknown component \"" + element.component() + "\"");
 			}
@@ -121,13 +156,18 @@ public final class JsElementRuntime implements AutoCloseable {
 			}
 			CompiledComponent compiled = slot.compiled().orElseThrow();
 			double fps = compiled.info().fps();
-			double localMs = timeMs - element.startMs();
-			double frame = localMs * fps / 1000.0;
-			double durationInFrames = element.durationMs() * fps / 1000.0;
-			canvas.scale((float) scale, (float) scale);
-			try (Canvas2D ctx = new Canvas2D(canvas, boxWidth / scale, boxHeight / scale)) {
-				compiled.render(ctx, frame, durationInFrames, timeMs, boxWidth / scale,
-						boxHeight / scale, element.props(), element.id());
+			ElementMotion.Blur blur = element.blur();
+			double frameMs = 1000.0 / fps;
+			int samples = blur.enabled() && moving(element, timeMs, blur.shutter() * frameMs)
+					? blur.samples() : 1;
+			for (int sample = 0; sample < samples; sample++) {
+				// Oldest sample first; the newest (the real frame) draws last at full strength.
+				double behind = samples == 1 ? 0
+						: blur.shutter() * frameMs * (samples - 1 - sample) / (samples - 1);
+				double sampleMs = Math.max(element.startMs(), timeMs - behind);
+				double strength = sample == samples - 1 ? 1 : 0.55 * (sample + 1) / samples;
+				drawSample(canvas, outputWidth, outputHeight, sampleMs, element, compiled, scale,
+						left, top, boxWidth, boxHeight, strength);
 			}
 		} catch (ComponentException error) {
 			canvas.restoreToCount(saveCount);
@@ -156,6 +196,61 @@ public final class JsElementRuntime implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Whether the trail is worth drawing: an element with host motion only blurs while that motion
+	 * changes its pose within the shutter window, so a resting element costs one draw, not
+	 * {@code samples}. Without host motion the component's own animation is what blurs.
+	 */
+	private static boolean moving(SceneElement element, double timeMs, double shutterMs) {
+		if (element.motion().isEmpty()) {
+			return true;
+		}
+		double now = timeMs - element.startMs();
+		double before = Math.max(0, now - shutterMs);
+		return !MotionEvaluator.evaluate(element.motion(), now, element.durationMs())
+				.equals(MotionEvaluator.evaluate(element.motion(), before, element.durationMs()));
+	}
+
+	/** One draw of the element at {@code sampleMs}: host motion around the box, then the component. */
+	private void drawSample(Canvas canvas, int outputWidth, int outputHeight, double sampleMs,
+			SceneElement element, CompiledComponent compiled, double scale, float left, float top,
+			float boxWidth, float boxHeight, double strength) {
+		double localMs = sampleMs - element.startMs();
+		MotionEvaluator.Pose pose = MotionEvaluator.evaluate(element.motion(), localMs,
+				element.durationMs());
+		double opacity = pose.opacity() * strength;
+		if (opacity <= 0.001) {
+			return;
+		}
+		int saved = opacity < 0.999
+				? canvas.saveLayerAlpha(null, (int) Math.round(opacity * 255))
+				: canvas.save();
+		try {
+			if (!pose.isRest()) {
+				float centerX = left + boxWidth / 2 + (float) (pose.translateX() / 100.0 * outputWidth);
+				float centerY = top + boxHeight / 2 + (float) (pose.translateY() / 100.0 * outputHeight);
+				canvas.translate(centerX, centerY);
+				canvas.rotate((float) pose.rotate());
+				canvas.scale((float) pose.scale(), (float) pose.scale());
+				canvas.translate(-boxWidth / 2, -boxHeight / 2);
+			} else {
+				canvas.translate(left, top);
+			}
+			canvas.clipRect(Rect.makeWH(boxWidth, boxHeight));
+			double fps = compiled.info().fps();
+			double frame = localMs * fps / 1000.0;
+			double durationInFrames = element.durationMs() * fps / 1000.0;
+			canvas.scale((float) scale, (float) scale);
+			try (Canvas2D ctx = new Canvas2D(canvas, boxWidth / scale, boxHeight / scale)) {
+				ctx.setFontResolver(host.fonts());
+				compiled.render(ctx, frame, durationInFrames, sampleMs, boxWidth / scale,
+						boxHeight / scale, element.props(), element.id());
+			}
+		} finally {
+			canvas.restoreToCount(saved);
+		}
+	}
+
 	private Slot slot(ElementComponent component) {
 		Map<String, Slot> threadSlots = slots.get();
 		Slot slot = threadSlots.get(component.name());
@@ -172,7 +267,7 @@ public final class JsElementRuntime implements AutoCloseable {
 		Slot next;
 		try {
 			CompiledComponent compiled = CompiledComponent.compile(engine, component.name(),
-					component.source());
+					component.source(), host);
 			all.add(compiled);
 			next = new Slot(component.source(), Optional.of(compiled), Optional.empty());
 		} catch (ComponentException error) {

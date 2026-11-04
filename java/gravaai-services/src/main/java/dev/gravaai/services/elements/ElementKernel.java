@@ -21,6 +21,27 @@ public final class ElementKernel {
 
 	static final ElementKernel INSTANCE = new ElementKernel();
 
+	private static final String[] CANVAS_MEMBERS = exported(
+			dev.gravaai.services.extensions.canvas.Canvas2D.class);
+	private static final String[] METRICS_MEMBERS = exported(
+			dev.gravaai.services.extensions.canvas.TextMetrics.class);
+
+	private static String[] exported(Class<?> type) {
+		return java.util.Arrays.stream(type.getMethods())
+				.filter(method -> method.isAnnotationPresent(HostAccess.Export.class))
+				.map(java.lang.reflect.Method::getName).distinct().sorted().toArray(String[]::new);
+	}
+
+	/** Exported member names of a host type, for the prelude's facades ("canvas", "metrics"). */
+	@HostAccess.Export
+	public String[] memberNames(String kind) {
+		return switch (kind) {
+			case "canvas" -> CANVAS_MEMBERS.clone();
+			case "metrics" -> METRICS_MEMBERS.clone();
+			default -> throw new IllegalArgumentException("unknown host type " + kind);
+		};
+	}
+
 	private ElementKernel() {}
 
 	@HostAccess.Export

@@ -45,6 +45,23 @@ public final class ElementCommands {
 		}
 	}
 
+	/**
+	 * Replaces one element with an edited copy (inspector edits: props, motion, space, blur). The
+	 * id is kept; a copy equal to the current element is a no-op, so no empty undo step is made.
+	 */
+	public record Replace(SceneElement next) implements EditorCommand {
+		@Override
+		public boolean apply(EditorStore store) {
+			Optional<SceneElement> current = find(store, next.id());
+			if (current.isEmpty() || current.get().equals(next)) {
+				return false;
+			}
+			store.setElements(store.state().elements().stream()
+					.map(element -> element.id().equals(next.id()) ? next : element).toList());
+			return true;
+		}
+	}
+
 	/** Removes an element. */
 	public record Delete(String id) implements EditorCommand {
 		@Override

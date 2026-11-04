@@ -71,7 +71,15 @@ final class AgentEditorViews {
 	/** Formatting inputs the editor session provides (kept explicit so the views stay testable). */
 	record Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
 			boolean dirty, long rev,
-			List<dev.gravaai.services.elements.ElementDiagnostics.ElementError> elementErrors) {
+			List<dev.gravaai.services.elements.ElementDiagnostics.ElementError> elementErrors,
+			java.util.Map<String, dev.gravaai.services.elements.ElementDiagnostics.Timing> elementTimings) {
+
+		Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
+				boolean dirty, long rev,
+				List<dev.gravaai.services.elements.ElementDiagnostics.ElementError> elementErrors) {
+			this(projectName, projectPath, sourcePath, sourceDurationMs, dirty, rev, elementErrors,
+					java.util.Map.of());
+		}
 
 		Meta(String projectName, @Nullable String projectPath, String sourcePath, long sourceDurationMs,
 				boolean dirty, long rev) {
@@ -106,6 +114,24 @@ final class AgentEditorViews {
 		if (!state.elements().isEmpty() || !state.elementComponents().isEmpty()) {
 			lines.add("elements " + count(state.elements()) + " • project components "
 					+ count(state.elementComponents()));
+		}
+		if (!state.elementAssets().isEmpty()) {
+			lines.add("assets " + state.elementAssets().stream().map(asset -> asset.name() + " ("
+					+ asset.kind().wire() + ")").collect(java.util.stream.Collectors.joining(", ")));
+		}
+		if (!meta.elementTimings().isEmpty()) {
+			java.util.Map<String, String> shorts = AgentIds.elementShortById(state);
+			List<java.util.Map.Entry<String, dev.gravaai.services.elements.ElementDiagnostics.Timing>> slowest =
+					new ArrayList<>(meta.elementTimings().entrySet());
+			slowest.sort((a, b) -> Double.compare(b.getValue().averageMs(), a.getValue().averageMs()));
+			StringBuilder timing = new StringBuilder("element render time (avg/max ms per frame, budget 4):");
+			for (var entry : slowest.subList(0, Math.min(5, slowest.size()))) {
+				timing.append(' ').append(shorts.getOrDefault(entry.getKey(), "?")).append(' ')
+						.append(String.format(Locale.ROOT, "%.1f/%.1f", entry.getValue().averageMs(),
+								entry.getValue().maxMs()))
+						.append(entry.getValue().averageMs() > 4 ? " SLOW" : "");
+			}
+			lines.add(timing.toString());
 		}
 		if (!meta.elementErrors().isEmpty()) {
 			java.util.Map<String, String> shorts = AgentIds.elementShortById(state);
@@ -154,6 +180,14 @@ final class AgentEditorViews {
 					+ " — " + (component.description().isEmpty() ? "(no description)"
 							: component.description()) + "; " + details);
 		}
+		if (!state.elementAssets().isEmpty()) {
+			lines.add("assets (image(name), lottie(name), scene3d({model}), ctx.font = \"… <font asset>\"):");
+			for (var asset : state.elementAssets()) {
+				lines.add("  " + asset.name() + " " + asset.kind().wire() + " " + Math.max(1, asset.size() / 1024)
+						+ " KB");
+			}
+		}
+		lines.add("built-in 3D models: gravaai:cube, gravaai:sphere, gravaai:torus, gravaai:torus-knot");
 		lines.add("rev " + rev);
 		return String.join("\n", lines);
 	}
@@ -307,7 +341,12 @@ final class AgentEditorViews {
 						+ " y " + frac((element.box().y() + element.box().height() / 2) / 100)
 						+ " w " + frac(element.box().width() / 100)
 						+ " h " + frac(element.box().height() / 100)
-						+ " layer " + element.zIndex());
+						+ " layer " + element.zIndex()
+						+ (element.space() == dev.gravaai.core.project.SceneElement.Space.SCENE ? " space scene" : "")
+						+ (element.motion().isEmpty() ? "" : " motion " + dev.gravaai.core.project.ProjectDocument
+								.writeMotion(element.motion()).toString())
+						+ (element.blur().enabled() ? " motionBlur " + element.blur().samples() + "x"
+								+ trim(element.blur().shutter()) : ""));
 			}
 			if (visibleElements.isEmpty()) {
 				lines.add("  (none in window)");

@@ -94,6 +94,12 @@ public interface Easing {
 			case "bounce" -> {
 				return Optional.of(BOUNCE);
 			}
+			case "spring" -> {
+				// The default spring (mass 1, damping 10, stiffness 100) stretched over the segment:
+				// overshoots and settles at 1 exactly when the segment ends.
+				return Optional.of(t -> t <= 0 ? 0 : t >= 1 ? 1
+						: Spring.value(t * 30, 30, new Spring.Params(1, 10, 100, false, 0, 1, 0, 30, false)));
+			}
 			default -> {
 			}
 		}
@@ -138,7 +144,7 @@ public interface Easing {
 
 	/** Names {@link #parse} accepts, for help text and errors. */
 	static String names() {
-		return "linear, ease, ease-in, ease-out, ease-in-out, ease-{in|out|in-out}-{quad|cubic|quart|quint|sine|circ|expo|back|elastic|bounce}, bounce, cubic-bezier(x1,y1,x2,y2)";
+		return "linear, ease, ease-in, ease-out, ease-in-out, ease-{in|out|in-out}-{quad|cubic|quart|quint|sine|circ|expo|back|elastic|bounce}, bounce, spring, cubic-bezier(x1,y1,x2,y2)";
 	}
 
 	private static double bounceOut(double t) {

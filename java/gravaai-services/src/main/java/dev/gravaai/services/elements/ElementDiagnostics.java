@@ -27,6 +27,61 @@ public final class ElementDiagnostics {
 
 	private final Map<String, ElementError> errors = new ConcurrentHashMap<>();
 	private final List<Consumer<ElementDiagnostics>> listeners = new CopyOnWriteArrayList<>();
+	private final Map<String, Timing> timings = new ConcurrentHashMap<>();
+
+	/**
+	 * Render cost of one element over its last {@value Timing#WINDOW} frames (plan risk R1:
+	 * the budget is 4 ms per element-frame). {@code samples} counts frames in the window.
+	 */
+	public static final class Timing {
+		static final int WINDOW = 240;
+		private final long[] nanos = new long[WINDOW];
+		private int next;
+		private int samples;
+
+		synchronized void add(long value) {
+			nanos[next] = value;
+			next = (next + 1) % WINDOW;
+			samples = Math.min(WINDOW, samples + 1);
+		}
+
+		public synchronized int samples() {
+			return samples;
+		}
+
+		public synchronized double averageMs() {
+			long total = 0;
+			for (int index = 0; index < samples; index++) {
+				total += nanos[index];
+			}
+			return samples == 0 ? 0 : total / 1e6 / samples;
+		}
+
+		public synchronized double maxMs() {
+			long max = 0;
+			for (int index = 0; index < samples; index++) {
+				max = Math.max(max, nanos[index]);
+			}
+			return max / 1e6;
+		}
+	}
+
+	/** Records how long one frame of {@code elementId} took to render (all threads). */
+	public void recordTiming(String elementId, long nanos) {
+		timings.computeIfAbsent(elementId, ignored -> new Timing()).add(nanos);
+	}
+
+	/** Render timing per element id, for the elements still in {@code state}. */
+	public Map<String, Timing> timings(ProjectEditorState state) {
+		Map<String, Timing> result = new java.util.LinkedHashMap<>();
+		for (SceneElement element : state.elements()) {
+			Timing timing = timings.get(element.id());
+			if (timing != null && timing.samples() > 0) {
+				result.put(element.id(), timing);
+			}
+		}
+		return result;
+	}
 
 	/** Records a failure; listeners hear about new or changed errors. */
 	public void report(ElementError error) {

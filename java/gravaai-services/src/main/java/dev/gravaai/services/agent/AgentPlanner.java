@@ -895,6 +895,8 @@ public final class AgentPlanner {
 			case "delete_camera_layout" -> deleteCameraLayout(draft, raw);
 			case "component" -> AgentElementOps.component(draft.elements(), raw);
 			case "delete_component" -> AgentElementOps.deleteComponent(draft.elements(), raw);
+			case "asset" -> AgentElementOps.asset(draft.elements(), raw);
+			case "delete_asset" -> AgentElementOps.deleteAsset(draft.elements(), raw);
 			case "element" -> AgentElementOps.addElement(draft.elements(), raw);
 			case "update_element" -> AgentElementOps.updateElement(draft.elements(), raw);
 			case "delete_element" -> AgentElementOps.deleteElement(draft.elements(), raw);

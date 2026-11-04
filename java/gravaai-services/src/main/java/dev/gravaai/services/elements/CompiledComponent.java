@@ -37,6 +37,7 @@ final class CompiledComponent implements AutoCloseable {
 
 	private static final HostAccess HOST_ACCESS = HostAccess.newBuilder(HostAccess.EXPLICIT)
 			.allowArrayAccess(true)
+			.allowBufferAccess(true)
 			.build();
 
 	private final Context context;
@@ -65,7 +66,7 @@ final class CompiledComponent implements AutoCloseable {
 	 * the JavaScript message and line when the module does not compile, has no {@code render}
 	 * function or declares invalid metadata.
 	 */
-	static CompiledComponent compile(Engine engine, String name, String source) {
+	static CompiledComponent compile(Engine engine, String name, String source, ElementHost host) {
 		String sourceName = sourceName(name);
 		Context context = Context.newBuilder("js")
 				.engine(engine)
@@ -82,7 +83,8 @@ final class CompiledComponent implements AutoCloseable {
 				.build();
 		try {
 			Value entry = context.eval(Source.newBuilder("js", PRELUDE, "gravaai-prelude.js")
-					.buildLiteral()).execute(ElementKernel.INSTANCE);
+					.buildLiteral()).execute(ElementKernel.INSTANCE,
+					new dev.gravaai.services.extensions.canvas.CanvasCommands(), host);
 			context.resetLimits();
 			Value module = context.eval(Source.newBuilder("js", source, sourceName)
 					.mimeType("application/javascript+module").buildLiteral());

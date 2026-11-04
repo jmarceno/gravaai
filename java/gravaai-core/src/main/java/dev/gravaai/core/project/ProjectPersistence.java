@@ -453,7 +453,8 @@ public final class ProjectPersistence {
 				sequenceChanged
 						? ClipSequence.rippleRegions(normalizeElements(field(editor, "elements")),
 								normalizedClipRegions, sequenceClips, ClipSequence.ELEMENT_SPAN)
-						: normalizeElements(field(editor, "elements"))));
+						: normalizeElements(field(editor, "elements")),
+				normalizeElementAssets(field(editor, "elementAssets"))));
 	}
 
 	/**
@@ -995,6 +996,72 @@ public final class ProjectPersistence {
 		return List.copyOf(components);
 	}
 
+	/** Motion tracks as written by {@code ProjectDocument.writeMotion}; invalid entries dropped. */
+	public static List<ElementMotion.Track> parseMotion(@Nullable JsonNode raw) {
+		if (raw == null || !raw.isArray()) {
+			return List.of();
+		}
+		List<ElementMotion.Track> tracks = new ArrayList<>();
+		for (JsonNode node : raw) {
+			String property = text(field(node, "property"));
+			JsonNode keys = field(node, "keyframes");
+			if (property == null || keys == null || !keys.isArray()) {
+				continue;
+			}
+			List<ElementMotion.Keyframe> keyframes = new ArrayList<>();
+			for (JsonNode key : keys) {
+				if (!isFiniteNumber(field(key, "value"))) {
+					continue;
+				}
+				String easing = text(field(key, "easing"));
+				JsonNode fromEnd = field(key, "fromEnd");
+				keyframes.add(new ElementMotion.Keyframe((long) numberOr(field(key, "atMs"), 0),
+						fromEnd != null && fromEnd.asBoolean(), field(key, "value").doubleValue(),
+						easing == null ? "linear" : easing));
+			}
+			if (!keyframes.isEmpty()) {
+				ElementMotion.Property.fromWire(property).ifPresent(
+						resolved -> tracks.add(new ElementMotion.Track(resolved, keyframes)));
+			}
+		}
+		return ElementMotion.combine(tracks);
+	}
+
+	/** Embedded assets: valid name, known kind, decodable base64 within the size limit. */
+	private static List<ElementAsset> normalizeElementAssets(@Nullable JsonNode raw) {
+		if (raw == null || !raw.isArray()) {
+			return List.of();
+		}
+		List<ElementAsset> assets = new ArrayList<>();
+		java.util.Set<String> names = new java.util.HashSet<>();
+		for (JsonNode node : raw) {
+			String name = text(field(node, "name"));
+			String kind = text(field(node, "kind"));
+			String data = text(field(node, "data"));
+			if (name == null || kind == null || data == null || !ElementAsset.isValidName(name)
+					|| !names.add(name)) {
+				continue;
+			}
+			String hash = text(field(node, "hash"));
+			if (hash != null && hash.matches("[0-9a-f]{64}")
+					&& (long) data.length() * 3 / 4 <= ElementAsset.MAX_BYTES + 3) {
+				// Written by us: keep the bytes as-is (every edit re-normalises the editor JSON,
+				// so decoding and re-hashing megabytes here would make editing slow).
+				ElementAsset.Kind.fromWire(kind).ifPresent(
+						resolved -> assets.add(new ElementAsset(name, resolved, data, hash)));
+				continue;
+			}
+			try {
+				byte[] bytes = java.util.Base64.getDecoder().decode(data);
+				ElementAsset.Kind.fromWire(kind).ifPresent(
+						resolved -> assets.add(ElementAsset.of(name, resolved, bytes)));
+			} catch (IllegalArgumentException invalid) {
+				// Not base64 or over the size limit: drop the asset, keep the project.
+			}
+		}
+		return List.copyOf(assets);
+	}
+
 	/** Elements: id + component required, span normalised, box clamped, props an object. */
 	private static List<SceneElement> normalizeElements(@Nullable JsonNode raw) {
 		if (raw == null || !raw.isArray()) {
@@ -1018,7 +1085,13 @@ public final class ProjectPersistence {
 			elements.add(new SceneElement(id, component.trim(), span.startMs(),
 					Math.max(span.endMs(), span.startMs() + 1), normalizedBox,
 					objectOrEmpty(field(node, "props")),
-					isFiniteNumber(zIndex) ? (int) clamp(zIndex.doubleValue(), -1000, 1000) : 0));
+					isFiniteNumber(zIndex) ? (int) clamp(zIndex.doubleValue(), -1000, 1000) : 0,
+					SceneElement.Space.fromWire(String.valueOf(text(field(node, "space"))))
+							.orElse(SceneElement.Space.SCREEN),
+					parseMotion(field(node, "motion")),
+					new ElementMotion.Blur(
+							(int) numberOr(field(field(node, "motionBlur"), "samples"), 1),
+							numberOr(field(field(node, "motionBlur"), "shutter"), 0))));
 			if (elements.size() >= MAX_ELEMENTS) {
 				break;
 			}

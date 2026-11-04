@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import dev.gravaai.core.project.ElementAsset;
 import dev.gravaai.core.project.ElementComponent;
+import dev.gravaai.core.project.ElementMotion;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.SceneElement;
@@ -67,7 +69,7 @@ final class AgentElementOps {
 		ElementComponent component = new ElementComponent(name, source, description);
 		ComponentInfo info;
 		try {
-			info = ComponentValidator.validate(component);
+			info = ComponentValidator.validate(component, session.state().elementAssets());
 		} catch (ComponentException error) {
 			throw new OpError("component \"" + name + "\" failed validation: " + error.describe());
 		}
@@ -139,8 +141,11 @@ final class AgentElementOps {
 		int zIndex = layer.isPresent() ? layer.get() : session.state().elements().stream()
 				.mapToInt(SceneElement::zIndex).max().orElse(0) + 1;
 		String id = session.newElementId();
+		long duration = span[1] - span[0];
 		SceneElement element = new SceneElement(id, name, span[0], span[1],
-				box(raw, SceneElement.Box.FULL), props, zIndex);
+				box(raw, SceneElement.Box.FULL), props, zIndex,
+				space(raw).orElse(defaultSpace(name)), motion(raw, duration).orElse(List.of()),
+				blur(raw).orElse(ElementMotion.Blur.NONE));
 		List<SceneElement> elements = new ArrayList<>(session.state().elements());
 		elements.add(element);
 		session.state(session.state().toBuilder().elements(elements).build());
@@ -176,7 +181,10 @@ final class AgentElementOps {
 		requireValidProps(info, props);
 		Optional<Integer> layer = layer(raw);
 		SceneElement updated = new SceneElement(element.id(), componentName, span[0], span[1],
-				box(raw, element.box()), props, layer.orElse(element.zIndex()));
+				box(raw, element.box()), props, layer.orElse(element.zIndex()),
+				space(raw).orElse(element.space()),
+				motion(raw, span[1] - span[0]).orElse(element.motion()),
+				blur(raw).orElse(element.blur()));
 		session.state(session.state().toBuilder().elements(session.state().elements().stream()
 				.map(candidate -> candidate.id().equals(element.id()) ? updated : candidate)
 				.toList()).build());
@@ -316,5 +324,172 @@ final class AgentElementOps {
 	private static String fmt(double value) {
 		return value == Math.rint(value) ? Long.toString((long) value)
 				: String.format(java.util.Locale.ROOT, "%.2f", value);
+	}
+	/** {@code space: "screen" | "scene"}. */
+	private static Optional<SceneElement.Space> space(JsonNode raw) {
+		String value = AgentOpReader.optionalString(raw, "space");
+		if (value == null) {
+			return Optional.empty();
+		}
+		return Optional.of(SceneElement.Space.fromWire(value.trim()).orElseThrow(() ->
+				new OpError("\"space\" is \"screen\" (fixed overlay) or \"scene\" (follows zoom/pan)")));
+	}
+
+	/** Callouts point at screen content, so they follow the camera by default. */
+	private static SceneElement.Space defaultSpace(String component) {
+		return component.equals("gravaai/callout") ? SceneElement.Space.SCENE : SceneElement.Space.SCREEN;
+	}
+
+	/**
+	 * {@code motion: [preset | {preset, in?, out?, duration?} | {property, keyframes: [{at, value,
+	 * easing?}]}]}; {@code []} clears. A negative {@code at} counts back from the element end.
+	 */
+	static Optional<List<ElementMotion.Track>> motion(JsonNode raw, long durationMs) {
+		JsonNode value = raw.get("motion");
+		if (value == null || value.isNull()) {
+			return Optional.empty();
+		}
+		if (value.isString() || value.isObject()) {
+			value = dev.gravaai.core.json.Json.nodeFactory().arrayNode().add(value);
+		}
+		if (!value.isArray()) {
+			throw new OpError("\"motion\" is a list of presets or tracks");
+		}
+		List<ElementMotion.Track> tracks = new ArrayList<>();
+		for (JsonNode item : value) {
+			if (item.isString()) {
+				tracks.addAll(preset(item.asString(), true, true, 400));
+				continue;
+			}
+			if (!item.isObject()) {
+				throw new OpError("motion item must be a preset name or an object");
+			}
+			if (item.has("preset")) {
+				boolean in = !item.has("in") || item.get("in").asBoolean(true);
+				boolean out = !item.has("out") || item.get("out").asBoolean(true);
+				double seconds = item.has("duration") ? item.get("duration").asDouble(0.4) : 0.4;
+				if (!(seconds > 0) || seconds > 30) {
+					throw new OpError("motion preset \"duration\" is in seconds (0–30]");
+				}
+				long d = Math.round(seconds * 1000);
+				if ((in && out ? 2 * d : d) > durationMs) {
+					d = Math.max(50, in && out ? durationMs / 2 : durationMs);
+				}
+				tracks.addAll(preset(item.get("preset").asString(""), in, out, d));
+				continue;
+			}
+			String property = item.path("property").asString("");
+			ElementMotion.Property resolved = ElementMotion.Property.fromWire(property).orElseThrow(() ->
+					new OpError("motion property \"" + property + "\" is not one of opacity, translateX, "
+							+ "translateY, scale, rotate"));
+			JsonNode keys = item.get("keyframes");
+			if (keys == null || !keys.isArray() || keys.isEmpty()) {
+				throw new OpError("motion track " + property + " needs keyframes: [{at, value, easing?}]");
+			}
+			List<ElementMotion.Keyframe> keyframes = new ArrayList<>();
+			for (JsonNode key : keys) {
+				if (!key.has("at") || !key.get("at").isNumber() || !key.has("value")
+						|| !key.get("value").isNumber()) {
+					throw new OpError("keyframe needs numeric \"at\" (seconds; negative = before the end)"
+							+ " and \"value\"");
+				}
+				double at = key.get("at").asDouble();
+				String easing = key.path("easing").asString("linear");
+				if (!dev.gravaai.media.compose.anim.MotionEvaluator.isKnownEasing(easing)) {
+					throw new OpError("unknown easing \"" + easing + "\"; use one of "
+							+ dev.gravaai.media.compose.anim.MotionEvaluator.easingNames());
+				}
+				boolean fromEnd = at < 0 || (at == 0 && key.path("fromEnd").asBoolean(false));
+				keyframes.add(new ElementMotion.Keyframe(Math.round(Math.abs(at) * 1000), fromEnd,
+						key.get("value").asDouble(), easing));
+			}
+			tracks.add(new ElementMotion.Track(resolved, keyframes));
+		}
+		return Optional.of(ElementMotion.combine(tracks));
+	}
+
+	private static List<ElementMotion.Track> preset(String name, boolean in, boolean out, long d) {
+		try {
+			return ElementMotion.preset(name, in, out, d);
+		} catch (IllegalArgumentException error) {
+			throw new OpError(String.valueOf(error.getMessage()));
+		}
+	}
+
+	/** {@code motionBlur: {samples, shutter} | false}. */
+	private static Optional<ElementMotion.Blur> blur(JsonNode raw) {
+		JsonNode value = raw.get("motionBlur");
+		if (value == null || value.isNull()) {
+			return Optional.empty();
+		}
+		if (value.isBoolean()) {
+			return Optional.of(value.asBoolean() ? new ElementMotion.Blur(6, 1) : ElementMotion.Blur.NONE);
+		}
+		if (!value.isObject()) {
+			throw new OpError("\"motionBlur\" is {samples: 2–16, shutter: 0–4 frames} or false");
+		}
+		return Optional.of(new ElementMotion.Blur(value.path("samples").asInt(6),
+				value.path("shutter").asDouble(1)));
+	}
+
+	/** {@code asset {name, path, kind?}}: embed a local file (image, Lottie JSON, font, glTF). */
+	static void asset(Session session, JsonNode raw) {
+		String name = AgentOpReader.string(raw, "name").trim();
+		if (!ElementAsset.isValidName(name)) {
+			throw new OpError("invalid asset name \"" + name + "\": 1–64 letters, digits, '-', '_' or '.'");
+		}
+		String pathText = AgentOpReader.string(raw, "path").trim();
+		java.nio.file.Path path = java.nio.file.Path.of(pathText);
+		if (!path.isAbsolute()) {
+			throw new OpError("\"path\" must be an absolute path to a local file");
+		}
+		String kindText = AgentOpReader.optionalString(raw, "kind");
+		ElementAsset.Kind kind = (kindText != null ? ElementAsset.Kind.fromWire(kindText.trim())
+				: ElementAsset.Kind.forFileName(path.getFileName().toString())).orElseThrow(() ->
+						new OpError("cannot tell the asset kind; pass kind: image | lottie | font | model"));
+		byte[] bytes;
+		try {
+			long size = java.nio.file.Files.size(path);
+			if (size > ElementAsset.MAX_BYTES) {
+				throw new OpError("\"" + pathText + "\" is " + size / (1024 * 1024) + " MB; the limit is "
+						+ ElementAsset.MAX_BYTES / (1024 * 1024) + " MB");
+			}
+			bytes = java.nio.file.Files.readAllBytes(path);
+		} catch (java.io.IOException error) {
+			throw new OpError("cannot read \"" + pathText + "\": " + error.getMessage());
+		}
+		ElementAsset asset;
+		try {
+			asset = ElementAsset.of(name, kind, bytes);
+		} catch (IllegalArgumentException error) {
+			throw new OpError(String.valueOf(error.getMessage()));
+		}
+		List<ElementAsset> assets = new ArrayList<>();
+		boolean replaced = false;
+		for (ElementAsset existing : session.state().elementAssets()) {
+			if (existing.name().equals(name)) {
+				assets.add(asset);
+				replaced = true;
+			} else {
+				assets.add(existing);
+			}
+		}
+		if (!replaced) {
+			assets.add(asset);
+		}
+		session.state(session.state().toBuilder().elementAssets(assets).build());
+		session.summary((replaced ? "replaced" : "added") + " " + kind.wire() + " asset " + name + " ("
+				+ Math.max(1, bytes.length / 1024) + " KB)");
+	}
+
+	/** {@code delete_asset {name}}. */
+	static void deleteAsset(Session session, JsonNode raw) {
+		String name = AgentOpReader.string(raw, "name").trim();
+		if (ElementAsset.find(session.state().elementAssets(), name).isEmpty()) {
+			throw new OpError("no asset named \"" + name + "\"");
+		}
+		session.state(session.state().toBuilder().elementAssets(session.state().elementAssets()
+				.stream().filter(asset -> !asset.name().equals(name)).toList()).build());
+		session.summary("deleted asset " + name);
 	}
 }

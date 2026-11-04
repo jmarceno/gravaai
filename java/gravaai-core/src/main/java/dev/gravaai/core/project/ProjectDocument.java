@@ -40,7 +40,7 @@ public final class ProjectDocument {
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "clickSound", "keySound", "aspectRatio", "sourceAudioTrackSettingsByClip",
 			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments",
-			"elementComponents", "elements");
+			"elementComponents", "elements", "elementAssets");
 
 	private final ObjectNode raw;
 	private final String videoPath;
@@ -199,6 +199,9 @@ public final class ProjectDocument {
 		}
 		if (!state.elements().isEmpty()) {
 			editor.set("elements", writeElements(state.elements()));
+		}
+		if (!state.elementAssets().isEmpty()) {
+			editor.set("elementAssets", writeElementAssets(state.elementAssets()));
 		}
 
 		// Keep the fields this build does not know; drop retired preferences and dev-only tuning.
@@ -507,7 +510,51 @@ public final class ProjectDocument {
 			box.put("height", element.box().height());
 			node.set("props", element.props().deepCopy());
 			node.put("zIndex", element.zIndex());
+			if (element.space() != SceneElement.Space.SCREEN) {
+				node.put("space", element.space().wire());
+			}
+			if (!element.motion().isEmpty()) {
+				node.set("motion", writeMotion(element.motion()));
+			}
+			if (element.blur().enabled()) {
+				ObjectNode blur = node.putObject("motionBlur");
+				blur.put("samples", element.blur().samples());
+				blur.put("shutter", element.blur().shutter());
+			}
 			array.add(node);
+		}
+		return array;
+	}
+
+	/** Serialises motion tracks: [{property, keyframes: [{atMs, fromEnd?, value, easing}]}]. */
+	public static ArrayNode writeMotion(List<ElementMotion.Track> tracks) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (ElementMotion.Track track : tracks) {
+			ObjectNode node = array.addObject();
+			node.put("property", track.property().wire());
+			ArrayNode keys = node.putArray("keyframes");
+			for (ElementMotion.Keyframe key : track.keyframes()) {
+				ObjectNode keyNode = keys.addObject();
+				keyNode.put("atMs", key.atMs());
+				if (key.fromEnd()) {
+					keyNode.put("fromEnd", true);
+				}
+				keyNode.put("value", key.value());
+				keyNode.put("easing", key.easing());
+			}
+		}
+		return array;
+	}
+
+	/** Serialises embedded element assets (name, kind, hash, base64 data). */
+	public static ArrayNode writeElementAssets(List<ElementAsset> assets) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (ElementAsset asset : assets) {
+			ObjectNode node = array.addObject();
+			node.put("name", asset.name());
+			node.put("kind", asset.kind().wire());
+			node.put("hash", asset.hash());
+			node.put("data", asset.data());
 		}
 		return array;
 	}

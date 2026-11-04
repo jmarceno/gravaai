@@ -446,10 +446,8 @@ public final class ProjectExporter {
 			Platform.runLater(() -> {
 				// Read before closing: a broken element fails the export instead of silently
 				// missing from it (preview shows the same error box).
-				java.util.Optional<String> elementError = elementHooks.runtime().failures().stream()
-						.findFirst().map(error -> "Element " + error.elementId() + " failed at "
-								+ String.format(java.util.Locale.ROOT, "%.2f", error.timeMs() / 1000.0)
-								+ "s: " + error.message());
+				java.util.Optional<String> elementError = elementHooks.failureMessage()
+						.map(message -> "E" + message.substring(1));
 				closeFactory();
 				if (!model.isCurrentRun(runId)) {
 					return;

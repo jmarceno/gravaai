@@ -182,7 +182,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		AgentEditorViews.Meta meta = new AgentEditorViews.Meta(session.displayName(),
 				session.projectPath() == null ? null : session.projectPath().toString(),
 				session.videoPath(), sourceMs, session.dirty(), rev,
-				session.elementDiagnostics().current(state));
+				session.elementDiagnostics().current(state),
+				session.elementDiagnostics().timings(state));
 		return switch (view) {
 			case "timeline" -> AgentEditorViews.timeline(state, sourceMs, number(args, "from"),
 					number(args, "to"), rev);
@@ -761,7 +762,8 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		return new AgentEditorViews.Meta(session.displayName(),
 				session.projectPath() == null ? null : session.projectPath().toString(),
 				session.videoPath(), sourceDurationMs(session), session.dirty(), rev,
-				session.elementDiagnostics().current(session.store().state()));
+				session.elementDiagnostics().current(session.store().state()),
+				session.elementDiagnostics().timings(session.store().state()));
 	}
 
 	/** Source duration cached per session; a probe failure falls back to the edited duration. */

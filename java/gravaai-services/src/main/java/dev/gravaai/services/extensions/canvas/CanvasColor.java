@@ -67,8 +67,13 @@ public final class CanvasColor {
 		int r = (argb >>> 16) & 0xFF;
 		int g = (argb >>> 8) & 0xFF;
 		int b = argb & 0xFF;
+		// HTML canvas serialisation: opaque colours read back as #rrggbb, others as rgba().
+		if ((argb >>> 24) == 0xFF) {
+			return String.format(java.util.Locale.ROOT, "#%02x%02x%02x", r, g, b);
+		}
 		double a = Math.round(alpha(argb) * 1000.0) / 1000.0;
-		return "rgba(" + r + ", " + g + ", " + b + ", " + a + ")";
+		String alphaText = java.math.BigDecimal.valueOf(a).stripTrailingZeros().toPlainString();
+		return "rgba(" + r + ", " + g + ", " + b + ", " + alphaText + ")";
 	}
 
 	private static @Nullable Integer parseHex(String digits) {

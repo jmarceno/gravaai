@@ -89,8 +89,11 @@ public interface FrameOverlayHooks {
 	 * @param timeMs the timeline time of the frame in milliseconds
 	 * @param exactTimeMs the same time without rounding (33.33 ms at 30 fps), for the element
 	 *        layer whose curves are sampled at fractional frames
+	 * @param gpu the compositor's GL surface when the frame renders on the GPU (the element
+	 *        layer draws 3D into its own FBO on the same context and must reset Skia's GL state)
 	 */
-	record FrameInfo(int width, int height, long timeMs, double exactTimeMs) {
+	record FrameInfo(int width, int height, long timeMs, double exactTimeMs,
+			java.util.Optional<dev.gravaai.media.gl.SkiaGlSurface> gpu) {
 
 		public FrameInfo {
 			if (width <= 0 || height <= 0) {
@@ -104,6 +107,10 @@ public interface FrameOverlayHooks {
 
 		public FrameInfo(int width, int height, long timeMs) {
 			this(width, height, timeMs, timeMs);
+		}
+
+		public FrameInfo(int width, int height, long timeMs, double exactTimeMs) {
+			this(width, height, timeMs, exactTimeMs, java.util.Optional.empty());
 		}
 	}
 }

@@ -44,7 +44,7 @@ public final class CanvasImage implements AutoCloseable {
 		return image.getHeight();
 	}
 
-	Image skiaImage() {
+	public Image skiaImage() {
 		return image;
 	}
 

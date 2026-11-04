@@ -799,7 +799,8 @@ public final class Compositor implements AutoCloseable {
 		try {
 			hooks.render(phase, canvas,
 					new FrameOverlayHooks.FrameInfo(width, height,
-							Math.round(input.timeSeconds() * 1000), input.timeSeconds() * 1000));
+							Math.round(input.timeSeconds() * 1000), input.timeSeconds() * 1000,
+							java.util.Optional.ofNullable(currentTarget)));
 		} catch (RuntimeException error) {
 			// The host registry logs and skips individual broken hooks; this is the compositor's
 			// last line of defence for adapter failures (and keeps preview/export alive).

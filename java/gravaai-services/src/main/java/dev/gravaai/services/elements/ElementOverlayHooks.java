@@ -1,10 +1,12 @@
 package dev.gravaai.services.elements;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import io.github.humbleui.skija.Canvas;
 
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.SceneElement;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 
 /**
@@ -39,11 +41,19 @@ public final class ElementOverlayHooks implements FrameOverlayHooks, AutoCloseab
 
 	@Override
 	public void render(Phase phase, Canvas canvas, FrameInfo frame) {
-		if (phase == Phase.POST_ANNOTATIONS) {
+		// SCENE elements draw inside the camera transform (post-cursor) so they follow zoom and pan;
+		// SCREEN elements draw over the finished frame (post-annotations).
+		Optional<SceneElement.Space> space = switch (phase) {
+			case POST_CURSOR -> Optional.of(SceneElement.Space.SCENE);
+			case POST_ANNOTATIONS -> Optional.of(SceneElement.Space.SCREEN);
+			default -> Optional.empty();
+		};
+		if (space.isPresent()) {
 			ProjectEditorState current = state.get();
 			if (!current.elements().isEmpty()) {
 				runtime.render(canvas, frame.width(), frame.height(), frame.exactTimeMs(),
-						current.elements(), current.elementComponents());
+						new JsElementRuntime.Request(current.elements(), current.elementComponents(),
+								current.elementAssets(), frame.gpu(), space));
 			}
 		}
 		if (delegate != FrameOverlayHooks.NONE) {
@@ -56,10 +66,19 @@ public final class ElementOverlayHooks implements FrameOverlayHooks, AutoCloseab
 	 * broken element fails the export instead of silently disappearing from it.
 	 */
 	public void requireNoFailures() {
-		runtime.failures().stream().findFirst().ifPresent(error -> {
-			throw new IllegalStateException("element " + error.elementId() + " failed at "
+		failureMessage().ifPresent(message -> {
+			throw new IllegalStateException(message);
+		});
+	}
+
+	/** The first element failure, named by its timeline short id ({@code e3}), if any. */
+	public Optional<String> failureMessage() {
+		return runtime.failures().stream().findFirst().map(error -> {
+			String shortId = dev.gravaai.services.agent.AgentIds.elementShortById(state.get())
+					.getOrDefault(error.elementId(), error.elementId());
+			return "element " + shortId + " failed at "
 					+ String.format(java.util.Locale.ROOT, "%.2f", error.timeMs() / 1000.0) + "s: "
-					+ error.message());
+					+ error.message();
 		});
 	}
 

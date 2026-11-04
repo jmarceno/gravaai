@@ -121,6 +121,7 @@ public final class TimelineView extends Region {
 	private static final Color ELEMENT_BORDER = Color.web("#a78bfa");
 	private static final Color ELEMENT_SELECTED = Color.web("#ddd6fe");
 	private static final Color ELEMENT_ERROR = Color.web("#ef4444");
+	private static final Color ELEMENT_RAMP = Color.web("#c4b5fd", 0.35);
 	private static final Color CAPTION_FILL = Color.web("#b58b12");
 	private static final Color CAPTION_BORDER = Color.web("#facc15");
 	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
@@ -2191,8 +2192,55 @@ public final class TimelineView extends Region {
 					new double[] {cy - 5, cy - 2, cy, cy + 2, cy + 5, cy + 2, cy, cy - 2}, 8);
 			labelX = x + 18;
 		}
+		// Motion: shaded ramps where the box animates in and out, so presets are visible on the
+		// lane; a trails glyph marks motion blur and a target marks "follows zoom" (scene space).
+		dev.gravaai.core.project.SceneElement model = elementsById.get(item.id());
+		double glyphs = 0;
+		if (model != null) {
+			long duration = Math.max(1, model.durationMs());
+			double pxPerMs = blockWidth / duration;
+			long entrance = 0;
+			long exit = 0;
+			for (dev.gravaai.core.project.ElementMotion.Track track : model.motion()) {
+				for (dev.gravaai.core.project.ElementMotion.Keyframe key : track.keyframes()) {
+					if (key.fromEnd()) {
+						exit = Math.max(exit, Math.min(duration / 2, key.atMs()));
+					} else {
+						entrance = Math.max(entrance, Math.min(duration / 2, key.atMs()));
+					}
+				}
+			}
+			graphics.setFill(ELEMENT_RAMP);
+			if (entrance > 0) {
+				double w = Math.max(3, entrance * pxPerMs);
+				graphics.fillPolygon(new double[] {x, x + w, x}, new double[] {y + height, y, y}, 3);
+			}
+			if (exit > 0) {
+				double w = Math.max(3, exit * pxPerMs);
+				double right = x + blockWidth;
+				graphics.fillPolygon(new double[] {right, right - w, right},
+						new double[] {y + height, y, y}, 3);
+			}
+			double gx = x + blockWidth - 10 - (failing ? 16 : 0);
+			double cy = y + height / 2;
+			graphics.setStroke(ELEMENT_BORDER);
+			graphics.setLineWidth(1.2);
+			if (model.blur().enabled() && blockWidth > 60) {
+				for (int line = 0; line < 3; line++) {
+					double ly = cy - 3 + line * 3;
+					graphics.strokeLine(gx - 6 + line, ly, gx + 2, ly);
+				}
+				gx -= 14;
+				glyphs += 14;
+			}
+			if (model.space() == dev.gravaai.core.project.SceneElement.Space.SCENE && blockWidth > 60) {
+				graphics.strokeOval(gx - 4, cy - 4, 8, 8);
+				graphics.fillOval(gx - 1.5, cy - 1.5, 3, 3);
+				glyphs += 14;
+			}
+		}
 		double badge = failing ? 16 : 0;
-		double labelWidth = blockWidth - (labelX - x) - 6 - badge;
+		double labelWidth = blockWidth - (labelX - x) - 6 - badge - glyphs;
 		if (labelWidth > 12) {
 			graphics.setFont(BLOCK_FONT);
 			graphics.setFill(BLOCK_TEXT);

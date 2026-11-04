@@ -14,7 +14,7 @@ import io.github.humbleui.skija.Shader;
  * after the gradient is created, so the shader is built from the current stops on every draw, like
  * a browser's gradient object.
  */
-public final class CanvasGradient {
+public final class CanvasGradient implements CanvasPaintSource {
 
 	private record Stop(double offset, int color) {}
 
@@ -60,7 +60,8 @@ public final class CanvasGradient {
 	}
 
 	/** The Skija shader for the current stops, or null when fewer than two are usable. */
-	@Nullable Shader shader() {
+	@Override
+	public @Nullable Shader shader() {
 		if (stops.size() < 2) {
 			return null;
 		}

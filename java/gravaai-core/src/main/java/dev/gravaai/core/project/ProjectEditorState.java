@@ -76,7 +76,8 @@ public record ProjectEditorState(
 		List<KeystrokeElement> keystrokeElements,
 		List<CameraLayoutSegment> cameraLayoutSegments,
 		List<ElementComponent> elementComponents,
-		List<SceneElement> elements) {
+		List<SceneElement> elements,
+		List<ElementAsset> elementAssets) {
 
 	/**
 	 * Copy with a new caption list, without re-normalising the rest of the state. The editor needs
@@ -99,7 +100,7 @@ public record ProjectEditorState(
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, sourceAudioTrackSettingsByClip,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
-				elementComponents, elements);
+				elementComponents, elements, elementAssets);
 	}
 
 	/**
@@ -125,7 +126,7 @@ public record ProjectEditorState(
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, normalized,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
-				elementComponents, elements);
+				elementComponents, elements, elementAssets);
 	}
 
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
@@ -206,6 +207,7 @@ public record ProjectEditorState(
 		private List<CameraLayoutSegment> cameraLayoutSegments;
 		private List<ElementComponent> elementComponents;
 		private List<SceneElement> elements;
+		private List<ElementAsset> elementAssets;
 
 		private Builder(ProjectEditorState state) {
 			wallpaper = state.wallpaper;
@@ -268,6 +270,7 @@ public record ProjectEditorState(
 			cameraLayoutSegments = state.cameraLayoutSegments;
 			elementComponents = state.elementComponents;
 			elements = state.elements;
+			elementAssets = state.elementAssets;
 		}
 
 		public Builder wallpaper(String value) {
@@ -570,6 +573,11 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder elementAssets(List<ElementAsset> value) {
+			elementAssets = List.copyOf(value);
+			return this;
+		}
+
 		/**
 		 * Copies one component, named as in the project JSON, from another state. Agent settings
 		 * paths name components at run time; the switch keeps every copy type-checked.
@@ -636,6 +644,7 @@ public record ProjectEditorState(
 				case "cameraLayoutSegments" -> cameraLayoutSegments = from.cameraLayoutSegments;
 				case "elementComponents" -> elementComponents = from.elementComponents;
 				case "elements" -> elements = from.elements;
+				case "elementAssets" -> elementAssets = from.elementAssets;
 				default -> throw new IllegalArgumentException("unknown editor component " + component);
 			}
 			return this;
@@ -702,7 +711,8 @@ public record ProjectEditorState(
 					keystrokeElements,
 					cameraLayoutSegments,
 					elementComponents,
-					elements);
+					elements,
+					elementAssets);
 		}
 	}
 }

@@ -31,7 +31,7 @@ public final class AgentHelpText {
 			transcript   cut_words restore_words cut_fillers cut_pauses cut_range_src
 			speed        speed delete_speed
 			annotations  text image figure blur update_annotation delete_annotation
-			elements     component delete_component element update_element delete_element — animated JS components (title cards, lower thirds, anything you can draw)
+			elements     component delete_component element update_element delete_element asset delete_asset — animated JS components (title cards, lower thirds, Lottie, shaders, 3D, anything you can draw)
 			audio        audio update_audio delete_audio source_audio
 			captions     caption update_caption split_caption merge_captions delete_caption captions_style
 			settings     set {key: value} — any key from inspect {view:"settings"}
@@ -124,10 +124,17 @@ public final class AgentHelpText {
 			Elements are animated graphics drawn by code (Remotion-style): a COMPONENT is a JS module you write; an ELEMENT places it on the timeline with props.
 			component {name, source, description?} — create/replace a project component. It is compiled and test-rendered before the batch commits (0%, 50%, last frame, plus a determinism check); errors come back with line:column.
 			delete_component {name} — refused while elements use it.
-			element {component, from, to?, x?, y?, w?, h?, props?, layer?} — place one; returns its e id. to defaults to the component's durationInFrames. x,y = centre, w,h = size, as 0–1 fractions (default: whole frame). layer = z order (default: on top).
-			update_element {id, component?, from?, to?, x?, y?, w?, h?, props?, layer?} — props merge into the old ones; a null prop removes it.
+			element {component, from, to?, x?, y?, w?, h?, props?, layer?, space?, motion?, motionBlur?} — place one; returns its e id. to defaults to the component's durationInFrames. x,y = centre, w,h = size, as 0–1 fractions (default: whole frame). layer = z order (default: on top).
+			update_element {id, component?, from?, to?, x?, y?, w?, h?, props?, layer?, space?, motion?, motionBlur?} — props merge into the old ones; a null prop removes it; motion replaces (motion:[] clears).
 			delete_element {id} | {all:true}
-			Built-ins (read any with inspect {view:"components", topic:"gravaai/title-card"} and fork it): gravaai/title-card, gravaai/lower-third, gravaai/counter, gravaai/callout.
+			space: "screen" (default; fixed over the frame) or "scene" (inside the camera: follows zoom and pan, for callouts on screen content; gravaai/callout defaults to scene).
+			motion (no-code animation of the whole box, on top of what the component draws): a list of presets and tracks.
+			  presets: fade rise slide-left slide-right slide-up slide-down spring-pop zoom spin — "fade" = in+out over 0.4s, or {preset:"rise", in?:true, out?:true, duration?:0.4}
+			  tracks: {property: opacity|translateX|translateY|scale|rotate, keyframes:[{at, value, easing?}]} — at in seconds from the element start, negative = before its end; translate in % of the frame, rotate in degrees; easing names: linear ease ease-in ease-out ease-in-out ease-{in|out|in-out}-{quad|cubic|quart|quint|sine|circ|expo|back|elastic|bounce} bounce spring cubic-bezier(a,b,c,d)
+			  e.g. motion:["fade", {preset:"slide-up", out:false, duration:0.6}, {property:"rotate", keyframes:[{at:0, value:-8}, {at:1, value:0, easing:"spring"}]}]
+			motionBlur {samples:2–16, shutter:0–4 frames} (or true = 6 samples, 1 frame; false = off): draws trails of fast motion.
+			asset {name, path, kind?} — embed a local file in the project (absolute path; kind from the extension: image .png/.jpg/.webp, lottie .json, font .ttf/.otf, model .glb/.gltf with embedded buffers); max 24 MB. delete_asset {name}.
+			Built-ins (read any with inspect {view:"components", topic:"gravaai/title-card"} and fork it): gravaai/title-card, gravaai/lower-third, gravaai/counter, gravaai/callout, gravaai/lottie {asset}, gravaai/shader-backdrop {style: aurora|waves|plasma}, gravaai/model-3d {model}.
 
 			Module contract (plain JS ES module, no JSX, no imports):
 			  export const fps = 30;               // nominal; frame = ms on the element * fps / 1000 (fractional between frames)
@@ -139,8 +146,10 @@ public final class AgentHelpText {
 			render must be a pure function of its arguments: it is called for frames in any order, on several threads, maybe twice. No module-level state that changes, no timers/promises/fetch/imports. Math.random, Date.now and performance.now are frozen per frame; prefer random("seed").
 			width/height = the element box in design pixels (a 1920-wide frame), so sizes look the same at every export resolution. ctx is translated and clipped to the box.
 			Globals (same semantics as Remotion): interpolate(input, inRange, outRange, {easing?, extrapolateLeft?, extrapolateRight?: "extend"|"clamp"|"identity"|"wrap"}), spring({frame, fps, config?:{mass, damping, stiffness, overshootClamping}, from?, to?, delay?, durationInFrames?, reverse?}), measureSpring({fps, config}), Easing.{linear, ease, quad, cubic, sin, circle, exp, bounce, poly(n), back(s), elastic(b), bezier(x1,y1,x2,y2), steps(n), in(f), out(f), inOut(f)}, random(seed), sequence(frame, from, durationInFrames, fn(localFrame)), series(frame, [{durationInFrames, render(localFrame)}…]).
-			ctx is HTML Canvas 2D: fillStyle strokeStyle (CSS colours or gradients) lineWidth lineCap lineJoin miterLimit globalAlpha globalCompositeOperation shadowColor shadowBlur shadowOffsetX/Y font ("bold 48px sans-serif") textAlign textBaseline filter ("blur(4px)") lineDashOffset; save restore translate rotate scale transform setTransform resetTransform; beginPath closePath moveTo lineTo quadraticCurveTo bezierCurveTo arc ellipse rect roundRect(x,y,w,h,r|[r…]) fill stroke clip setLineDash getLineDash; fillRect strokeRect clearRect fillText strokeText measureText (width, actualBoundingBox*); createLinearGradient createRadialGradient (addColorStop).
-			Not available: DOM, images from URLs, createPattern, putImageData.
+			Asset globals: image(name) → for ctx.drawImage(img, x, y, w?, h?) and ctx.createPattern(img, "repeat"); lottie(name) → {duration, fps, width, height, draw(ctx, seconds, x?, y?, w?, h?)}; shader(sksl, {uniform: number|[numbers]}) → a fillStyle/strokeStyle (SkSL: half4 main(float2 coord), coord in design pixels); scene3d(ctx, {model, x?, y?, width?, height?, rotation?:[x,y,z] degrees, position?:[x,y,z], scale?, cameraDistance?:3, fov?:35, ambient?, specular?, tint?, light?:{color, direction:[x,y,z]}}) draws a glTF model asset or a built-in shape gravaai:cube|sphere|torus|torus-knot (normalised to a unit sphere); assets(kind) lists the project's asset names. ctx.font may name a font asset (by asset name or family).
+			ctx is HTML Canvas 2D: fillStyle strokeStyle (CSS colours or gradients) lineWidth lineCap lineJoin miterLimit globalAlpha globalCompositeOperation shadowColor shadowBlur shadowOffsetX/Y font ("bold 48px sans-serif") textAlign textBaseline filter ("blur(4px)", "drop-shadow(4px 6px 8px rgba(0,0,0,.5))") lineDashOffset; save restore translate rotate scale transform setTransform resetTransform; beginPath closePath moveTo lineTo quadraticCurveTo bezierCurveTo arc ellipse rect roundRect(x,y,w,h,r|[r…]) fill stroke clip setLineDash getLineDash; fillRect strokeRect clearRect fillText strokeText measureText (width, actualBoundingBox*); createLinearGradient createRadialGradient (addColorStop) createPattern drawImage.
+			Not available: DOM, images from URLs, putImageData, getImageData.
+			Budget: keep render under ~4 ms per frame (inspect overview lists the slowest elements). Draw calls are batched, so loops of fillRect/arc are cheap; reading ctx state (measureText, ctx.fillStyle) inside a hot loop is not.
 			A component that throws draws a red error box in preview and frames, is listed under "element errors" in inspect overview, and fails exports. Fix it with component (same name) and look again.
 			Workflow: write component → element → frames {from,to,count:6} over its span → adjust → export.
 			Example:
@@ -151,7 +160,7 @@ public final class AgentHelpText {
 			inspect {view?, from?, to?, topic?}
 			overview (default) project, source/edited duration, aspect, counts, webcam, rev
 			timeline  one line per clip/zoom/speed/annotation/element/audio in from–to (seconds)
-			components element components (built-in + project): fps, length, props; topic:<name> returns its source
+			components element components (built-in + project): fps, length, props; project assets; topic:<name> returns its source
 			transcript words grouped by cue, cut words marked ~, pause markers, paged by from–to (source seconds)
 			settings  flat key=value list; add topic to narrow and see ranges
 			library   projects + unprojected recordings and meetings, newest first

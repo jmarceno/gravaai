@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,9 +73,9 @@ public final class Canvas2D implements AutoCloseable {
 	private boolean contourOpen;
 
 	private int fillColor = 0xFF000000;
-	private @Nullable CanvasGradient fillGradient;
+	private @Nullable CanvasPaintSource fillGradient;
 	private int strokeColor = 0xFF000000;
-	private @Nullable CanvasGradient strokeGradient;
+	private @Nullable CanvasPaintSource strokeGradient;
 	private double lineWidth = 1.0;
 	private double globalAlpha = 1.0;
 	private BlendMode composite = BlendMode.SRC_OVER;
@@ -94,10 +95,21 @@ public final class Canvas2D implements AutoCloseable {
 	private String filterCss = "none";
 	private final Deque<Extras> savedExtras = new ArrayDeque<>();
 
+	/** Resolves a font family to a project-embedded typeface before system fonts. */
+	@FunctionalInterface
+	public interface FontResolver {
+		java.util.Optional<Typeface> resolve(String family, FontStyle style);
+	}
+
+	private FontResolver fonts = (family, style) -> java.util.Optional.empty();
+	/** The canvas matrix when this context was created: setTransform/resetTransform are relative to it. */
+	private final Matrix33 baseMatrix;
+
 	private boolean closed;
 
 	public Canvas2D(Canvas canvas, double width, double height) {
 		this.canvas = canvas;
+		this.baseMatrix = canvas.getLocalToDeviceAsMatrix33();
 		this.width = width;
 		this.height = height;
 	}
@@ -368,12 +380,12 @@ public final class Canvas2D implements AutoCloseable {
 
 	@HostAccess.Export
 	public void setTransform(double a, double b, double c, double d, double e, double f) {
-		canvas.setMatrix(matrix(a, b, c, d, e, f));
+		canvas.setMatrix(baseMatrix.makeConcat(matrix(a, b, c, d, e, f)));
 	}
 
 	@HostAccess.Export
 	public void resetTransform() {
-		canvas.resetMatrix();
+		canvas.setMatrix(baseMatrix);
 	}
 
 	// ------------------------------------------------------------------------
@@ -779,7 +791,10 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	/** {@code filter}: {@code none} or {@code blur(<px>px)}; other CSS filters are ignored. */
+	/**
+	 * {@code filter}: {@code none}, or a list of {@code blur(<px>)} and
+	 * {@code drop-shadow(<dx> <dy> [<blur>] [<color>])}; anything else leaves the filter unchanged.
+	 */
 	@HostAccess.Export
 	public String getFilter() {
 		return filterCss;
@@ -793,11 +808,36 @@ public final class Canvas2D implements AutoCloseable {
 			filterCss = "none";
 			return;
 		}
-		Matcher matcher = BLUR.matcher(css);
-		if (matcher.matches()) {
-			filterBlur = Double.parseDouble(matcher.group(1));
+		java.util.Optional<List<CssFilter>> parsed = CssFilter.parse(css);
+		if (parsed.isPresent()) {
+			filterBlur = parsed.get().stream().filter(CssFilter.Blur.class::isInstance)
+					.mapToDouble(filter -> ((CssFilter.Blur) filter).radius()).sum();
 			filterCss = css;
 		}
+	}
+
+	/** {@code createPattern(image, "repeat"|"repeat-x"|"repeat-y"|"no-repeat")}. */
+	@HostAccess.Export
+	public @Nullable CanvasPattern createPattern(@Nullable CanvasImage image, @Nullable String repetition) {
+		if (image == null) {
+			return null;
+		}
+		return new CanvasPattern(image, repetition == null ? "repeat" : repetition);
+	}
+
+	/** Project fonts for {@code ctx.font} (not visible to scripts). */
+	public void setFontResolver(FontResolver resolver) {
+		this.fonts = resolver;
+	}
+
+	/** The Skija canvas with this context's current transform and clip (not visible to scripts). */
+	public Canvas skiaCanvas() {
+		return canvas;
+	}
+
+	/** {@code globalAlpha}, for host-drawn content (Lottie, 3D) that must honour it. */
+	public double currentAlpha() {
+		return globalAlpha;
 	}
 
 	@HostAccess.Export
@@ -918,6 +958,10 @@ public final class Canvas2D implements AutoCloseable {
 		FontStyle style = font.bold() && font.italic()
 				? FontStyle.BOLD_ITALIC
 				: font.bold() ? FontStyle.BOLD : font.italic() ? FontStyle.ITALIC : FontStyle.NORMAL;
+		java.util.Optional<Typeface> project = fonts.resolve(font.family(), style);
+		if (project.isPresent()) {
+			return new Font(project.get(), (float) font.size());
+		}
 		String key = font.family() + "|" + style;
 		Typeface typeface = TYPEFACES.computeIfAbsent(key, ignored -> {
 			Typeface matched = FontMgr.getDefault().matchFamilyStyle(font.family(), style);
@@ -998,11 +1042,13 @@ public final class Canvas2D implements AutoCloseable {
 						shadowColor);
 				paint.setImageFilter(filter);
 			}
-			if (filterBlur > 0) {
-				closeQuietly(filter);
-				float sigma = (float) filterBlur;
-				filter = ImageFilter.makeBlur(sigma, sigma, FilterTileMode.DECAL);
-				paint.setImageFilter(filter);
+			if (!filterCss.equals("none")) {
+				ImageFilter css = CssFilter.build(CssFilter.parse(filterCss).orElse(List.of()));
+				if (css != null) {
+					closeQuietly(filter);
+					filter = css;
+					paint.setImageFilter(filter);
+				}
 			}
 			if (stroke && lineDash.length > 0) {
 				effect = PathEffect.makeDash(lineDash, (float) lineDashOffset);
@@ -1061,8 +1107,8 @@ public final class Canvas2D implements AutoCloseable {
 
 	/** Parses a fill/stroke style value: a CSS colour string or a gradient host object. */
 	private static @Nullable Style style(Object value) {
-		if (value instanceof CanvasGradient gradient) {
-			return new Style(0x00000000, gradient);
+		if (value instanceof CanvasPaintSource source) {
+			return new Style(0x00000000, source);
 		}
 		if (value instanceof String css) {
 			Integer color = CanvasColor.parse(css);
@@ -1121,16 +1167,16 @@ public final class Canvas2D implements AutoCloseable {
 		}
 	}
 
-	private record Style(int color, @Nullable CanvasGradient gradient) {}
+	private record Style(int color, @Nullable CanvasPaintSource gradient) {}
 
 	/** State added with the element layer; saved and restored with the rest. */
 	private record Extras(float[] lineDash, double lineDashOffset, double filterBlur, String filterCss) {}
 
 	private record Snapshot(
 			int fillColor,
-			@Nullable CanvasGradient fillGradient,
+			@Nullable CanvasPaintSource fillGradient,
 			int strokeColor,
-			@Nullable CanvasGradient strokeGradient,
+			@Nullable CanvasPaintSource strokeGradient,
 			double lineWidth,
 			double globalAlpha,
 			BlendMode composite,

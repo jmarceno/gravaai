@@ -102,6 +102,10 @@ Render hooks draw into `hookCtx.ctx`, a `CanvasRenderingContext2D`, at specific 
 | `post-annotations` | Yes | Yes | Runs after the built-in transform |
 | `final` | Yes | Yes | Last pass for HUD-style overlays |
 
+### Extensions and Animated Elements
+
+Animated elements (the timeline's ANIM lane, written by the AI through MCP) are JS components that draw on the same Canvas 2D surface extensions use (`Canvas2D`), plus element-only globals (`interpolate`, `spring`, `image()`, `lottie()`, `shader()`, `scene3d()`). Screen-space elements draw at `post-annotations`, scene-space elements (they follow zoom) at `post-cursor`, before the extension hooks of the same phase. Both share `ctx.setTransform` semantics: the matrix is relative to the canvas the hook or element was given, not the output frame.
+
 ### Inside vs Outside the Scene Transform
 
 - `post-video`, `post-zoom`, and `post-cursor` already follow zoom and motion in preview and export.

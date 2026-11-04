@@ -42,6 +42,12 @@ public final class ComponentValidator {
 
 	/** Validates {@code component} as described above; throws {@link ComponentException}. */
 	public static ComponentInfo validate(ElementComponent component) {
+		return validate(component, List.of());
+	}
+
+	/** Validates with the project's assets available to {@code image()}, {@code lottie()} and 3D. */
+	public static ComponentInfo validate(ElementComponent component,
+			List<dev.gravaai.core.project.ElementAsset> assets) {
 		ComponentInfo info;
 		byte[] first;
 		try (JsElementRuntime runtime = new JsElementRuntime(new ElementDiagnostics())) {
@@ -52,16 +58,16 @@ public final class ComponentValidator {
 					Math.max(1, durationMs), SceneElement.Box.FULL, SceneElement.noProps(), 0);
 			double lastFrameMs = Math.max(0, (info.durationInFrames() - 1) * 1000.0 / fps);
 			for (double timeMs : new double[] {0, durationMs / 2.0, lastFrameMs}) {
-				render(runtime, probe, component, timeMs);
+				render(runtime, probe, component, timeMs, assets);
 			}
-			first = render(runtime, probe, component, durationMs / 2.0);
+			first = render(runtime, probe, component, durationMs / 2.0, assets);
 		}
 		try (JsElementRuntime fresh = new JsElementRuntime(new ElementDiagnostics())) {
 			double fps = info.fps();
 			long durationMs = Math.round(info.durationInFrames() * 1000.0 / fps);
 			SceneElement probe = new SceneElement("validate", component.name(), 0,
 					Math.max(1, durationMs), SceneElement.Box.FULL, SceneElement.noProps(), 0);
-			byte[] second = render(fresh, probe, component, durationMs / 2.0);
+			byte[] second = render(fresh, probe, component, durationMs / 2.0, assets);
 			if (!Arrays.equals(first, second)) {
 				throw new ComponentException("render is not deterministic: the same frame drew "
 						+ "different pixels twice. Draw only from frame/props (no module-level "
@@ -96,12 +102,13 @@ public final class ComponentValidator {
 	}
 
 	private static byte[] render(JsElementRuntime runtime, SceneElement probe,
-			ElementComponent component, double timeMs) {
+			ElementComponent component, double timeMs, List<dev.gravaai.core.project.ElementAsset> assets) {
 		ImageInfo imageInfo = ImageInfo.makeN32(WIDTH, HEIGHT, ColorAlphaType.PREMUL);
 		try (Bitmap bitmap = new Bitmap()) {
 			bitmap.allocPixels(imageInfo);
 			try (Canvas canvas = new Canvas(bitmap)) {
-				runtime.render(canvas, WIDTH, HEIGHT, timeMs, List.of(probe), List.of(component));
+				runtime.render(canvas, WIDTH, HEIGHT, timeMs, new JsElementRuntime.Request(List.of(probe),
+						List.of(component), assets, java.util.Optional.empty(), java.util.Optional.empty()));
 			}
 			runtime.failures().stream().findFirst().ifPresent(error -> {
 				throw new ComponentException("frame " + Math.round(timeMs * runtime.describe(

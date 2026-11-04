@@ -18,7 +18,8 @@ import dev.gravaai.core.project.ElementComponent;
  */
 public final class BuiltinComponents {
 
-	private static final List<String> NAMES = List.of("title-card", "lower-third", "counter", "callout");
+	private static final List<String> NAMES = List.of("title-card", "lower-third", "counter", "callout",
+			"lottie", "shader-backdrop", "model-3d");
 
 	private static final Map<String, ElementComponent> COMPONENTS = load();
 

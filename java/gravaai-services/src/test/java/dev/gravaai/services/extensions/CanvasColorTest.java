@@ -65,10 +65,10 @@ class CanvasColorTest {
 	}
 
 	@Test
-	@DisplayName("toCss renders rgba() with the alpha channel")
+	@DisplayName("toCss serialises like a browser: #rrggbb when opaque, rgba() otherwise")
 	void toCss() {
 		assertEquals("rgba(255, 0, 0, 0.502)", CanvasColor.toCss(0x80FF0000));
-		assertEquals("rgba(18, 52, 86, 1.0)", CanvasColor.toCss(0xFF123456));
+		assertEquals("#123456", CanvasColor.toCss(0xFF123456));
 		assertTrue(CanvasColor.toCss(0x00000000).startsWith("rgba(0, 0, 0, 0"));
 	}
 }

@@ -144,6 +144,12 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	public void setElementAssets(List<dev.gravaai.core.project.ElementAsset> assets) {
+		ObjectNode json = editorJson();
+		json.set("elementAssets", ProjectDocument.writeElementAssets(assets));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
 	/** The selected element on the elements lane, if any. */
 	public java.util.Optional<String> selectedElementId() {
 		return selectedElementId;
@@ -199,7 +205,7 @@ public final class EditorStore {
 						: state.sourceAudioTrackSettingsByClip().deepCopy(),
 				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId,
 				state.cameraLayoutSegments(), selectedCameraLayoutId, state.elementComponents(),
-				state.elements(), selectedElementId);
+				state.elements(), state.elementAssets(), selectedElementId);
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -214,6 +220,7 @@ public final class EditorStore {
 		setCameraLayoutSegments(snapshot.cameraLayoutSegments());
 		setElementComponents(snapshot.elementComponents());
 		setElements(snapshot.elements());
+		setElementAssets(snapshot.elementAssets());
 		selectedElementId = snapshot.selectedElementId();
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();

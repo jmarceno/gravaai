@@ -13,7 +13,7 @@ jobs and MCP bridge; this package only renders state and forwards user actions.
 | `PlaceholderAgentUiService` | Stand-in for snapshots/tests and for the app before services.agent is wired: `new PlaceholderAgentUiService()` = demo connected state, `disabled()` = off with no activity |
 | `AgentSettingsView` | Settings -> AI control page (enable switch, status + socket/editor-ready pills, copy Claude Code command/JSON config/regenerate token, MCP command, Claude Code command, JSON config, masked token with reveal/copy/regenerate, recent activity). AutoCloseable, installs `/ui/agent/agent.css` when attached. |
 | `AgentStatusChip` | Editor header chip: purple dot + ping when connected, "AI editing", Revert last change, X turns AI control off; hides itself when off and nothing to revert. Owns its subscription + `dispose()`. |
-| `AgentHighlightsController` + `AgentTimelineHighlights` | Transient 2.5 s timeline overlay (cut glowing line + "✦ AI cut" pill; added/changed coloured bands); controller subscribes to the service highlights, overlay takes the timeline's `TimeAxis`. |
+| `AgentHighlightsController` + `AgentTimelineHighlights` | Transient 2.5 s timeline overlay (cut glowing line + "✦ AI cut" pill; added/changed coloured bands, each with a "✦ AI added/changed <name>" pill); controller subscribes to the service highlights, overlay takes the timeline's `TimeAxis`. |
 
 ## AppContext wiring (final, after dashboard/core-storage seams)
 

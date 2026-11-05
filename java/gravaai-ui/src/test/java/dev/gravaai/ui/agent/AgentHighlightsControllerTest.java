@@ -77,7 +77,7 @@ class AgentHighlightsControllerTest {
 		assertEquals("agent-highlight-2", views.get(1).id());
 		assertEquals(100, views.get(0).startMs());
 		assertEquals(200, views.get(0).endMs());
-		assertEquals("zoom", views.get(0).displayLabel());
+		assertEquals("✦ AI added zoom", views.get(0).displayLabel());
 	}
 
 	/** Records scheduled tasks; the test decides when time passes. */

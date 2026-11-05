@@ -60,9 +60,10 @@ public final class ServiceAgentUiService implements AgentUiService {
 
 	@Override
 	public void applyHighlights(List<AgentHighlightUpdate> updates) {
-		if (updates == null || updates.isEmpty()) {
+		if (updates == null) {
 			return;
 		}
+		// An empty list is meaningful: revert_ai sends it to clear the stale bands.
 		agentService.applyHighlights(toServiceHighlights(updates));
 	}
 

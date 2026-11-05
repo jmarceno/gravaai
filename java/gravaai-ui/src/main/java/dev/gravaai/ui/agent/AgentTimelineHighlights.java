@@ -119,8 +119,14 @@ public final class AgentTimelineHighlights extends Pane {
 		return marker;
 	}
 
-	/** Added/changed spans: a translucent band with a 2 px AI-colour top border. */
+	/**
+	 * Added/changed spans: a translucent band with a 2 px AI-colour top border and a labelled pill
+	 * at its left edge — cuts get the "✦ AI cut" pill, so the other agent work announces itself
+	 * just as visibly (an unlabeled 15%-alpha band reads as "nothing happened").
+	 */
 	private Node band(AgentHighlightView highlight, double x, double width) {
+		Pane marker = new Pane();
+		marker.setMouseTransparent(true);
 		Region band = new Region();
 		band.setMouseTransparent(true);
 		band.setLayoutX(x);
@@ -130,7 +136,17 @@ public final class AgentTimelineHighlights extends Pane {
 		band.setStyle("-fx-background-color: " + withAlpha(colour, 0.15)
 				+ "; -fx-border-color: " + colour + " transparent transparent transparent;"
 				+ " -fx-border-width: 2 0 0 0; -fx-background-radius: 3; -fx-border-radius: 3;");
-		return band;
+		Label pill = new Label(highlight.displayLabel());
+		pill.setMouseTransparent(true);
+		pill.setStyle("-fx-background-color: " + colour
+				+ "; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: 600;"
+				+ " -fx-padding: 1 6 1 6; -fx-background-radius: 999;");
+		pill.applyCss();
+		pill.autosize();
+		pill.setLayoutX(x);
+		pill.setLayoutY(0);
+		marker.getChildren().addAll(band, pill);
+		return marker;
 	}
 
 	private static String cssColour(int argb) {

@@ -93,6 +93,11 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	private volatile Consumer<List<AgentHighlightUpdate>> highlightSink = updates -> {};
 
+	private volatile Consumer<Activity> activitySink = activity -> {};
+
+	/** One AI activity entry for the Settings list and the status chip's last change. */
+	record Activity(String label, boolean failed) {}
+
 	private record RevertEntry(ProjectEditorState state, long revAfter) {}
 
 	private record ExportJob(AtomicBoolean cancelled) {}
@@ -128,6 +133,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		}
 	}
 
+	/** Wired by {@link AgentWiring}: every applied/failed AI edit lands in the activity log. */
+	void onActivity(Consumer<Activity> sink) {
+		if (sink != null) {
+			this.activitySink = sink;
+		}
+	}
+
 	// ── EditorPort ──────────────────────────────────────────────────────────────────────────
 
 	@Override
@@ -158,7 +170,15 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 			}
 			JsonNode result = switch (tool) {
 				case "inspect" -> text(inspect(session, args));
-				case "edit" -> text(edit(session, args));
+				case "edit" -> {
+					try {
+						yield text(edit(session, args));
+					} catch (RuntimeException error) {
+						// The failed attempt is activity too (styled failed in the Settings list).
+						activitySink.accept(new Activity(failureLabel(error), true));
+						throw error;
+					}
+				}
 				case "frames" -> frames(session, args);
 				case "project" -> text(project(session, args));
 				case "job" -> text(job(session, args));
@@ -252,6 +272,9 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		long newRev = rev(session);
 		pushRevert(new RevertEntry(before, newRev));
 		highlightSink.accept(highlights(ok.highlights(), label));
+		// Same string as the timeline pill fallback: the chip's "Last change" and the Settings
+		// activity list read from it.
+		activitySink.accept(new Activity(label, false));
 		long editedMs = editedDurationMs(ok.state(), sourceDurationMs(session));
 		return summary + "\nrev " + newRev + " \u2022 edited "
 				+ String.format(Locale.ROOT, "%.2f", editedMs / 1000.0) + "s";
@@ -826,5 +849,14 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		}
 		return error.getMessage() == null || error.getMessage().isBlank()
 				? error.getClass().getSimpleName() : error.getMessage();
+	}
+
+	/**
+	 * The one-line activity label for a failed edit: error messages can embed a whole view dump
+	 * (STALE), so keep only the first line, capped.
+	 */
+	private static String failureLabel(RuntimeException error) {
+		String firstLine = messageOf(error).split("\n", 2)[0].trim();
+		return firstLine.length() > 160 ? firstLine.substring(0, 157) + "..." : firstLine;
 	}
 }

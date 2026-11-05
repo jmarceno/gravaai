@@ -112,6 +112,9 @@ public final class AgentWiring implements AutoCloseable {
 				// A disposed window/overlay must not fail the edit the agent already applied.
 			}
 		}));
+		// Activity log entries carry no scene graph: AgentService is thread-safe and the chip and
+		// the Settings page hop to the FX thread themselves.
+		editorPort.onActivity(activity -> service.recordActivity(activity.label(), activity.failed()));
 		return new AgentWiring(service, ui, dispatcher);
 	}
 

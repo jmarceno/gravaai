@@ -15,7 +15,7 @@ mkdir -p native/build
 cp -a "$GRAVAAI_NATIVE_CACHE/out/." native/build/
 step() { local t=$SECONDS; "$@"; echo "[build-release] $(basename "$1") took $((SECONDS - t))s"; }
 step native/build-native-helpers.sh
-step native/build-ffmpeg.sh
+step ../.gitea/scripts/fetch-ffmpeg.sh native/build   # prebuilt GPU-enabled FFmpeg, not compiled
 step native/build-whisper.sh
 rm -rf "$GRAVAAI_NATIVE_CACHE/out" && cp -a native/build "$GRAVAAI_NATIVE_CACHE/out"
 # Stamp the release version into every pom (the packaged app reports it) and McpMain's fallback.

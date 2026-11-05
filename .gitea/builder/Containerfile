@@ -1,0 +1,16 @@
+# Release builder: Ubuntu 22.04 (glibc 2.35) so the AppImage runs on every current distribution.
+# Holds JDK 27 + JavaFX 27 jmods and the packages the native helpers, FFmpeg and whisper.cpp need.
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake pkg-config nasm patchelf curl ca-certificates xz-utils unzip git file \
+        libwayland-dev wayland-protocols libpipewire-0.3-dev libdbus-1-dev \
+        libgl1 libegl1 libx11-6 libxext6 libxrender1 libxtst6 libxi6 libfontconfig1 libfreetype6 fuse libfuse2 \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /opt/toolchain && cd /opt/toolchain \
+    && curl -fsSL --retry 3 -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/27/ga/linux/x64/jdk/hotspot/normal/eclipse" \
+    && mkdir jdk && tar xzf jdk.tar.gz -C jdk --strip-components=1 && rm jdk.tar.gz \
+    && curl -fsSL --retry 3 -o jmods.zip "https://download2.gluonhq.com/openjfx/27/openjfx-27_linux-x64_bin-jmods.zip" \
+    && unzip -q jmods.zip && mv javafx-jmods-27* javafx-jmods && rm jmods.zip
+ENV GRAVAAI_JAVA_HOME=/opt/toolchain/jdk JAVA_HOME=/opt/toolchain/jdk
+WORKDIR /workspace

@@ -1,0 +1,63 @@
+name: release
+
+# MANUAL ONLY: start it from the Actions tab ("Run workflow") on the branch
+# to release. Never add push / tag / schedule / pull_request triggers.
+#
+# The version is java/pom.xml's when newer than every release tag, otherwise
+# the latest tag with the patch bumped. The AppImage is built in an Ubuntu
+# 22.04 container (glibc 2.35), published as release v<version> on the
+# dispatched commit in this Gitea, then copied to GitHub. A commit that
+# already has a release tag is refused.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Plan version
+        id: plan
+        run: .gitea/scripts/release-plan.sh "$(sed -nE '0,/<version>([^<]+)<\/version>/s//\1/p' java/pom.xml | head -n1 | tr -d '[:space:]')"
+
+      - name: Build AppImage (Ubuntu 22.04)
+        run: |
+          set -euo pipefail
+          image=gravaai-release-builder:22.04
+          docker build -t "$image" -f .gitea/builder/Containerfile .gitea/builder
+          .gitea/scripts/container-build.sh "$image" java/dist \
+            -v gravaai-release-native:/var/cache/gravaai-native \
+            -v gravaai-release-m2:/root/.m2 \
+            -- .gitea/scripts/build-release.sh "${{ steps.plan.outputs.version }}"
+
+      - name: Collect assets
+        run: |
+          set -euo pipefail
+          test -s java/dist/Gravaai-linux-x64.AppImage
+          mkdir -p dist
+          cp java/dist/Gravaai-linux-x64.AppImage "dist/Gravaai-${{ steps.plan.outputs.version }}-linux-x64.AppImage"
+          (cd dist && sha256sum ./*.AppImage > SHA256SUMS)
+
+      - name: Publish release
+        env:
+          GITEA_API: ${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          RELEASE_SHA: ${{ gitea.sha }}
+        run: .gitea/scripts/release-publish.sh "${{ steps.plan.outputs.tag }}" "Gravaai ${{ steps.plan.outputs.version }}" "${{ steps.plan.outputs.notes }}" dist
+
+      - name: Copy release to GitHub
+        env:
+          GH_REPO: jmarceno/gravaai
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          RELEASE_SHA: ${{ gitea.sha }}
+        run: .gitea/scripts/github-publish.sh "${{ steps.plan.outputs.tag }}" "Gravaai ${{ steps.plan.outputs.version }}" "${{ steps.plan.outputs.notes }}" dist

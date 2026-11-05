@@ -85,13 +85,35 @@ code-animated wipe too. Blur needs real speed: on a 0.4 s entrance it is barely 
 | | `screen` (default) | `scene` |
 |---|---|---|
 | Transform | Fixed overlay on the output frame | Inside the camera: **follows zoom and pan** |
-| Use for | Titles, badges, lower thirds, backdrops, anything "on the video" | Callouts, highlights, labels attached to screen content |
+| Use for | Titles, badges, lower thirds, anything "on the video" | Callouts, highlights, labels attached to screen content |
 | Draw phase | After annotations | After the cursor, inside the scene transform |
 
 `gravaai/callout` defaults to `space:"scene"`; everything else defaults to `screen`. A scene-space
 element placed over a button stays glued to that button while an `auto_zoom` zooms in — that is the
 single most common reason to reach for it. Screen-space is right when the graphic is a layer of the
 video, not a part of the recorded screen.
+
+**Composite order — scene draws UNDER screen.** The pipeline renders the scene (recording,
+wallpaper, zoom, then scene-space elements), then the webcam, then screen-space elements. Two
+consequences that are invisible until they bite:
+
+- A **full-frame opaque screen-space element hides every scene-space element** (a symptomless
+  disappearance: `inspect` shows the element rendering without errors, `frames` show nothing). If
+  the project has a full-frame backdrop (e.g. `gravaai/shader-backdrop`), place or convert it to
+  `space:"scene"` whenever zoom-following graphics are involved. At rest a full-frame element
+  renders identically in either space; under zoom, a scene-space backdrop zooms with the video
+  (what a backdrop usually should do), a screen-space one stays fixed like a picture-frame mat.
+- Scene-space elements also draw **under the webcam picture** — don't place scene graphics where
+  the webcam box sits.
+
+**Zooms transform only the scene** — the recording, the wallpaper and scene-space elements.
+Screen-space elements do not move under a zoom, so a punch-in on content drawn by screen-space
+elements shows nothing changing. Convert those elements with `update_element {id, space:"scene"}`
+(at rest the pixels are identical) and the zoom — new or existing — immediately applies to them.
+
+**Zoom depth** (the `zoom` op, 1–6) is a zoom factor that grows with depth: 1 ≈ 1.25×, 2 ≈ 1.5×,
+3 ≈ 1.8× (the default), 4 ≈ 2.2×, 5 ≈ 3.5×, 6 ≈ 5×. When a callout must survive a zoom, give it a
+wider span than the zoom (start before, end after) so it's on screen before the punch-in begins.
 
 ## Layer, geometry and span
 

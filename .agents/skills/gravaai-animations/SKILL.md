@@ -214,5 +214,10 @@ then read `inspect overview` for element errors and the slowest elements before 
   not deep-merge.
 - **Negative keyframe times** (`at:-0.5`) count back from the element's end — that's how you build
   exits that survive resizing.
+- **Scene draws under screen.** Scene-space elements composite beneath screen-space elements and
+  the webcam. A full-frame opaque backdrop in screen space makes every zoom-tracking callout
+  invisibly hidden (no errors — it just never shows up). Put full-frame backdrops in
+  `space:"scene"`, and remember a zoom only moves scene content — screen-space elements must be
+  converted to ride a punch-in. Details in `references/motion-and-space.md`.
 - **One component per project.** Components aren't shared across projects; copy the source into a
   new project if needed.

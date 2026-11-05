@@ -59,6 +59,11 @@ A typical no-code build:
 **Motion replaces on update** — `update_element {id, motion:[…]}` rewrites the whole list;
 `motion: []` clears it. It does not merge with the previous motion.
 
+**Don't copy the read-back format.** `inspect {view:"timeline"}` prints motion in its expanded
+internal form (`{"atMs":400,"fromEnd":true,…}`); that is not authoring syntax. To change motion,
+write fresh tracks in the seconds-based syntax above — never round-trip the `atMs` form through
+`update_element`.
+
 ## Motion blur
 
 ```json

@@ -65,6 +65,19 @@ A component that throws draws a **red error box** in the preview and in `frames`
 `element errors` in `inspect overview`, and **fails exports**. Fix it by sending `component` again
 with the same name, then look again with `frames`.
 
+One ordering trap review will catch if you miss it: **draw persistent layers (backgrounds,
+scrims, borders) before any early return.** In this common shape —
+
+```js
+const opacity = …entrance/exit curve…;
+if (opacity <= 0) return;                    // BAD: skips the scrim too
+ctx.fillStyle = scrim; ctx.fillRect(0, 0, width, height);   // background over the video
+drawTitle(…);
+```
+
+— the raw footage shows through on every frame where `opacity <= 0`. Draw everything that should
+cover the video first; return only when nothing at all should be visible.
+
 ## Animation globals (Remotion semantics)
 
 ```js
@@ -125,7 +138,9 @@ name or family name (see `references/assets-lottie-shaders.md`).
 ## Performance
 
 The 4 ms/frame budget (per element) is real: `inspect overview` prints avg/max render time per
-element, and slow elements stall previews and exports.
+element, and slow elements stall previews and exports. Judge by the **avg** — the max often carries
+a one-time first-frame cost (font and asset warm-up) that never repeats, so a max dozens of times
+the avg with a healthy avg is not a problem.
 
 - Draw calls are **batched** into a command buffer and replayed in one host call, so loops of
   `fillRect`/`arc`/`lineTo` are cheap — thousands of particles are fine.

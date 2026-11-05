@@ -49,6 +49,9 @@ Read these before the matching work (they are long; don't load them all up front
 
 1. **Orient.** `inspect` (overview) shows element counts, `element errors` and `element render
    time` lines when present. `inspect {view:"timeline"}` lists placed elements with their `e` ids.
+   If no project is open, `inspect {view:"library"}` lists the user's projects and recordings —
+   open one with `project {action:"open", path}`. When several could be "the video", ask which;
+   otherwise the most recently modified is the sane default (say which you picked).
 2. **See what exists.** `inspect {view:"components"}` lists built-ins and project components with
    fps, duration and props schema. `inspect {view:"components", topic:"gravaai/title-card"}`
    returns a component's full source — read a built-in, then fork it.
@@ -58,7 +61,9 @@ Read these before the matching work (they are long; don't load them all up front
    determinism check) before the batch commits; failures come back with `line:column`.
 5. **Place it** with `element {…}` in the same batch, and do several related edits in one batch.
 6. **Review** with a contact sheet over the element span: `frames {from, to, count:6}`. The sheet
-   shows the animation curve. Fix the component with `component` (same name) and look again.
+   shows the animation curve; the returned images arrive in the order of the listed timestamps.
+   For a pinpoint check of one instant use `frames {at:[2.5]}` — `from`/`to` need `to > from`.
+   Fix the component with `component` (same name) and look again.
 7. **Export only when asked.** Exports fail while any element has an error — check
    `inspect overview` first.
 
@@ -183,8 +188,10 @@ then read `inspect overview` for element errors and the slowest elements before 
 - **Contact sheet over the span** (`frames {from,to,count:6}`, count ≤ 9) — you should see the
   entrance, the hold and the exit. One frame tells you almost nothing about an animation.
 - **`inspect overview`** lists `element errors` (drawn as a red box in preview; **exports fail**
-  until fixed) and `element render time (avg/max ms per frame, budget 4)`. Fix slow components
-  before exporting — see the performance section of `references/component-authoring.md`.
+  until fixed) and `element render time (avg/max ms per frame, budget 4)`. Judge slowness by the
+  **avg** — a max far above it is usually one-time first-frame work (font/asset warm-up), not the
+  steady-state cost. Fix slow components before exporting — see the performance section of
+  `references/component-authoring.md`.
 - Components are validated when written (compile + test renders + determinism). A component that
   only fails at certain props still passes validation — check `frames` with the real props.
 
@@ -199,8 +206,10 @@ then read `inspect overview` for element errors and the slowest elements before 
   need `extrapolateLeft:"clamp", extrapolateRight:"clamp"` or values blow past 0–1.
 - **`measureText` and state reads flush the draw batch.** Cheap in setup, expensive in a hot loop —
   measure once per frame, not per particle.
-- **Re-read after cuts.** Cutting clips ripples elements (they follow their footage); `e` ids and
-  times from an older read are stale. Same `STALE` discipline as any edit.
+- **Re-read after cuts *and* inserts.** Cutting clips ripples elements (they follow their
+  footage), and placing an element earlier than existing ones shifts their `e` ids (ids are
+  ordered by start time). Times and ids from an older read are stale after either. Same `STALE`
+  discipline as any edit.
 - **Shallow props merge.** Passing `props:{style:{...}}` replaces the whole nested object, it does
   not deep-merge.
 - **Negative keyframe times** (`at:-0.5`) count back from the element's end — that's how you build

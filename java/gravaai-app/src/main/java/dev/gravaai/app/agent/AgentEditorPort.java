@@ -284,19 +284,14 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		String name = op.path("op").asString();
 		int count = op.path("n").isNumber() && op.path("n").asInt() > 0 ? op.path("n").asInt() : 1;
 		if ("revert_ai".equals(name)) {
-			RevertEntry entry = revertStack.peek();
-			if (entry == null) {
-				throw new AgentDispatcher.AgentDispatchError("there is no AI change to revert");
-			}
-			if (entry.revAfter() != rev) {
-				throw new AgentDispatcher.AgentDispatchError(
+			return switch (revertCore(session, rev)) {
+				case REVERTED -> "reverted the last AI change\nrev " + rev(session);
+				case NO_CHANGE -> throw new AgentDispatcher.AgentDispatchError(
+						"there is no AI change to revert");
+				case STALE -> throw new AgentDispatcher.AgentDispatchError(
 						"the project changed since the last AI change; use undo instead so those"
 								+ " edits are not lost");
-			}
-			revertStack.pop();
-			commit(session, entry.state());
-			highlightSink.accept(List.of());
-			return "reverted the last AI change\nrev " + rev(session);
+			};
 		}
 		boolean undo = "undo".equals(name);
 		if (!undo && !"redo".equals(name)) {
@@ -313,6 +308,46 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		}
 		return (undo ? "undid " : "redid ") + done + " change" + (done == 1 ? "" : "s")
 				+ "\nrev " + rev(session);
+	}
+
+	/** Why a revert request did not revert. */
+	private enum RevertOutcome {
+		REVERTED,
+		NO_CHANGE,
+		STALE
+	}
+
+	/**
+	 * Shared revert semantics for the {@code revert_ai} op and the chip's Revert button: restores
+	 * the full project state from before the last AI batch and clears the timeline highlights.
+	 * {@code rev} is the project's current rev; a mismatch means the user edited after the batch.
+	 */
+	private RevertOutcome revertCore(EditorSession session, long rev) {
+		RevertEntry entry = revertStack.peek();
+		if (entry == null) {
+			return RevertOutcome.NO_CHANGE;
+		}
+		if (entry.revAfter() != rev) {
+			return RevertOutcome.STALE;
+		}
+		revertStack.pop();
+		commit(session, entry.state());
+		highlightSink.accept(List.of());
+		return RevertOutcome.REVERTED;
+	}
+
+	/**
+	 * The chip's "Revert last AI change" (the {@code revert_ai} op without the wire): {@code false}
+	 * when there is no AI change, or when the user edited after it — reverting then would eat those
+	 * edits, so the editor's own undo stack stays the way back.
+	 */
+	CompletableFuture<Boolean> revertLastAiChange() {
+		EditorSession session = activeEditor.get();
+		if (session == null) {
+			return CompletableFuture.completedFuture(false);
+		}
+		return CompletableFuture.completedFuture(
+				revertCore(session, rev(session)) == RevertOutcome.REVERTED);
 	}
 
 	/** One editor store change = one undo step, so the user can Ctrl+Z the whole AI batch. */

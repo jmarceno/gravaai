@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import dev.gravaai.app.editor.EditorSession;
@@ -99,7 +98,7 @@ public final class AgentWiring implements AutoCloseable {
 						}
 					}
 				},
-				() -> CompletableFuture.completedFuture(false),
+				editorPort::revertLastAiChange,
 				appExecutablePath(),
 				List.of("--mcp", "--ozone-platform=headless"));
 		service.startIfEnabled();

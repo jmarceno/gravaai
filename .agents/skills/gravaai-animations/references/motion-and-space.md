@@ -112,8 +112,11 @@ elements shows nothing changing. Convert those elements with `update_element {id
 (at rest the pixels are identical) and the zoom — new or existing — immediately applies to them.
 
 **Zoom depth** (the `zoom` op, 1–6) is a zoom factor that grows with depth: 1 ≈ 1.25×, 2 ≈ 1.5×,
-3 ≈ 1.8× (the default), 4 ≈ 2.2×, 5 ≈ 3.5×, 6 ≈ 5×. When a callout must survive a zoom, give it a
-wider span than the zoom (start before, end after) so it's on screen before the punch-in begins.
+3 ≈ 1.8× (the default), 4 ≈ 2.2×, 5 ≈ 3.5×, 6 ≈ 5×. `focus` (0–1 across/down the frame) is the
+point that **stays centred in the output** while zoomed. Also budget the vertical space: the zoomed
+scene must fit between the frame top and the webcam box, so measure what the punch-in will crop
+before picking depth and focus. When a callout must survive a zoom, give it a wider span than the
+zoom (start before, end after) so it's on screen before the punch-in begins.
 
 ## Layer, geometry and span
 

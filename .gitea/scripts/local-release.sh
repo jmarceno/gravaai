@@ -4,7 +4,7 @@
 # is not simulated. Output lands in $OUT (default: ./dist-local) and logs in $LOG.
 #
 # Usage: .gitea/scripts/local-release.sh [version]     (default: pom version)
-# Env:   MEMORY=12g  CPUS=3  JOBS=2  OUT=...  WORK=...  LOG=...
+# Env:   MEMORY=12g  CPUS=4  JOBS=4  LIMIT=40m  OUT=...  WORK=...  LOG=...
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 version="${1:-$(sed -nE '0,/<version>([^<]+)<\/version>/s//\1/p' "$repo/java/pom.xml" | head -n1 | tr -d '[:space:]')}"
@@ -12,8 +12,9 @@ WORK="${WORK:-/tmp/gravaai-local-release}"
 OUT="${OUT:-$repo/dist-local}"
 LOG="${LOG:-$WORK/build.log}"
 MEMORY="${MEMORY:-12g}"
-CPUS="${CPUS:-3}"
-export JOBS="${JOBS:-2}"
+CPUS="${CPUS:-4}"
+export JOBS="${JOBS:-4}"
+LIMIT="${LIMIT:-40m}"   # hard cap for the whole build; a first run (cold caches) needs the most
 
 rm -rf "$WORK/checkout"
 mkdir -p "$WORK/checkout" "$OUT"
@@ -21,8 +22,8 @@ git -C "$repo" archive HEAD | tar -x -C "$WORK/checkout"   # committed files onl
 cd "$WORK/checkout"
 
 image=gravaai-release-builder:22.04
-docker build -t "$image" -f .gitea/builder/Containerfile .gitea/builder
-.gitea/scripts/container-build.sh "$image" java/dist \
+timeout --foreground "$LIMIT" docker build -t "$image" -f .gitea/builder/Containerfile .gitea/builder
+timeout --foreground "$LIMIT" .gitea/scripts/container-build.sh "$image" java/dist \
   --memory "$MEMORY" --memory-swap "$MEMORY" --cpus "$CPUS" -e JOBS \
   -v gravaai-release-native:/var/cache/gravaai-native \
   -v gravaai-release-m2:/root/.m2 \

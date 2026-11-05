@@ -20,6 +20,7 @@ import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.SceneElement;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.ZoomRegion;
 import dev.gravaai.services.agent.AgentIds;
@@ -114,6 +115,10 @@ final class AgentEditorViews {
 		if (!state.elements().isEmpty() || !state.elementComponents().isEmpty()) {
 			lines.add("elements " + count(state.elements()) + " • project components "
 					+ count(state.elementComponents()));
+			String hiding = fullFrameHidesWarning(state);
+			if (hiding != null) {
+				lines.add(hiding);
+			}
 		}
 		if (!state.elementAssets().isEmpty()) {
 			lines.add("assets " + state.elementAssets().stream().map(asset -> asset.name() + " ("
@@ -143,6 +148,47 @@ final class AgentEditorViews {
 		}
 		lines.add("rev " + meta.rev());
 		return String.join("\n", lines);
+	}
+
+	/**
+	 * The classic silent-invisibility trap as a one-line heuristic: a full-frame screen-space
+	 * element draws over the finished frame (after the webcam), so it hides every scene-space
+	 * element it overlaps in time — inspect shows both rendering while frames show nothing.
+	 * Returns {@code null} when no full-frame screen element overlaps a scene element.
+	 */
+	static @Nullable String fullFrameHidesWarning(ProjectEditorState state) {
+		if (state.elements().isEmpty()) {
+			return null;
+		}
+		Map<String, String> shorts = AgentIds.elementShortById(state);
+		List<SceneElement> screens = state.elements().stream().filter(element ->
+				element.space() == SceneElement.Space.SCREEN && coversFrame(element.box())).toList();
+		if (screens.isEmpty()) {
+			return null;
+		}
+		List<String> hidden = new ArrayList<>();
+		for (SceneElement element : state.elements()) {
+			if (element.space() != SceneElement.Space.SCENE) {
+				continue;
+			}
+			if (screens.stream().anyMatch(screen ->
+					screen.startMs() < element.endMs() && element.startMs() < screen.endMs())) {
+				hidden.add(shorts.getOrDefault(element.id(), element.id()));
+			}
+		}
+		if (hidden.isEmpty()) {
+			return null;
+		}
+		List<String> screenNames = screens.stream()
+				.map(element -> shorts.getOrDefault(element.id(), element.id())).toList();
+		return String.join(", ", screenNames) + " (screen, full-frame) may hide scene elements "
+				+ String.join(", ", hidden);
+	}
+
+	/** A box that covers (nearly) the whole frame: within 1% of every edge. */
+	private static boolean coversFrame(SceneElement.Box box) {
+		return box.x() <= 1 && box.y() <= 1
+				&& box.x() + box.width() >= 99 && box.y() + box.height() >= 99;
 	}
 
 	/**

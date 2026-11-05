@@ -2,18 +2,22 @@ package dev.gravaai.app.agent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.project.ElementMotion;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.SceneElement;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -106,6 +110,34 @@ class AgentEditorViewsTest {
 		assertThrows(IllegalArgumentException.class,
 				() -> AgentExportRunner.destination(options("/tmp/out.mp4", "gif")));
 		assertEquals("gif", AgentExportRunner.format(options("/tmp/out.gif", "gif")));
+	}
+
+	@Test
+	@DisplayName("overview warns when a full-frame screen-space element overlaps scene elements")
+	void overviewWarnsAboutHiddenSceneElements() throws Exception {
+		ProjectEditorState base = load("03-zoom-motion-blur.gravaai");
+		SceneElement backdrop = new SceneElement("element-a", "gravaai/shader-backdrop", 0, 4000,
+				SceneElement.Box.FULL, Json.nodeFactory().objectNode(), 0, SceneElement.Space.SCREEN,
+				List.of(), ElementMotion.Blur.NONE);
+		SceneElement callout = new SceneElement("element-b", "gravaai/callout", 1000, 2000,
+				new SceneElement.Box(30, 30, 40, 30), Json.nodeFactory().objectNode(), 0,
+				SceneElement.Space.SCENE, List.of(), ElementMotion.Blur.NONE);
+		ProjectEditorState state = base.toBuilder().elements(List.of(backdrop, callout)).build();
+		assertEquals("e1 (screen, full-frame) may hide scene elements e2",
+				AgentEditorViews.fullFrameHidesWarning(state));
+		assertTrue(AgentEditorViews.overview(state, meta(7))
+				.contains("e1 (screen, full-frame) may hide scene elements e2"));
+
+		ProjectEditorState small = base.toBuilder().elements(List.of(new SceneElement("element-a",
+				"gravaai/shader-backdrop", 0, 4000, new SceneElement.Box(10, 10, 80, 80),
+				Json.nodeFactory().objectNode(), 0))).build();
+		assertNull(AgentEditorViews.fullFrameHidesWarning(small));
+
+		SceneElement disjointCallout = new SceneElement("element-b", "gravaai/callout", 4000, 5000,
+				new SceneElement.Box(30, 30, 40, 30), Json.nodeFactory().objectNode(), 0,
+				SceneElement.Space.SCENE, List.of(), ElementMotion.Blur.NONE);
+		assertNull(AgentEditorViews.fullFrameHidesWarning(
+				base.toBuilder().elements(List.of(backdrop, disjointCallout)).build()));
 	}
 
 	private static ObjectNode options(String path, String format) {

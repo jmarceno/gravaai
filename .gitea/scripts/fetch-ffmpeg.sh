@@ -25,9 +25,10 @@ die() { printf '[fetch-ffmpeg] error: %s\n' "$*" >&2; exit 1; }
 mkdir -p "$cache"
 if [[ ! -f "$tarball" ]] || [[ "$(sha256sum "$tarball" | cut -d' ' -f1)" != "$FFMPEG_SHA256" ]]; then
 	say "downloading $FFMPEG_URL"
-	# --speed-limit/--speed-time abort a stalled transfer so --retry can start a fresh one.
-	curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 \
-		--max-time 900 -o "$tarball.part" "$FFMPEG_URL"
+	# Abort a dead transfer so --retry can start a fresh one, but do not require a minimum
+	# speed: that would kill a healthy slow download (see the Containerfile's download note).
+	curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 \
+		--max-time 1800 -o "$tarball.part" "$FFMPEG_URL"
 	got="$(sha256sum "$tarball.part" | cut -d' ' -f1)"
 	[[ "$got" == "$FFMPEG_SHA256" ]] || die "sha256 mismatch: expected $FFMPEG_SHA256, got $got"
 	mv "$tarball.part" "$tarball"

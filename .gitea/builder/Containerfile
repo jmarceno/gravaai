@@ -2,21 +2,28 @@
 # Holds JDK 27 + JavaFX 27 jmods and the packages the native helpers, FFmpeg and whisper.cpp need.
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Download rule: guard against a dead transfer, never against a slow one. download2.gluonhq.com
+# serves the JavaFX jmods at 90-270 KB/s on a healthy connection, so a "must exceed N KB/s"
+# floor makes every attempt abort and burn its retries on a perfectly good download. Abort only
+# when the transfer is effectively stopped (<10 KB/s for a minute) and let --max-time cap the
+# rest. The toolchain lives in its own early layers so editing the package list further down
+# does not re-download the JDK and jmods from that slow server.
+
+# Only what the downloads below need: this layer must stay stable and small.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential cmake pkg-config patchelf curl ca-certificates xz-utils zip unzip git file xvfb xauth libgtk-3-0 \
-        libwayland-dev wayland-protocols libpipewire-0.3-dev libdbus-1-dev \
-        libgl1 libegl1 libx11-6 libxext6 libxrender1 libxtst6 libxi6 libfontconfig1 libfreetype6 fuse libfuse2 \
+        ca-certificates curl xz-utils unzip \
     && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /opt/toolchain && cd /opt/toolchain \
-    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 --max-time 900 -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/27/ga/linux/x64/jdk/hotspot/normal/eclipse" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 --max-time 1800 -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/27/ga/linux/x64/jdk/hotspot/normal/eclipse" \
     && mkdir jdk && tar xzf jdk.tar.gz -C jdk --strip-components=1 && rm jdk.tar.gz \
-    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 --max-time 900 -o jmods.zip "https://download2.gluonhq.com/openjfx/27/openjfx-27_linux-x64_bin-jmods.zip" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 --max-time 1800 -o jmods.zip "https://download2.gluonhq.com/openjfx/27/openjfx-27_linux-x64_bin-jmods.zip" \
     && unzip -q jmods.zip && mv javafx-jmods-27* javafx-jmods && rm jmods.zip
 # Ubuntu 22.04 ships wayland-protocols 1.25, which predates the staging ext-image-* protocols the
 # capture helpers need. The protocols are plain XML, so install a current release and point
 # pkg-config at it (its pkgdatadir wins over the distro .pc through PKG_CONFIG_PATH).
 RUN mkdir -p /opt/wayland-protocols/src /opt/wayland-protocols/share/pkgconfig \
-    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 --max-time 900 -o /tmp/wp.tar.xz "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.45/downloads/wayland-protocols-1.45.tar.xz" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 --max-time 1800 -o /tmp/wp.tar.xz "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.45/downloads/wayland-protocols-1.45.tar.xz" \
     && tar xJf /tmp/wp.tar.xz -C /opt/wayland-protocols/src --strip-components=1 && rm /tmp/wp.tar.xz \
     && mkdir -p /opt/wayland-protocols/share/wayland-protocols \
     && cp -a /opt/wayland-protocols/src/stable /opt/wayland-protocols/src/staging /opt/wayland-protocols/src/unstable /opt/wayland-protocols/share/wayland-protocols/ \
@@ -26,7 +33,7 @@ RUN mkdir -p /opt/wayland-protocols/src /opt/wayland-protocols/share/pkgconfig \
 # capture helper includes. Stage the headers of a newer release (they are inline code; the helper
 # still links the distro's libpipewire-0.3.so) and shadow the distro .pc with one that points there.
 RUN mkdir -p /opt/pipewire/include/pipewire-0.3 /opt/pipewire/include/spa-0.3 /tmp/pw \
-    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 --max-time 900 -o /tmp/pw.tgz "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.2.7/pipewire-1.2.7.tar.gz" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 --max-time 1800 -o /tmp/pw.tgz "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.2.7/pipewire-1.2.7.tar.gz" \
     && tar xzf /tmp/pw.tgz -C /tmp/pw --strip-components=1 \
     && cp -a /tmp/pw/spa/include/spa /opt/pipewire/include/spa-0.3/ \
     && cp -a /tmp/pw/src/pipewire /opt/pipewire/include/pipewire-0.3/ \
@@ -34,6 +41,13 @@ RUN mkdir -p /opt/pipewire/include/pipewire-0.3 /opt/pipewire/include/spa-0.3 /t
     && sed -e 's/@PIPEWIRE_API_VERSION@/"0.3"/' -e 's/@PIPEWIRE_VERSION_MAJOR@/1/g' -e 's/@PIPEWIRE_VERSION_MINOR@/2/g' -e 's/@PIPEWIRE_VERSION_MICRO@/7/g' /tmp/pw/src/pipewire/version.h.in > /opt/pipewire/include/pipewire-0.3/pipewire/version.h \
     && printf 'Name: libpipewire\nDescription: PipeWire (newer headers, distro library)\nVersion: 1.2.7\nCflags: -I/opt/pipewire/include/pipewire-0.3 -I/opt/pipewire/include/spa-0.3\nLibs: -L/usr/lib/x86_64-linux-gnu -lpipewire-0.3\n' > /opt/wayland-protocols/share/pkgconfig/libpipewire-0.3.pc \
     && rm -rf /tmp/pw /tmp/pw.tgz
+# Build dependencies last: this is the list that gets edited while chasing build problems, and
+# with the toolchain layers above it no longer drags a 200 MB redownload behind it.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake pkg-config patchelf git file xvfb xauth libgtk-3-0 zip \
+        libwayland-dev wayland-protocols libpipewire-0.3-dev libdbus-1-dev \
+        libgl1 libegl1 libx11-6 libxext6 libxrender1 libxtst6 libxi6 libfontconfig1 libfreetype6 fuse libfuse2 \
+    && rm -rf /var/lib/apt/lists/*
 ENV PKG_CONFIG_PATH=/opt/wayland-protocols/share/pkgconfig
 ENV GRAVAAI_JAVA_HOME=/opt/toolchain/jdk JAVA_HOME=/opt/toolchain/jdk
 WORKDIR /workspace

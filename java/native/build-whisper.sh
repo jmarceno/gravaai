@@ -73,7 +73,8 @@ fi
 if [[ ! -f "$extract/CMakeLists.txt" ]]; then
 	if [[ ! -f "$archive" ]]; then
 		say "downloading whisper.cpp $WHISPER_VERSION source"
-		curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 262144 --speed-time 30 --max-time 1800 -o "$archive.part" "$SOURCE_URL"
+		# Stall guard, not a speed floor: a healthy download slower than 256 KB/s must not fail.
+		curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --speed-limit 10240 --speed-time 60 --max-time 1800 -o "$archive.part" "$SOURCE_URL"
 		mv "$archive.part" "$archive"
 	fi
 	say "source archive sha256: $(sha256sum "$archive" | cut -d' ' -f1)"

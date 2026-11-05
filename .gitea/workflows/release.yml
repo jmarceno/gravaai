@@ -21,7 +21,10 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The first run after a Containerfile change re-downloads the JDK and JavaFX jmods, and
+    # download2.gluonhq.com delivers the latter at ~100-250 KB/s: budget ~15 min for the builder
+    # image alone on top of the ~40 min build.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:

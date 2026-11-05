@@ -41,7 +41,7 @@ if [ ! -x "$TOOL" ] || [ "$(sha256sum "$TOOL" | cut -d' ' -f1)" != "$expected" ]
 	echo "build-appimage.sh: downloading appimagetool to $TOOL"
 	mkdir -p "$(dirname "$TOOL")"
 	curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 \
-		--speed-limit 262144 --speed-time 30 --max-time 600 -o "$TOOL.part" "$URL"
+		--speed-limit 10240 --speed-time 60 --max-time 600 -o "$TOOL.part" "$URL"
 	actual="$(sha256sum "$TOOL.part" | cut -d' ' -f1)"
 	if [ "$expected" != "$actual" ]; then
 		echo "build-appimage.sh: appimagetool checksum mismatch" >&2

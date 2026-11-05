@@ -73,7 +73,7 @@ fi
 if [[ ! -f "$extract/CMakeLists.txt" ]]; then
 	if [[ ! -f "$archive" ]]; then
 		say "downloading whisper.cpp $WHISPER_VERSION source"
-		curl -fsSL --retry 3 --max-time 1800 -o "$archive.part" "$SOURCE_URL"
+		curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --max-time 1800 -o "$archive.part" "$SOURCE_URL"
 		mv "$archive.part" "$archive"
 	fi
 	say "source archive sha256: $(sha256sum "$archive" | cut -d' ' -f1)"

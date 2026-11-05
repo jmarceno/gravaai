@@ -85,7 +85,7 @@ fetch() {
 	fi
 	mkdir -p "$(dirname "$dst")"
 	say "downloading $url"
-	curl -fsSL --retry 3 --max-time 1800 -o "$dst.part" "$url"
+	curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --max-time 1800 -o "$dst.part" "$url"
 	mv "$dst.part" "$dst"
 	if [[ -n "$want" ]]; then
 		local got

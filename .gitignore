@@ -16,3 +16,4 @@ extension-sources/
 target/
 *.class
 .jqwik-database
+/dist-local/

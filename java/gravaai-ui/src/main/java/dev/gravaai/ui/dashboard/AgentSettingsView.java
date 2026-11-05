@@ -18,7 +18,7 @@ import javafx.scene.layout.VBox;
 /**
  * Settings -> AI control (port of {@code AgentSettings.tsx}).
  *
- * <p>Off by default. When on, Gravaai listens on the local agent socket for an outside MCP client
+ * <p>On by default. When on, Gravaai listens on the local agent socket for an outside MCP client
  * (Claude Code, ...). The page only shows the switch, the status line and the copyable MCP
  * configuration; prompt handling and models stay outside the app. The agent service is Phase 3, so
  * the page talks to {@link AgentSettingsController} (Lead decision).

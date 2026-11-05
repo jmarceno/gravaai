@@ -91,7 +91,7 @@ public final class AgentSettingsView extends VBox implements AutoCloseable {
 		VBox enableSection = section(null, null, null);
 		Label enableTitle = new Label("AI control (MCP)");
 		enableTitle.getStyleClass().add("agent-settings__section-title");
-		Label enableDescription = new Label("Off by default. When on, Gravaai listens on the local "
+		Label enableDescription = new Label("On by default. When on, Gravaai listens on the local "
 				+ "agent socket for an MCP client.");
 		enableDescription.getStyleClass().add("agent-settings__description");
 		enableDescription.setWrapText(true);

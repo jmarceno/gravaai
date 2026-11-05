@@ -14,6 +14,7 @@ import dev.gravaai.app.editor.EditorSession;
 import dev.gravaai.app.export.ProjectExporter;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.settings.AppSettingsStore;
+import dev.gravaai.core.storage.StorageFiles;
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.services.agent.AgentDispatcher;
 import dev.gravaai.services.agent.AgentJobRegistry;
@@ -84,14 +85,14 @@ public final class AgentWiring implements AutoCloseable {
 				new AgentService.SettingsPort() {
 					@Override
 					public boolean aiControlEnabled() {
-						JsonNode value = settings.readSetting("aiControlEnabled");
-						return value != null && value.isBoolean() && value.booleanValue();
+						return AgentWiring.aiControlEnabled(
+								settings.readSetting(StorageFiles.AI_CONTROL_SETTING));
 					}
 
 					@Override
 					public void setAiControlEnabled(boolean enabled) {
 						try {
-							settings.writeSetting("aiControlEnabled",
+							settings.writeSetting(StorageFiles.AI_CONTROL_SETTING,
 									Json.nodeFactory().booleanNode(enabled));
 						} catch (IOException error) {
 							throw new java.io.UncheckedIOException(error);
@@ -139,6 +140,15 @@ public final class AgentWiring implements AutoCloseable {
 			return appImage;
 		}
 		return ProcessHandle.current().info().command().orElse("gravaai");
+	}
+
+	/**
+	 * AI control is on by default (plan card "AI Control must to be ON by default"): the stored
+	 * setting only matters when it explicitly says off, so a fresh install listens on the agent
+	 * socket without a visit to Settings first. A non-boolean value counts as the default.
+	 */
+	static boolean aiControlEnabled(@Nullable JsonNode stored) {
+		return stored == null || stored.isNull() || !stored.isBoolean() || stored.booleanValue();
 	}
 
 	// ── ports ───────────────────────────────────────────────────────────────────────────────

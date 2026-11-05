@@ -24,6 +24,8 @@ if [[ "$old" != "$version" ]]; then
   find . -name pom.xml -not -path './native/*' -exec sed -i "s#<version>$old</version>#<version>$version</version>#" {} +
   sed -i "s#\"$old\"#\"$version\"#" gravaai-app/src/main/java/dev/gravaai/app/mcp/McpMain.java
 fi
-step ./mvnw -B -T1 -DskipTests -Pdist package \
+# package-dist.sh trains the AOT cache by starting the real app for a few seconds: give it an X
+# display (Xvfb, software GL) - the container has no desktop.
+step xvfb-run -a -s "-screen 0 1920x1080x24" ./mvnw -B -T1 -DskipTests -Pdist package \
   -Dgravaai.jdk=/opt/toolchain/jdk -Dgravaai.javafx.jmods=/opt/toolchain/javafx-jmods \
   -Dgravaai.build.root=/tmp/gravaai-targets

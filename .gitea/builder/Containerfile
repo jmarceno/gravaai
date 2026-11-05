@@ -3,7 +3,7 @@
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential cmake pkg-config nasm patchelf curl ca-certificates xz-utils unzip git file \
+        build-essential cmake pkg-config patchelf curl ca-certificates xz-utils zip unzip git file xvfb xauth libgtk-3-0 \
         libwayland-dev wayland-protocols libpipewire-0.3-dev libdbus-1-dev \
         libgl1 libegl1 libx11-6 libxext6 libxrender1 libxtst6 libxi6 libfontconfig1 libfreetype6 fuse libfuse2 \
     && rm -rf /var/lib/apt/lists/*

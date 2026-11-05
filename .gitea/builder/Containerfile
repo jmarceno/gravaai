@@ -12,5 +12,16 @@ RUN mkdir -p /opt/toolchain && cd /opt/toolchain \
     && mkdir jdk && tar xzf jdk.tar.gz -C jdk --strip-components=1 && rm jdk.tar.gz \
     && curl -fsSL --retry 3 -o jmods.zip "https://download2.gluonhq.com/openjfx/27/openjfx-27_linux-x64_bin-jmods.zip" \
     && unzip -q jmods.zip && mv javafx-jmods-27* javafx-jmods && rm jmods.zip
+# Ubuntu 22.04 ships wayland-protocols 1.25, which predates the staging ext-image-* protocols the
+# capture helpers need. The protocols are plain XML, so install a current release and point
+# pkg-config at it (its pkgdatadir wins over the distro .pc through PKG_CONFIG_PATH).
+RUN mkdir -p /opt/wayland-protocols/src /opt/wayland-protocols/share/pkgconfig \
+    && curl -fsSL --retry 3 -o /tmp/wp.tar.xz "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.45/downloads/wayland-protocols-1.45.tar.xz" \
+    && tar xJf /tmp/wp.tar.xz -C /opt/wayland-protocols/src --strip-components=1 && rm /tmp/wp.tar.xz \
+    && mkdir -p /opt/wayland-protocols/share/wayland-protocols \
+    && cp -a /opt/wayland-protocols/src/stable /opt/wayland-protocols/src/staging /opt/wayland-protocols/src/unstable /opt/wayland-protocols/share/wayland-protocols/ \
+    && printf 'prefix=/opt/wayland-protocols\npkgdatadir=${prefix}/share/wayland-protocols\nName: Wayland Protocols\nDescription: Wayland protocol files\nVersion: 1.45\n' > /opt/wayland-protocols/share/pkgconfig/wayland-protocols.pc \
+    && rm -rf /opt/wayland-protocols/src
+ENV PKG_CONFIG_PATH=/opt/wayland-protocols/share/pkgconfig
 ENV GRAVAAI_JAVA_HOME=/opt/toolchain/jdk JAVA_HOME=/opt/toolchain/jdk
 WORKDIR /workspace

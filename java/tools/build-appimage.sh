@@ -31,25 +31,27 @@ for required in IMAGE NAME VERSION ICON OUTPUT; do
 done
 
 TOOL="${GRAVAAI_APPIMAGE_TOOL:-$SCRIPT_DIR/../build/tools/appimagetool-x86_64.AppImage}"
-URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+# A versioned release, never "continuous": that tag is rebuilt upstream, which breaks the pin.
+URL="https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
 PIN_FILE="$SCRIPT_DIR/appimagetool.sha256"
+expected="$(tr -d '[:space:]' < "$PIN_FILE")"
 
-if [ ! -x "$TOOL" ]; then
+# A cached tool that does not match the pin (an older pin, a partial file) is replaced.
+if [ ! -x "$TOOL" ] || [ "$(sha256sum "$TOOL" | cut -d' ' -f1)" != "$expected" ]; then
 	echo "build-appimage.sh: downloading appimagetool to $TOOL"
 	mkdir -p "$(dirname "$TOOL")"
-	curl -fL --retry 3 --connect-timeout 20 -o "$TOOL.part" "$URL"
-	mv "$TOOL.part" "$TOOL"
-	chmod +x "$TOOL"
-fi
-if [ -f "$PIN_FILE" ]; then
-	expected="$(tr -d '[:space:]' < "$PIN_FILE")"
-	actual="$(sha256sum "$TOOL" | cut -d' ' -f1)"
+	curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 \
+		--speed-limit 262144 --speed-time 30 --max-time 600 -o "$TOOL.part" "$URL"
+	actual="$(sha256sum "$TOOL.part" | cut -d' ' -f1)"
 	if [ "$expected" != "$actual" ]; then
 		echo "build-appimage.sh: appimagetool checksum mismatch" >&2
 		echo "  expected $expected" >&2
 		echo "  actual   $actual" >&2
+		rm -f "$TOOL.part"
 		exit 1
 	fi
+	mv "$TOOL.part" "$TOOL"
+	chmod +x "$TOOL"
 fi
 
 WORK="$(dirname "$OUTPUT")/.appimage-work"

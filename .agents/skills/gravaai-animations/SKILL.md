@@ -219,5 +219,9 @@ then read `inspect overview` for element errors and the slowest elements before 
   invisibly hidden (no errors — it just never shows up). Put full-frame backdrops in
   `space:"scene"`, and remember a zoom only moves scene content — screen-space elements must be
   converted to ride a punch-in. Details in `references/motion-and-space.md`.
+- **The timeline never grows.** There is no insert-time op — the edited duration can't exceed the
+  source. An "intro at the start" is therefore a full-frame element **overlaid** on the opening
+  seconds (content keeps its timing and simply plays underneath/after), not an insert that pushes
+  everything later. Say which you chose; overlay is the norm for intros and titles.
 - **One component per project.** Components aren't shared across projects; copy the source into a
   new project if needed.

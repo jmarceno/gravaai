@@ -48,8 +48,9 @@ for lib in "$out"/lib/*.so.*; do
 done
 
 "$out/bin/ffmpeg" -hide_banner -version | head -n1
+encoders="$("$out/bin/ffmpeg" -hide_banner -encoders 2>/dev/null)"
 for encoder in libx264 libopus libmp3lame h264_vaapi h264_vulkan h264_nvenc; do
-	"$out/bin/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -qE "^ *[A-Z.]+ +$encoder " \
+	grep -qE "^ *[A-Z.]+ +$encoder " <<<"$encoders" \
 		|| die "encoder $encoder missing from the staged FFmpeg"
 done
 say "staged $(du -sh "$out" | cut -f1) into $out"

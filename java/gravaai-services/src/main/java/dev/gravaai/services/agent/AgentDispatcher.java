@@ -710,7 +710,7 @@ public final class AgentDispatcher implements AutoCloseable {
 			return failure("frames needs \"at\" times, or \"from\" and \"to\" for a contact sheet");
 		}
 		if (from != null && to != null && to <= from) {
-			return failure("\"to\" must be after \"from\"");
+			return failure("\"to\" must be after \"from\" (for exact single frames use at:[…])");
 		}
 		Double clampedWidth = clamp(args.path("width"), FRAME_WIDTH_MIN, FRAME_WIDTH_MAX);
 		int width = Math.round((float) (clampedWidth == null ? FRAME_WIDTH_DEFAULT : clampedWidth));

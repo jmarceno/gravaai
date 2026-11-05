@@ -62,7 +62,7 @@ public final class AgentHelpText {
 			Clips are always re-packed: you never create gaps. Zoom/speed/annotation/audio regions follow the footage they cover.""".stripTrailing();
 
 	private static final String ZOOM = """
-			zoom {from,to, depth? 1–6, focus?:{x,y}} — depth 1 is closest, 6 tightest; focus is 0–1 across/down the frame.
+			zoom {from,to, depth? 1–6, focus?:{x,y}} — depth sets the zoom factor: 1=1.25x, 2=1.5x, 3=1.8x (default), 4=2.2x, 5=3.5x, 6=5x. focus is the frame point (0–1 across/down) that stays centred in the output while zoomed.
 			update_zoom {id, from?,to?,depth?,focus?}
 			delete_zoom {id} | {all:true}
 			auto_zoom {from?,to?,replace?} — one zoom per click cluster from the recording's cursor telemetry.

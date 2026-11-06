@@ -22,6 +22,7 @@ import dev.gravaai.services.automations.AutomationTemplate;
 import dev.gravaai.services.automations.AutomationTrigger;
 import dev.gravaai.services.automations.Automations;
 import dev.gravaai.services.automations.AutomationsFile;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Card;
 import dev.gravaai.ui.kit.Dialog;
@@ -103,7 +104,7 @@ public final class AutomationsSettingsView extends VBox {
 					rebuild();
 				});
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	/** Flushes an edit still inside the debounce window (used when leaving the page). */
@@ -142,7 +143,7 @@ public final class AutomationsSettingsView extends VBox {
 		refreshDirtyHint(false);
 		return CompletableFuture.supplyAsync(() -> controller.saveAutomations(
 				java.util.Objects.requireNonNull(Automations.toJson(snapshot),
-						"automations serialiser produced no document")))
+						"automations serialiser produced no document")), UiThreads.background())
 				.thenApplyAsync(result -> {
 					saving = false;
 					if (result.isOk()) {
@@ -379,7 +380,8 @@ public final class AutomationsSettingsView extends VBox {
 					return;
 				}
 				CompletableFuture.supplyAsync(() ->
-						controller.runAutomationOnFile(rule.id(), sample.toString(), null))
+						controller.runAutomationOnFile(rule.id(), sample.toString(), null),
+						UiThreads.background())
 						.thenAcceptAsync(this::handleRunResult, Platform::runLater);
 			});
 		});

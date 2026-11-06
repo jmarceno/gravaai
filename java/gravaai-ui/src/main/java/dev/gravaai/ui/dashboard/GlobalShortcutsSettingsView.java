@@ -12,6 +12,7 @@ import dev.gravaai.services.shortcuts.GlobalShortcutKeyEvent;
 import dev.gravaai.services.shortcuts.GlobalShortcuts;
 import dev.gravaai.services.shortcuts.GlobalShortcutsConfig;
 import dev.gravaai.services.shortcuts.GlobalShortcutsStatus;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -74,7 +75,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			} catch (RuntimeException error) {
 				Platform.runLater(() -> showError(message(error)));
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	private GlobalShortcutsConfig loadedConfig() {
@@ -292,7 +293,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 					showError(message(error));
 				});
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	private void reset() {

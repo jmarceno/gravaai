@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Switch;
 import dev.gravaai.ui.kit.Toast;
@@ -45,7 +46,7 @@ public final class AgentSettingsView extends VBox {
 			} catch (RuntimeException error) {
 				Platform.runLater(() -> showError(message(error)));
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	private void rebuild() {
@@ -121,7 +122,7 @@ public final class AgentSettingsView extends VBox {
 					showError(message(error));
 				});
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	private void copy(String label, String text) {

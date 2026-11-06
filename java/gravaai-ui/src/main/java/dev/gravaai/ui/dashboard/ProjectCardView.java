@@ -11,6 +11,7 @@ import javafx.animation.PauseTransition;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
 import dev.gravaai.services.projects.RecordingEntry;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -463,7 +464,7 @@ final class ProjectCardView extends VBox {
 				} finally {
 					javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 				}
-			});
+			}, UiThreads.background());
 		});
 	}
 
@@ -482,7 +483,7 @@ final class ProjectCardView extends VBox {
 			} finally {
 				javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 			}
-		});
+		}, UiThreads.background());
 	}
 
 	private void startRename() {
@@ -532,6 +533,6 @@ final class ProjectCardView extends VBox {
 					model.busyProperty().set(false);
 				});
 			}
-		});
+		}, UiThreads.background());
 	}
 }

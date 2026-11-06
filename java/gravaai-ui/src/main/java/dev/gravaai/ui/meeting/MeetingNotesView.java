@@ -13,6 +13,7 @@ import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.Subscription;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.kit.Toast;
@@ -158,21 +159,22 @@ public final class MeetingNotesView extends VBox {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.getFiles(current)).thenAcceptAsync(result -> {
-			if (!current.equals(mediaPath)) {
-				return;
-			}
-			loading = false;
-			if (result.isErr()) {
-				showError(result.errorMessage());
-			} else {
-				error(null);
-				files = result.orNull();
-			}
-			rebuildJobStatus();
-			rebuildContent();
-			rebuildActions();
-		}, Platform::runLater);
+		CompletableFuture.supplyAsync(() -> service.getFiles(current), UiThreads.background())
+				.thenAcceptAsync(result -> {
+					if (!current.equals(mediaPath)) {
+						return;
+					}
+					loading = false;
+					if (result.isErr()) {
+						showError(result.errorMessage());
+					} else {
+						error(null);
+						files = result.orNull();
+					}
+					rebuildJobStatus();
+					rebuildContent();
+					rebuildActions();
+				}, Platform::runLater);
 	}
 
 	private void loadLatestJob() {
@@ -180,21 +182,22 @@ public final class MeetingNotesView extends VBox {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(service::listJobs).thenAcceptAsync(jobs -> {
-			if (!current.equals(mediaPath) || jobs == null) {
-				return;
-			}
-			MeetingJob latest = null;
-			for (MeetingJob candidate : jobs) {
-				if (candidate.mediaPath() != null && candidate.mediaPath().equals(current)) {
-					latest = candidate;
-				}
-			}
-			job = latest;
-			rebuildJobStatus();
-			rebuildContent();
-			rebuildActions();
-		}, Platform::runLater);
+		CompletableFuture.supplyAsync(service::listJobs, UiThreads.background())
+				.thenAcceptAsync(jobs -> {
+					if (!current.equals(mediaPath) || jobs == null) {
+						return;
+					}
+					MeetingJob latest = null;
+					for (MeetingJob candidate : jobs) {
+						if (candidate.mediaPath() != null && candidate.mediaPath().equals(current)) {
+							latest = candidate;
+						}
+					}
+					job = latest;
+					rebuildJobStatus();
+					rebuildContent();
+					rebuildActions();
+				}, Platform::runLater);
 	}
 
 	private void onJobUpdate(MeetingJob update) {
@@ -406,7 +409,7 @@ public final class MeetingNotesView extends VBox {
 				? MeetingService.FileKind.NOTES
 				: MeetingService.FileKind.TRANSCRIPT;
 		String content = draft == null ? "" : draft;
-		CompletableFuture.supplyAsync(() -> service.saveFile(current, kind, content))
+		CompletableFuture.supplyAsync(() -> service.saveFile(current, kind, content), UiThreads.background())
 				.thenAcceptAsync(result -> {
 					if (result.isErr()) {
 						showError(result.errorMessage());
@@ -437,16 +440,17 @@ public final class MeetingNotesView extends VBox {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.runJob(current, mode)).thenAcceptAsync(result -> {
-			if (result.isErr()) {
-				showError(result.errorMessage());
-				return;
-			}
-			job = result.orNull();
-			rebuildJobStatus();
-			rebuildContent();
-			rebuildActions();
-		}, Platform::runLater);
+		CompletableFuture.supplyAsync(() -> service.runJob(current, mode), UiThreads.background())
+				.thenAcceptAsync(result -> {
+					if (result.isErr()) {
+						showError(result.errorMessage());
+						return;
+					}
+					job = result.orNull();
+					rebuildJobStatus();
+					rebuildContent();
+					rebuildActions();
+				}, Platform::runLater);
 	}
 
 	private void cancel() {
@@ -454,7 +458,7 @@ public final class MeetingNotesView extends VBox {
 		if (current == null || !current.isActive()) {
 			return;
 		}
-		CompletableFuture.runAsync(() -> service.cancelJob(current.id()));
+		CompletableFuture.runAsync(() -> service.cancelJob(current.id()), UiThreads.background());
 	}
 
 	private void error(@Nullable String message) {

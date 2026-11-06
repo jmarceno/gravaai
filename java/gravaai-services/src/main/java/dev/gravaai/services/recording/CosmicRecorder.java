@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -173,6 +174,14 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	private final KeystrokeSource keystrokes;
 	private final Supplier<MicNoiseReduction> micNoiseReductionSetting;
 	private final ScheduledExecutorService diskChecker;
+	/** One virtual thread per process wait (plan §4.1: virtual threads for process waiting). */
+	private final ExecutorService processWaits = Executors.newVirtualThreadPerTaskExecutor();
+	/**
+	 * Pipe drains sit in long native reads (plan §4.1: keep FFmpeg pipe drains on platform
+	 * threads); one daemon platform thread per drained pipe, off the shared common pool.
+	 */
+	private final ExecutorService pipeDrains = Executors.newThreadPerTaskExecutor(
+			Thread.ofPlatform().daemon().name("gravaai-recorder-drain-", 0).factory());
 
 	private @Nullable ActiveRecording active;
 
@@ -526,14 +535,14 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		return track;
 	}
 
-	private static CompletableFuture<Void> processExit(SpawnedProcess process) {
+	private CompletableFuture<Void> processExit(SpawnedProcess process) {
 		return CompletableFuture.runAsync(() -> {
 			try {
 				process.waitFor();
 			} catch (InterruptedException error) {
 				Thread.currentThread().interrupt();
 			}
-		});
+		}, processWaits);
 	}
 
 	private void killAudioTracks(List<AudioTrack> audio) {
@@ -688,7 +697,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		}
 	}
 
-	private static CompletableFuture<Integer> exitCode(SpawnedProcess process) {
+	private CompletableFuture<Integer> exitCode(SpawnedProcess process) {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
 				return process.waitFor();
@@ -696,7 +705,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 				Thread.currentThread().interrupt();
 				return -1;
 			}
-		});
+		}, processWaits);
 	}
 
 	/** @param stream the piped stream, or null when the process was spawned without it */
@@ -923,7 +932,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 				} catch (IOException error) {
 					return "";
 				}
-			});
+			}, pipeDrains);
 			return new FfmpegRun(process, stderr);
 		} catch (IOException error) {
 			throw new IllegalStateException("Could not start ffmpeg", error);
@@ -1261,7 +1270,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			} catch (IOException error) {
 				return new byte[0];
 			}
-		});
+		}, pipeDrains);
 		CompletableFuture<byte[]> stderr = CompletableFuture.supplyAsync(() -> {
 			if (stderrPipe == null) {
 				return new byte[0];
@@ -1271,7 +1280,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			} catch (IOException error) {
 				return new byte[0];
 			}
-		});
+		}, pipeDrains);
 		int code;
 		try {
 			code = process.waitFor();

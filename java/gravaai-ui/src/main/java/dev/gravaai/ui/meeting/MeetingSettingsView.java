@@ -16,6 +16,7 @@ import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingServiceKind;
 import dev.gravaai.services.meeting.MeetingSettings;
 import dev.gravaai.services.meeting.Subscription;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.dashboard.SettingsRow;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.ChoiceGroup;
@@ -100,7 +101,7 @@ public final class MeetingSettingsView extends VBox {
 			MeetingSettings.View settings = service.settings();
 			List<MeetingService.AssetStatus> statuses = service.listAssets();
 			return new Loaded(settings, statuses);
-		}).thenAcceptAsync(loaded -> {
+		}, UiThreads.background()).thenAcceptAsync(loaded -> {
 			view = loaded.settings();
 			assets = loaded.assets();
 			loading = false;
@@ -109,10 +110,11 @@ public final class MeetingSettingsView extends VBox {
 	}
 
 	private void refreshAssets() {
-		CompletableFuture.supplyAsync(service::listAssets).thenAcceptAsync(statuses -> {
-			assets = statuses == null ? List.of() : statuses;
-			rebuild();
-		}, Platform::runLater);
+		CompletableFuture.supplyAsync(service::listAssets, UiThreads.background())
+				.thenAcceptAsync(statuses -> {
+					assets = statuses == null ? List.of() : statuses;
+					rebuild();
+				}, Platform::runLater);
 	}
 
 	private void rebuild() {
@@ -383,7 +385,7 @@ public final class MeetingSettingsView extends VBox {
 	}
 
 	private void apply(Supplier<Result<MeetingSettings.View>> change) {
-		CompletableFuture.supplyAsync(change).thenAcceptAsync(result -> {
+		CompletableFuture.supplyAsync(change, UiThreads.background()).thenAcceptAsync(result -> {
 			if (result.isErr()) {
 				error = result.errorMessage();
 				Toast.show(this, error).variant(Toast.Variant.DANGER);
@@ -417,7 +419,7 @@ public final class MeetingSettingsView extends VBox {
 	}
 
 	private void removeAsset(MeetingService.AssetStatus asset) {
-		CompletableFuture.supplyAsync(() -> service.removeAsset(asset.id()))
+		CompletableFuture.supplyAsync(() -> service.removeAsset(asset.id()), UiThreads.background())
 				.thenAcceptAsync(result -> {
 					if (result.isErr()) {
 						Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);

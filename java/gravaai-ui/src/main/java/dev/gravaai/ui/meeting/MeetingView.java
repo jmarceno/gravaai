@@ -17,6 +17,7 @@ import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingMeta;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.Subscription;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -258,18 +259,19 @@ public final class MeetingView extends Region {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.getFiles(current)).thenAcceptAsync(result -> {
-			if (!current.equals(mediaPath)) {
-				return;
-			}
-			if (result.isErr()) {
-				Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
-				return;
-			}
-			MeetingService.FilesView files = result.orNull();
-			meta = files == null ? null : files.meta();
-			updateTitle();
-		}, Platform::runLater);
+		CompletableFuture.supplyAsync(() -> service.getFiles(current), UiThreads.background())
+				.thenAcceptAsync(result -> {
+					if (!current.equals(mediaPath)) {
+						return;
+					}
+					if (result.isErr()) {
+						Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
+						return;
+					}
+					MeetingService.FilesView files = result.orNull();
+					meta = files == null ? null : files.meta();
+					updateTitle();
+				}, Platform::runLater);
 	}
 
 	private void updateTitle() {
@@ -318,7 +320,7 @@ public final class MeetingView extends Region {
 			return;
 		}
 		Path current = mediaPath;
-		CompletableFuture.supplyAsync(() -> service.renameMeeting(current, next))
+		CompletableFuture.supplyAsync(() -> service.renameMeeting(current, next), UiThreads.background())
 				.thenAcceptAsync(result -> {
 					if (result.isErr()) {
 						Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);

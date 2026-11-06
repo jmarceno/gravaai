@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -129,7 +130,7 @@ public final class DashboardFiltersBar extends VBox {
 						model.busyProperty().set(false);
 					});
 				}
-			});
+			}, UiThreads.background());
 			return;
 		}
 		DashboardDeleteDialog.show(this, paths, deleteRecordings -> {
@@ -144,7 +145,7 @@ public final class DashboardFiltersBar extends VBox {
 				} finally {
 					Platform.runLater(() -> model.busyProperty().set(false));
 				}
-			});
+			}, UiThreads.background());
 		});
 	}
 

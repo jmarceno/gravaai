@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.dashboard.SettingsRow;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Dialog;
@@ -107,7 +108,8 @@ public final class MeetingLibraryView extends VBox {
 		loading = true;
 		error = null;
 		rebuild();
-		CompletableFuture.supplyAsync(service::listMeetings).thenAcceptAsync(result -> {
+		CompletableFuture.supplyAsync(service::listMeetings, UiThreads.background())
+				.thenAcceptAsync(result -> {
 			loading = false;
 			if (result.isErr()) {
 				error = result.errorMessage();
@@ -218,7 +220,8 @@ public final class MeetingLibraryView extends VBox {
 			if (next.isEmpty() || next.equals(title.getText())) {
 				return;
 			}
-			CompletableFuture.supplyAsync(() -> service.renameMeeting(entry.mediaPath(), next))
+			CompletableFuture.supplyAsync(() -> service.renameMeeting(entry.mediaPath(), next),
+					UiThreads.background())
 					.thenAcceptAsync(result -> {
 						if (result.isErr()) {
 							Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
@@ -247,7 +250,8 @@ public final class MeetingLibraryView extends VBox {
 		Button delete = new Button("Delete", Button.Variant.DESTRUCTIVE, Button.Size.SM);
 		delete.setOnAction(event -> {
 			dialog.close();
-			CompletableFuture.supplyAsync(() -> service.deleteMeetings(List.of(entry.mediaPath())))
+			CompletableFuture.supplyAsync(() -> service.deleteMeetings(List.of(entry.mediaPath())),
+					UiThreads.background())
 					.thenAcceptAsync(result -> {
 						if (result.isErr()) {
 							Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
@@ -265,7 +269,8 @@ public final class MeetingLibraryView extends VBox {
 		if (picked == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.importMeeting(picked)).thenAcceptAsync(result -> {
+		CompletableFuture.supplyAsync(() -> service.importMeeting(picked), UiThreads.background())
+				.thenAcceptAsync(result -> {
 			if (result.isErr()) {
 				Toast.show(this, result.errorMessage()).variant(Toast.Variant.DANGER);
 				return;

@@ -12,8 +12,10 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -127,11 +129,20 @@ public final class RecordingThumbnails {
 			throw new IllegalStateException("Could not start ffmpeg for a thumbnail", error);
 		}
 		try (InputStream stdout = process.stdout(); InputStream stderr = process.stderr()) {
-			CompletableFuture<byte[]> output = CompletableFuture.supplyAsync(() -> readAll(stdout));
-			CompletableFuture<byte[]> errors = CompletableFuture.supplyAsync(() -> readAll(stderr));
+			// Both drains share one scope-shaped executor (plan §4.1: FFmpeg pipe drains stay on
+			// platform threads) so neither reader can outlive the decode. The JDK's
+			// StructuredTaskScope is still a preview API on this toolchain, so the shape comes
+			// from the executor's close() instead.
+			List<Future<byte[]>> drained;
+			try (ExecutorService drains = Executors.newThreadPerTaskExecutor(
+					Thread.ofPlatform().daemon().name("gravaai-thumbnail-drain-", 0).factory())) {
+				drained = drains.invokeAll(List.of(
+						() -> readAll(stdout),
+						() -> readAll(stderr)));
+			}
 			int code = process.waitFor();
-			byte[] bytes = output.join();
-			String errorText = new String(errors.join(), StandardCharsets.UTF_8).trim();
+			byte[] bytes = drained.get(0).get();
+			String errorText = new String(drained.get(1).get(), StandardCharsets.UTF_8).trim();
 			if (code != 0) {
 				throw new IllegalStateException(
 						errorText.isEmpty() ? "ffmpeg exited with code " + code : errorText);
@@ -139,6 +150,8 @@ public final class RecordingThumbnails {
 			return bytes;
 		} catch (IOException error) {
 			throw new IllegalStateException("Could not decode a thumbnail", error);
+		} catch (ExecutionException error) {
+			throw new IllegalStateException("Could not drain a thumbnail decode", error.getCause());
 		} catch (InterruptedException error) {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException("Thumbnail decoding was interrupted", error);

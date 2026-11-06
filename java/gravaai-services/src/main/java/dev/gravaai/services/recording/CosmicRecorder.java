@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -123,8 +124,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	private record VideoCapture(
 			SpawnedProcess capture,
 			SpawnedProcess encoder,
-			Path videoPath,
-			CompletableFuture<Integer> encoderExit) {
+			Path videoPath) {
 	}
 
 	private static final class ActiveRecording {
@@ -621,7 +621,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		Thread.ofPlatform().daemon().name("gravaai-av-copy").start(() -> copyFrames(capture, encoder));
 
 		ActiveRecording recording = new ActiveRecording(
-				new VideoCapture(capture, encoder, videoPath, exitCode(encoder)),
+				new VideoCapture(capture, encoder, videoPath),
 				audio, outputPath, videoStartedAtMs, options.keepSpeakerTracks(), pauseState,
 				currentMicNoiseReduction(), timestamp,
 				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
@@ -695,17 +695,6 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		} catch (IOException error) {
 			LOG.log(System.Logger.Level.WARNING, "Frame copy ended: " + error);
 		}
-	}
-
-	private CompletableFuture<Integer> exitCode(SpawnedProcess process) {
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				return process.waitFor();
-			} catch (InterruptedException error) {
-				Thread.currentThread().interrupt();
-				return -1;
-			}
-		}, processWaits);
 	}
 
 	/** @param stream the piped stream, or null when the process was spawned without it */
@@ -1056,10 +1045,8 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			writeCommand(video.capture(), "stop");
 			closeStdin(video.capture());
 		}
-		List<CompletableFuture<Void>> audioExits = new ArrayList<>();
 		for (AudioTrack track : recording.audio) {
 			track.process.destroy();
-			audioExits.add(processExit(track.process).thenRun(() -> closeQuietly(track.file)));
 		}
 		if (video != null) {
 			try {
@@ -1069,15 +1056,49 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 			}
 			persistCosmicCursorTelemetry(recording);
 		}
+		// The processes were already told to stop; reap the encoder and the audio tracks in one
+		// scope-shaped executor so a hung wait on one cannot leave the others unreaped (and no
+		// reaper outlives this method).
 		int encoderCode = 0;
-		if (video != null) {
-			try {
-				encoderCode = video.encoderExit().join();
-			} catch (RuntimeException error) {
-				encoderCode = -1;
+		try (ExecutorService reaper = Executors.newThreadPerTaskExecutor(
+				Thread.ofVirtual().name("gravaai-record-reap-", 0).factory())) {
+			Future<Integer> encoderExit = video == null ? null
+					: reaper.submit(() -> {
+						try {
+							return video.encoder().waitFor();
+						} catch (InterruptedException error) {
+							Thread.currentThread().interrupt();
+							return -1;
+						}
+					});
+			List<Future<Void>> audioExits = new ArrayList<>();
+			for (AudioTrack track : recording.audio) {
+				audioExits.add(reaper.submit(() -> {
+					try {
+						track.process.waitFor();
+					} catch (InterruptedException error) {
+						Thread.currentThread().interrupt();
+					}
+					closeQuietly(track.file);
+					return null;
+				}));
 			}
+			for (Future<Void> audioExit : audioExits) {
+				audioExit.get();
+			}
+			if (encoderExit != null) {
+				try {
+					encoderCode = encoderExit.get();
+				} catch (RuntimeException error) {
+					// The reaper already folded a failed wait into the exit code.
+					encoderCode = -1;
+				}
+			}
+		} catch (InterruptedException error) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException error) {
+			LOG.log(System.Logger.Level.WARNING, "Reaping the stopped recording failed: " + error);
 		}
-		CompletableFuture.allOf(audioExits.toArray(CompletableFuture[]::new)).join();
 		if (encoderCode != 0) {
 			return StopResult.failed("The video encoder exited with code " + encoderCode + ".");
 		}
@@ -1161,11 +1182,9 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 		if (recording.video != null) {
 			try {
 				recording.video.capture().waitFor();
-				recording.video.encoderExit().join();
+				recording.video.encoder().waitFor();
 			} catch (InterruptedException error) {
 				Thread.currentThread().interrupt();
-			} catch (RuntimeException error) {
-				// Encoder already gone.
 			}
 		}
 		removeCosmicTempFiles(recording);

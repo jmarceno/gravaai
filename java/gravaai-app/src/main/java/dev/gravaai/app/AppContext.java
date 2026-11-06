@@ -1601,6 +1601,11 @@ public final class AppContext {
 				quit();
 				return;
 			}
+			if (editor != null) {
+				// Close-to-tray only hides the window: the engine keeps decoding on its background
+				// threads, so the preview must pause before the window disappears.
+				editor.pausePlayback();
+			}
 			stage.hide();
 		});
 	}

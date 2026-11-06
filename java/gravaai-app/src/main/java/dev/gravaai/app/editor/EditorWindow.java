@@ -626,6 +626,13 @@ public final class EditorWindow {
 		}
 	}
 
+	/** Pauses the preview when it is playing (no-op otherwise); the position is kept. */
+	public void pausePlayback() {
+		if (session.playbackPort().state().isPlaying()) {
+			session.playbackPort().togglePlayPause();
+		}
+	}
+
 	private void requestClose(javafx.stage.WindowEvent event) {
 		if (isExportRunning()) {
 			event.consume();

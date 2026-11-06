@@ -32,6 +32,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioInput;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
@@ -265,7 +266,12 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	 * Without this the app kept "recording" a pipe that no longer delivered frames.
 	 */
 	private void watchCaptureEnd(ActiveRecording recording, SpawnedProcess capture) {
-		processExit(capture).thenRun(() -> {
+		Threads.startVirtual("gravaai-capture-watch", () -> {
+			try {
+				capture.waitFor();
+			} catch (InterruptedException error) {
+				Thread.currentThread().interrupt();
+			}
 			synchronized (this) {
 				// The app stopped or discarded the recording itself.
 				if (active != recording) {

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
@@ -458,7 +459,7 @@ public final class MeetingNotesView extends VBox {
 		if (current == null || !current.isActive()) {
 			return;
 		}
-		CompletableFuture.runAsync(() -> service.cancelJob(current.id()), UiThreads.background());
+		Threads.startVirtual("gravaai-meeting-cancel", () -> service.cancelJob(current.id()));
 	}
 
 	private void error(@Nullable String message) {

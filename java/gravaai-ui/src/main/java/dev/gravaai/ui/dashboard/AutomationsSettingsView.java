@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.automations.AutomationAction;
 import dev.gravaai.services.automations.AutomationActionType;
@@ -89,7 +90,7 @@ public final class AutomationsSettingsView extends VBox {
 		setSpacing(20);
 		getChildren().add(content);
 		saveTimer.setOnFinished(event -> flushSave());
-		CompletableFuture.runAsync(() -> {
+		Threads.startVirtual("gravaai-automations-load", () -> {
 			try {
 				AutomationsFile loaded = controller.getAutomations();
 				Platform.runLater(() -> {
@@ -104,7 +105,7 @@ public final class AutomationsSettingsView extends VBox {
 					rebuild();
 				});
 			}
-		}, UiThreads.background());
+		});
 	}
 
 	/** Flushes an edit still inside the debounce window (used when leaving the page). */

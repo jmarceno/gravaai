@@ -10,8 +10,8 @@ import javafx.animation.PauseTransition;
 
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.projects.RecordingEntry;
-import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -455,7 +455,7 @@ final class ProjectCardView extends VBox {
 		}
 		DashboardDeleteDialog.show(this, paths, deleteRecordings -> {
 			model.busyProperty().set(true);
-			java.util.concurrent.CompletableFuture.runAsync(() -> {
+			Threads.startVirtual("gravaai-card-trash", () -> {
 				try {
 					model.trashProjects(paths, deleteRecordings);
 				} catch (java.io.IOException error) {
@@ -464,7 +464,7 @@ final class ProjectCardView extends VBox {
 				} finally {
 					javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 				}
-			}, UiThreads.background());
+			});
 		});
 	}
 
@@ -474,7 +474,7 @@ final class ProjectCardView extends VBox {
 	 */
 	private void deleteLibraryEntry(java.util.List<String> paths) {
 		model.busyProperty().set(true);
-		java.util.concurrent.CompletableFuture.runAsync(() -> {
+		Threads.startVirtual("gravaai-card-delete", () -> {
 			try {
 				model.deleteLibraryEntries(paths);
 			} catch (java.io.IOException error) {
@@ -483,7 +483,7 @@ final class ProjectCardView extends VBox {
 			} finally {
 				javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 			}
-		}, UiThreads.background());
+		});
 	}
 
 	private void startRename() {
@@ -514,7 +514,7 @@ final class ProjectCardView extends VBox {
 			return;
 		}
 		model.busyProperty().set(true);
-		java.util.concurrent.CompletableFuture.runAsync(() -> {
+		Threads.startVirtual("gravaai-card-rename", () -> {
 			try {
 				String target = model.renameProject(entry.path(), name);
 				javafx.application.Platform.runLater(() -> {
@@ -533,6 +533,6 @@ final class ProjectCardView extends VBox {
 					model.busyProperty().set(false);
 				});
 			}
-		}, UiThreads.background());
+		});
 	}
 }

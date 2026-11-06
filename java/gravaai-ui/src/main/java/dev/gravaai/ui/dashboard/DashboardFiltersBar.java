@@ -3,9 +3,8 @@ package dev.gravaai.ui.dashboard;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
-import dev.gravaai.ui.UiThreads;
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -118,7 +117,7 @@ public final class DashboardFiltersBar extends VBox {
 		}
 		if (model.isRaw() || model.isMeetings()) {
 			model.busyProperty().set(true);
-			CompletableFuture.runAsync(() -> {
+			Threads.startVirtual("gravaai-dashboard-delete", () -> {
 				try {
 					model.deleteLibraryEntries(paths);
 				} catch (IOException error) {
@@ -130,12 +129,12 @@ public final class DashboardFiltersBar extends VBox {
 						model.busyProperty().set(false);
 					});
 				}
-			}, UiThreads.background());
+			});
 			return;
 		}
 		DashboardDeleteDialog.show(this, paths, deleteRecordings -> {
 			model.busyProperty().set(true);
-			CompletableFuture.runAsync(() -> {
+			Threads.startVirtual("gravaai-dashboard-delete", () -> {
 				try {
 					model.trashProjects(paths, deleteRecordings);
 					Platform.runLater(() -> model.setSelecting(false));
@@ -145,7 +144,7 @@ public final class DashboardFiltersBar extends VBox {
 				} finally {
 					Platform.runLater(() -> model.busyProperty().set(false));
 				}
-			}, UiThreads.background());
+			});
 		});
 	}
 

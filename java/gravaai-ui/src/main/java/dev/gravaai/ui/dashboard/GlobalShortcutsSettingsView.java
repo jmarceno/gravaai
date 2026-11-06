@@ -3,16 +3,15 @@ package dev.gravaai.ui.dashboard;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
 import dev.gravaai.services.shortcuts.GlobalShortcutBinding;
 import dev.gravaai.services.shortcuts.GlobalShortcutKeyEvent;
 import dev.gravaai.services.shortcuts.GlobalShortcuts;
 import dev.gravaai.services.shortcuts.GlobalShortcutsConfig;
 import dev.gravaai.services.shortcuts.GlobalShortcutsStatus;
-import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -63,7 +62,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		errorBanner.setVisible(false);
 		errorBanner.setManaged(false);
 		getChildren().addAll(errorBanner, rows);
-		CompletableFuture.runAsync(() -> {
+		Threads.startVirtual("gravaai-shortcuts-load", () -> {
 			try {
 				GlobalShortcutsConfig loadedConfig = controller.readConfig();
 				GlobalShortcutsStatus loadedStatus = controller.status();
@@ -75,7 +74,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			} catch (RuntimeException error) {
 				Platform.runLater(() -> showError(message(error)));
 			}
-		}, UiThreads.background());
+		});
 	}
 
 	private GlobalShortcutsConfig loadedConfig() {
@@ -276,7 +275,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		}
 		busy = true;
 		rebuild();
-		CompletableFuture.runAsync(() -> {
+		Threads.startVirtual("gravaai-shortcuts-apply", () -> {
 			try {
 				GlobalShortcutsStatus nextStatus = controller.apply(next);
 				GlobalShortcutsConfig stored = controller.readConfig();
@@ -293,7 +292,7 @@ public final class GlobalShortcutsSettingsView extends VBox {
 					showError(message(error));
 				});
 			}
-		}, UiThreads.background());
+		});
 	}
 
 	private void reset() {

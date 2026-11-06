@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 import dev.gravaai.media.ffmpeg.gen.AVPacketSideData;
 import dev.gravaai.media.ffmpeg.gen.AVRational;
@@ -30,12 +32,34 @@ public final class MediaProbe {
 	private MediaProbe() {}
 
 	/**
-	 * Probes a file.
+	 * Probes a file. Safe to call from a virtual thread: FFM downcalls pin the carrier thread
+	 * (plan §4.1), so the libavformat work runs on a platform thread and the caller parks until
+	 * it finishes — parking unmounts the virtual thread.
 	 *
 	 * @throws FfmpegException when FFmpeg cannot open or read the container
 	 * @throws IllegalArgumentException when the path is not a readable regular file
 	 */
 	public static MediaInfo probe(Path file) {
+		if (!Thread.currentThread().isVirtual()) {
+			return probeOnThisThread(file);
+		}
+		FutureTask<MediaInfo> probe = new FutureTask<>(() -> probeOnThisThread(file));
+		Thread.ofPlatform().daemon().name("gravaai-media-probe").start(probe);
+		try {
+			return probe.get();
+		} catch (InterruptedException error) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("Media probe was interrupted", error);
+		} catch (ExecutionException error) {
+			Throwable cause = error.getCause();
+			if (cause instanceof RuntimeException runtimeError) {
+				throw runtimeError;
+			}
+			throw new IllegalStateException("Media probe failed", cause);
+		}
+	}
+
+	private static MediaInfo probeOnThisThread(Path file) {
 		FfmpegLibs.ensureLoaded();
 		Path path = file.toAbsolutePath().normalize();
 		if (!Files.isReadable(path)) {

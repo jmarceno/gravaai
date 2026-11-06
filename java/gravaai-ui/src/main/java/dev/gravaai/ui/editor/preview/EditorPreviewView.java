@@ -215,20 +215,27 @@ public final class EditorPreviewView extends Region {
 	/**
 	 * The person mask for the decoded webcam frame when the scene enables background blur, else
 	 * null. The decoded buffers rotate in turn, so identical frames return the cached mask; only
-	 * a buffer flip recomputes it. Callers hold the frame snapshot monitor.
+	 * a buffer flip recomputes it. The segmenter may be asynchronous (the preview path keeps
+	 * inference off this thread), so the mask it returns is the most recent completed one, not
+	 * necessarily this frame's; caching it per buffer keeps that stable across repaints.
+	 * Callers hold the frame snapshot monitor.
 	 */
 	private @Nullable RgbaFrame webcamMask(PlaybackFrame frame, PreviewFrameMapper.PreviewScene scene) {
 		RgbaFrame webcamFrame = frame.webcamFrame();
 		if (webcamFrame == null || !scene.webcam().backgroundBlur()) {
 			return null;
 		}
-		if (webcamFrame == lastMaskedWebcamFrame && lastWebcamMask != null) {
+		if (webcamSegmenter == null) {
+			return null;
+		}
+		if (webcamFrame == lastMaskedWebcamFrame) {
+			// Same decoded buffer: answer from the cache. A null entry is a real answer (the
+			// segmenter had no mask yet), not a cache miss.
 			return lastWebcamMask;
 		}
-		RgbaFrame mask = webcamSegmenter == null ? null : webcamSegmenter.maskFor(webcamFrame);
 		lastMaskedWebcamFrame = webcamFrame;
-		lastWebcamMask = mask;
-		return mask;
+		lastWebcamMask = webcamSegmenter.maskFor(webcamFrame);
+		return lastWebcamMask;
 	}
 
 	private void markReadiness(PlaybackFrame frame) {

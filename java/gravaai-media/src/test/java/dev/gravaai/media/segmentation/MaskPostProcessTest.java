@@ -99,23 +99,30 @@ class MaskPostProcessTest {
 	}
 
 	@Test
-	@DisplayName("upscale maps the mask value into every RGBA channel")
-	void upscalesToRgba() {
-		// 2x2 mask (0, 1 / 0, 1) into a 4x4 output: quadrant mapping.
-		float[] mask = {0f, 1f, 0f, 1f};
-		ByteBuffer out = ByteBuffer.allocateDirect(4 * 4 * 4);
-		MaskPostProcess.upscaleToRgba(mask, 2, 2, 4, 4, out);
-		int leftTop = (0 * 4 + 0) * 4;
-		int rightTop = (0 * 4 + 3) * 4;
-		assertEquals(0, Byte.toUnsignedInt(out.get(leftTop)), "left quadrant must be 0");
-		assertEquals(255, Byte.toUnsignedInt(out.get(rightTop + 3)),
-				"right quadrant must be 255");
+	@DisplayName("packs the mask value into every RGBA channel at the mask's own resolution")
+	void packsRgba() {
+		// The mask keeps model resolution: the compositor's shader does the upscale, so this only
+		// has to widen each value into four channels.
+		float[] mask = {0f, 1f, 0f, 0.5f};
+		ByteBuffer out = MaskPostProcess.toRgba(mask, 2, 2);
+		int first = 0;
+		assertEquals(0, Byte.toUnsignedInt(out.get(first)), "0 must quantise to 0");
+		assertEquals(255, Byte.toUnsignedInt(out.get(first + 4)), "1 must quantise to 255");
+		assertEquals(128, Byte.toUnsignedInt(out.get(first + 12)), "0.5 must quantise to 128");
 		for (int channel = 0; channel < 4; channel++) {
-			assertEquals(out.get(rightTop), out.get(rightTop + channel),
+			assertEquals(out.get(first + 4), out.get(first + 4 + channel),
 					"the mask value must sit in every channel");
 		}
 		// Position 0 rewound, limit exact: the buffer is ready for a direct upload.
 		assertEquals(0, out.position());
-		assertEquals(4 * 4 * 4, out.limit());
+		assertEquals(2 * 2 * 4, out.limit());
+	}
+
+	@Test
+	@DisplayName("clamps out-of-range mask values before packing")
+	void packsClamped() {
+		ByteBuffer out = MaskPostProcess.toRgba(new float[] {-0.5f, 1.5f}, 2, 1);
+		assertEquals(0, Byte.toUnsignedInt(out.get(0)), "negative values clamp to 0");
+		assertEquals(255, Byte.toUnsignedInt(out.get(4)), "values above 1 clamp to 255");
 	}
 }

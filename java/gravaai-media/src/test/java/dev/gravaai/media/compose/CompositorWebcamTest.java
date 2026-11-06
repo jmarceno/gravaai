@@ -277,15 +277,38 @@ class CompositorWebcamTest {
 
 	@Test
 	@Timeout(60)
-	@DisplayName("ignores a mask that does not match the webcam frame size")
-	void ignoresMisSizedMask() throws Exception {
+	@DisplayName("a mask below frame resolution still lands in register over the person")
+	void acceptsLowerResolutionMask() throws Exception {
+		// The segmenter produces the mask at model resolution (256x256 for the bundled model), not
+		// at frame resolution: that upscale is the GPU's job through the mask matrix. A mask that
+		// covers the whole frame at a smaller size must therefore composite exactly like a
+		// full-resolution one.
 		RgbaFrame webcamFrame = stripedWebcam();
 		WebcamSpec webcam = spec(true, "center", 50, false, 0, List.of(), false);
-		ByteBuffer plain = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE));
-		ByteBuffer misSized = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+		ByteBuffer fullSize = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+				.withWebcamMask(rightHalfMask(80, 40)));
+		ByteBuffer smallMask = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
 				.withWebcamMask(rightHalfMask(40, 20)));
-		assertArrayEquals(toArray(plain), toArray(misSized),
-				"a mis-sized mask must render like no mask");
+
+		// Same sharp person and the same blurred background: the mask is a coverage map, so the
+		// only difference a smaller mask can introduce is resampling noise at its hard edge.
+		int[] fullPerson = pixel(fullSize, 225, 100);
+		int[] smallPerson = pixel(smallMask, 225, 100);
+		assertTrue(smallPerson[1] > 200 && smallPerson[2] < 60,
+				"person half must stay sharp with a smaller mask: " + smallPerson[0] + ","
+						+ smallPerson[1] + "," + smallPerson[2]);
+		for (int channel = 0; channel < 3; channel++) {
+			assertTrue(Math.abs(fullPerson[channel] - smallPerson[channel]) <= 8,
+					"person pixel must match the full-size mask within resampling noise: "
+							+ fullPerson[channel] + " vs " + smallPerson[channel]);
+		}
+		int[] fullBackground = pixel(fullSize, 165, 100);
+		int[] smallBackground = pixel(smallMask, 165, 100);
+		for (int channel = 0; channel < 3; channel++) {
+			assertTrue(Math.abs(fullBackground[channel] - smallBackground[channel]) <= 8,
+					"background pixel must match the full-size mask within resampling noise: "
+							+ fullBackground[channel] + " vs " + smallBackground[channel]);
+		}
 	}
 
 	private static byte[] toArray(ByteBuffer frame) {

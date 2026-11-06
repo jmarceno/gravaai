@@ -13,14 +13,18 @@ import dev.gravaai.media.onnx.OnnxRuntimeApi;
 
 /**
  * The MediaPipe selfie segmenter (ONNX) behind the webcam background blur: maps one decoded
- * webcam frame to a person mask at the frame's dimensions.
+ * webcam frame to a person mask covering that frame.
  *
  * <p>Pipeline per frame: stretch the RGBA frame to the model's square input ({@code [0,1]}
  * float, no letterboxing — MediaPipe resizes without preserving aspect and a letterbox would
  * pollute the borders) → inference → squeeze the single-channel confidence map → temporal mean
  * over the last three masks (hair-region flicker) → dilate + Gaussian + steep sigmoid remap
- * (halo fix: the soft 256px edge is collapsed to about a pixel before upsampling) → bilinear
- * upscale into a fresh RGBA buffer with the mask value in every channel.</p>
+ * (halo fix: the soft edge is collapsed to about a pixel) → pack into an RGBA buffer with the mask
+ * value in every channel.</p>
+ *
+ * <p>The mask stays at the model's resolution rather than being upscaled to the frame: the
+ * compositor's shader samples it through a matrix, so upscaling here would add a scalar bilinear
+ * pass over frame-sized data per frame for no visible gain.</p>
  *
  * <p>Single-caller: an ORT session must not run concurrently; each consumer (preview decode,
  * export, filmstrips) owns its own instance. The input/output names, layouts and sizes are read
@@ -69,13 +73,22 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 	private final float[] smoothed;
 	private boolean closed;
 
+	/**
+	 * Intra-op threads for the ORT session. The model is a 256x256 encoder-decoder that is bound by
+	 * per-inference overhead more than throughput, and the default pool (one thread per core) both
+	 * oversubscribes the process and wakes a core's worth of workers per frame. Two threads keeps
+	 * the inference latency below the default pool's wake-up cost while leaving the machine to the
+	 * audio pump and the GL thread.
+	 */
+	private static final int INFERENCE_THREADS = 2;
+
 	public SelfieSegmenter(Path modelFile) {
 		if (!Files.isRegularFile(modelFile)) {
 			throw new IllegalArgumentException("model file missing: " + modelFile);
 		}
 		this.api = OnnxRuntimeApi.bind();
 		MemorySegment env = api.createEnv();
-		this.session = api.createSession(env, modelFile);
+		this.session = api.createSession(env, modelFile, INFERENCE_THREADS);
 		this.memoryInfo = api.createCpuMemoryInfo();
 		MemorySegment allocator = api.defaultAllocator();
 		if (api.sessionInputCount(session) != 1 || api.sessionOutputCount(session) != 1) {
@@ -147,7 +160,7 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 			MaskPostProcess.dilate(scratchA, scratchB, maskWidth, maskHeight, DILATION_RADIUS);
 			MaskPostProcess.gaussianBlur(scratchA, scratchB, maskWidth, maskHeight, MASK_SIGMA);
 			MaskPostProcess.sigmoidRemap(scratchA, REMAP_SLOPE, REMAP_MIDPOINT);
-			return upscale(frame);
+			return maskFrame();
 		} finally {
 			api.releaseValue(output);
 		}
@@ -216,12 +229,14 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 		maskRingNext = (maskRingNext + 1) % SMOOTHING_FRAMES;
 	}
 
-	/** Upscales the edge-shaped mask into a fresh RGBA frame buffer. */
-	private RgbaFrame upscale(RgbaFrame frame) {
-		ByteBuffer buffer = ByteBuffer.allocateDirect(frame.width() * frame.height() * 4);
-		MaskPostProcess.upscaleToRgba(scratchA, maskWidth, maskHeight, frame.width(),
-				frame.height(), buffer);
-		return new RgbaFrame(frame.width(), frame.height(), buffer);
+	/**
+	 * Packs the edge-shaped mask into a fresh RGBA frame buffer. The buffer stays at the mask's
+	 * own resolution: the compositor samples it onto the card through a matrix, so upscaling here
+	 * would be a scalar bilinear pass over frame-sized data per frame for no gain.
+	 */
+	private RgbaFrame maskFrame() {
+		return new RgbaFrame(maskWidth, maskHeight, MaskPostProcess.toRgba(scratchA, maskWidth,
+				maskHeight));
 	}
 
 	/** Copies the scratch input tensor into the native buffer (native byte order) for ORT. */

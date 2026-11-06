@@ -98,8 +98,22 @@ class CompositorWebcamBlurRealTest {
 	}
 
 	/**
+	 * Mask byte for a point given in frame coordinates: the mask spans the frame but is at model
+	 * resolution, so callers that reason in frame pixels read it through this.
+	 */
+	private static int maskAtFramePoint(RgbaFrame mask, int frameX, int frameY, int frameWidth,
+			int frameHeight) {
+		int maskX = Math.min(mask.width() - 1,
+				(int) ((frameX + 0.5) * mask.width() / frameWidth));
+		int maskY = Math.min(mask.height() - 1,
+				(int) ((frameY + 0.5) * mask.height() / frameHeight));
+		return maskAt(mask, maskX, maskY);
+	}
+
+	/**
 	 * The portrait person composited over a synthetic striped room: the mask keeps the person
-	 * opaque and the stripes show everywhere else.
+	 * opaque and the stripes show everywhere else. The mask covers the whole portrait, so it is
+	 * read in portrait coordinates here (it is at model resolution, not portrait resolution).
 	 */
 	private static RgbaFrame personInStripedRoom(RgbaFrame portrait, RgbaFrame portraitMask) {
 		int width = portrait.width();
@@ -107,7 +121,12 @@ class CompositorWebcamBlurRealTest {
 		ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 4);
 		ByteBuffer person = portrait.pixelsTopFirstRgba();
 		for (int y = 0; y < height; y++) {
+			// The mask spans the frame by definition: map this pixel onto its grid.
+			int maskY = Math.min(portraitMask.height() - 1,
+					(int) ((y + 0.5) * portraitMask.height() / height));
 			for (int x = 0; x < width; x++) {
+				int maskX = Math.min(portraitMask.width() - 1,
+						(int) ((x + 0.5) * portraitMask.width() / width));
 				int offset = (y * width + x) * 4;
 				// Two saturated stripes with a wide luminance gap: the saturation sample
 				// survives either one, the luminance deviation sees the structure.
@@ -115,7 +134,7 @@ class CompositorWebcamBlurRealTest {
 				int red = brightStripe ? 230 : 30;
 				int green = brightStripe ? 210 : 20;
 				int blue = brightStripe ? 30 : 160;
-				int alpha = maskAt(portraitMask, x, y);
+				int alpha = maskAt(portraitMask, maskX, maskY);
 				int mixRed = (Byte.toUnsignedInt(person.get(offset)) * alpha + red * (255 - alpha))
 						/ 255;
 				int mixGreen = (Byte.toUnsignedInt(person.get(offset + 1)) * alpha
@@ -184,15 +203,20 @@ class CompositorWebcamBlurRealTest {
 		return max - min;
 	}
 
-	/** True when the mask calls (canvasX, canvasY) background and stays background around it. */
+	/**
+	 * True when the mask calls the canvas point background and stays background around it. The
+	 * canvas point is mapped back to frame coordinates and then onto the mask's own grid.
+	 */
 	private static boolean backgroundAround(RgbaFrame mask, int canvasX, int canvasY,
-			double offsetX, double offsetY, double scale) {
+			double offsetX, double offsetY, double scale, int frameWidth, int frameHeight) {
 		for (int dy = -1; dy <= 1; dy++) {
 			for (int dx = -1; dx <= 1; dx++) {
 				int sourceX = (int) Math.round((canvasX + dx - offsetX) / scale);
 				int sourceY = (int) Math.round((canvasY + dy - offsetY) / scale);
-				if (sourceX < 0 || sourceY < 0 || sourceX >= mask.width()
-						|| sourceY >= mask.height() || maskAt(mask, sourceX, sourceY) >= 15) {
+				if (sourceX < 0 || sourceY < 0 || sourceX >= frameWidth
+						|| sourceY >= frameHeight
+						|| maskAtFramePoint(mask, sourceX, sourceY, frameWidth,
+								frameHeight) >= 15) {
 					return false;
 				}
 			}
@@ -209,7 +233,7 @@ class CompositorWebcamBlurRealTest {
 	 * collapses towards the mean colour.
 	 */
 	private static double backgroundLuminanceDeviation(ByteBuffer frame, RgbaFrame mask,
-			double offsetX, double offsetY, double scale) {
+			double offsetX, double offsetY, double scale, int frameWidth, int frameHeight) {
 		double sum = 0;
 		double sumOfSquares = 0;
 		int count = 0;
@@ -217,7 +241,8 @@ class CompositorWebcamBlurRealTest {
 				canvasY++) {
 			for (int canvasX = CARD_LEFT + CARD_INSET; canvasX < CARD_LEFT + CARD - CARD_INSET;
 					canvasX++) {
-				if (!backgroundAround(mask, canvasX, canvasY, offsetX, offsetY, scale)) {
+				if (!backgroundAround(mask, canvasX, canvasY, offsetX, offsetY, scale, frameWidth,
+						frameHeight)) {
 					continue;
 				}
 				int offset = (canvasY * WIDTH + canvasX) * 4;
@@ -275,7 +300,7 @@ class CompositorWebcamBlurRealTest {
 						|| canvasX > CARD_LEFT + CARD - CARD_INSET) {
 					continue;
 				}
-				int value = maskAt(mask, x, y);
+				int value = maskAtFramePoint(mask, x, y, scene.width(), scene.height());
 				if (value > 250) {
 					personSumX += canvasX;
 					personSumY += canvasY;
@@ -316,9 +341,10 @@ class CompositorWebcamBlurRealTest {
 				"the striped background must blur: " + saturation(plainBackground) + " -> "
 						+ saturation(blurredBackground));
 
-		double plainDeviation = backgroundLuminanceDeviation(plain, mask, offsetX, offsetY, scale);
+		double plainDeviation = backgroundLuminanceDeviation(plain, mask, offsetX, offsetY, scale,
+				scene.width(), scene.height());
 		double blurredDeviation = backgroundLuminanceDeviation(blurred, mask, offsetX, offsetY,
-				scale);
+				scale, scene.width(), scene.height());
 		assertTrue(blurredDeviation < plainDeviation * 0.5,
 				"the background structure must be destroyed: " + plainDeviation + " -> "
 						+ blurredDeviation);

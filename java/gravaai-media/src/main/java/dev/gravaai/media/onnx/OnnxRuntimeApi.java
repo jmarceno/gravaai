@@ -84,15 +84,47 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	}
 
 	/**
-	 * Loads a model file into a session (default session options; the caller closes the session
-	 * with {@link #releaseSession}).
+	 * Loads a model file into a session, limiting intra-op parallelism to {@code threads}.
+	 *
+	 * <p>ORT defaults intra-op threads to the core count, so one 256x256 inference fans out across
+	 * every core. On the preview path that inference shares the process with the audio pump and the
+	 * GL thread, and the default pool both oversubscribes them and pays thread wake-up latency per
+	 * frame. The segmenter is small enough to be bound by launch overhead rather than FLOPs, so a
+	 * small fixed pool is both faster and far kinder to the other threads.
+	 *
+	 * @param threads intra-op thread count, or 0 for the ORT default
 	 */
-	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile) {
+	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
+			int threads) {
+		if (threads < 0) {
+			throw new IllegalArgumentException("threads must not be negative: " + threads);
+		}
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment path = cString(arena, modelFile.toAbsolutePath().toString());
 			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
-			checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
-					MemorySegment.NULL, out), "CreateSession(" + modelFile + ")");
+			if (threads == 0) {
+				checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
+						MemorySegment.NULL, out), "CreateSession(" + modelFile + ")");
+			} else {
+				MemorySegment optionsOut = arena.allocate(ValueLayout.ADDRESS);
+				checkStatus(OrtApi.CreateSessionOptions.invoke(
+						OrtApi.CreateSessionOptions(api), optionsOut), "CreateSessionOptions");
+				MemorySegment options = optionsOut.get(ValueLayout.ADDRESS, 0);
+				try {
+					checkStatus(OrtApi.SetIntraOpNumThreads.invoke(
+							OrtApi.SetIntraOpNumThreads(api), options, threads),
+							"SetIntraOpNumThreads(" + threads + ")");
+					// Inter-op parallelism would open a second pool on top of the intra-op one; one
+					// worker is enough for this graph and keeps a frame's thread count predictable.
+					checkStatus(OrtApi.SetInterOpNumThreads.invoke(
+							OrtApi.SetInterOpNumThreads(api), options, 1),
+							"SetInterOpNumThreads(1)");
+					checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
+							options, out), "CreateSession(" + modelFile + ")");
+				} finally {
+					OrtApi.ReleaseSessionOptions.invoke(OrtApi.ReleaseSessionOptions(api), options);
+				}
+			}
 			MemorySegment created = out.get(ValueLayout.ADDRESS, 0);
 			if (created.address() == 0) {
 				throw new IllegalStateException(
@@ -100,6 +132,15 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 			}
 			return created;
 		}
+	}
+
+	/**
+	 * Loads a model file into a session with the ORT default session options (thread pool left at
+	 * the ORT default). Callers that run per-frame inference should use
+	 * {@link #createSession(MemorySegment, java.nio.file.Path, int)} instead.
+	 */
+	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile) {
+		return createSession(env, modelFile, 0);
 	}
 
 	/** The CPU memory info the input tensors are created with. */

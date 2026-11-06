@@ -1378,7 +1378,10 @@ public final class AppContext {
 		editorWindows.add(window);
 		window.show();
 		window.setOverlayHooks(previewOverlayHooks(window.session()));
-		window.setWebcamSegmenter(new dev.gravaai.media.segmentation.LazyWebcamSegmenter());
+		// The preview is a real-time path: keep inference off the playback render thread so a slow
+		// segmenter cannot starve the audio pump. Export and agent renders stay synchronous.
+		window.setWebcamSegmenter(new dev.gravaai.media.segmentation.AsyncWebcamSegmenter(
+				new dev.gravaai.media.segmentation.LazyWebcamSegmenter()));
 		attachAgent(window);
 		attachCaptions(window);
 		if (path != null) {

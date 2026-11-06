@@ -77,8 +77,12 @@ class SelfieSegmenterTest {
 		try (SelfieSegmenter segmenter = new SelfieSegmenter(modelFile)) {
 			RgbaFrame frame = portraitFrame();
 			RgbaFrame mask = segmenter.maskFor(frame);
-			assertEquals(frame.width(), mask.width(), "the mask must match the frame size");
-			assertEquals(frame.height(), mask.height(), "the mask must match the frame size");
+			// The mask keeps the model's resolution: the compositor scales it onto the card, so
+			// a per-frame full-frame upscale here would be pure waste.
+			assertTrue(mask.width() <= frame.width() && mask.height() <= frame.height(),
+					"the mask must not be upscaled past the frame: " + mask.width() + "x"
+							+ mask.height() + " for " + frame.width() + "x" + frame.height());
+			assertTrue(mask.width() > 0 && mask.height() > 0, "the mask must not be empty");
 
 			// The portrait fills most of the frame with the person centre-frame; the top corners
 			// are plain studio background.

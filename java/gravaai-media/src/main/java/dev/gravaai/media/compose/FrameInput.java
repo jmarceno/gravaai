@@ -19,8 +19,9 @@ import java.util.List;
  * @param sourceFrame the decoded source video frame, or {@code null} for a background-only frame
  * @param webcamFrame the decoded webcam frame, or {@code null} (webcam overlay stage 7)
  * @param webcamMask the person mask for the webcam frame (webcam background blur, stage 7), or
- *        {@code null} when blur is off or no segmenter is available; same dimensions as
- *        {@code webcamFrame} with the mask value in every RGBA channel
+ *        {@code null} when blur is off or no segmenter is available; it covers the webcam frame
+ *        at any resolution (the segmenter returns it at model resolution) with the mask value in
+ *        every RGBA channel, and the compositor scales it onto the card
  * @param cursorSamples cursor samples covering this frame, in time order (stages 3 and 6)
  * @param background the background to paint (stage 1); callers keep one instance per project so
  *        the compositor can cache the pre-rendered background

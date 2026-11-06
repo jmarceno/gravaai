@@ -113,31 +113,19 @@ final class MaskPostProcess {
 	}
 
 	/**
-	 * Bilinear upscales the mask into a direct RGBA buffer (top-first, mask value in every
-	 * channel), the format the compositor uploads.
+	 * Packs the mask into an RGBA buffer (top-first, mask value in every channel), the format the
+	 * compositor uploads. The mask keeps its own resolution: the shader samples it through a
+	 * matrix that maps it onto the frame, so upscaling it here (a scalar bilinear over 65k source
+	 * pixels per 720p frame) only duplicated work the GPU does for free.
 	 */
-	static void upscaleToRgba(float[] mask, int width, int height, int outWidth, int outHeight,
-			ByteBuffer out) {
-		double scaleX = (double) width / outWidth;
-		double scaleY = (double) height / outHeight;
-		for (int y = 0; y < outHeight; y++) {
-			double sourceY = Math.min(height - 1.0, (y + 0.5) * scaleY - 0.5);
-			int y0 = Math.max(0, (int) Math.floor(sourceY));
-			int y1 = Math.min(height - 1, y0 + 1);
-			double fy = sourceY - y0;
-			for (int x = 0; x < outWidth; x++) {
-				double sourceX = Math.min(width - 1.0, (x + 0.5) * scaleX - 0.5);
-				int x0 = Math.max(0, (int) Math.floor(sourceX));
-				int x1 = Math.min(width - 1, x0 + 1);
-				double fx = sourceX - x0;
-				float value = (float) ((mask[y0 * width + x0] * (1 - fx) + mask[y0 * width + x1] * fx)
-						* (1 - fy)
-						+ (mask[y1 * width + x0] * (1 - fx) + mask[y1 * width + x1] * fx) * fy);
-				byte quantised = (byte) Math.round(Math.max(0f, Math.min(1f, value)) * 255f);
-				out.put(quantised).put(quantised).put(quantised).put(quantised);
-			}
+	static ByteBuffer toRgba(float[] mask, int width, int height) {
+		ByteBuffer out = ByteBuffer.allocateDirect(width * height * 4);
+		for (int i = 0; i < mask.length; i++) {
+			byte value = (byte) Math.round(Math.max(0f, Math.min(1f, mask[i])) * 255f);
+			out.put(value).put(value).put(value).put(value);
 		}
 		out.position(0);
-		out.limit(outWidth * outHeight * 4);
+		out.limit(width * height * 4);
+		return out;
 	}
 }

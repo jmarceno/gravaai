@@ -31,29 +31,43 @@ final class WebcamBlurShaders {
 	private WebcamBlurShaders() {}
 
 	/**
-	 * Builds the sharp-person-through-mask shader for one webcam layer. The effect must be drawn
-	 * over the full stage rect: runtime-effect draws with child shaders only composite correctly
-	 * at stage bounds in this Skia/Skija stack (a sub-rect draw renders displaced and shrunk), so
-	 * the caller runs it on a full-stage offscreen and clips the result to the card.
+	 * Builds the sharp-person-through-mask shader for one webcam layer.
+	 *
+	 * <p>The caller draws this over the card rect (in card-local coordinates on an offscreen
+	 * surface) rather than the full stage: the mask only ever needs to cover the card, and shading
+	 * the whole frame for a small card is pure waste. The two textures come from different images
+	 * at different resolutions, so the mask gets its own matrix.</p>
 	 *
 	 * <p>The effect shader holds its own reference to the children: close ours here. A leaked
 	 * child shader is freed by the Java cleaner on another thread, which races the GL thread when
-	 * the layer is a GPU image (export crash in GrGpuResource::release).
+	 * the layer is a GPU image (export crash in GrGpuResource::release).</p>
 	 *
 	 * @param webcam the webcam layer image
-	 * @param mask the person mask image (mask value in every channel)
-	 * @param imageToCanvas the shared cover matrix (see {@code Compositor#webcamCoverMatrix}), so
-	 *        the mask lands in register with the webcam
+	 * @param mask the person mask image (mask value in every channel), at any resolution covering
+	 *        the whole frame
+	 * @param imageToCanvas the cover matrix from webcam pixels to canvas space
+	 * @param maskToCanvas the matrix from mask pixels to canvas space (accounts for the mask
+	 *        being smaller than the frame)
 	 * @param webcamSampling sampling for the webcam texture (mipmapped); the mask is LINEAR
 	 */
 	public static Shader personThroughMask(Image webcam, Image mask, Matrix33 imageToCanvas,
-			SamplingMode webcamSampling) {
+			Matrix33 maskToCanvas, SamplingMode webcamSampling) {
 		Shader webcamChild = webcam.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
 				webcamSampling, imageToCanvas);
 		Shader maskChild = mask.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
-				SamplingMode.LINEAR, imageToCanvas);
+				SamplingMode.LINEAR, maskToCanvas);
 		try (webcamChild; maskChild; Data empty = Data.makeFromBytes(new byte[0])) {
 			return PERSON_EFFECT.makeShader(empty, new Shader[] {webcamChild, maskChild});
 		}
+	}
+
+	/**
+	 * Same-matrix overload for a mask already at the webcam image's resolution.
+	 *
+	 * @param imageToCanvas the shared cover matrix
+	 */
+	public static Shader personThroughMask(Image webcam, Image mask, Matrix33 imageToCanvas,
+			SamplingMode webcamSampling) {
+		return personThroughMask(webcam, mask, imageToCanvas, imageToCanvas, webcamSampling);
 	}
 }

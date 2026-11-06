@@ -62,6 +62,54 @@ final class MaskPostProcess {
 	}
 
 	/**
+	 * In-place min-filter erosion with a square kernel of the given radius: the mask shrinks, so
+	 * the blurred room creeps towards the subject (a negative edge offset).
+	 */
+	static void erode(float[] mask, float[] scratch, int width, int height, int radius) {
+		for (int y = 0; y < height; y++) {
+			int row = y * width;
+			for (int x = 0; x < width; x++) {
+				float min = 1f;
+				int from = Math.max(0, x - radius);
+				int to = Math.min(width - 1, x + radius);
+				for (int i = from; i <= to; i++) {
+					float value = mask[row + i];
+					if (value < min) {
+						min = value;
+					}
+				}
+				scratch[row + x] = min;
+			}
+		}
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				float min = 1f;
+				int from = Math.max(0, y - radius);
+				int to = Math.min(height - 1, y + radius);
+				for (int i = from; i <= to; i++) {
+					float value = scratch[i * width + x];
+					if (value < min) {
+						min = value;
+					}
+				}
+				mask[y * width + x] = min;
+			}
+		}
+	}
+
+	/**
+	 * Moves the mask edge by {@code radius} pixels: positive grows the person past the model's
+	 * outline (fixing hair and collar the model clipped), negative pulls it in. Zero is a no-op.
+	 */
+	static void shiftEdge(float[] mask, float[] scratch, int width, int height, int radius) {
+		if (radius > 0) {
+			dilate(mask, scratch, width, height, radius);
+		} else if (radius < 0) {
+			erode(mask, scratch, width, height, -radius);
+		}
+	}
+
+	/**
 	 * In-place separable Gaussian blur with the given sigma (halo fix step 2: the soft mask edge
 	 * that a steep remap then collapses).
 	 */

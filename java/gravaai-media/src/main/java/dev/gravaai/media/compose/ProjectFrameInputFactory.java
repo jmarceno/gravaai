@@ -21,6 +21,7 @@ import dev.gravaai.media.ffmpeg.MediaInfo;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.media.ffmpeg.VideoDecoder;
 import dev.gravaai.media.playback.WebcamSync;
+import dev.gravaai.media.segmentation.MaskTuning;
 import dev.gravaai.media.segmentation.WebcamSegmenter;
 
 /**
@@ -64,6 +65,8 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final FrameStyle style;
 	private final CursorSpec cursorSpec;
 	private final WebcamSpec webcamSpec;
+	/** The per-project mask edge shape (Webcam → Advanced), fixed with the editor state. */
+	private final MaskTuning maskTuning;
 	private final List<AnnotationSpec> annotations;
 	private final CaptionSpec captions;
 	private final KeystrokeSpec keystrokes;
@@ -116,6 +119,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		this.style = ProjectEditorInputs.frameStyle(editor);
 		this.cursorSpec = ProjectEditorInputs.cursorSpec(editor);
 		this.webcamSpec = ProjectEditorInputs.webcamSpec(editor);
+		this.maskTuning = ProjectEditorInputs.maskTuning(editor);
 		this.annotations = ProjectEditorInputs.annotationSpecs(editor);
 		this.captions = ProjectEditorInputs.captionSpec(editor);
 		this.keystrokes = ProjectEditorInputs.keystrokeSpec(editor, videoPath);
@@ -188,7 +192,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		}
 		RgbaFrame mask = webcamSegmenter == null
 				? null
-				: webcamSegmenter.maskFor(webcamFrame);
+				: webcamSegmenter.maskFor(webcamFrame, maskTuning);
 		lastMaskedWebcamSeconds = webcamSeconds;
 		lastWebcamMask = mask;
 		return mask;

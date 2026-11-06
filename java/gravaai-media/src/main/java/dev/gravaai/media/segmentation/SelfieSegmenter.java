@@ -38,12 +38,7 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 
 	/** Temporal smoothing window (masks); three frames remove shimmer without visible lag. */
 	private static final int SMOOTHING_FRAMES = 3;
-	/** Dilation radius in mask pixels before the edge remap (keeps the person edge inside). */
-	private static final int DILATION_RADIUS = 2;
-	/** Gaussian sigma of the mask blur before the remap. */
-	private static final double MASK_SIGMA = 2.0;
-	/** Steep sigmoid slope/midpoint of the remap (1/(1+e^(-12·(m-0.5)))). */
-	private static final double REMAP_SLOPE = 12.0;
+	/** Midpoint of the sigmoid remap (1/(1+e^(-slope·(m-0.5)))); the slope is per-project. */
 	private static final double REMAP_MIDPOINT = 0.5;
 
 	private final OnnxRuntimeApi api;
@@ -140,7 +135,7 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 	}
 
 	@Override
-	public RgbaFrame maskFor(RgbaFrame frame) {
+	public RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 		if (closed) {
 			throw new IllegalStateException("selfie segmenter is closed");
 		}
@@ -157,9 +152,11 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 			// The edge shaping runs on the smoothed mask; the ring keeps the raw masks so the
 			// smoothing window stays honest across the dilation/remap.
 			System.arraycopy(smoothed, 0, scratchA, 0, smoothed.length);
-			MaskPostProcess.dilate(scratchA, scratchB, maskWidth, maskHeight, DILATION_RADIUS);
-			MaskPostProcess.gaussianBlur(scratchA, scratchB, maskWidth, maskHeight, MASK_SIGMA);
-			MaskPostProcess.sigmoidRemap(scratchA, REMAP_SLOPE, REMAP_MIDPOINT);
+			MaskPostProcess.shiftEdge(scratchA, scratchB, maskWidth, maskHeight,
+					tuning.dilationRadius(maskWidth, maskHeight));
+			MaskPostProcess.gaussianBlur(scratchA, scratchB, maskWidth, maskHeight,
+					tuning.sigma());
+			MaskPostProcess.sigmoidRemap(scratchA, tuning.slope(), REMAP_MIDPOINT);
 			return maskFrame();
 		} finally {
 			api.releaseValue(output);

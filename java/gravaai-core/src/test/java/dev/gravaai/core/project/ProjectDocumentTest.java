@@ -77,11 +77,19 @@ class ProjectDocumentTest {
 			editor.set("keySound", ProjectDocument.writeKeySound(KeySoundSettings.DEFAULT));
 		}
 		// And the webcam background blur toggle: the canonical save always carries the default
-		// (off) for projects that predate it.
+		// (off) for projects that predate it, along with the mask edge controls.
 		if (expected.get("editor") instanceof ObjectNode editor
-				&& editor.get("webcam") instanceof ObjectNode webcam
-				&& !webcam.has("backgroundBlur")) {
-			webcam.put("backgroundBlur", false);
+				&& editor.get("webcam") instanceof ObjectNode webcam) {
+			if (!webcam.has("backgroundBlur")) {
+				webcam.put("backgroundBlur", false);
+			}
+			if (!webcam.has("maskPrecision")) {
+				webcam.put("maskPrecision",
+						WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION);
+			}
+			if (!webcam.has("maskOffset")) {
+				webcam.put("maskOffset", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
+			}
 		}
 
 		assertEquals(2, saved.get("version").intValue());
@@ -111,6 +119,11 @@ class ProjectDocumentTest {
 		assertEquals("/tmp/cam.mp4", editor.get("webcam").get("sourcePath").asString());
 		// The typed webcam rewrite carries the blur toggle (defaulting off for old projects).
 		assertFalse(editor.get("webcam").get("backgroundBlur").booleanValue());
+		// And the mask edge controls (defaulting to the shipped shape).
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION,
+				editor.get("webcam").get("maskPrecision").doubleValue(), 1e-9);
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET,
+				editor.get("webcam").get("maskOffset").doubleValue(), 1e-9);
 	}
 
 	@Test

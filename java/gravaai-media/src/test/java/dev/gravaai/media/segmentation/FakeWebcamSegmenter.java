@@ -9,14 +9,16 @@ public final class FakeWebcamSegmenter implements WebcamSegmenter {
 
 	private final int maskValue;
 	private int calls;
+	private MaskTuning lastTuning = MaskTuning.DEFAULT;
 
 	public FakeWebcamSegmenter(int maskValue) {
 		this.maskValue = maskValue;
 	}
 
 	@Override
-	public RgbaFrame maskFor(RgbaFrame frame) {
+	public RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 		calls++;
+		lastTuning = tuning;
 		ByteBuffer buffer = ByteBuffer.allocateDirect(frame.width() * frame.height() * 4);
 		for (int pixel = 0; pixel < frame.width() * frame.height(); pixel++) {
 			buffer.put((byte) maskValue).put((byte) maskValue).put((byte) maskValue)
@@ -29,5 +31,10 @@ public final class FakeWebcamSegmenter implements WebcamSegmenter {
 	/** How many frames reached the segmenter (the cache must collapse repeats). */
 	public int calls() {
 		return calls;
+	}
+
+	/** The edge settings the last request carried (the caller must pass the project's). */
+	public MaskTuning lastTuning() {
+		return lastTuning;
 	}
 }

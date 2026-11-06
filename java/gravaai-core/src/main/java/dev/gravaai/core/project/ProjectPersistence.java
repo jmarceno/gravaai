@@ -1290,7 +1290,13 @@ public final class ProjectPersistence {
 						? clamp(field(webcamNode, "margin").doubleValue(), 0, 96)
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_MARGIN,
 				booleanOr(field(webcamNode, "backgroundBlur"),
-						WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_BLUR));
+						WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_BLUR),
+				isFiniteNumber(field(webcamNode, "maskPrecision"))
+						? clamp(field(webcamNode, "maskPrecision").doubleValue(), 0, 1)
+						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION,
+				isFiniteNumber(field(webcamNode, "maskOffset"))
+						? clamp(field(webcamNode, "maskOffset").doubleValue(), -10, 10)
+						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
 	}
 
 	// ---------------------------------------------------------------------

@@ -17,6 +17,7 @@ import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.media.segmentation.MaskTuning;
 
 /**
  * Production mapping from the project editor model ({@code gravaai-core} P2.2) to the media-local
@@ -219,6 +220,18 @@ public final class ProjectEditorInputs {
 				webcam.reactToZoom(),
 				new LayoutCrop(crop.x(), crop.y(), crop.width(), crop.height()), ranges,
 				webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundBlur());
+	}
+
+	/**
+	 * The mask edge shape the project asks the background-blur segmenter for (Webcam → Advanced).
+	 * A project without a webcam block gets the shipped defaults, which is also what the compositor
+	 * renders when the segmenter is unavailable.
+	 */
+	public static MaskTuning maskTuning(ProjectEditorState editor) {
+		var webcam = editor.webcam();
+		return webcam == null
+				? MaskTuning.DEFAULT
+				: new MaskTuning(webcam.maskPrecision(), webcam.maskOffset());
 	}
 
 	/** Maps the editor annotations (stage 8). */

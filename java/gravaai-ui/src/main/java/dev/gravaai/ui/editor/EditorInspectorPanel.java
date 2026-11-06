@@ -1437,6 +1437,20 @@ public final class EditorInspectorPanel extends VBox {
 				cropNode.put("height", 1);
 			})), cropControl);
 			root.getChildren().add(cropBlock);
+
+			// Background blur mask: how crisp the cut-out edge is and how far it sits from the
+			// detected subject. Both are no-ops unless the blur is on, so they stay under Advanced
+			// beside the crop control rather than cluttering the main section.
+			root.getChildren().add(heading("Background blur", () -> applyWebcam(json -> {
+				json.put("maskPrecision", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION);
+				json.put("maskOffset", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
+			})));
+			root.getChildren().add(slider("Edge precision", webcam.maskPrecision(), 0, 1, 0.05,
+					value -> Math.round(value * 100) + "%",
+					value -> applyWebcam(json -> json.put("maskPrecision", value))));
+			root.getChildren().add(slider("Edge offset", webcam.maskOffset(), -5, 5, 0.5,
+					value -> (value > 0 ? "+" : "") + Math.round(value) + "%",
+					value -> applyWebcam(json -> json.put("maskOffset", value))));
 		}
 		root.getChildren().add(slider("Roundness", webcam.roundness(), 0, 100, 1,
 				value -> formatPercent(value),

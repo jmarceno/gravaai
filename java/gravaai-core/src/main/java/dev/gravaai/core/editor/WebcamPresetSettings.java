@@ -34,20 +34,24 @@ public record WebcamPresetSettings(
 		@Nullable Double cornerRadius,
 		double shadow,
 		double margin,
-		boolean backgroundBlur) {
+		boolean backgroundBlur,
+		double maskPrecision,
+		double maskOffset) {
 
 	public static WebcamPresetSettings from(WebcamOverlaySettings webcam) {
 		return new WebcamPresetSettings(webcam.enabled(), webcam.timeOffsetMs(), webcam.mirror(),
 				webcam.cropRegion(), webcam.corner(), webcam.positionPreset(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),
 				webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(), webcam.shadow(),
-				webcam.margin(), webcam.backgroundBlur());
+				webcam.margin(), webcam.backgroundBlur(), webcam.maskPrecision(),
+				webcam.maskOffset());
 	}
 
 	public WebcamOverlaySettings toOverlaySettings() {
 		return new WebcamOverlaySettings(null, enabled, null, timeOffsetMs, mirror, cropRegion,
 				corner, positionPreset, positionX, positionY, size, width, height, reactToZoom,
-				roundness, cornerRadius, shadow, margin, backgroundBlur);
+				roundness, cornerRadius, shadow, margin, backgroundBlur, maskPrecision,
+				maskOffset);
 	}
 
 	public ObjectNode toJson() {
@@ -73,6 +77,8 @@ public record WebcamPresetSettings(
 		node.put("shadow", shadow);
 		node.put("margin", margin);
 		node.put("backgroundBlur", backgroundBlur);
+		node.put("maskPrecision", maskPrecision);
+		node.put("maskOffset", maskOffset);
 		return node;
 	}
 }

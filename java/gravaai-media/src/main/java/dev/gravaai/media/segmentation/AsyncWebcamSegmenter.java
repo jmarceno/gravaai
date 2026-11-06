@@ -44,6 +44,10 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 	/** Buffer the worker has finished with, free to overwrite. Recycled to keep the path alloc-free. */
 	private @Nullable ByteBuffer freeBuffer;
 	private @Nullable RgbaFrame pendingFrame;
+	/** Tuning for {@link #pendingFrame}: the worker reads it when it picks the request up. */
+	private MaskTuning pendingTuning = MaskTuning.DEFAULT;
+	/** Runs on the worker after each completed mask; see {@link #setMaskReadyListener}. */
+	private volatile @Nullable Runnable maskReadyListener;
 	/** Latest completed mask; written by the worker, read by the render thread. */
 	private final AtomicReference<RgbaFrame> latestMask = new AtomicReference<>();
 	private final AtomicBoolean running = new AtomicBoolean(true);
@@ -55,13 +59,14 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 	}
 
 	@Override
-	public @Nullable RgbaFrame maskFor(RgbaFrame frame) {
+	public @Nullable RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 		if (!running.get()) {
 			return null;
 		}
 		synchronized (requestLock) {
 			// Replace any frame the worker has not started yet: only the newest is worth doing.
 			pendingFrame = copyIntoStaging(frame);
+			pendingTuning = tuning;
 			requestLock.notifyAll();
 		}
 		return latestMask.get();
@@ -70,6 +75,21 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 	/** True once a mask has been produced (diagnostics/tests). */
 	public boolean hasMask() {
 		return latestMask.get() != null;
+	}
+
+	@Override
+	public @Nullable RgbaFrame completedMask() {
+		return latestMask.get();
+	}
+
+	/**
+	 * Registers a callback that runs on the worker thread after each completed mask, so a paused
+	 * preview can repaint when a mask finally arrives (nothing else would ask for a redraw: the
+	 * render loop only draws frames the engine submits). A null clears it.
+	 */
+	@Override
+	public void setMaskReadyListener(@Nullable Runnable listener) {
+		maskReadyListener = listener;
 	}
 
 	/**
@@ -107,6 +127,7 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 	private void pump() {
 		while (running.get()) {
 			RgbaFrame frame;
+			MaskTuning tuning;
 			synchronized (requestLock) {
 				while (pendingFrame == null && running.get()) {
 					try {
@@ -120,14 +141,19 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 					return;
 				}
 				frame = pendingFrame;
+				tuning = pendingTuning;
 				pendingFrame = null;
 			}
 			try {
-				RgbaFrame mask = delegate.maskFor(frame);
+				RgbaFrame mask = delegate.maskFor(frame, tuning);
 				if (mask != null) {
 					// Latest-wins: the render thread may read the previous mask mid-frame, so the
 					// reference is swapped rather than mutated, and the old one is left to the GC.
 					latestMask.set(mask);
+					Runnable listener = maskReadyListener;
+					if (listener != null && running.get()) {
+						listener.run();
+					}
 				}
 			} catch (RuntimeException error) {
 				// A failed inference must not kill the worker: keep the last good mask and retry on

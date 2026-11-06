@@ -125,6 +125,31 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("defaults the webcam blur mask controls and clamps them to their slider ranges")
+	void webcamMaskControlsDefaultAndClamp() {
+		// A project saved before the controls existed keeps the shipped edge shape.
+		WebcamOverlaySettings untouched = normalize("{\"webcam\":{\"enabled\":true}}").webcam();
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION, untouched.maskPrecision(), 1e-9);
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET, untouched.maskOffset(), 1e-9);
+
+		// Explicit values round-trip.
+		WebcamOverlaySettings shaped = normalize(
+				"{\"webcam\":{\"maskPrecision\":0.75,\"maskOffset\":-2.5}}").webcam();
+		assertEquals(0.75, shaped.maskPrecision(), 1e-9);
+		assertEquals(-2.5, shaped.maskOffset(), 1e-9);
+
+		// Out-of-range numbers clamp to the slider ends, and junk falls back to the defaults.
+		WebcamOverlaySettings clamped = normalize(
+				"{\"webcam\":{\"maskPrecision\":9,\"maskOffset\":-99}}").webcam();
+		assertEquals(1, clamped.maskPrecision(), 1e-9);
+		assertEquals(-10, clamped.maskOffset(), 1e-9);
+		WebcamOverlaySettings junk = normalize(
+				"{\"webcam\":{\"maskPrecision\":\"soft\",\"maskOffset\":\"in\"}}").webcam();
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION, junk.maskPrecision(), 1e-9);
+		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET, junk.maskOffset(), 1e-9);
+	}
+
+	@Test
 	@DisplayName("migrates legacy webcam radius pixels to percentage roundness")
 	void migratesLegacyWebcamRadius() {
 		ProjectEditorState state = normalize("{\"webcam\":{\"cornerRadius\":90,\"width\":40,\"height\":40}}");

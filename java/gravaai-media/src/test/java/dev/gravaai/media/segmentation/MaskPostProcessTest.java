@@ -55,6 +55,60 @@ class MaskPostProcessTest {
 	}
 
 	@Test
+	@DisplayName("erosion shrinks a solid region by the kernel radius and never goes below 0")
+	void erodesRegion() {
+		int size = 32;
+		float[] mask = new float[size * size];
+		float[] scratch = new float[size * size];
+		// A 10x10 block of 1 in the middle.
+		for (int y = 11; y < 21; y++) {
+			for (int x = 11; x < 21; x++) {
+				mask[y * size + x] = 1f;
+			}
+		}
+		MaskPostProcess.erode(mask, scratch, size, size, 2);
+		// The region shrinks by 2 px on each side.
+		assertEquals(0f, mask[12 * size + 16], 1e-6, "the top edge must move in by the radius");
+		assertEquals(0f, mask[16 * size + 12], 1e-6, "the left edge must move in by the radius");
+		assertEquals(1f, mask[13 * size + 16], 1e-6, "inside the shrunken region stays 1");
+		assertEquals(1f, mask[18 * size + 18], 1e-6, "the centre stays 1");
+		for (float value : mask) {
+			assertTrue(value >= 0f, "erosion must not go below 0");
+		}
+	}
+
+	@Test
+	@DisplayName("edge shifting dilates, erodes or does nothing depending on the sign")
+	void shiftsEdgeBySign() {
+		int size = 16;
+		float[] grown = new float[size * size];
+		float[] shrunk = new float[size * size];
+		float[] untouched = new float[size * size];
+		for (int i = 0; i < size * size; i++) {
+			grown[i] = 1f;
+			shrunk[i] = 1f;
+			untouched[i] = 1f;
+		}
+		// Punch a hole so both directions have an edge to move.
+		for (int y = 6; y < 10; y++) {
+			for (int x = 6; x < 10; x++) {
+				grown[y * size + x] = 0f;
+				shrunk[y * size + x] = 0f;
+				untouched[y * size + x] = 0f;
+			}
+		}
+		MaskPostProcess.shiftEdge(grown, new float[size * size], size, size, 2);
+		MaskPostProcess.shiftEdge(shrunk, new float[size * size], size, size, -2);
+		MaskPostProcess.shiftEdge(untouched, new float[size * size], size, size, 0);
+		// The hole spans 6..9; dilating fills it back by the radius, eroding widens it by the same.
+		assertEquals(1f, grown[7 * size + 7], 1e-6, "a positive radius must fill the hole back");
+		assertEquals(0f, shrunk[5 * size + 7], 1e-6, "a negative radius must grow the hole");
+		assertEquals(1f, shrunk[3 * size + 3], 1e-6, "far from the hole the mask stays solid");
+		assertEquals(0f, untouched[7 * size + 7], 1e-6, "radius 0 must leave the mask alone");
+		assertEquals(1f, untouched[5 * size + 7], 1e-6, "radius 0 must leave the hole alone");
+	}
+
+	@Test
 	@DisplayName("gaussian blur smooths a step edge and preserves the mean")
 	void blursStepEdge() {
 		int size = 64;

@@ -63,6 +63,9 @@ final class AgentEditorViews {
 			Map.entry("autoCaptionSettings.bottomOffset", "0-30"),
 			Map.entry("autoCaptionSettings.backgroundOpacity", "0-1"),
 			Map.entry("webcam.size", "10-100 (percent of the frame)"),
+			Map.entry("webcam.maskPrecision", "0-1 (background blur edge crispness)"),
+			Map.entry("webcam.maskOffset", "-5-5 percent of the card (grows or shrinks the"
+					+ " background blur cut-out)"),
 			Map.entry("webcam.positionPreset", "top-left, top-center, top-right, center-left,"
 					+ " center, center-right, bottom-left, bottom-center, bottom-right, custom,"
 					+ " split-right, split-left, split-top, split-bottom"),

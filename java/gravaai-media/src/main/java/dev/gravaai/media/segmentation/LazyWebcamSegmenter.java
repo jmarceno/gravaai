@@ -23,9 +23,9 @@ public final class LazyWebcamSegmenter implements WebcamSegmenter {
 	private boolean unavailable;
 
 	@Override
-	public @Nullable RgbaFrame maskFor(RgbaFrame frame) {
+	public @Nullable RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 		SelfieSegmenter active = segmenter();
-		return active == null ? null : active.maskFor(frame);
+		return active == null ? null : active.maskFor(frame, tuning);
 	}
 
 	/** The open segmenter, opening it on first use; {@code null} once opening failed. */

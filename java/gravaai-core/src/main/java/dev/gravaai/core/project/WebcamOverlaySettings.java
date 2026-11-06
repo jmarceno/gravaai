@@ -24,7 +24,9 @@ public record WebcamOverlaySettings(
 		@Nullable Double cornerRadius,
 		double shadow,
 		double margin,
-		boolean backgroundBlur) {
+		boolean backgroundBlur,
+		double maskPrecision,
+		double maskOffset) {
 
 	public record TimeRange(long startMs, long endMs) {}
 
@@ -38,6 +40,13 @@ public record WebcamOverlaySettings(
 	public static final double DEFAULT_WEBCAM_POSITION_Y = 1;
 	public static final long DEFAULT_WEBCAM_TIME_OFFSET_MS = 0;
 	public static final boolean DEFAULT_WEBCAM_BACKGROUND_BLUR = false;
+	/**
+	 * Default edge precision: 0.5 is the mask post-process the blur shipped with (dilate 2 plus a
+	 * σ2 Gaussian and a slope-12 sigmoid), so existing projects render exactly as before.
+	 */
+	public static final double DEFAULT_WEBCAM_MASK_PRECISION = 0.5;
+	/** Default edge offset in percent of the card's short side: 0 means no grow/shrink. */
+	public static final double DEFAULT_WEBCAM_MASK_OFFSET = 0;
 
 	/** {@code DEFAULT_WEBCAM_OVERLAY}. */
 	public static WebcamOverlaySettings defaults() {
@@ -46,6 +55,7 @@ public record WebcamOverlaySettings(
 				DEFAULT_WEBCAM_POSITION_X, DEFAULT_WEBCAM_POSITION_Y, DEFAULT_WEBCAM_SIZE,
 				DEFAULT_WEBCAM_SIZE, DEFAULT_WEBCAM_SIZE, DEFAULT_WEBCAM_REACT_TO_ZOOM,
 				DEFAULT_WEBCAM_ROUNDNESS, null, DEFAULT_WEBCAM_SHADOW, DEFAULT_WEBCAM_MARGIN,
-				DEFAULT_WEBCAM_BACKGROUND_BLUR);
+				DEFAULT_WEBCAM_BACKGROUND_BLUR, DEFAULT_WEBCAM_MASK_PRECISION,
+				DEFAULT_WEBCAM_MASK_OFFSET);
 	}
 }

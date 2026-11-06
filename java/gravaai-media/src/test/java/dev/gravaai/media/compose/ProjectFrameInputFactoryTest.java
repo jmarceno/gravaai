@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Timeout;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.WebcamOverlaySettings;
 import dev.gravaai.media.segmentation.FakeWebcamSegmenter;
+import dev.gravaai.media.segmentation.MaskTuning;
 
 /** Production resolver parity with the golden/test mapping (plan §5.8/§5.10). */
 class ProjectFrameInputFactoryTest {
@@ -93,7 +94,8 @@ class ProjectFrameInputFactoryTest {
 				webcam.mirror(), webcam.cropRegion(), webcam.corner(), webcam.positionPreset(),
 				webcam.positionX(), webcam.positionY(), webcam.size(), webcam.width(),
 				webcam.height(), webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(),
-				webcam.shadow(), webcam.margin(), true);
+				webcam.shadow(), webcam.margin(), true, webcam.maskPrecision(),
+				webcam.maskOffset());
 		ProjectEditorState blurOn = loaded.editor().toBuilder().webcam(blurOnWebcam).build();
 
 		FakeWebcamSegmenter segmenter = new FakeWebcamSegmenter(255);
@@ -105,10 +107,32 @@ class ProjectFrameInputFactoryTest {
 			assertEquals(255, Byte.toUnsignedInt(
 					first.webcamMask().pixelsTopFirstRgba().get(3)), "mask value lost");
 			assertEquals(1, segmenter.calls(), "first frame must reach the segmenter");
+			assertEquals(MaskTuning.DEFAULT, segmenter.lastTuning(),
+					"a project that never touched the controls must get the shipped shape");
 			// The same timeline time decodes the same webcam frame: the cached mask returns.
 			FrameInput second = factory.inputAtTime(0.35);
 			assertSame(first.webcamMask(), second.webcamMask(), "mask recomputed for one frame");
 			assertEquals(1, segmenter.calls(), "cache must collapse repeat decodes");
+		}
+
+		// The project's edge controls reach the segmenter.
+		WebcamOverlaySettings shapedWebcam = new WebcamOverlaySettings(
+				blurOnWebcam.visibleRanges(), blurOnWebcam.enabled(),
+				blurOnWebcam.sourcePath(), blurOnWebcam.timeOffsetMs(), blurOnWebcam.mirror(),
+				blurOnWebcam.cropRegion(), blurOnWebcam.corner(),
+				blurOnWebcam.positionPreset(), blurOnWebcam.positionX(),
+				blurOnWebcam.positionY(), blurOnWebcam.size(), blurOnWebcam.width(),
+				blurOnWebcam.height(), blurOnWebcam.reactToZoom(), blurOnWebcam.roundness(),
+				blurOnWebcam.cornerRadius(), blurOnWebcam.shadow(), blurOnWebcam.margin(), true,
+				0.9, -2);
+		ProjectEditorState shaped = loaded.editor().toBuilder().webcam(shapedWebcam).build();
+		FakeWebcamSegmenter shapedSegmenter = new FakeWebcamSegmenter(255);
+		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
+				shaped, loaded.videoPath(), webcamPath, List.of(), 0,
+				shaped.webcam().timeOffsetMs(), wallpaperRoot, 60, shapedSegmenter)) {
+			factory.inputAtTime(0.35);
+			assertEquals(new MaskTuning(0.9, -2), shapedSegmenter.lastTuning(),
+					"the project's edge controls must reach the segmenter");
 		}
 
 		// Blur off (the project default): no mask and the segmenter never runs.

@@ -7,11 +7,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.media.compose.CameraGeometry;
 import dev.gravaai.media.compose.FrameOverlayHooks;
+import dev.gravaai.media.compose.ProjectEditorInputs;
 import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.playback.PlaybackController;
 import dev.gravaai.media.playback.PlaybackFrame;
+import dev.gravaai.media.playback.PlaybackState;
 import dev.gravaai.media.playback.PlaybackStatus;
 import dev.gravaai.media.playback.PreviewVideoReadiness;
+import dev.gravaai.media.segmentation.MaskTuning;
 import dev.gravaai.media.segmentation.WebcamSegmenter;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
@@ -150,12 +153,59 @@ public final class EditorPreviewView extends Region {
 	private @Nullable WebcamSegmenter webcamSegmenter;
 	private @Nullable RgbaFrame lastMaskedWebcamFrame;
 	private @Nullable RgbaFrame lastWebcamMask;
+	/** Edge settings the cached mask was shaped with; a change invalidates the cache. */
+	private MaskTuning lastMaskedTuning = MaskTuning.DEFAULT;
+	/**
+	 * Set while this view is repainting because a mask finished on the segmenter's worker thread:
+	 * that repaint must consume the mask already in hand rather than queue another inference.
+	 * Guarded by the frame snapshot monitor.
+	 */
+	private boolean maskRepaintPending;
 
 	/** Supplies the person segmenter backing the webcam background blur; null keeps blur off. */
 	public void setWebcamSegmenter(@Nullable WebcamSegmenter segmenter) {
+		WebcamSegmenter previous = this.webcamSegmenter;
+		if (previous != segmenter && previous != null) {
+			previous.setMaskReadyListener(null);
+		}
 		this.webcamSegmenter = segmenter;
 		lastMaskedWebcamFrame = null;
 		lastWebcamMask = null;
+		lastMaskedTuning = MaskTuning.DEFAULT;
+		if (segmenter != null) {
+			// The mask lands on the segmenter's worker thread, long after the frame that asked for
+			// it was drawn. Repainting then is what makes the edge controls visible while paused:
+			// the render loop only draws frames the engine submits, and a paused engine submits
+			// none. Drop the cached mask first so the repaint asks for a fresh one.
+			segmenter.setMaskReadyListener(this::onMaskReady);
+		}
+	}
+
+	/**
+	 * A mask finished on the segmenter's worker thread: repaint the retained frame so the new edge
+	 * shape reaches the screen. The cache is guarded by the frame snapshot monitor, which a repaint
+	 * takes, so the flag must be set under it too.
+	 *
+	 * <p>Only a paused preview needs this: while playing, the engine's own frames arrive at the
+	 * frame rate and pick the mask up anyway, and repainting on every delivered mask would double
+	 * the render work for no visible gain.
+	 */
+	private void onMaskReady() {
+		PreviewFrameSnapshot snapshot = lastFrame;
+		PlaybackStatus status = lastStatus;
+		// The cached status, not engine.isPlaying(): this runs on the mask worker and must not
+		// take the engine lock (the frame callback already holds it while decoding).
+		if (snapshot == null || disposed || status == null || status.state() == PlaybackState.PLAYING) {
+			return;
+		}
+		synchronized (snapshot) {
+			maskRepaintPending = true;
+			// The delivered mask may pair with a buffer this view cached as "no mask yet"; drop
+			// that answer so the repaint picks the completed mask up.
+			lastMaskedWebcamFrame = null;
+			lastWebcamMask = null;
+		}
+		Platform.runLater(this::requestRepaint);
 	}
 
 	private void onFrame(PlaybackFrame frame) {
@@ -197,7 +247,9 @@ public final class EditorPreviewView extends Region {
 			synchronized (snapshot) {
 				PlaybackFrame frame = snapshot.playbackFrame();
 				boolean accepted = target.submit(PreviewFrameMapper.frameInput(frame, current,
-						background, webcamMask(frame, current)));
+						background, webcamMask(frame, current, maskRepaintPending)));
+				// One repaint per delivered mask: the next one must ask the segmenter again.
+				maskRepaintPending = false;
 				if (accepted && updateReadiness) {
 					markReadiness(frame);
 				}
@@ -215,12 +267,18 @@ public final class EditorPreviewView extends Region {
 	/**
 	 * The person mask for the decoded webcam frame when the scene enables background blur, else
 	 * null. The decoded buffers rotate in turn, so identical frames return the cached mask; only
-	 * a buffer flip recomputes it. The segmenter may be asynchronous (the preview path keeps
-	 * inference off this thread), so the mask it returns is the most recent completed one, not
-	 * necessarily this frame's; caching it per buffer keeps that stable across repaints.
+	 * a buffer flip or an edge-control change recomputes it. The segmenter may be asynchronous
+	 * (the preview path keeps inference off this thread), so the mask it returns is the most
+	 * recent completed one, not necessarily this frame's; caching it per buffer keeps that stable
+	 * across repaints.
+	 *
+	 * <p>On the repaint this view requests for a finished mask ({@link #onMaskReady}), the mask is
+	 * already in hand: reading {@link WebcamSegmenter#completedMask()} instead of asking again is
+	 * what stops that repaint from queueing another inference and looping forever while paused.
 	 * Callers hold the frame snapshot monitor.
 	 */
-	private @Nullable RgbaFrame webcamMask(PlaybackFrame frame, PreviewFrameMapper.PreviewScene scene) {
+	private @Nullable RgbaFrame webcamMask(PlaybackFrame frame, PreviewFrameMapper.PreviewScene scene,
+			boolean maskAlreadyDelivered) {
 		RgbaFrame webcamFrame = frame.webcamFrame();
 		if (webcamFrame == null || !scene.webcam().backgroundBlur()) {
 			return null;
@@ -228,13 +286,17 @@ public final class EditorPreviewView extends Region {
 		if (webcamSegmenter == null) {
 			return null;
 		}
-		if (webcamFrame == lastMaskedWebcamFrame) {
-			// Same decoded buffer: answer from the cache. A null entry is a real answer (the
-			// segmenter had no mask yet), not a cache miss.
+		MaskTuning tuning = ProjectEditorInputs.maskTuning(scene.editor());
+		if (webcamFrame == lastMaskedWebcamFrame && tuning.equals(lastMaskedTuning)) {
+			// Same decoded buffer and same edge settings: answer from the cache. A null entry is a
+			// real answer (the segmenter had no mask yet), not a cache miss.
 			return lastWebcamMask;
 		}
 		lastMaskedWebcamFrame = webcamFrame;
-		lastWebcamMask = webcamSegmenter.maskFor(webcamFrame);
+		lastMaskedTuning = tuning;
+		lastWebcamMask = maskAlreadyDelivered
+				? webcamSegmenter.completedMask()
+				: webcamSegmenter.maskFor(webcamFrame, tuning);
 		return lastWebcamMask;
 	}
 
@@ -442,6 +504,12 @@ public final class EditorPreviewView extends Region {
 			return;
 		}
 		disposed = true;
+		WebcamSegmenter segmenter = webcamSegmenter;
+		if (segmenter != null) {
+			// The worker outlives this view (the app closes it): stop it calling back into a
+			// disposed preview.
+			segmenter.setMaskReadyListener(null);
+		}
 		readiness.detach();
 		ready.set(false);
 		unbind();

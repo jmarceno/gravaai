@@ -38,7 +38,7 @@ class AsyncWebcamSegmenterTest {
 		private int closed;
 
 		@Override
-		public RgbaFrame maskFor(RgbaFrame frame) {
+		public RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 			synchronized (this) {
 				calls++;
 			}
@@ -159,7 +159,7 @@ class AsyncWebcamSegmenterTest {
 		private int closed;
 
 		@Override
-		public RgbaFrame maskFor(RgbaFrame frame) {
+		public RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
 			synchronized (this) {
 				calls++;
 			}

@@ -8,7 +8,7 @@ public record WebcamSpec(boolean enabled, String positionPreset, String corner, 
 		double positionY, double size, double width, double height, boolean mirror,
 		double roundness, double shadow, double margin, boolean reactToZoom, LayoutCrop cropRegion,
 		List<VisibleRange> visibleRanges, double timeOffsetMs,
-		Optional<Transition> transition) {
+		Optional<Transition> transition, boolean backgroundBlur) {
 
 	/** A webcam visibility window in timeline milliseconds (TS {@code TimeRange}). */
 	public record VisibleRange(double startMs, double endMs) {
@@ -31,13 +31,13 @@ public record WebcamSpec(boolean enabled, String positionPreset, String corner, 
 			LayoutCrop cropRegion, List<VisibleRange> visibleRanges, double timeOffsetMs) {
 		this(enabled, positionPreset, corner, positionX, positionY, size, width, height, mirror,
 				roundness, shadow, margin, reactToZoom, cropRegion, visibleRanges, timeOffsetMs,
-				Optional.empty());
+				Optional.empty(), false);
 	}
 
 	public WebcamSpec withTransition(Optional<Transition> next) {
 		return new WebcamSpec(enabled, positionPreset, corner, positionX, positionY, size, width,
 				height, mirror, roundness, shadow, margin, reactToZoom, cropRegion, visibleRanges,
-				timeOffsetMs, next);
+				timeOffsetMs, next, backgroundBlur);
 	}
 
 	/** No webcam overlay. */

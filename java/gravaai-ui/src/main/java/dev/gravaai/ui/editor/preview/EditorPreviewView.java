@@ -7,10 +7,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.media.compose.CameraGeometry;
 import dev.gravaai.media.compose.FrameOverlayHooks;
+import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.playback.PlaybackController;
 import dev.gravaai.media.playback.PlaybackFrame;
 import dev.gravaai.media.playback.PlaybackStatus;
 import dev.gravaai.media.playback.PreviewVideoReadiness;
+import dev.gravaai.media.segmentation.WebcamSegmenter;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
@@ -143,6 +145,19 @@ public final class EditorPreviewView extends Region {
 	// Video wallpaper decoder: used on the engine thread, closed on dispose.
 	private final PreviewWallpaper wallpaper = new PreviewWallpaper();
 
+	// Webcam background blur: the app layer wires the segmenter (null keeps blur off). The mask
+	// cache is guarded by the frame snapshot monitor (every submitSnapshot caller holds it).
+	private @Nullable WebcamSegmenter webcamSegmenter;
+	private @Nullable RgbaFrame lastMaskedWebcamFrame;
+	private @Nullable RgbaFrame lastWebcamMask;
+
+	/** Supplies the person segmenter backing the webcam background blur; null keeps blur off. */
+	public void setWebcamSegmenter(@Nullable WebcamSegmenter segmenter) {
+		this.webcamSegmenter = segmenter;
+		lastMaskedWebcamFrame = null;
+		lastWebcamMask = null;
+	}
+
 	private void onFrame(PlaybackFrame frame) {
 		if (disposed) {
 			return;
@@ -181,8 +196,8 @@ public final class EditorPreviewView extends Region {
 			// while the queue is still copying them.
 			synchronized (snapshot) {
 				PlaybackFrame frame = snapshot.playbackFrame();
-				boolean accepted = target.submit(
-						PreviewFrameMapper.frameInput(frame, current, background));
+				boolean accepted = target.submit(PreviewFrameMapper.frameInput(frame, current,
+						background, webcamMask(frame, current)));
 				if (accepted && updateReadiness) {
 					markReadiness(frame);
 				}
@@ -195,6 +210,25 @@ public final class EditorPreviewView extends Region {
 			}
 			return false;
 		}
+	}
+
+	/**
+	 * The person mask for the decoded webcam frame when the scene enables background blur, else
+	 * null. The decoded buffers rotate in turn, so identical frames return the cached mask; only
+	 * a buffer flip recomputes it. Callers hold the frame snapshot monitor.
+	 */
+	private @Nullable RgbaFrame webcamMask(PlaybackFrame frame, PreviewFrameMapper.PreviewScene scene) {
+		RgbaFrame webcamFrame = frame.webcamFrame();
+		if (webcamFrame == null || !scene.webcam().backgroundBlur()) {
+			return null;
+		}
+		if (webcamFrame == lastMaskedWebcamFrame && lastWebcamMask != null) {
+			return lastWebcamMask;
+		}
+		RgbaFrame mask = webcamSegmenter == null ? null : webcamSegmenter.maskFor(webcamFrame);
+		lastMaskedWebcamFrame = webcamFrame;
+		lastWebcamMask = mask;
+		return mask;
 	}
 
 	private void markReadiness(PlaybackFrame frame) {

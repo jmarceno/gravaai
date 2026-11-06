@@ -47,6 +47,7 @@ import dev.gravaai.ui.editor.preview.PreviewFrameMapper;
 import dev.gravaai.ui.editor.timeline.core.TimelineAudioPlacement;
 import dev.gravaai.ui.kit.Toast;
 import dev.gravaai.media.compose.CursorSample;
+import dev.gravaai.media.segmentation.WebcamSegmenter;
 import dev.gravaai.ui.editor.timeline.TimelineView;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Dialog;
@@ -165,6 +166,8 @@ public final class EditorWindow {
 	private boolean closeApproved;
 	private boolean previewFrameLogged;
 	private @Nullable AutoCaptionController captions;
+	/** Webcam background-blur segmenter handed to the preview; closed with the window. */
+	private @Nullable WebcamSegmenter webcamSegmenter;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
 	private dev.gravaai.core.event.@Nullable Subscription playheadSubscription;
 	private final Subscription playbackRateSubscription;
@@ -430,6 +433,10 @@ public final class EditorWindow {
 			if (captions != null) {
 				captions.close();
 			}
+			if (webcamSegmenter != null) {
+				webcamSegmenter.close();
+				webcamSegmenter = null;
+			}
 			shell.dispose();
 			session.close();
 		} finally {
@@ -541,6 +548,20 @@ public final class EditorWindow {
 	public void setOverlayHooks(FrameOverlayHooks hooks) {
 		shell.setOverlayHooks(hooks);
 		bindElementErrors();
+	}
+
+	/**
+	 * Hands the webcam background-blur segmenter to the preview; the window closes it on dispose.
+	 * Null keeps blur off, and the lazy app default only opens the model once a project enables
+	 * the blur.
+	 */
+	public void setWebcamSegmenter(@Nullable WebcamSegmenter segmenter) {
+		WebcamSegmenter previous = this.webcamSegmenter;
+		this.webcamSegmenter = segmenter;
+		shell.setWebcamSegmenter(segmenter);
+		if (previous != null && previous != segmenter) {
+			previous.close();
+		}
 	}
 
 	private boolean elementErrorsBound;

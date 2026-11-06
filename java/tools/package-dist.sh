@@ -152,6 +152,12 @@ if [ -n "$NATIVE_DIR" ] && [ -d "$NATIVE_DIR" ]; then
 		# lib/pkgconfig is build tooling, not runtime.
 		rm -rf "$LINUX/ffmpeg/lib/pkgconfig"
 	fi
+	# ONNX Runtime: the CPU inference lib the webcam background-blur segmenter
+	# loads through FFM (include/ is only needed to regenerate the bindings).
+	if [ -d "$NATIVE_DIR/onnxruntime/lib" ]; then
+		mkdir -p "$LINUX/onnxruntime/lib"
+		cp -a "$NATIVE_DIR/onnxruntime/lib/." "$LINUX/onnxruntime/lib/"
+	fi
 else
 	echo "package-dist.sh: no native payload yet ($NATIVE_DIR)"
 fi

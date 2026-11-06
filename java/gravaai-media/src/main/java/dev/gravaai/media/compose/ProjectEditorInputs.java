@@ -218,7 +218,7 @@ public final class ProjectEditorInputs {
 				webcam.mirror(), webcam.roundness(), webcam.shadow(), webcam.margin(),
 				webcam.reactToZoom(),
 				new LayoutCrop(crop.x(), crop.y(), crop.width(), crop.height()), ranges,
-				webcam.timeOffsetMs());
+				webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundBlur());
 	}
 
 	/** Maps the editor annotations (stage 8). */
@@ -469,7 +469,7 @@ public final class ProjectEditorInputs {
 				style.height().orElse(base.height()), base.mirror(),
 				style.roundness().orElse(base.roundness()), style.shadow().orElse(base.shadow()),
 				base.margin(), base.reactToZoom(), base.cropRegion(), base.visibleRanges(),
-				base.timeOffsetMs());
+				base.timeOffsetMs(), Optional.empty(), base.backgroundBlur());
 	}
 
 	/** Maps the project's fade-through-black clip transitions (stage 11). */

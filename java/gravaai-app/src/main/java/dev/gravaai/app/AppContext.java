@@ -1378,6 +1378,7 @@ public final class AppContext {
 		editorWindows.add(window);
 		window.show();
 		window.setOverlayHooks(previewOverlayHooks(window.session()));
+		window.setWebcamSegmenter(new dev.gravaai.media.segmentation.LazyWebcamSegmenter());
 		attachAgent(window);
 		attachCaptions(window);
 		if (path != null) {

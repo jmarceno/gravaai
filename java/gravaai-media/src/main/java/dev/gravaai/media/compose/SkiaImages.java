@@ -28,11 +28,24 @@ final class SkiaImages {
 	 * @return an image the caller must close after the surface flush
 	 */
 	static Image fromRgbaFrame(RgbaFrame frame, ColorSpace colorSpace) {
+		return image(frame, colorSpace, ColorAlphaType.OPAQUE);
+	}
+
+	/**
+	 * Creates a raster image for one person-mask frame: the mask value must stay readable in the
+	 * alpha channel, so the image is {@link ColorAlphaType#UNPREMUL} (an opaque borrow would force
+	 * the sampled alpha to 1).
+	 */
+	static Image maskFromRgbaFrame(RgbaFrame frame, ColorSpace colorSpace) {
+		return image(frame, colorSpace, ColorAlphaType.UNPREMUL);
+	}
+
+	private static Image image(RgbaFrame frame, ColorSpace colorSpace, ColorAlphaType alphaType) {
 		int stride = frame.strideBytes();
 		byte[] pixels = new byte[frame.height() * stride];
 		frame.pixelsTopFirstRgba().duplicate().get(pixels, 0, pixels.length);
 		ImageInfo info = new ImageInfo(frame.width(), frame.height(), ColorType.RGBA_8888,
-				ColorAlphaType.OPAQUE, colorSpace);
+				alphaType, colorSpace);
 		Image image = Image.makeRasterFromBytes(info, pixels, stride);
 		if (image == null) {
 			throw new IllegalStateException("Image.makeRaster returned null for "

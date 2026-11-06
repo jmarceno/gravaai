@@ -182,6 +182,18 @@ class PreviewFrameMapperTest {
 		assertTrue(webcam.visibleRanges().isEmpty());
 	}
 
+	@DisplayName("webcam background blur maps into the compositor spec (stage 7)")
+	@Test
+	void webcamBackgroundBlurMapping() {
+		assertTrue(PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundBlur\":true}}")).backgroundBlur());
+		// Absent key (projects predating the toggle) and junk both fall back to off.
+		assertFalse(PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true}}")).backgroundBlur());
+		assertFalse(PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundBlur\":3}}")).backgroundBlur());
+	}
+
 	@DisplayName("cursor samples hand the compositor the bracketing pair for a frame time")
 	@Test
 	void cursorTrackWindow() {

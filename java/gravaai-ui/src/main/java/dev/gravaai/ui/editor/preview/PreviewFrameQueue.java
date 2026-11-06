@@ -86,18 +86,21 @@ public final class PreviewFrameQueue {
 		}
 	}
 
-	/** One reusable frame buffer pair (source + webcam). */
+	/** One reusable frame buffer set (source + webcam + webcam mask). */
 	private static final class Slot {
 		private @Nullable ByteBuffer sourcePixels;
 		private @Nullable ByteBuffer webcamPixels;
+		private @Nullable ByteBuffer webcamMaskPixels;
 		private @Nullable ByteBuffer wallpaperPixels;
 		private @Nullable RgbaFrame sourceFrame;
 		private @Nullable RgbaFrame webcamFrame;
+		private @Nullable RgbaFrame webcamMaskFrame;
 		private @Nullable FrameInput frame;
 
 		void copy(FrameInput input) {
-			sourceFrame = copy(input.sourceFrame(), true);
-			webcamFrame = copy(input.webcamFrame(), false);
+			sourceFrame = copy(input.sourceFrame(), BufferKind.SOURCE);
+			webcamFrame = copy(input.webcamFrame(), BufferKind.WEBCAM);
+			webcamMaskFrame = copy(input.webcamMask(), BufferKind.WEBCAM_MASK);
 			Background background = input.background();
 			if (background instanceof Background.VideoFrame video && video.frame() != null) {
 				// The wallpaper decoder reuses its buffer; the GL thread needs a stable copy.
@@ -110,26 +113,32 @@ public final class PreviewFrameQueue {
 						copyInto(frame, wallpaperPixels, needed));
 			}
 			frame = new FrameInput(input.frameIndex(), input.timeSeconds(), sourceFrame, webcamFrame,
-					input.cursorSamples(), background, input.backgroundBlur(), input.layout(),
-					input.zoom(), input.style(), input.cursor(), input.webcam(),
+					webcamMaskFrame, input.cursorSamples(), background, input.backgroundBlur(),
+					input.layout(), input.zoom(), input.style(), input.cursor(), input.webcam(),
 					input.annotations(), input.captions(), input.keystrokes(), input.fade(),
 					input.scene(), input.sourceTimeSeconds());
 		}
 
-		private @Nullable RgbaFrame copy(@Nullable RgbaFrame frame, boolean source) {
+		private enum BufferKind { SOURCE, WEBCAM, WEBCAM_MASK }
+
+		private @Nullable RgbaFrame copy(@Nullable RgbaFrame frame, BufferKind kind) {
 			if (frame == null) {
 				return null;
 			}
 			int width = frame.width();
 			int height = frame.height();
 			int needed = width * height * 4;
-			ByteBuffer target = source ? sourcePixels : webcamPixels;
+			ByteBuffer target = switch (kind) {
+				case SOURCE -> sourcePixels;
+				case WEBCAM -> webcamPixels;
+				case WEBCAM_MASK -> webcamMaskPixels;
+			};
 			if (target == null || target.capacity() < needed) {
 				target = ByteBuffer.allocateDirect(needed);
-				if (source) {
-					sourcePixels = target;
-				} else {
-					webcamPixels = target;
+				switch (kind) {
+					case SOURCE -> sourcePixels = target;
+					case WEBCAM -> webcamPixels = target;
+					case WEBCAM_MASK -> webcamMaskPixels = target;
 				}
 			}
 			target.clear();

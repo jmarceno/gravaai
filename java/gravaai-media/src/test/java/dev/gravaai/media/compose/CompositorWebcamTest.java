@@ -1,5 +1,6 @@
 package dev.gravaai.media.compose;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,6 +49,41 @@ class CompositorWebcamTest {
 						.put((byte) (left ? leftGreen : rightGreen))
 						.put((byte) (left ? leftBlue : rightBlue))
 						.put((byte) 255);
+			}
+		}
+		buffer.position(0);
+		return new RgbaFrame(width, height, buffer);
+	}
+
+	/**
+	 * A striped left half (blurred background candidate) and a solid right half (person): blur
+	 * must visibly mix the stripes but leave the solid half alone.
+	 */
+	private static RgbaFrame stripedWebcam() {
+		int width = 80;
+		int height = 40;
+		ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 4);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				boolean left = x < width / 2;
+				boolean blueStripe = (x / 4) % 2 == 0;
+				int red = 0;
+				int green = left ? (blueStripe ? 0 : 255) : 255;
+				int blue = left ? (blueStripe ? 255 : 0) : 0;
+				buffer.put((byte) red).put((byte) green).put((byte) blue).put((byte) 255);
+			}
+		}
+		buffer.position(0);
+		return new RgbaFrame(width, height, buffer);
+	}
+
+	/** Person mask covering the right half only (mask value in every channel). */
+	private static RgbaFrame rightHalfMask(int width, int height) {
+		ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 4);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				byte value = (byte) (x < width / 2 ? 0 : 255);
+				buffer.put(value).put(value).put(value).put(value);
 			}
 		}
 		buffer.position(0);
@@ -202,5 +238,61 @@ class CompositorWebcamTest {
 			}
 		}
 		return count;
+	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("blurs the webcam background and keeps the masked person sharp")
+	void blursBackgroundThroughMask() throws Exception {
+		// Frame: striped left half (background), solid green right half (person); mask keeps only
+		// the right half. Center preset at 50% puts a 100x100 card at (150,50) (half the smaller
+		// stage side); the 80x40 frame cover-fits at 2.5x (200x100, cropped to the card), so
+		// source (50,20) lands at canvas (225,100) (person) and (26,20) at (165,100) (mid blue
+		// background stripe).
+		RgbaFrame webcamFrame = stripedWebcam();
+		WebcamSpec webcam = spec(true, "center", 50, false, 0, List.of(), false);
+		ByteBuffer plain = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE));
+
+		ByteBuffer blurred = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+				.withWebcamMask(rightHalfMask(80, 40)));
+
+		// The person half stays sharp and identical to the unblurred render.
+		int[] plainPerson = pixel(plain, 225, 100);
+		int[] blurredPerson = pixel(blurred, 225, 100);
+		assertTrue(blurredPerson[1] > 200 && blurredPerson[2] < 60,
+				"person half must stay sharp: " + blurredPerson[0] + "," + blurredPerson[1]
+						+ "," + blurredPerson[2]);
+		assertArrayEquals(plainPerson, blurredPerson, "the mask must not touch the person");
+
+		// The striped background half is visibly mixed by the blur.
+		int[] plainBackground = pixel(plain, 165, 100);
+		int[] blurredBackground = pixel(blurred, 165, 100);
+		assertTrue(plainBackground[2] > 200, "sample pixel must be a blue stripe: "
+				+ plainBackground[0] + "," + plainBackground[1] + "," + plainBackground[2]);
+		assertTrue(blurredBackground[2] < plainBackground[2] - 25
+						&& blurredBackground[1] > plainBackground[1] + 10,
+				"background half must be blurred: " + blurredBackground[0] + ","
+						+ blurredBackground[1] + "," + blurredBackground[2]);
+	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("ignores a mask that does not match the webcam frame size")
+	void ignoresMisSizedMask() throws Exception {
+		RgbaFrame webcamFrame = stripedWebcam();
+		WebcamSpec webcam = spec(true, "center", 50, false, 0, List.of(), false);
+		ByteBuffer plain = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE));
+		ByteBuffer misSized = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+				.withWebcamMask(rightHalfMask(40, 20)));
+		assertArrayEquals(toArray(plain), toArray(misSized),
+				"a mis-sized mask must render like no mask");
+	}
+
+	private static byte[] toArray(ByteBuffer frame) {
+		ByteBuffer duplicate = frame.duplicate();
+		duplicate.position(0);
+		byte[] bytes = new byte[duplicate.remaining()];
+		duplicate.get(bytes);
+		return bytes;
 	}
 }

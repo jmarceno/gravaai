@@ -3,6 +3,8 @@ package dev.gravaai.media.compose;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -13,6 +15,10 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.WebcamOverlaySettings;
+import dev.gravaai.media.segmentation.FakeWebcamSegmenter;
 
 /** Production resolver parity with the golden/test mapping (plan §5.8/§5.10). */
 class ProjectFrameInputFactoryTest {
@@ -70,6 +76,49 @@ class ProjectFrameInputFactoryTest {
 			assertNotNull(input.webcamFrame(), "webcam frame was not decoded");
 			assertTrue(input.webcamFrame().width() > 0);
 			assertTrue(input.webcam().isVisibleAt(350));
+		}
+	}
+
+	@Test
+	@Timeout(120)
+	@DisplayName("computes the webcam mask once per decoded frame and only when blur is on")
+	void webcamMaskCachesPerDecodedFrame() throws Exception {
+		ProjectFixture.Loaded loaded = fixture("07-webcam-bottom-right");
+		Path wallpaperRoot = ProjectFixture.wallpaperRoot();
+		Path webcamPath = Path.of(loaded.editor().webcam().sourcePath());
+		assertTrue(Files.isReadable(webcamPath), "webcam fixture missing: " + webcamPath);
+		WebcamOverlaySettings webcam = loaded.editor().webcam();
+		WebcamOverlaySettings blurOnWebcam = new WebcamOverlaySettings(
+				webcam.visibleRanges(), webcam.enabled(), webcam.sourcePath(), webcam.timeOffsetMs(),
+				webcam.mirror(), webcam.cropRegion(), webcam.corner(), webcam.positionPreset(),
+				webcam.positionX(), webcam.positionY(), webcam.size(), webcam.width(),
+				webcam.height(), webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(),
+				webcam.shadow(), webcam.margin(), true);
+		ProjectEditorState blurOn = loaded.editor().toBuilder().webcam(blurOnWebcam).build();
+
+		FakeWebcamSegmenter segmenter = new FakeWebcamSegmenter(255);
+		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
+				blurOn, loaded.videoPath(), webcamPath, List.of(), 0,
+				blurOn.webcam().timeOffsetMs(), wallpaperRoot, 60, segmenter)) {
+			FrameInput first = factory.inputAtTime(0.35);
+			assertNotNull(first.webcamMask(), "blur on but no mask");
+			assertEquals(255, Byte.toUnsignedInt(
+					first.webcamMask().pixelsTopFirstRgba().get(3)), "mask value lost");
+			assertEquals(1, segmenter.calls(), "first frame must reach the segmenter");
+			// The same timeline time decodes the same webcam frame: the cached mask returns.
+			FrameInput second = factory.inputAtTime(0.35);
+			assertSame(first.webcamMask(), second.webcamMask(), "mask recomputed for one frame");
+			assertEquals(1, segmenter.calls(), "cache must collapse repeat decodes");
+		}
+
+		// Blur off (the project default): no mask and the segmenter never runs.
+		FakeWebcamSegmenter offSegmenter = new FakeWebcamSegmenter(255);
+		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
+				loaded.editor(), loaded.videoPath(), webcamPath, List.of(), 0,
+				loaded.editor().webcam().timeOffsetMs(), wallpaperRoot, 60, offSegmenter)) {
+			FrameInput input = factory.inputAtTime(0.35);
+			assertNull(input.webcamMask(), "blur off must not produce a mask");
+			assertEquals(0, offSegmenter.calls(), "segmenter must not run when blur is off");
 		}
 	}
 

@@ -1288,7 +1288,9 @@ public final class ProjectPersistence {
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_SHADOW,
 				isFiniteNumber(field(webcamNode, "margin"))
 						? clamp(field(webcamNode, "margin").doubleValue(), 0, 96)
-						: WebcamOverlaySettings.DEFAULT_WEBCAM_MARGIN);
+						: WebcamOverlaySettings.DEFAULT_WEBCAM_MARGIN,
+				booleanOr(field(webcamNode, "backgroundBlur"),
+						WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_BLUR));
 	}
 
 	// ---------------------------------------------------------------------

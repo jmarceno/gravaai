@@ -115,6 +115,16 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("defaults the webcam background blur to off and round-trips it")
+	void webcamBackgroundBlurDefaultsOffAndRoundTrips() {
+		// A project saved before the toggle existed: blur off.
+		assertFalse(normalize("{\"webcam\":{\"enabled\":true}}").webcam().backgroundBlur());
+		// Explicit values round-trip; non-boolean junk falls back to the default.
+		assertTrue(normalize("{\"webcam\":{\"backgroundBlur\":true}}").webcam().backgroundBlur());
+		assertFalse(normalize("{\"webcam\":{\"backgroundBlur\":\"yes\"}}").webcam().backgroundBlur());
+	}
+
+	@Test
 	@DisplayName("migrates legacy webcam radius pixels to percentage roundness")
 	void migratesLegacyWebcamRadius() {
 		ProjectEditorState state = normalize("{\"webcam\":{\"cornerRadius\":90,\"width\":40,\"height\":40}}");

@@ -3,6 +3,7 @@ package dev.gravaai.ui.editor.preview;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.Padding;
@@ -10,6 +11,7 @@ import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.media.compose.FrameInput;
 import dev.gravaai.media.compose.ProjectEditorInputs;
+import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.CursorClickEffect;
 import dev.gravaai.media.compose.CursorSpec;
@@ -240,7 +242,7 @@ public final class PreviewFrameMapper {
 				webcam.corner() == null ? "bottom-right" : webcam.corner().wire(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(), webcam.mirror(),
 				webcam.roundness(), webcam.shadow(), webcam.margin(), webcam.reactToZoom(), cropSpec,
-				ranges, webcam.timeOffsetMs());
+				ranges, webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundBlur());
 	}
 
 	/**
@@ -281,6 +283,15 @@ public final class PreviewFrameMapper {
 	/** One compositor input with a per-frame background (a decoded video wallpaper frame). */
 	public static FrameInput frameInput(PlaybackFrame frame, PreviewScene scene,
 			Background background) {
+		return frameInput(frame, scene, background, null);
+	}
+
+	/**
+	 * Same as above with the stage-7 webcam person mask (webcam background blur); {@code null}
+	 * keeps the webcam unblurred.
+	 */
+	public static FrameInput frameInput(PlaybackFrame frame, PreviewScene scene,
+			Background background, @Nullable RgbaFrame webcamMask) {
 		// Captions, keystrokes, cursor and webcam follow the source time (VideoPlayback maps the
 		// timeline time through the clips, nearest clip boundary in a gap).
 		double sourceSeconds = frame.sourceSeconds() != null ? frame.sourceSeconds()
@@ -296,7 +307,7 @@ public final class PreviewFrameMapper {
 				: ProjectEditorInputs.webcamSpecAt(scene.webcam(), scene.editor(),
 						frame.timelineSeconds() * 1000);
 		return new FrameInput(frame.frameIndex(), frame.timelineSeconds(), frame.sourceFrame(),
-				frame.webcamFrame(), scene.cursor().around(sourceSeconds), background,
+				frame.webcamFrame(), webcamMask, scene.cursor().around(sourceSeconds), background,
 				scene.backgroundBlur(), scene.layout(), scene.zoom(), scene.style(),
 				scene.cursorSpec(), webcam, scene.annotations(), scene.captions(),
 				keystrokes, scene.fade(), sceneSpec, sourceSeconds);

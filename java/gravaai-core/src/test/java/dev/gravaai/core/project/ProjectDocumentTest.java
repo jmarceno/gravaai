@@ -76,6 +76,13 @@ class ProjectDocumentTest {
 				&& !editor.has("keySound")) {
 			editor.set("keySound", ProjectDocument.writeKeySound(KeySoundSettings.DEFAULT));
 		}
+		// And the webcam background blur toggle: the canonical save always carries the default
+		// (off) for projects that predate it.
+		if (expected.get("editor") instanceof ObjectNode editor
+				&& editor.get("webcam") instanceof ObjectNode webcam
+				&& !webcam.has("backgroundBlur")) {
+			webcam.put("backgroundBlur", false);
+		}
 
 		assertEquals(2, saved.get("version").intValue());
 		assertSemanticallyEqual(expected, saved, "$");
@@ -102,6 +109,8 @@ class ProjectDocumentTest {
 		assertFalse(editor.has("zoomMotionBlurTuning"));
 		assertEquals("#123456", editor.get("wallpaper").asString());
 		assertEquals("/tmp/cam.mp4", editor.get("webcam").get("sourcePath").asString());
+		// The typed webcam rewrite carries the blur toggle (defaulting off for old projects).
+		assertFalse(editor.get("webcam").get("backgroundBlur").booleanValue());
 	}
 
 	@Test

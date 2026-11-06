@@ -335,6 +335,7 @@ public record EditorPreferences(
 		node.put("shadow", webcam.shadow());
 		node.put("timeOffsetMs", webcam.timeOffsetMs());
 		node.put("margin", webcam.margin());
+		node.put("backgroundBlur", webcam.backgroundBlur());
 		return node;
 	}
 

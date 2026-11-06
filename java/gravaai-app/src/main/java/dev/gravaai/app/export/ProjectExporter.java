@@ -19,6 +19,7 @@ import dev.gravaai.media.compose.CompositorExportFrameProvider;
 import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 import dev.gravaai.media.compose.ProjectFrameInputFactory;
+import dev.gravaai.media.segmentation.LazyWebcamSegmenter;
 import dev.gravaai.services.extensions.ExtensionFrameOverlayHooks;
 import dev.gravaai.services.elements.ElementOverlayHooks;
 import dev.gravaai.services.extensions.ExtensionHost;
@@ -140,7 +141,7 @@ public final class ProjectExporter {
 			ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 					session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 					cursorSamples, prepared.durationSeconds(), 0,
-					wallpaperRoot, prepared.frameRate());
+					wallpaperRoot, prepared.frameRate(), new LazyWebcamSegmenter());
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
 					elementHooks);
@@ -369,7 +370,7 @@ public final class ProjectExporter {
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 				session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 				cursorSamples, prepared.durationSeconds(), 0,
-				stageWallpapers(session), prepared.frameRate());
+				stageWallpapers(session), prepared.frameRate(), new LazyWebcamSegmenter());
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 						factory, hooks)) {

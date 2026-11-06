@@ -124,10 +124,27 @@ def harden_shared(source, path):
 
 
 def main(argv):
-    if len(argv) != 2:
-        print("usage: postprocess-ffmpeg-bindings.py GEN_DIR", file=sys.stderr)
+    # The FFmpeg bindings are the default caller; the ONNX Runtime extraction reuses the same
+    # transforms with its own package and header class (see extract-onnxruntime-bindings.sh).
+    usage = ("usage: postprocess-ffmpeg-bindings.py GEN_DIR "
+             "[--package PKG] [--shared-name NAME]")
+    package = PACKAGE
+    shared_name = "ffmpeg_h$shared.java"
+    args = argv[1:]
+    while args and args[0].startswith("--"):
+        if args[0] == "--package" and len(args) >= 3:
+            package = args[1]
+            args = args[2:]
+        elif args[0] == "--shared-name" and len(args) >= 3:
+            shared_name = args[1]
+            args = args[2:]
+        else:
+            print(usage, file=sys.stderr)
+            return 2
+    if len(args) != 1:
+        print(usage, file=sys.stderr)
         return 2
-    gen_dir = pathlib.Path(argv[1])
+    gen_dir = pathlib.Path(args[0])
     if not gen_dir.is_dir():
         print(f"postprocess-ffmpeg-bindings.py: {gen_dir} is not a directory", file=sys.stderr)
         return 2
@@ -141,13 +158,15 @@ def main(argv):
         source = path.read_text(encoding="utf-8")
         source = annotate_reinterpret_cleanup(source, path)
         source = document_cleanup_param(source)
-        if "Consumer<MemorySegment> cleanup" in source or path.name == "ffmpeg_h$shared.java":
+        if "Consumer<MemorySegment> cleanup" in source or path.name == shared_name:
             source = add_nullable_import(source, path)
-        if path.name == "ffmpeg_h$shared.java":
+        if path.name == shared_name:
             source = harden_shared(source, path)
         path.write_text(source, encoding="utf-8")
 
-    (gen_dir / "package-info.java").write_text(PACKAGE_INFO, encoding="utf-8")
+    package_info = (f"@NullMarked\npackage {package};\n\n"
+                    + "import org.jspecify.annotations.NullMarked;\n")
+    (gen_dir / "package-info.java").write_text(package_info, encoding="utf-8")
     print(f"postprocess-ffmpeg-bindings.py: post-processed {len(sources)} files in {gen_dir}")
     return 0
 

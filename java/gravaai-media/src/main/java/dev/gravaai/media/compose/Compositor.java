@@ -527,13 +527,92 @@ public final class Compositor implements AutoCloseable {
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
 				drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
 						Math.min(box.getWidth(), box.getHeight()));
-				fillImage(canvas, image, webcamCoverMatrix(source, box, spec.mirror()), box,
-						radius, WEBCAM_SAMPLING);
+				Matrix33 cover = webcamCoverMatrix(source, box, spec.mirror());
+				RgbaFrame maskFrame = input.webcamMask();
+				if (maskFrame != null && (maskFrame.width() != frame.width()
+						|| maskFrame.height() != frame.height())) {
+					// A mis-sized mask cannot be composited in register; render unblurred.
+					maskFrame = null;
+				}
+				if (maskFrame == null) {
+					fillImage(canvas, image, cover, box, radius, WEBCAM_SAMPLING);
+				} else {
+					// Background blur: blur the card and draw the sharp person back through the
+					// segmentation mask. The composite runs on a full-stage raster surface (the
+					// blurBackground pattern) built from raster copies of the frames: GPU filter
+					// draws, sub-rect runtime-effect draws and shader-drawn raster images all
+					// render displaced or not at all on GL surfaces in this stack, while
+					// drawImageRect of a raster image is the proven path (renderBackground). The
+					// card edge inside the composite already carries the squircle coverage of the
+					// direct draw; a rounded card additionally clips the blit.
+					float blur = (float) webcamBlurSigma(box);
+					try (Image webcamRaster = SkiaImages.fromRgbaFrame(frame, colorSpace);
+							Image maskImage = SkiaImages.maskFromRgbaFrame(maskFrame, colorSpace);
+							Image composite = webcamBlurComposite(webcamRaster, maskImage, cover,
+									box, radius, blur)) {
+						// The composite is stage-sized and already holds the card at its stage
+						// position: blit that region onto itself (src == dst). Passing the whole
+						// stage rect as the source would squash the composite into the card.
+						Rect card = box;
+						if (radius > 0.5) {
+							canvas.save();
+							try (Path cardPath = SquircleGeometry.toPath(
+									squircleRect(box, radius))) {
+								if (cardPath != null) {
+									canvas.clipPath(cardPath);
+								}
+							}
+							canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR, null,
+									true);
+							canvas.restore();
+						} else {
+							canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR, null,
+									true);
+						}
+					}
+				}
 			}
 		} finally {
 			if (layered) {
 				canvas.restore();
 			}
+		}
+	}
+
+	/**
+	 * The Gaussian sigma of the webcam background blur, scaled with the card size so a small
+	 * bubble and a full-height split card blur consistently (single fixed setting).
+	 */
+	private static double webcamBlurSigma(Rect box) {
+		return Math.max(8, Math.min(48, Math.min(box.getWidth(), box.getHeight()) * 0.07));
+	}
+
+	/**
+	 * Composites the blurred webcam card with the sharp person through the mask on a full-stage
+	 * raster surface. The blurred pass fills the card (its squircle coverage, as in the direct
+	 * draw); the person pass covers the whole stage and is cut back by the card draw afterwards.
+	 */
+	private Image webcamBlurComposite(Image image, Image maskImage, Matrix33 cover, Rect box,
+			double radius, float blur) {
+		ImageInfo info = new ImageInfo(width, height, ColorType.RGBA_8888,
+				ColorAlphaType.PREMUL, colorSpace);
+		Surface surface = Surface.makeRaster(info);
+		try {
+			Canvas offscreen = surface.getCanvas();
+			// The raster frame copies carry no mip levels, so the mipmapped WEBCAM_SAMPLING would
+			// sample nothing here; plain LINEAR matches the frame-to-card scale.
+			try (ImageFilter blurFilter = ImageFilter.makeBlur(blur, blur, FilterTileMode.DECAL)) {
+				fillImage(offscreen, image, cover, box, radius, SamplingMode.LINEAR, blurFilter);
+			}
+			try (Shader person = WebcamBlurShaders.personThroughMask(image, maskImage, cover,
+					SamplingMode.LINEAR); Paint paint = new Paint()) {
+				paint.setShader(person);
+				offscreen.drawRect(Rect.makeWH(width, height), paint);
+			}
+			Image snapshot = surface.makeImageSnapshot();
+			return snapshot;
+		} finally {
+			surface.close();
 		}
 	}
 
@@ -694,10 +773,17 @@ public final class Compositor implements AutoCloseable {
 	 */
 	private static void fillImage(Canvas canvas, Image image, Matrix33 imageToCanvas, Rect box,
 			double radius, SamplingMode sampling) {
+		fillImage(canvas, image, imageToCanvas, box, radius, sampling, null);
+	}
+
+	/** Same as above with an optional image filter applied to the drawn image. */
+	private static void fillImage(Canvas canvas, Image image, Matrix33 imageToCanvas, Rect box,
+			double radius, SamplingMode sampling, @Nullable ImageFilter imageFilter) {
 		try (Shader shader = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
 				sampling, imageToCanvas); Paint paint = new Paint()) {
 			paint.setAntiAlias(true);
 			paint.setShader(shader);
+			paint.setImageFilter(imageFilter);
 			if (radius <= 0.5) {
 				canvas.drawRect(box, paint);
 				return;
@@ -707,6 +793,21 @@ public final class Compositor implements AutoCloseable {
 					canvas.drawPath(path, paint);
 				}
 			}
+		}
+	}
+
+	/**
+	 * Fills the squircle (or plain rectangle) outline of {@code box} with the sharp webcam
+	 * weighted by the person mask: the blurred-background pass under it stays visible wherever
+	 * the mask is 0. Same rasterized coverage as {@link #fillImage}.
+	 */
+	private void fillPersonThroughMask(Canvas canvas, Image image, Image mask,
+			Matrix33 imageToCanvas, Rect box, double radius) {
+		try (Shader shader = WebcamBlurShaders.personThroughMask(image, mask, imageToCanvas,
+				WEBCAM_SAMPLING); Paint paint = new Paint()) {
+			paint.setAntiAlias(true);
+			paint.setShader(shader);
+			canvas.drawRect(Rect.makeWH(width, height), paint); // PROBE: full stage + children
 		}
 	}
 

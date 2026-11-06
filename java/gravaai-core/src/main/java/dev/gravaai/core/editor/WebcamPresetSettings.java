@@ -33,20 +33,21 @@ public record WebcamPresetSettings(
 		double roundness,
 		@Nullable Double cornerRadius,
 		double shadow,
-		double margin) {
+		double margin,
+		boolean backgroundBlur) {
 
 	public static WebcamPresetSettings from(WebcamOverlaySettings webcam) {
 		return new WebcamPresetSettings(webcam.enabled(), webcam.timeOffsetMs(), webcam.mirror(),
 				webcam.cropRegion(), webcam.corner(), webcam.positionPreset(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),
 				webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(), webcam.shadow(),
-				webcam.margin());
+				webcam.margin(), webcam.backgroundBlur());
 	}
 
 	public WebcamOverlaySettings toOverlaySettings() {
 		return new WebcamOverlaySettings(null, enabled, null, timeOffsetMs, mirror, cropRegion,
 				corner, positionPreset, positionX, positionY, size, width, height, reactToZoom,
-				roundness, cornerRadius, shadow, margin);
+				roundness, cornerRadius, shadow, margin, backgroundBlur);
 	}
 
 	public ObjectNode toJson() {
@@ -71,6 +72,7 @@ public record WebcamPresetSettings(
 		node.put("roundness", roundness);
 		node.put("shadow", shadow);
 		node.put("margin", margin);
+		node.put("backgroundBlur", backgroundBlur);
 		return node;
 	}
 }

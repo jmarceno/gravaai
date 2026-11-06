@@ -18,6 +18,9 @@ import java.util.List;
  * @param timeSeconds the output time in seconds
  * @param sourceFrame the decoded source video frame, or {@code null} for a background-only frame
  * @param webcamFrame the decoded webcam frame, or {@code null} (webcam overlay stage 7)
+ * @param webcamMask the person mask for the webcam frame (webcam background blur, stage 7), or
+ *        {@code null} when blur is off or no segmenter is available; same dimensions as
+ *        {@code webcamFrame} with the mask value in every RGBA channel
  * @param cursorSamples cursor samples covering this frame, in time order (stages 3 and 6)
  * @param background the background to paint (stage 1); callers keep one instance per project so
  *        the compositor can cache the pre-rendered background
@@ -42,6 +45,7 @@ public record FrameInput(
 		double timeSeconds,
 		@Nullable RgbaFrame sourceFrame,
 		@Nullable RgbaFrame webcamFrame,
+		@Nullable RgbaFrame webcamMask,
 		List<CursorSample> cursorSamples,
 		@Nullable Background background,
 		double backgroundBlur,
@@ -56,6 +60,31 @@ public record FrameInput(
 		FadeSpec fade,
 		SceneSpec scene,
 		double sourceTimeSeconds) {
+
+	/** Back-compat constructor for callers without a webcam mask (stage 7 blur off). */
+	public FrameInput(
+			long frameIndex,
+			double timeSeconds,
+			@Nullable RgbaFrame sourceFrame,
+			@Nullable RgbaFrame webcamFrame,
+			List<CursorSample> cursorSamples,
+			@Nullable Background background,
+			double backgroundBlur,
+			LayoutSpec layout,
+			ZoomSpec zoom,
+			FrameStyle style,
+			CursorSpec cursor,
+			WebcamSpec webcam,
+			List<AnnotationSpec> annotations,
+			CaptionSpec captions,
+			KeystrokeSpec keystrokes,
+			FadeSpec fade,
+			SceneSpec scene,
+			double sourceTimeSeconds) {
+		this(frameIndex, timeSeconds, sourceFrame, webcamFrame, null, cursorSamples, background,
+				backgroundBlur, layout, zoom, style, cursor, webcam, annotations, captions,
+				keystrokes, fade, scene, sourceTimeSeconds);
+	}
 
 	public FrameInput {
 		if (frameIndex < 0) {
@@ -218,42 +247,49 @@ public record FrameInput(
 
 	/** Copy with the stage-8 annotation list. */
 	public FrameInput withAnnotations(List<AnnotationSpec> annotations) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}
 
 	/** Copy with the stage-9 captions. */
 	public FrameInput withCaptions(CaptionSpec captions) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}
 
 	/** Copy with the stage-10 keystroke overlay. */
 	public FrameInput withKeystrokes(KeystrokeSpec keystrokes) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}
 
 	/** Copy with the stage-11 fade windows. */
 	public FrameInput withFade(FadeSpec fade) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}
 
 	/** Copy with the per-clip camera layout state. */
 	public FrameInput withScene(SceneSpec scene) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
+				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
+				captions, keystrokes, fade, scene, sourceTimeSeconds);
+	}
+
+	/** Copy with the stage-7 webcam person mask (see {@link #webcamMask()}). */
+	public FrameInput withWebcamMask(RgbaFrame webcamMask) {
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}
 
 	/** Copy with the clip-mapped source time. */
 	public FrameInput withSourceTime(double sourceTimeSeconds) {
-		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, cursorSamples,
+		return new FrameInput(frameIndex, timeSeconds, sourceFrame, webcamFrame, webcamMask, cursorSamples,
 				background, backgroundBlur, layout, zoom, style, cursor, webcam, annotations,
 				captions, keystrokes, fade, scene, sourceTimeSeconds);
 	}

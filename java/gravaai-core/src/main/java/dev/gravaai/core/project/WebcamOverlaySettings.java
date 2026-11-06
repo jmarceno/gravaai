@@ -23,7 +23,8 @@ public record WebcamOverlaySettings(
 		double roundness,
 		@Nullable Double cornerRadius,
 		double shadow,
-		double margin) {
+		double margin,
+		boolean backgroundBlur) {
 
 	public record TimeRange(long startMs, long endMs) {}
 
@@ -36,6 +37,7 @@ public record WebcamOverlaySettings(
 	public static final double DEFAULT_WEBCAM_POSITION_X = 1;
 	public static final double DEFAULT_WEBCAM_POSITION_Y = 1;
 	public static final long DEFAULT_WEBCAM_TIME_OFFSET_MS = 0;
+	public static final boolean DEFAULT_WEBCAM_BACKGROUND_BLUR = false;
 
 	/** {@code DEFAULT_WEBCAM_OVERLAY}. */
 	public static WebcamOverlaySettings defaults() {
@@ -43,6 +45,7 @@ public record WebcamOverlaySettings(
 				CropRegion.DEFAULT, WebcamCorner.BOTTOM_RIGHT, DEFAULT_WEBCAM_POSITION_PRESET,
 				DEFAULT_WEBCAM_POSITION_X, DEFAULT_WEBCAM_POSITION_Y, DEFAULT_WEBCAM_SIZE,
 				DEFAULT_WEBCAM_SIZE, DEFAULT_WEBCAM_SIZE, DEFAULT_WEBCAM_REACT_TO_ZOOM,
-				DEFAULT_WEBCAM_ROUNDNESS, null, DEFAULT_WEBCAM_SHADOW, DEFAULT_WEBCAM_MARGIN);
+				DEFAULT_WEBCAM_ROUNDNESS, null, DEFAULT_WEBCAM_SHADOW, DEFAULT_WEBCAM_MARGIN,
+				DEFAULT_WEBCAM_BACKGROUND_BLUR);
 	}
 }

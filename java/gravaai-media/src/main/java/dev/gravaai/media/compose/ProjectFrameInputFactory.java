@@ -21,6 +21,7 @@ import dev.gravaai.media.ffmpeg.MediaInfo;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.media.ffmpeg.VideoDecoder;
 import dev.gravaai.media.playback.WebcamSync;
+import dev.gravaai.media.segmentation.WebcamSegmenter;
 
 /**
  * Production {@link FrameAtTime.FrameInputFactory}: resolves the full compositor
@@ -49,6 +50,12 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final int frameRate;
 	private final MediaFrameReader videoFrames;
 	private final @Nullable MediaFrameReader webcamFrames;
+	private final @Nullable WebcamSegmenter webcamSegmenter;
+	// Masks cache per requested webcam media time: consecutive timeline frames inside one decoded
+	// webcam frame re-request the same time (the reader's buffers rotate, so frame identity is
+	// not a stable key).
+	private double lastMaskedWebcamSeconds = Double.NaN;
+	private @Nullable RgbaFrame lastWebcamMask;
 	private @Nullable Background staticBackground;
 	// The editor state is fixed for this factory, so the overlay specs resolve once (the keystroke
 	// spec reads the .keys.json sidecar).
@@ -78,8 +85,22 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
 			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
 			int frameRate) {
+		this(editor, videoPath, webcamPath, cursorSamples, sourceDurationSeconds,
+				webcamTimeOffsetMs, wallpaperRoot, frameRate, null);
+	}
+
+	/**
+	 * @param webcamSegmenter the person segmenter backing the webcam background blur, or null
+	 *        when unavailable (blur then silently renders off even when enabled). The factory
+	 *        takes ownership: {@link #close()} closes it with the decoders.
+	 */
+	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath,
+			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
+			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
+			int frameRate, @Nullable WebcamSegmenter webcamSegmenter) {
 		this.editor = Objects.requireNonNull(editor, "editor");
 		this.videoPath = Objects.requireNonNull(videoPath, "videoPath");
+		this.webcamSegmenter = webcamSegmenter;
 		this.webcamPath = webcamPath;
 		this.cursorSamples = cursorSamples.stream()
 				.sorted(Comparator.comparingDouble(CursorSample::timeSeconds))
@@ -124,17 +145,22 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		// the TS exporter; a gap between clips reports source time 0 there as well.
 		double sourceTime = sourceSeconds.orElse(0);
 		RgbaFrame webcamFrame = null;
+		double webcamSeconds = 0;
 		if (webcamFrames != null && webcamSpec.enabled()
 				&& webcamSpec.isVisibleAt(sourceTime * 1000)) {
-			double webcamSeconds = WebcamSync.getWebcamMediaTargetTimeSeconds(sourceTime,
+			webcamSeconds = WebcamSync.getWebcamMediaTargetTimeSeconds(sourceTime,
 					webcamFrames.durationSeconds(), (double) webcamTimeOffsetMs);
 			webcamFrame = webcamFrames.decodeForward(webcamSeconds);
 		}
+		RgbaFrame webcamMask = webcamFrame != null && webcamSpec.backgroundBlur()
+				? webcamMask(webcamSeconds, webcamFrame)
+				: null;
 		return new FrameInput(
 				Math.round(timelineSeconds * frameRate),
 				timelineSeconds,
 				sourceFrame,
 				webcamFrame,
+				webcamMask,
 				cursorSamples,
 				backgroundAt(timelineSeconds),
 				editor.backgroundBlur(),
@@ -149,6 +175,23 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				fade,
 				ProjectEditorInputs.sceneSpec(editor, timelineMs),
 				sourceTime);
+	}
+
+	/**
+	 * The person mask for the decoded webcam frame (webcam background blur), cached per requested
+	 * webcam media time so repeat requests (paused repaints, coalesced frames) do not re-run the
+	 * segmenter.
+	 */
+	private @Nullable RgbaFrame webcamMask(double webcamSeconds, RgbaFrame webcamFrame) {
+		if (webcamSeconds == lastMaskedWebcamSeconds && lastWebcamMask != null) {
+			return lastWebcamMask;
+		}
+		RgbaFrame mask = webcamSegmenter == null
+				? null
+				: webcamSegmenter.maskFor(webcamFrame);
+		lastMaskedWebcamSeconds = webcamSeconds;
+		lastWebcamMask = mask;
+		return mask;
 	}
 
 	/**
@@ -214,6 +257,9 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		}
 		if (wallpaperFrames != null) {
 			wallpaperFrames.close();
+		}
+		if (webcamSegmenter != null) {
+			webcamSegmenter.close();
 		}
 	}
 }

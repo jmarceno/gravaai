@@ -1342,9 +1342,14 @@ public final class EditorInspectorPanel extends VBox {
 		Switch react = new Switch("React to zoom");
 		react.setChecked(webcam.reactToZoom());
 		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
+		Switch backgroundBlur = new Switch("Background blur");
+		backgroundBlur.setChecked(webcam.backgroundBlur());
+		backgroundBlur.onCheckedChange(value ->
+				applyWebcam(json -> json.put("backgroundBlur", value)));
 		boolean split = webcam.positionPreset().isSplit();
 		// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
-		root.getChildren().addAll(split ? List.of(enabled, mirror) : List.of(enabled, mirror, react));
+		root.getChildren().addAll(split ? List.of(enabled, mirror, backgroundBlur)
+				: List.of(enabled, mirror, react, backgroundBlur));
 
 		// Layout first: the floating bubble or split screen, each with its own position control.
 		ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");

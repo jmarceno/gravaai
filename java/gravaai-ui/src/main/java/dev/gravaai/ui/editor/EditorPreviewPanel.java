@@ -242,6 +242,14 @@ public final class EditorPreviewPanel extends VBox {
 		previewView.setOverlayHooks(hooks);
 	}
 
+	/**
+	 * Supplies the person segmenter behind the webcam background blur. The window owns it (and
+	 * closes it); null keeps blur off.
+	 */
+	public void setWebcamSegmenter(dev.gravaai.media.segmentation.@Nullable WebcamSegmenter segmenter) {
+		previewView.setWebcamSegmenter(segmenter);
+	}
+
 	/** The interactive annotation overlay (tests/snapshots). */
 	public AnnotationOverlayController annotationOverlay() {
 		return annotationOverlay;

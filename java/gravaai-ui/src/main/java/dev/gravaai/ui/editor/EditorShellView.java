@@ -204,6 +204,11 @@ public final class EditorShellView extends VBox {
 		preview.setOverlayHooks(hooks);
 	}
 
+	/** Forwards the webcam background-blur segmenter to the preview panel. */
+	public void setWebcamSegmenter(dev.gravaai.media.segmentation.@Nullable WebcamSegmenter segmenter) {
+		preview.setWebcamSegmenter(segmenter);
+	}
+
 	/** Adds the editor stylesheet on top of the kit theme. */
 	public static void installStyles(Scene scene) {
 		dev.gravaai.ui.kit.Theme.install(scene);

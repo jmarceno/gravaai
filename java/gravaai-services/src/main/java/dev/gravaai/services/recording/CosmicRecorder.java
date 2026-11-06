@@ -57,7 +57,7 @@ import tools.jackson.databind.JsonNode;
  * on rotated outputs, so video comes straight from the compositor and audio from PulseAudio
  * (parec), then everything is muxed.
  */
-public final class CosmicRecorder implements CosmicSession.CosmicMux {
+public final class CosmicRecorder implements CosmicSession.CosmicMux, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
 
@@ -1324,5 +1324,13 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux {
 	private MicNoiseReduction currentMicNoiseReduction() {
 		MicNoiseReduction level = micNoiseReductionSetting.get();
 		return level == null ? MicNoiseReduction.DEFAULT : level;
+	}
+
+	/** Stops the disk checker and the process-wait/pipe-drain executors (app shutdown). */
+	@Override
+	public void close() {
+		diskChecker.shutdownNow();
+		processWaits.shutdownNow();
+		pipeDrains.shutdownNow();
 	}
 }

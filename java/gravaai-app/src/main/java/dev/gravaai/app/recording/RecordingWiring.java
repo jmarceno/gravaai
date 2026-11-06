@@ -90,6 +90,7 @@ public final class RecordingWiring implements AutoCloseable {
 	private final RecordingsDirectory recordingsDirectory;
 	private final Supplier<Path> recordingsDirSupplier;
 	private final CursorScreen cursorScreen;
+	private final CursorCaptureSession cursorSession;
 	private final CosmicRecorder cosmic;
 	private final RecordingService recording;
 	private final SourceService sources;
@@ -116,6 +117,7 @@ public final class RecordingWiring implements AutoCloseable {
 			RecordingsDirectory recordingsDirectory,
 			Supplier<Path> recordingsDirSupplier,
 			CursorScreen cursorScreen,
+			CursorCaptureSession cursorSession,
 			CosmicRecorder cosmic,
 			RecordingService recording,
 			SourceService sources,
@@ -138,6 +140,7 @@ public final class RecordingWiring implements AutoCloseable {
 		this.recordingsDirectory = recordingsDirectory;
 		this.recordingsDirSupplier = recordingsDirSupplier;
 		this.cursorScreen = cursorScreen;
+		this.cursorSession = cursorSession;
 		this.cosmic = cosmic;
 		this.recording = recording;
 		this.sources = sources;
@@ -354,6 +357,7 @@ public final class RecordingWiring implements AutoCloseable {
 				recordingsDirectory,
 				recordingsDir,
 				cursorScreen,
+				cursorSession,
 				cosmic,
 				recording,
 				sources,
@@ -546,6 +550,8 @@ public final class RecordingWiring implements AutoCloseable {
 		areaBorder.hide();
 		micLevelMeter.close();
 		thumbnails.close();
+		cosmic.close();
+		cursorSession.close();
 	}
 
 	private static void closeQuietly(AutoCloseable closeable) {

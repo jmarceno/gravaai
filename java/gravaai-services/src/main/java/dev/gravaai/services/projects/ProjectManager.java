@@ -57,15 +57,14 @@ public final class ProjectManager {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.projects");
 
-	/** Blocking file IO and ffmpeg previews run on virtual threads (plan §4.1). */
-	private static final Executor THUMBNAIL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
-
 	private static final Pattern PNG_DATA_URL = Pattern.compile("^data:image/png;base64,(.+)$");
 
 	private final UserData userData;
 	private final RecordingsDirectory recordingsDirectory;
 	private final RecentProjectsStore recentProjects;
 	private final ProjectThumbnailGenerator thumbnailGenerator;
+	/** Blocking file IO and ffmpeg previews run on virtual threads (plan §4.1). */
+	private final Executor thumbnailExecutor = Executors.newVirtualThreadPerTaskExecutor();
 	private final Map<Path, CompletableFuture<ProjectThumbnailReady>> thumbnailJobs = new ConcurrentHashMap<>();
 	private volatile @Nullable Path currentProjectPath;
 
@@ -360,7 +359,7 @@ public final class ProjectManager {
 		Path key = projectPath.toAbsolutePath().normalize();
 		CompletableFuture<ProjectThumbnailReady> task = thumbnailJobs.computeIfAbsent(key,
 				path -> CompletableFuture.supplyAsync(() -> refreshProjectThumbnailNow(path, revision),
-						THUMBNAIL_EXECUTOR));
+						thumbnailExecutor));
 		task.whenComplete((ready, error) -> thumbnailJobs.remove(key, task));
 		return task;
 	}

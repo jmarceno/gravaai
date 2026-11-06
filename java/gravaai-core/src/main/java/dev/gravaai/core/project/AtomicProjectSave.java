@@ -33,7 +33,11 @@ public final class AtomicProjectSave {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.project");
 
-	/** Plans the write work off the caller thread; these are blocking file operations (plan §4.1). */
+	/**
+	 * Plans the write work off the caller thread; these are blocking file operations (plan §4.1).
+	 * Shared for the app lifetime — this class is a static utility, and a per-task executor parks
+	 * nothing between writes, so there is no shutdown step.
+	 */
 	private static final Executor WRITE_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
 	private static final Object QUEUE_LOCK = new Object();

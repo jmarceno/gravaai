@@ -40,7 +40,7 @@ import dev.gravaai.services.sources.WindowBounds;
  * which are only ever written next to the recording. Samples are taken every 33 ms with drift
  * compensation so CPU load cannot create large gaps.
  */
-public final class CursorCaptureSession implements CursorTelemetrySource, KeystrokeSource {
+public final class CursorCaptureSession implements CursorTelemetrySource, KeystrokeSource, AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
 
@@ -518,5 +518,11 @@ public final class CursorCaptureSession implements CursorTelemetrySource, Keystr
 	/** The modifier order used by the keystroke renderer; exposed for the UI. */
 	public static List<KeyModifier> modifierOrder() {
 		return KeystrokeTypes.KEYSTROKE_MODIFIER_ORDER;
+	}
+
+	/** Stops the cursor sampler (app shutdown). */
+	@Override
+	public void close() {
+		sampler.shutdownNow();
 	}
 }

@@ -7,13 +7,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
 import dev.gravaai.services.projects.ProjectThumbnailReady;
+import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.ContentClamp;
 import dev.gravaai.ui.kit.Icon;
@@ -57,8 +56,6 @@ import javafx.util.Duration;
  * itself stays owned by {@code ui.windows.EditorWindow} (outside this package).
  */
 public final class DashboardView {
-
-	private static final Executor LOAD_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
 	/** The dashboard stylesheet; the hosting window adds it with {@link #installStyles(Scene)}. */
 	public static final String STYLESHEET = "/ui/dashboard/dashboard.css";
@@ -267,7 +264,7 @@ public final class DashboardView {
 					rebuildGrid();
 				});
 			}
-		}, LOAD_EXECUTOR);
+		}, UiThreads.background());
 	}
 
 	/**

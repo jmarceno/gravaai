@@ -87,6 +87,9 @@ public final class AddCustomFontDialog {
 		HBox footer = new HBox(8, spacer, cancel, add);
 		footer.setAlignment(Pos.CENTER_RIGHT);
 		dialog.footer(footer);
+		// The loader thread outlives no dialog: a still-running load finishes against a closed
+		// dialog, and its Platform.runLater callbacks no-op safely.
+		dialog.onClose(executor::shutdownNow);
 	}
 
 	/** Opens the dialog inside the kit root that owns {@code owner}. */

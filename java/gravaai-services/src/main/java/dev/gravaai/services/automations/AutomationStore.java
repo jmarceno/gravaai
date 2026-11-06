@@ -13,6 +13,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.storage.StorageFiles;
 import dev.gravaai.core.storage.UserData;
@@ -31,11 +32,7 @@ public final class AutomationStore implements AutoCloseable {
 	private static final System.Logger LOG = System.getLogger("gravaai.automations");
 
 	private final Path filePath;
-	private final ExecutorService writeExecutor = Executors.newSingleThreadExecutor(task -> {
-		Thread thread = new Thread(task, "gravaai-automations-store");
-		thread.setDaemon(true);
-		return thread;
-	});
+	private final ExecutorService writeExecutor = Threads.daemon("gravaai-automations-store");
 
 	public AutomationStore(Path filePath) {
 		this.filePath = filePath;

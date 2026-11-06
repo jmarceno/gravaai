@@ -5,11 +5,11 @@ import org.jspecify.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.media.export.CaptionSidecars;
@@ -80,11 +80,7 @@ public final class ExportCoordinator implements AutoCloseable {
 	public ExportCoordinator(ExportPublisher publisher, AutomationTriggers triggers) {
 		this.publisher = Objects.requireNonNull(publisher, "publisher");
 		this.triggers = triggers;
-		this.executor = Executors.newSingleThreadExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "export-job");
-			thread.setDaemon(true);
-			return thread;
-		});
+		this.executor = Threads.daemon("export-job");
 	}
 
 	/** {@code true} while an export is running. */

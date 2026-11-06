@@ -5,9 +5,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.meeting.CancelSignal;
 
 /**
@@ -69,11 +69,7 @@ public final class AutoCaptionService implements AutoCloseable {
 	}
 
 	public static AutoCaptionService withDaemonThread(CaptionGenerator generator) {
-		return new AutoCaptionService(generator,
-				Executors.newSingleThreadExecutor(runnable -> {
-					Thread thread = Thread.ofPlatform().daemon().name("gravaai-captions").unstarted(runnable);
-					return thread;
-				}));
+		return new AutoCaptionService(generator, Threads.daemon("gravaai-captions"));
 	}
 
 	public Status status() {

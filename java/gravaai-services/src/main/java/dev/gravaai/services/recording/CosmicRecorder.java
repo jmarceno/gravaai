@@ -201,11 +201,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux, AutoClosea
 		this.cursorTelemetry = cursorTelemetry;
 		this.keystrokes = keystrokes;
 		this.micNoiseReductionSetting = micNoiseReductionSetting;
-		this.diskChecker = Executors.newSingleThreadScheduledExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "gravaai-disk-check");
-			thread.setDaemon(true);
-			return thread;
-		});
+		this.diskChecker = Threads.daemonScheduler("gravaai-disk-check");
 	}
 
 	/** Timestamp of the recording in progress, so recovery leaves its files alone. */
@@ -1265,7 +1261,7 @@ public final class CosmicRecorder implements CosmicSession.CosmicMux, AutoClosea
 			result.complete(null);
 			return;
 		}
-		Thread.ofVirtual().start(() -> {
+		Threads.startVirtual("gravaai-output-pick-resolve", () -> {
 			try {
 				result.complete(CosmicSources.outputAt(listCosmicOutputs(), picked.x(), picked.y()));
 			} catch (IOException | RuntimeException error) {

@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,6 +24,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.services.agent.AgentTypes.AgentImage;
 import dev.gravaai.services.agent.AgentTypes.AgentProgressUpdate;
@@ -68,12 +68,7 @@ public final class AgentSocketBridge implements AutoCloseable {
 	private final Map<Long, Pending> waiting = new ConcurrentHashMap<>();
 	private final AtomicLong idCounter = new AtomicLong();
 	private final Object writeLock = new Object();
-	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-			runnable -> {
-				Thread thread = new Thread(runnable, "agent-bridge-timeout");
-				thread.setDaemon(true);
-				return thread;
-			});
+	private final ScheduledExecutorService scheduler = Threads.daemonScheduler("agent-bridge-timeout");
 
 	private volatile @Nullable SocketChannel socket;
 	private volatile @Nullable CompletableFuture<SocketChannel> connecting;

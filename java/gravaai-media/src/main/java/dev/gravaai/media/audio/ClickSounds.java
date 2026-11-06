@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.project.ClickSoundStyle;
 import dev.gravaai.core.project.KeySoundStyle;
 import dev.gravaai.media.ffmpeg.AudioDecoder;
@@ -88,7 +89,7 @@ public final class ClickSounds {
 
 	/** Decodes every bundled sound off the calling thread, so the first playback is not cold. */
 	public static void preload() {
-		Thread.ofVirtual().start(() -> {
+		Threads.startVirtual("gravaai-click-preload", () -> {
 			for (ClickSoundStyle style : ClickSoundStyle.values()) {
 				pcm(style);
 			}

@@ -9,7 +9,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +16,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.recording.CursorTelemetry.CursorInteractionType;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.CursorTelemetry.CursorVisualType;
@@ -57,11 +57,7 @@ public final class CursorCaptureSession implements CursorTelemetrySource, Keystr
 	private final Supplier<SelectedSource> selectedSource;
 	private final Supplier<WindowBounds> selectedWindowBounds;
 	private final Supplier<String> keystrokeCaptureModeSetting;
-	private final ScheduledExecutorService sampler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-		Thread thread = new Thread(runnable, "gravaai-cursor-sampler");
-		thread.setDaemon(true);
-		return thread;
-	});
+	private final ScheduledExecutorService sampler = Threads.daemonScheduler("gravaai-cursor-sampler");
 
 	private final CursorCaptureClock clock = new CursorCaptureClock();
 	private final List<CursorTelemetryPoint> activeSamples = new ArrayList<>();

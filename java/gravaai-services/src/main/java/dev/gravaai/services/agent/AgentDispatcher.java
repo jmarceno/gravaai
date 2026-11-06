@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.services.agent.AgentJobRegistry.Job;
 import dev.gravaai.services.agent.AgentJobRegistry.Kind;
@@ -195,11 +196,7 @@ public final class AgentDispatcher implements AutoCloseable {
 		this.jobs = jobs;
 		this.config = config == null ? Config.DEFAULT : config;
 		this.executor = Executors.newVirtualThreadPerTaskExecutor();
-		this.meetingWatcher = Executors.newSingleThreadScheduledExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "agent-meeting-watch");
-			thread.setDaemon(true);
-			return thread;
-		});
+		this.meetingWatcher = Threads.daemonScheduler("agent-meeting-watch");
 	}
 
 	/** {@code dispatchAgentTool}: runs on a worker thread; the future carries the result. */

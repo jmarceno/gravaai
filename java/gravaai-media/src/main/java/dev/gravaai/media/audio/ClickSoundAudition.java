@@ -2,6 +2,7 @@ package dev.gravaai.media.audio;
 
 import org.jspecify.annotations.Nullable;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.project.ClickSoundStyle;
 import dev.gravaai.core.project.KeySoundStyle;
 
@@ -34,7 +35,7 @@ public final class ClickSoundAudition {
 			return;
 		}
 		double gain = Double.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
-		Thread.ofVirtual().start(() -> {
+		Threads.startVirtual("gravaai-click-audition", () -> {
 			try (PlaybackAudioSink sink = PulseAudio.openPlayback()) {
 				float[] scaled = new float[pcm.length];
 				for (int index = 0; index < pcm.length; index++) {

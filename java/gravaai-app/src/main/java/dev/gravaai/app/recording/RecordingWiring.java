@@ -7,7 +7,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -18,6 +17,7 @@ import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
 import javafx.stage.Screen;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.media.capture.WebcamDevices;
@@ -284,11 +284,7 @@ public final class RecordingWiring implements AutoCloseable {
 
 		CountdownDelayStore countdownDelay = new CountdownDelayStore(userData.countdownSettingsFile());
 		CountdownOverlay countdownOverlay = new CountdownOverlay();
-		ScheduledExecutorService countdownScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "gravaai-countdown");
-			thread.setDaemon(true);
-			return thread;
-		});
+		ScheduledExecutorService countdownScheduler = Threads.daemonScheduler("gravaai-countdown");
 		CountdownService countdown = new CountdownService(
 				countdownOverlay,
 				hudController::setCountdown,

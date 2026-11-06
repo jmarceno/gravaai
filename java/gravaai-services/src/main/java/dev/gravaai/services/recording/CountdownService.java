@@ -3,11 +3,12 @@ package dev.gravaai.services.recording;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import dev.gravaai.core.concurrent.Threads;
 
 /**
  * The recording countdown, ported from {@code electron/countdownController.ts}.
@@ -52,11 +53,7 @@ public final class CountdownService {
 		}
 
 		static Scheduler createDefault() {
-			return of(Executors.newSingleThreadScheduledExecutor(runnable -> {
-				Thread thread = new Thread(runnable, "gravaai-countdown");
-				thread.setDaemon(true);
-				return thread;
-			}));
+			return of(Threads.daemonScheduler("gravaai-countdown"));
 		}
 	}
 

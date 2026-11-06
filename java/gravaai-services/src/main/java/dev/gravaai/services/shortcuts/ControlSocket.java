@@ -18,11 +18,12 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import dev.gravaai.core.concurrent.Threads;
 
 /**
  * Gravaai's control socket: one action per line answered {@code ok}/{@code error}, exactly like
@@ -56,12 +57,7 @@ public final class ControlSocket {
 		return OPEN_PREFIX + file;
 	}
 
-	private static final ScheduledExecutorService TIMEOUTS =
-			Executors.newSingleThreadScheduledExecutor(task -> {
-				Thread thread = new Thread(task, "gravaai-control-timeouts");
-				thread.setDaemon(true);
-				return thread;
-			});
+	private static final ScheduledExecutorService TIMEOUTS = Threads.daemonScheduler("gravaai-control-timeouts");
 
 	private ControlSocket() {}
 

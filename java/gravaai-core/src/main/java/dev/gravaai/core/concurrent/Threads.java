@@ -2,6 +2,7 @@ package dev.gravaai.core.concurrent;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Helpers for the thread conventions (plan §4.1: virtual threads for blocking IO and process
@@ -38,6 +39,15 @@ public final class Threads {
 	 */
 	public static ExecutorService daemon(String name) {
 		return Executors.newSingleThreadExecutor(runnable -> {
+			Thread thread = new Thread(runnable, name);
+			thread.setDaemon(true);
+			return thread;
+		});
+	}
+
+	/** {@link #daemon(String)} for the scheduled variants of the same boilerplate. */
+	public static ScheduledExecutorService daemonScheduler(String name) {
+		return Executors.newSingleThreadScheduledExecutor(runnable -> {
 			Thread thread = new Thread(runnable, name);
 			thread.setDaemon(true);
 			return thread;

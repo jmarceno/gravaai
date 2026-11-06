@@ -20,6 +20,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceService;
 import dev.gravaai.ui.kit.Button;
@@ -273,7 +274,7 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 		selecting = true;
 		setRowsDisabled(true);
 		showError(null);
-		Thread.ofVirtual().start(() -> {
+		Threads.startVirtual("gravaai-source-select", () -> {
 			String error = null;
 			try {
 				SelectedSource selected = sourceService.selectSource(source);

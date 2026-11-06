@@ -19,6 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.recording.ports.RecordingProcesses.SpawnOptions;
@@ -38,11 +39,7 @@ public final class RecordingThumbnails {
 	private final Supplier<Path> userDataDir;
 	private final RecordingProcesses processes;
 	private final RecordingEnvironment environment;
-	private final ExecutorService queue = Executors.newSingleThreadExecutor(runnable -> {
-		Thread thread = new Thread(runnable, "gravaai-thumbnails");
-		thread.setDaemon(true);
-		return thread;
-	});
+	private final ExecutorService queue = Threads.daemon("gravaai-thumbnails");
 	private final ConcurrentHashMap<String, CompletableFuture<String>> pending = new ConcurrentHashMap<>();
 
 	public RecordingThumbnails(

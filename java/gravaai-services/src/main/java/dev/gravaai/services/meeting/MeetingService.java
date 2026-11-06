@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingAssets.MeetingAsset;
@@ -171,11 +172,7 @@ public final class MeetingService {
 				tempDirectory);
 		MeetingPipeline pipeline = new MeetingPipeline(settingsService, assets, installer, whisper,
 				apiTranscription, llama, client, metaStore, clock);
-		ExecutorService jobExecutor = Executors.newSingleThreadExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "meeting-jobs");
-			thread.setDaemon(true);
-			return thread;
-		});
+		ExecutorService jobExecutor = Threads.daemon("meeting-jobs");
 		MeetingJobs jobs = new MeetingJobs(pipeline::run, settingsService::read, metaStore, clock,
 				() -> UUID.randomUUID().toString(), jobExecutor, onMeetingNotesReady);
 		MeetingLibrary library = new MeetingLibrary(recordings, metaStore, jobs, settingsService,

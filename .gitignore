@@ -11,6 +11,7 @@ logs
 .tmp/
 .history/
 extension-sources/
+.zcode/
 
 # Java build output
 target/

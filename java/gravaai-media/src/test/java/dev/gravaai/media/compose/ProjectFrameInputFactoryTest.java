@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.core.project.WebcamOverlaySettings;
 import dev.gravaai.media.segmentation.FakeWebcamSegmenter;
 import dev.gravaai.media.segmentation.MaskTuning;
@@ -82,20 +83,15 @@ class ProjectFrameInputFactoryTest {
 
 	@Test
 	@Timeout(120)
-	@DisplayName("computes the webcam mask once per decoded frame and only when blur is on")
+	@DisplayName("computes the webcam mask once per decoded frame and only when the effect is on")
 	void webcamMaskCachesPerDecodedFrame() throws Exception {
 		ProjectFixture.Loaded loaded = fixture("07-webcam-bottom-right");
 		Path wallpaperRoot = ProjectFixture.wallpaperRoot();
 		Path webcamPath = Path.of(loaded.editor().webcam().sourcePath());
 		assertTrue(Files.isReadable(webcamPath), "webcam fixture missing: " + webcamPath);
 		WebcamOverlaySettings webcam = loaded.editor().webcam();
-		WebcamOverlaySettings blurOnWebcam = new WebcamOverlaySettings(
-				webcam.visibleRanges(), webcam.enabled(), webcam.sourcePath(), webcam.timeOffsetMs(),
-				webcam.mirror(), webcam.cropRegion(), webcam.corner(), webcam.positionPreset(),
-				webcam.positionX(), webcam.positionY(), webcam.size(), webcam.width(),
-				webcam.height(), webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(),
-				webcam.shadow(), webcam.margin(), true, webcam.maskPrecision(),
-				webcam.maskOffset());
+		WebcamOverlaySettings blurOnWebcam = webcam
+				.withBackgroundEffect(WebcamBackgroundEffect.BLUR);
 		ProjectEditorState blurOn = loaded.editor().toBuilder().webcam(blurOnWebcam).build();
 
 		FakeWebcamSegmenter segmenter = new FakeWebcamSegmenter(255);
@@ -116,15 +112,7 @@ class ProjectFrameInputFactoryTest {
 		}
 
 		// The project's edge controls reach the segmenter.
-		WebcamOverlaySettings shapedWebcam = new WebcamOverlaySettings(
-				blurOnWebcam.visibleRanges(), blurOnWebcam.enabled(),
-				blurOnWebcam.sourcePath(), blurOnWebcam.timeOffsetMs(), blurOnWebcam.mirror(),
-				blurOnWebcam.cropRegion(), blurOnWebcam.corner(),
-				blurOnWebcam.positionPreset(), blurOnWebcam.positionX(),
-				blurOnWebcam.positionY(), blurOnWebcam.size(), blurOnWebcam.width(),
-				blurOnWebcam.height(), blurOnWebcam.reactToZoom(), blurOnWebcam.roundness(),
-				blurOnWebcam.cornerRadius(), blurOnWebcam.shadow(), blurOnWebcam.margin(), true,
-				0.9, -2);
+		WebcamOverlaySettings shapedWebcam = blurOnWebcam.withMaskTuning(0.9, -2);
 		ProjectEditorState shaped = loaded.editor().toBuilder().webcam(shapedWebcam).build();
 		FakeWebcamSegmenter shapedSegmenter = new FakeWebcamSegmenter(255);
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
@@ -143,6 +131,19 @@ class ProjectFrameInputFactoryTest {
 			FrameInput input = factory.inputAtTime(0.35);
 			assertNull(input.webcamMask(), "blur off must not produce a mask");
 			assertEquals(0, offSegmenter.calls(), "segmenter must not run when blur is off");
+		}
+
+		// Removal needs the same mask: the effect mode, not the old blur boolean, decides.
+		FakeWebcamSegmenter removeSegmenter = new FakeWebcamSegmenter(255);
+		WebcamOverlaySettings removeWebcam = webcam
+				.withBackgroundEffect(WebcamBackgroundEffect.REMOVE);
+		ProjectEditorState remove = loaded.editor().toBuilder().webcam(removeWebcam).build();
+		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
+				remove, loaded.videoPath(), webcamPath, List.of(), 0,
+				remove.webcam().timeOffsetMs(), wallpaperRoot, 60, removeSegmenter)) {
+			FrameInput input = factory.inputAtTime(0.35);
+			assertNotNull(input.webcamMask(), "remove on but no mask");
+			assertEquals(1, removeSegmenter.calls(), "removal must segment the person");
 		}
 	}
 

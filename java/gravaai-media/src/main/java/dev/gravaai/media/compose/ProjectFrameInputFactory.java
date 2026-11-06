@@ -156,7 +156,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 					webcamFrames.durationSeconds(), (double) webcamTimeOffsetMs);
 			webcamFrame = webcamFrames.decodeForward(webcamSeconds);
 		}
-		RgbaFrame webcamMask = webcamFrame != null && webcamSpec.backgroundBlur()
+		RgbaFrame webcamMask = webcamFrame != null && webcamSpec.segmentsPerson()
 				? webcamMask(webcamSeconds, webcamFrame)
 				: null;
 		return new FrameInput(
@@ -182,7 +182,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	}
 
 	/**
-	 * The person mask for the decoded webcam frame (webcam background blur), cached per requested
+	 * The person mask for the decoded webcam frame (webcam background effect), cached per requested
 	 * webcam media time so repeat requests (paused repaints, coalesced frames) do not re-run the
 	 * segmenter.
 	 */

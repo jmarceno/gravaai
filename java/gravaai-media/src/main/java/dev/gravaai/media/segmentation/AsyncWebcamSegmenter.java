@@ -72,6 +72,29 @@ public final class AsyncWebcamSegmenter implements WebcamSegmenter {
 		return latestMask.get();
 	}
 
+	/**
+	 * Forwards a path switch to the delegate and drops a queued request from the old path.
+	 *
+	 * <p>The queued frame is dropped because it belongs to the model that is no longer wanted: a
+	 * pause would otherwise spend a full fast-path inference before the precise mask even starts, and
+	 * the resolve is fast enough that the wait is visible. The in-flight inference is left to finish
+	 * (a native call cannot be interrupted) — its mask is still a correct mask for a neighbouring
+	 * frame, and the next request runs on the new path.</p>
+	 */
+	@Override
+	public void setQuality(WebcamMaskQuality quality) {
+		delegate.setQuality(quality);
+		synchronized (requestLock) {
+			RgbaFrame dropped = pendingFrame;
+			pendingFrame = null;
+			// Recycle the dropped frame's staging buffer instead of stranding it: it was taken out of
+			// the free slot when it was queued.
+			if (dropped != null) {
+				freeBuffer = dropped.pixelsTopFirstRgba();
+			}
+		}
+	}
+
 	/** True once a mask has been produced (diagnostics/tests). */
 	public boolean hasMask() {
 		return latestMask.get() != null;

@@ -1,132 +1,29 @@
 package dev.gravaai.media.segmentation;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.onnx.OnnxLibs;
-import dev.gravaai.media.onnx.OnnxRuntimeApi;
 
 /**
- * The MediaPipe selfie segmenter (ONNX) behind the webcam background blur: maps one decoded
- * webcam frame to a person mask covering that frame.
+ * The MediaPipe selfie segmenter (ONNX), the <em>fast</em> path: about 2 ms per 256x256 inference,
+ * so it is what the preview uses while the timeline is playing.
  *
- * <p>Pipeline per frame: stretch the RGBA frame to the model's square input ({@code [0,1]}
- * float, no letterboxing — MediaPipe resizes without preserving aspect and a letterbox would
- * pollute the borders) → inference → squeeze the single-channel confidence map → temporal mean
- * over the last three masks (hair-region flicker) → dilate + Gaussian + steep sigmoid remap
- * (halo fix: the soft edge is collapsed to about a pixel) → pack into an RGBA buffer with the mask
- * value in every channel.</p>
+ * <p>Everything except the model choice lives in {@link OnnxMaskSegmenter}: the shared
+ * pre-processing, the temporal smoothing and the project's edge controls, which is why the fast and
+ * slow masks differ in model quality and not in edge character.</p>
  *
- * <p>The mask stays at the model's resolution rather than being upscaled to the frame: the
- * compositor's shader samples it through a matrix, so upscaling here would add a scalar bilinear
- * pass over frame-sized data per frame for no visible gain.</p>
- *
- * <p>Single-caller: an ORT session must not run concurrently; each consumer (preview decode,
- * export, filmstrips) owns its own instance. The input/output names, layouts and sizes are read
- * from the model at construction, so a different conversion of the same model does not need code
- * changes. Mask buffers handed out are immutable (a fresh allocation per frame), matching the
- * preview queue's stable-copy contract.</p>
+ * <p>Two intra-op threads. The model is a 256x256 encoder-decoder bound by per-inference overhead
+ * more than throughput, and ORT's default pool (one thread per core) both oversubscribes the
+ * process and wakes a core's worth of workers per frame. Two threads keeps the inference latency
+ * below the default pool's wake-up cost while leaving the machine to the audio pump and the GL
+ * thread.</p>
  */
-public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
+public final class SelfieSegmenter extends OnnxMaskSegmenter {
 
-	private static final System.Logger LOG = System.getLogger(SelfieSegmenter.class.getName());
-
-	/** Temporal smoothing window (masks); three frames remove shimmer without visible lag. */
-	private static final int SMOOTHING_FRAMES = 3;
-	/** Midpoint of the sigmoid remap (1/(1+e^(-slope·(m-0.5)))); the slope is per-project. */
-	private static final double REMAP_MIDPOINT = 0.5;
-
-	private final OnnxRuntimeApi api;
-	private final MemorySegment session;
-	private final MemorySegment memoryInfo;
-	private final String inputName;
-	private final String outputName;
-	private final int inputWidth;
-	private final int inputHeight;
-	private final int inputChannels;
-	private final boolean inputNHWC;
-	private final int maskWidth;
-	private final int maskHeight;
-	private final boolean outputNHWC;
-	private final long outputElementCount;
-	// Scratch (single-caller): the [0,1] input tensor, the smoothing ring and the edge-shaped mask.
-	private final float[] inputTensor;
-	/** Native buffer the input tensor is copied into (native byte order), reused every frame. */
-	private final MemorySegment inputSegment;
-	/** Owns {@link #inputSegment} for the segmenter's lifetime. */
-	private final Arena arena = Arena.ofShared();
-	private final float[][] maskRing = new float[SMOOTHING_FRAMES][];
-	private int maskRingFilled;
-	private int maskRingNext;
-	private final float[] scratchA;
-	private final float[] scratchB;
-	private final float[] smoothed;
-	private boolean closed;
-
-	/**
-	 * Intra-op threads for the ORT session. The model is a 256x256 encoder-decoder that is bound by
-	 * per-inference overhead more than throughput, and the default pool (one thread per core) both
-	 * oversubscribes the process and wakes a core's worth of workers per frame. Two threads keeps
-	 * the inference latency below the default pool's wake-up cost while leaving the machine to the
-	 * audio pump and the GL thread.
-	 */
+	/** Input size the selfie segmenter is trained and run at. */
+	private static final int INPUT_SIZE = 256;
 	private static final int INFERENCE_THREADS = 2;
 
-	public SelfieSegmenter(Path modelFile) {
-		if (!Files.isRegularFile(modelFile)) {
-			throw new IllegalArgumentException("model file missing: " + modelFile);
-		}
-		this.api = OnnxRuntimeApi.bind();
-		MemorySegment env = api.createEnv();
-		this.session = api.createSession(env, modelFile, INFERENCE_THREADS);
-		this.memoryInfo = api.createCpuMemoryInfo();
-		MemorySegment allocator = api.defaultAllocator();
-		if (api.sessionInputCount(session) != 1 || api.sessionOutputCount(session) != 1) {
-			throw new IllegalArgumentException(
-					"selfie-segmenter.onnx must have exactly one input and one output: "
-							+ modelFile);
-		}
-		this.inputName = api.sessionInputName(session, allocator, 0);
-		this.outputName = api.sessionOutputName(session, allocator, 0);
-		long[] inputShape = api.sessionInputShape(session, 0);
-		this.inputNHWC = isChannelsLast(inputShape, 3);
-		if (inputNHWC) {
-			this.inputHeight = (int) inputShape[1];
-			this.inputWidth = (int) inputShape[2];
-			this.inputChannels = (int) inputShape[3];
-		} else {
-			this.inputChannels = (int) inputShape[1];
-			this.inputHeight = (int) inputShape[2];
-			this.inputWidth = (int) inputShape[3];
-		}
-		this.inputTensor = new float[inputWidth * inputHeight * inputChannels];
-		this.inputSegment = arena.allocate((long) inputTensor.length * Float.BYTES,
-				Float.BYTES);
-		long[] outputShape = api.sessionOutputShape(session, 0);
-		this.outputNHWC = isChannelsLast(outputShape, 1);
-		if (outputNHWC) {
-			this.maskHeight = (int) outputShape[1];
-			this.maskWidth = (int) outputShape[2];
-		} else {
-			this.maskHeight = (int) outputShape[2];
-			this.maskWidth = (int) outputShape[3];
-		}
-		this.outputElementCount = product(outputShape);
-		for (int i = 0; i < SMOOTHING_FRAMES; i++) {
-			maskRing[i] = new float[maskWidth * maskHeight];
-		}
-		this.scratchA = new float[maskWidth * maskHeight];
-		this.scratchB = new float[maskWidth * maskHeight];
-		this.smoothed = new float[maskWidth * maskHeight];
-		LOG.log(System.Logger.Level.DEBUG, () -> "selfie segmenter ready: " + modelFile
-				+ " input " + inputName + " " + inputWidth + "x" + inputHeight + "x" + inputChannels
-				+ " (" + (inputNHWC ? "NHWC" : "NCHW") + "), output " + outputName + " "
-				+ maskWidth + "x" + maskHeight);
+	public SelfieSegmenter(java.nio.file.Path modelFile) {
+		super(modelFile, INFERENCE_THREADS, INPUT_SIZE, false);
 	}
 
 	/** Opens the bundled selfie-segmenter model ({@link OnnxLibs#resolveModelFile()}). */
@@ -135,152 +32,7 @@ public final class SelfieSegmenter implements WebcamSegmenter, AutoCloseable {
 	}
 
 	@Override
-	public RgbaFrame maskFor(RgbaFrame frame, MaskTuning tuning) {
-		if (closed) {
-			throw new IllegalStateException("selfie segmenter is closed");
-		}
-		preprocess(frame);
-		MemorySegment input = inputTensorSegment();
-		MemorySegment output = api.runSingle(session, inputName, input,
-				(long) inputTensor.length * Float.BYTES,
-				new long[] {inputShapeDim(0), inputShapeDim(1), inputShapeDim(2), inputShapeDim(3)},
-				memoryInfo, outputName);
-		try {
-			float[] raw = api.getTensorFloats(output, outputElementCount);
-			extractMask(raw);
-			MaskPostProcess.average(maskRing, maskRingFilled, smoothed);
-			// The edge shaping runs on the smoothed mask; the ring keeps the raw masks so the
-			// smoothing window stays honest across the dilation/remap.
-			System.arraycopy(smoothed, 0, scratchA, 0, smoothed.length);
-			MaskPostProcess.shiftEdge(scratchA, scratchB, maskWidth, maskHeight,
-					tuning.dilationRadius(maskWidth, maskHeight));
-			MaskPostProcess.gaussianBlur(scratchA, scratchB, maskWidth, maskHeight,
-					tuning.sigma());
-			MaskPostProcess.sigmoidRemap(scratchA, tuning.slope(), REMAP_MIDPOINT);
-			return maskFrame();
-		} finally {
-			api.releaseValue(output);
-		}
-	}
-
-	@Override
-	public void close() {
-		if (closed) {
-			return;
-		}
-		closed = true;
-		api.releaseMemoryInfo(memoryInfo);
-		api.releaseSession(session);
-		api.close();
-		arena.close();
-	}
-
-	private void preprocess(RgbaFrame frame) {
-		ByteBuffer pixels = frame.pixelsTopFirstRgba();
-		int frameWidth = frame.width();
-		int frameHeight = frame.height();
-		float scaleX = (float) frameWidth / inputWidth;
-		float scaleY = (float) frameHeight / inputHeight;
-		// Stretch sampling (no letterbox): nearest-neighbour on the source, bilinear quality is
-		// wasted at 256px and the mask is upscaled bilinearly afterwards anyway.
-		for (int y = 0; y < inputHeight; y++) {
-			int sourceY = Math.min(frameHeight - 1, (int) ((y + 0.5f) * scaleY));
-			int row = sourceY * frameWidth;
-			int outRow = y * inputWidth;
-			for (int x = 0; x < inputWidth; x++) {
-				int sourceX = Math.min(frameWidth - 1, (int) ((x + 0.5f) * scaleX));
-				int offset = (row + sourceX) * 4;
-				float r = Byte.toUnsignedInt(pixels.get(offset)) / 255f;
-				float g = Byte.toUnsignedInt(pixels.get(offset + 1)) / 255f;
-				float b = Byte.toUnsignedInt(pixels.get(offset + 2)) / 255f;
-				if (inputNHWC) {
-					int base = (outRow + x) * inputChannels;
-					inputTensor[base] = r;
-					inputTensor[base + 1] = g;
-					inputTensor[base + 2] = b;
-				} else {
-					int plane = inputWidth * inputHeight;
-					int index = outRow + x;
-					inputTensor[index] = r;
-					inputTensor[plane + index] = g;
-					inputTensor[2 * plane + index] = b;
-				}
-			}
-		}
-	}
-
-	/**
-	 * Squeezes the raw output into {@code maskRing[next]} (the single-channel confidence map
-	 * regardless of the tensor layout) and advances the ring.
-	 */
-	private void extractMask(float[] raw) {
-		float[] target = maskRing[maskRingNext];
-		int plane = maskWidth * maskHeight;
-		int channelOffset = 0;
-		if (!outputNHWC) {
-			// NCHW: the mask plane follows the (single) channel plane.
-			channelOffset = raw.length > plane ? plane : 0;
-		}
-		System.arraycopy(raw, channelOffset, target, 0, plane);
-		maskRingFilled = Math.min(SMOOTHING_FRAMES, maskRingFilled + 1);
-		maskRingNext = (maskRingNext + 1) % SMOOTHING_FRAMES;
-	}
-
-	/**
-	 * Packs the edge-shaped mask into a fresh RGBA frame buffer. The buffer stays at the mask's
-	 * own resolution: the compositor samples it onto the card through a matrix, so upscaling here
-	 * would be a scalar bilinear pass over frame-sized data per frame for no gain.
-	 */
-	private RgbaFrame maskFrame() {
-		return new RgbaFrame(maskWidth, maskHeight, MaskPostProcess.toRgba(scratchA, maskWidth,
-				maskHeight));
-	}
-
-	/** Copies the scratch input tensor into the native buffer (native byte order) for ORT. */
-	private MemorySegment inputTensorSegment() {
-		// JAVA_FLOAT writes IEEE-754 in the platform's native order. A ByteBuffer view would not:
-		// allocateDirect() defaults to BIG_ENDIAN, which silently byte-swaps every float and
-		// makes the model return NaN on little-endian hosts.
-		MemorySegment.copy(inputTensor, 0, inputSegment, ValueLayout.JAVA_FLOAT, 0,
-				inputTensor.length);
-		return inputSegment;
-	}
-
-	/** Input shape entry for the run call (N, H, W, C in the model's own layout). */
-	private long inputShapeDim(int index) {
-		return inputNHWC
-				? switch (index) {
-					case 0 -> 1;
-					case 1 -> inputHeight;
-					case 2 -> inputWidth;
-					default -> inputChannels;
-				}
-				: switch (index) {
-					case 0 -> 1;
-					case 1 -> inputChannels;
-					case 2 -> inputHeight;
-					default -> inputWidth;
-				};
-	}
-
-	/**
-	 * Whether a 4-D tensor shape is channels-last ({@code [N,H,W,C]}) or channels-first
-	 * ({@code [N,C,H,W]}): {@code channels} is the expected channel count, so a model with
-	 * {@code [1,256,256,3]} input reads NHWC and one with {@code [1,3,256,256]} reads NCHW.
-	 */
-	private static boolean isChannelsLast(long[] shape, int channels) {
-		if (shape.length != 4) {
-			throw new IllegalArgumentException("expected a 4-D tensor shape, got rank "
-					+ shape.length);
-		}
-		return shape[3] == channels || shape[1] != channels;
-	}
-
-	private static long product(long[] shape) {
-		long product = 1;
-		for (long dim : shape) {
-			product *= Math.max(1, dim);
-		}
-		return product;
+	protected String modelDescription() {
+		return "selfie segmenter";
 	}
 }

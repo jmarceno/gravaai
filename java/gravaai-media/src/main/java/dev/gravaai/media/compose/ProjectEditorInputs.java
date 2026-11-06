@@ -219,13 +219,14 @@ public final class ProjectEditorInputs {
 				webcam.mirror(), webcam.roundness(), webcam.shadow(), webcam.margin(),
 				webcam.reactToZoom(),
 				new LayoutCrop(crop.x(), crop.y(), crop.width(), crop.height()), ranges,
-				webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundBlur());
+				webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundEffect());
 	}
 
 	/**
-	 * The mask edge shape the project asks the background-blur segmenter for (Webcam → Advanced).
-	 * A project without a webcam block gets the shipped defaults, which is also what the compositor
-	 * renders when the segmenter is unavailable.
+	 * The mask edge shape the project asks the segmenter for (Webcam → Advanced). A project without
+	 * a webcam block gets the shipped defaults, which is also what the compositor renders when the
+	 * segmenter is unavailable. The same tuning reaches both paths, so Edge precision / Edge offset
+	 * mean the same thing before and after a pause.
 	 */
 	public static MaskTuning maskTuning(ProjectEditorState editor) {
 		var webcam = editor.webcam();
@@ -482,7 +483,7 @@ public final class ProjectEditorInputs {
 				style.height().orElse(base.height()), base.mirror(),
 				style.roundness().orElse(base.roundness()), style.shadow().orElse(base.shadow()),
 				base.margin(), base.reactToZoom(), base.cropRegion(), base.visibleRanges(),
-				base.timeOffsetMs(), Optional.empty(), base.backgroundBlur());
+				base.timeOffsetMs(), Optional.empty(), base.backgroundEffect());
 	}
 
 	/** Maps the project's fade-through-black clip transitions (stage 11). */

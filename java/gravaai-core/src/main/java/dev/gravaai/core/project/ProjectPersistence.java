@@ -1260,6 +1260,16 @@ public final class ProjectPersistence {
 						? legacyZoomScaleEffect > 0
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_REACT_TO_ZOOM;
 
+		// The effect mode replaced the backgroundBlur boolean: an explicit backgroundEffect wins,
+		// otherwise the legacy true maps to BLUR so existing projects keep rendering identically.
+		WebcamBackgroundEffect backgroundEffect =
+				WebcamBackgroundEffect.fromWireOrNull(text(field(webcamNode, "backgroundEffect")));
+		if (backgroundEffect == null) {
+			backgroundEffect = Boolean.TRUE.equals(bool(field(webcamNode, "backgroundBlur")))
+					? WebcamBackgroundEffect.BLUR
+					: WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_EFFECT;
+		}
+
 		return new WebcamOverlaySettings(
 				visibleRanges,
 				booleanOr(field(webcamNode, "enabled"), defaults.enabled()),
@@ -1289,8 +1299,9 @@ public final class ProjectPersistence {
 				isFiniteNumber(field(webcamNode, "margin"))
 						? clamp(field(webcamNode, "margin").doubleValue(), 0, 96)
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_MARGIN,
-				booleanOr(field(webcamNode, "backgroundBlur"),
-						WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_BLUR),
+				backgroundEffect,
+				booleanOr(field(webcamNode, "highQualityMaskWhilePlaying"),
+						WebcamOverlaySettings.DEFAULT_WEBCAM_HIGH_QUALITY_MASK_WHILE_PLAYING),
 				isFiniteNumber(field(webcamNode, "maskPrecision"))
 						? clamp(field(webcamNode, "maskPrecision").doubleValue(), 0, 1)
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION,

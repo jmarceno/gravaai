@@ -609,7 +609,12 @@ public final class ProjectDocument {
 		node.put("shadow", webcam.shadow());
 		node.put("timeOffsetMs", webcam.timeOffsetMs());
 		node.put("margin", webcam.margin());
-		node.put("backgroundBlur", webcam.backgroundBlur());
+		node.put("backgroundEffect", webcam.backgroundEffect().wire());
+		// The legacy boolean stays in the file so a project opened again in the previous app keeps
+		// the blur it had; "remove" has no legacy equivalent and there degrades to blur off.
+		node.put("backgroundBlur",
+				webcam.backgroundEffect() == WebcamBackgroundEffect.BLUR);
+		node.put("highQualityMaskWhilePlaying", webcam.highQualityMaskWhilePlaying());
 		node.put("maskPrecision", webcam.maskPrecision());
 		node.put("maskOffset", webcam.maskOffset());
 		return node;

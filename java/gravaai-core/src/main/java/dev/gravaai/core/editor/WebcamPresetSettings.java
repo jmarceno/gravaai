@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.CropRegion;
+import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.core.project.WebcamCorner;
 import dev.gravaai.core.project.WebcamOverlaySettings;
 import dev.gravaai.core.project.WebcamPositionPreset;
@@ -34,7 +35,8 @@ public record WebcamPresetSettings(
 		@Nullable Double cornerRadius,
 		double shadow,
 		double margin,
-		boolean backgroundBlur,
+		WebcamBackgroundEffect backgroundEffect,
+		boolean highQualityMaskWhilePlaying,
 		double maskPrecision,
 		double maskOffset) {
 
@@ -43,15 +45,15 @@ public record WebcamPresetSettings(
 				webcam.cropRegion(), webcam.corner(), webcam.positionPreset(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),
 				webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(), webcam.shadow(),
-				webcam.margin(), webcam.backgroundBlur(), webcam.maskPrecision(),
-				webcam.maskOffset());
+				webcam.margin(), webcam.backgroundEffect(), webcam.highQualityMaskWhilePlaying(),
+				webcam.maskPrecision(), webcam.maskOffset());
 	}
 
 	public WebcamOverlaySettings toOverlaySettings() {
 		return new WebcamOverlaySettings(null, enabled, null, timeOffsetMs, mirror, cropRegion,
 				corner, positionPreset, positionX, positionY, size, width, height, reactToZoom,
-				roundness, cornerRadius, shadow, margin, backgroundBlur, maskPrecision,
-				maskOffset);
+				roundness, cornerRadius, shadow, margin, backgroundEffect,
+				highQualityMaskWhilePlaying, maskPrecision, maskOffset);
 	}
 
 	public ObjectNode toJson() {
@@ -76,7 +78,11 @@ public record WebcamPresetSettings(
 		node.put("roundness", roundness);
 		node.put("shadow", shadow);
 		node.put("margin", margin);
-		node.put("backgroundBlur", backgroundBlur);
+		node.put("backgroundEffect", backgroundEffect.wire());
+		// Legacy mirror: a preset written by this build still carries the boolean the previous
+		// app reads, and a preset written by the previous app is migrated by ProjectPersistence.
+		node.put("backgroundBlur", backgroundEffect == WebcamBackgroundEffect.BLUR);
+		node.put("highQualityMaskWhilePlaying", highQualityMaskWhilePlaying);
 		node.put("maskPrecision", maskPrecision);
 		node.put("maskOffset", maskOffset);
 		return node;

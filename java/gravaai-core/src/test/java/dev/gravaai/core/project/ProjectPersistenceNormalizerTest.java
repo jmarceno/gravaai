@@ -115,13 +115,55 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
-	@DisplayName("defaults the webcam background blur to off and round-trips it")
-	void webcamBackgroundBlurDefaultsOffAndRoundTrips() {
-		// A project saved before the toggle existed: blur off.
-		assertFalse(normalize("{\"webcam\":{\"enabled\":true}}").webcam().backgroundBlur());
-		// Explicit values round-trip; non-boolean junk falls back to the default.
-		assertTrue(normalize("{\"webcam\":{\"backgroundBlur\":true}}").webcam().backgroundBlur());
-		assertFalse(normalize("{\"webcam\":{\"backgroundBlur\":\"yes\"}}").webcam().backgroundBlur());
+	@DisplayName("defaults the webcam background effect to none and round-trips it")
+	void webcamBackgroundEffectDefaultsOffAndRoundTrips() {
+		// A project saved before the effect existed: nothing happens to the room behind the person.
+		assertEquals(WebcamBackgroundEffect.NONE,
+				normalize("{\"webcam\":{\"enabled\":true}}").webcam().backgroundEffect());
+		// Explicit values round-trip.
+		assertEquals(WebcamBackgroundEffect.BLUR,
+				normalize("{\"webcam\":{\"backgroundEffect\":\"blur\"}}").webcam()
+						.backgroundEffect());
+		assertEquals(WebcamBackgroundEffect.REMOVE,
+				normalize("{\"webcam\":{\"backgroundEffect\":\"remove\"}}").webcam()
+						.backgroundEffect());
+		// Unknown junk falls back to none.
+		assertEquals(WebcamBackgroundEffect.NONE,
+				normalize("{\"webcam\":{\"backgroundEffect\":\"pixelate\"}}").webcam()
+						.backgroundEffect());
+	}
+
+	@Test
+	@DisplayName("migrates the legacy webcam backgroundBlur boolean to the effect mode")
+	void webcamBackgroundBlurMigratesToEffect() {
+		// Projects written before the effect mode carry only the boolean; true used to mean blur.
+		assertEquals(WebcamBackgroundEffect.BLUR,
+				normalize("{\"webcam\":{\"backgroundBlur\":true}}").webcam().backgroundEffect());
+		assertEquals(WebcamBackgroundEffect.NONE,
+				normalize("{\"webcam\":{\"backgroundBlur\":false}}").webcam().backgroundEffect());
+		// Non-boolean junk in the legacy key falls back to the default.
+		assertEquals(WebcamBackgroundEffect.NONE,
+				normalize("{\"webcam\":{\"backgroundBlur\":\"yes\"}}").webcam()
+						.backgroundEffect());
+		// An explicit effect wins over a stale legacy boolean.
+		assertEquals(WebcamBackgroundEffect.REMOVE,
+				normalize("{\"webcam\":{\"backgroundEffect\":\"remove\",\"backgroundBlur\":true}}")
+						.webcam().backgroundEffect());
+		assertEquals(WebcamBackgroundEffect.NONE,
+				normalize("{\"webcam\":{\"backgroundEffect\":\"none\",\"backgroundBlur\":true}}")
+						.webcam().backgroundEffect());
+	}
+
+	@Test
+	@DisplayName("defaults the high-quality-mask-while-playing switch to off and round-trips it")
+	void webcamHighQualityMaskWhilePlayingDefaultsOff() {
+		// Off by default: playback uses the fast model, only stops and exports use the precise one.
+		assertFalse(normalize("{\"webcam\":{\"enabled\":true}}").webcam()
+				.highQualityMaskWhilePlaying());
+		assertTrue(normalize("{\"webcam\":{\"highQualityMaskWhilePlaying\":true}}").webcam()
+				.highQualityMaskWhilePlaying());
+		assertFalse(normalize("{\"webcam\":{\"highQualityMaskWhilePlaying\":\"yes\"}}").webcam()
+				.highQualityMaskWhilePlaying());
 	}
 
 	@Test

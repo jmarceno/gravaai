@@ -26,6 +26,7 @@ import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.compose.FrameOverlayHooks;
 import dev.gravaai.media.compose.ProjectFrameInputFactory;
 import dev.gravaai.media.segmentation.LazyWebcamSegmenter;
+import dev.gravaai.media.segmentation.WebcamMaskQuality;
 import dev.gravaai.services.export.ProjectExport;
 import dev.gravaai.services.elements.ElementOverlayHooks;
 import tools.jackson.databind.node.ObjectNode;
@@ -95,7 +96,7 @@ final class AgentFrameRenderer {
 				session.elementDiagnostics(), () -> state);
 				ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state, videoPath,
 				webcamPath, cursorSamples, editedMs / 1000.0, 0, wallpaperRoot, FRAME_RATE,
-				new LazyWebcamSegmenter());
+				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE));
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(width,
 						height, FRAME_RATE, factory, elements)) {
 			ByteBuffer buffer = ByteBuffer.allocate(width * height * 4);

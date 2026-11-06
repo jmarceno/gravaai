@@ -25,6 +25,7 @@ import io.github.humbleui.skija.Shader;
 import io.github.humbleui.skija.Surface;
 import io.github.humbleui.types.Rect;
 
+import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.media.gl.SkiaGlSurface;
 
 /**
@@ -525,12 +526,24 @@ public final class Compositor implements AutoCloseable {
 		try {
 			try (Image image = frameTextures.image(target,
 					GpuFrameTextures.Slot.WEBCAM, frame, colorSpace)) {
-				drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
-						Math.min(box.getWidth(), box.getHeight()));
+				WebcamBackgroundEffect effect = spec.backgroundEffect();
 				Matrix33 cover = webcamCoverMatrix(source, box, spec.mirror());
 				RgbaFrame maskFrame = input.webcamMask();
 				if (maskFrame == null) {
+					// No person mask (effect off, or the segmenter could not run): the card is drawn
+					// as it always was. An unavailable model must never blank the webcam.
+					drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
+							Math.min(box.getWidth(), box.getHeight()));
 					fillImage(canvas, image, cover, box, radius, WEBCAM_SAMPLING);
+				} else if (effect == WebcamBackgroundEffect.REMOVE) {
+					// Background removal: the camera frame is gone entirely — no card fill, no
+					// shadow, nothing of the room. Only the cut-out person is drawn, floating over
+					// whatever the scene shows behind the webcam (the screen video, annotations and
+					// all). The pass is clipped to the card's squircle: the mask spans the whole
+					// webcam frame and both textures sample with CLAMP, so a person touching the
+					// frame border would otherwise smear past it. Inside the frame the mask alone
+					// decides visibility, so where it is 0 the scene shows through untouched.
+					drawRemovalComposite(canvas, image, maskFrame, frame, cover, box, radius);
 				} else {
 					// Background blur: blur the card and draw the sharp person back through the
 					// segmentation mask. Both passes run on one GPU offscreen surface and the
@@ -539,10 +552,12 @@ public final class Compositor implements AutoCloseable {
 					// by the same squircle path the direct draw uses. The mask may be smaller
 					// than the frame (the segmenter returns it at model resolution), so it has
 					// its own matrix and the shader's bilinear sampling does the upscale.
+					drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
+							Math.min(box.getWidth(), box.getHeight()));
 					float blur = (float) webcamBlurSigma(box);
 					Matrix33 maskMatrix = maskToCanvasMatrix(maskFrame, frame.width(),
 							frame.height(), cover);
-					try (Image composite = webcamBlurComposite(image, maskFrame, cover, maskMatrix,
+					try (Image composite = webcamEffectComposite(image, maskFrame, cover, maskMatrix,
 							box, radius, blur)) {
 						// The composite is stage-sized and already holds the card at its stage
 						// position: blit that region onto itself (src == dst). Passing the whole
@@ -602,7 +617,7 @@ public final class Compositor implements AutoCloseable {
 	 *        returns it at model resolution and the shader's bilinear sampling does the upscale)
 	 * @param maskMatrix the matrix from mask pixels to canvas space
 	 */
-	private Image webcamBlurComposite(Image image, RgbaFrame maskFrame, Matrix33 cover,
+	private Image webcamEffectComposite(Image image, RgbaFrame maskFrame, Matrix33 cover,
 			Matrix33 maskMatrix, Rect box, double radius, float blur) {
 		Surface offscreen = currentTarget().makeOffscreen(width, height);
 		if (offscreen == null) {
@@ -630,6 +645,50 @@ public final class Compositor implements AutoCloseable {
 		} finally {
 			offscreen.close();
 		}
+	}
+
+	/**
+	 * Draws the background-removed webcam: only the sharp person through the mask, with nothing of
+	 * the camera frame around them — no card fill, no shadow, no re-drawn wallpaper. The person
+	 * floats over whatever the scene already shows behind the webcam (the screen video, the
+	 * wallpaper corners, annotations), which is the point of removing the background.
+	 *
+	 * <p>The draw is clipped to the card's squircle. The person shader covers the whole stage on
+	 * purpose (a sub-rect runtime-effect draw renders displaced in this Skia/GL stack) and both
+	 * textures sample with CLAMP, so without the clip a person touching the webcam frame border
+	 * would smear past it. Inside the frame the mask itself decides visibility: where it is 0 the
+	 * draw is fully transparent and the scene shows through untouched.
+	 */
+	private void drawRemovalComposite(Canvas canvas, Image image, RgbaFrame maskFrame,
+			RgbaFrame frame, Matrix33 cover, Rect box, double radius) {
+		Matrix33 maskMatrix = maskToCanvasMatrix(maskFrame, frame.width(), frame.height(), cover);
+		canvas.save();
+		try {
+			clipToCard(canvas, box, radius);
+			// The sharp person through the mask, over the whole clipped stage.
+			try (Image maskImage = SkiaImages.maskFromRgbaFrame(maskFrame, colorSpace);
+					Shader person = WebcamBlurShaders.personThroughMask(image, maskImage, cover,
+							maskMatrix, WEBCAM_SAMPLING);
+					Paint paint = new Paint()) {
+				paint.setShader(person);
+				canvas.drawRect(Rect.makeWH(width, height), paint);
+			}
+		} finally {
+			canvas.restore();
+		}
+	}
+
+	/** Clips the canvas to the card's squircle (or its plain rect when it has no rounding). */
+	private static void clipToCard(Canvas canvas, Rect box, double radius) {
+		if (radius > 0.5) {
+			try (Path cardPath = SquircleGeometry.toPath(squircleRect(box, radius))) {
+				if (cardPath != null) {
+					canvas.clipPath(cardPath);
+					return;
+				}
+			}
+		}
+		canvas.clipRect(box);
 	}
 
 	/**

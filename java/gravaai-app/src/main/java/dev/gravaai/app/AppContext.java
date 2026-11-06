@@ -1379,9 +1379,11 @@ public final class AppContext {
 		window.show();
 		window.setOverlayHooks(previewOverlayHooks(window.session()));
 		// The preview is a real-time path: keep inference off the playback render thread so a slow
-		// segmenter cannot starve the audio pump. Export and agent renders stay synchronous.
+		// segmenter cannot starve the audio pump. The preview runs the fast model while the timeline
+		// plays and the precise one once it stops (or always, when the project asks for it); export
+		// and agent renders are synchronous and always precise.
 		window.setWebcamSegmenter(new dev.gravaai.media.segmentation.AsyncWebcamSegmenter(
-				new dev.gravaai.media.segmentation.LazyWebcamSegmenter()));
+				dev.gravaai.media.segmentation.DualPathWebcamSegmenter.preview()));
 		attachAgent(window);
 		attachCaptions(window);
 		if (path != null) {

@@ -106,31 +106,41 @@ public final class OnnxLibs {
 	}
 
 	/**
-	 * Resolves the bundled selfie-segmenter model file. The model ships in the native payload
-	 * ({@code models/segmentation/}, staged by build-onnxruntime.sh like the rnnoise model); the
-	 * same dev-layout fallbacks as {@link #resolveLibraryDir()} apply.
+	 * Resolves the bundled selfie-segmenter model file (the fast path). The model ships in the
+	 * native payload ({@code models/segmentation/}, staged by build-onnxruntime.sh like the
+	 * rnnoise model); the same dev-layout fallbacks as {@link #resolveLibraryDir()} apply.
 	 */
 	public static Path resolveModelFile() {
+		return resolveSegmentationModel("selfie-segmenter.onnx");
+	}
+
+	/**
+	 * Resolves the bundled MODNet model file (the slow path, used for paused frames, scrubs and
+	 * exports). Same payload layout and fallbacks as {@link #resolveModelFile()}.
+	 */
+	public static Path resolveModnetModelFile() {
+		return resolveSegmentationModel("modnet.onnx");
+	}
+
+	private static Path resolveSegmentationModel(String fileName) {
 		Path bundled = NativeHelpers.nativeDir().resolve("models").resolve("segmentation")
-				.resolve("selfie-segmenter.onnx");
+				.resolve(fileName);
 		if (Files.isRegularFile(bundled)) {
 			return bundled;
 		}
 		List<Path> candidates = List.of(
-				Path.of("native", "build", "models", "segmentation", "selfie-segmenter.onnx"),
-				Path.of("..", "native", "build", "models", "segmentation", "selfie-segmenter.onnx"),
-				Path.of("..", "..", "native", "build", "models", "segmentation",
-						"selfie-segmenter.onnx"),
-				Path.of("..", "..", "..", "native", "build", "models", "segmentation",
-						"selfie-segmenter.onnx"));
+				Path.of("native", "build", "models", "segmentation", fileName),
+				Path.of("..", "native", "build", "models", "segmentation", fileName),
+				Path.of("..", "..", "native", "build", "models", "segmentation", fileName),
+				Path.of("..", "..", "..", "native", "build", "models", "segmentation", fileName));
 		for (Path candidate : candidates) {
 			if (Files.isRegularFile(candidate)) {
 				return candidate.toAbsolutePath().normalize();
 			}
 		}
 		throw new IllegalStateException(
-				"selfie-segmenter.onnx not found. Run java/native/build-onnxruntime.sh, then pass"
-						+ " -Dgravaai.nativeDir=<dir> (the model lives in models/segmentation)."
+				fileName + " not found. Run java/native/build-onnxruntime.sh, then pass"
+						+ " -Dgravaai.nativeDir=<dir> (the models live in models/segmentation)."
 						+ " Tried: " + bundled + " and " + candidates);
 	}
 }

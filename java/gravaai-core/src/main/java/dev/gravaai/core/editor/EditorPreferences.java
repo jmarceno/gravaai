@@ -335,7 +335,11 @@ public record EditorPreferences(
 		node.put("shadow", webcam.shadow());
 		node.put("timeOffsetMs", webcam.timeOffsetMs());
 		node.put("margin", webcam.margin());
-		node.put("backgroundBlur", webcam.backgroundBlur());
+		node.put("backgroundEffect", webcam.backgroundEffect().wire());
+		// Legacy mirror for readers that only know the boolean (see ProjectDocument.writeWebcam).
+		node.put("backgroundBlur",
+				webcam.backgroundEffect() == dev.gravaai.core.project.WebcamBackgroundEffect.BLUR);
+		node.put("highQualityMaskWhilePlaying", webcam.highQualityMaskWhilePlaying());
 		node.put("maskPrecision", webcam.maskPrecision());
 		node.put("maskOffset", webcam.maskOffset());
 		return node;

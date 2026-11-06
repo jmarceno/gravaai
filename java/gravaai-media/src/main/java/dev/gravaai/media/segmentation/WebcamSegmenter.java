@@ -5,14 +5,14 @@ import org.jspecify.annotations.Nullable;
 import dev.gravaai.media.compose.RgbaFrame;
 
 /**
- * Person-segmentation port behind the webcam background blur (stage 7): maps one decoded webcam
+ * Person-segmentation port behind the webcam background effect (stage 7): maps one decoded webcam
  * frame to a person mask. The media layer stays free of the inference runtime — implementations
- * wrap the model (ONNX selfie segmenter) and are wired in by the app layer.
+ * wrap the model (ONNX) and are wired in by the app layer.
  *
  * <p>The returned mask covers the whole input frame with the person probability in every RGBA
  * channel (the compositor samples one channel), or {@code null} when segmentation cannot run (the
- * native runtime or the model is missing): the compositor then draws the webcam unblurred, which is
- * exactly the blur-off look. The mask does not have to be at frame resolution — implementations
+ * native runtime or the model is missing): the compositor then draws the webcam untouched, which is
+ * exactly the effect-off look. The mask does not have to be at frame resolution — implementations
  * return it at their model's native size and the compositor samples it up through a matrix, which
  * avoids a scalar full-frame bilinear pass per frame. Implementations own their temporal state
  * (mask smoothing) and may cache internally; implementations are single-threaded, one per caller
@@ -60,6 +60,14 @@ public interface WebcamSegmenter extends AutoCloseable {
 	 * implement this: their {@link #maskFor} caller already has the mask in hand.
 	 */
 	default void setMaskReadyListener(@Nullable Runnable listener) {}
+
+	/**
+	 * Points the implementation at a model quality. Default no-op: a segmenter that owns exactly one
+	 * model ignores it (export, still frames). {@link DualPathWebcamSegmenter} switches models, and
+	 * {@link AsyncWebcamSegmenter} forwards the switch to its delegate and drops a queued request
+	 * that belongs to the old path.
+	 */
+	default void setQuality(WebcamMaskQuality quality) {}
 
 	/** Releases the inference resources; implementations without state keep this a no-op. */
 	@Override

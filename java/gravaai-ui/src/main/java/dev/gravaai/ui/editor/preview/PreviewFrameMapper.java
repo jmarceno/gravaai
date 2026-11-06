@@ -242,7 +242,7 @@ public final class PreviewFrameMapper {
 				webcam.corner() == null ? "bottom-right" : webcam.corner().wire(), webcam.positionX(),
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(), webcam.mirror(),
 				webcam.roundness(), webcam.shadow(), webcam.margin(), webcam.reactToZoom(), cropSpec,
-				ranges, webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundBlur());
+				ranges, webcam.timeOffsetMs(), Optional.empty(), webcam.backgroundEffect());
 	}
 
 	/**

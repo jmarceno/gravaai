@@ -14,6 +14,7 @@ import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.media.compose.CursorClickEffect;
 import dev.gravaai.media.compose.CursorSample;
@@ -182,16 +183,25 @@ class PreviewFrameMapperTest {
 		assertTrue(webcam.visibleRanges().isEmpty());
 	}
 
-	@DisplayName("webcam background blur maps into the compositor spec (stage 7)")
+	@DisplayName("webcam background effect maps into the compositor spec (stage 7)")
 	@Test
-	void webcamBackgroundBlurMapping() {
-		assertTrue(PreviewFrameMapper.webcamSpecFor(
-				state("{\"webcam\":{\"enabled\":true,\"backgroundBlur\":true}}")).backgroundBlur());
-		// Absent key (projects predating the toggle) and junk both fall back to off.
-		assertFalse(PreviewFrameMapper.webcamSpecFor(
-				state("{\"webcam\":{\"enabled\":true}}")).backgroundBlur());
-		assertFalse(PreviewFrameMapper.webcamSpecFor(
-				state("{\"webcam\":{\"enabled\":true,\"backgroundBlur\":3}}")).backgroundBlur());
+	void webcamBackgroundEffectMapping() {
+		assertEquals(WebcamBackgroundEffect.BLUR, PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundEffect\":\"blur\"}}"))
+				.backgroundEffect());
+		assertEquals(WebcamBackgroundEffect.REMOVE, PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundEffect\":\"remove\"}}"))
+				.backgroundEffect());
+		// A project predating the effect mode keeps the blur it had through the legacy boolean.
+		assertEquals(WebcamBackgroundEffect.BLUR, PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundBlur\":true}}"))
+				.backgroundEffect());
+		// Absent key and junk both fall back to none.
+		assertEquals(WebcamBackgroundEffect.NONE, PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true}}")).backgroundEffect());
+		assertEquals(WebcamBackgroundEffect.NONE, PreviewFrameMapper.webcamSpecFor(
+				state("{\"webcam\":{\"enabled\":true,\"backgroundEffect\":\"pixelate\"}}"))
+				.backgroundEffect());
 	}
 
 	@DisplayName("cursor samples hand the compositor the bracketing pair for a frame time")

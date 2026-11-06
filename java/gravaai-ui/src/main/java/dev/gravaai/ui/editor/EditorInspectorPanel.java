@@ -31,6 +31,7 @@ import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.core.project.WebcamCorner;
 import dev.gravaai.core.project.WebcamOverlaySettings;
 import dev.gravaai.core.project.WebcamPositionPreset;
@@ -1342,14 +1343,28 @@ public final class EditorInspectorPanel extends VBox {
 		Switch react = new Switch("React to zoom");
 		react.setChecked(webcam.reactToZoom());
 		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
-		Switch backgroundBlur = new Switch("Background blur");
-		backgroundBlur.setChecked(webcam.backgroundBlur());
-		backgroundBlur.onCheckedChange(value ->
-				applyWebcam(json -> json.put("backgroundBlur", value)));
 		boolean split = webcam.positionPreset().isSplit();
 		// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
-		root.getChildren().addAll(split ? List.of(enabled, mirror, backgroundBlur)
-				: List.of(enabled, mirror, react, backgroundBlur));
+		root.getChildren().addAll(split ? List.of(enabled, mirror)
+				: List.of(enabled, mirror, react));
+
+		// What the card does with the room: nothing, blur it, or let the wallpaper show through.
+		// One selector rather than two switches, so blur and remove cannot both be on.
+		ChoiceGroup backgroundEffect = choice(WebcamBackgroundEffect.NONE.wire(), "None",
+				WebcamBackgroundEffect.BLUR.wire(), "Blur",
+				WebcamBackgroundEffect.REMOVE.wire(), "Remove");
+		backgroundEffect.setValue(webcam.backgroundEffect().wire());
+		backgroundEffect.setAccessibleText("Webcam background");
+		backgroundEffect.onValueChange(value -> {
+			WebcamBackgroundEffect effect = WebcamBackgroundEffect.fromWireOrNull(value);
+			if (effect == null || effect == webcam.backgroundEffect()) {
+				return;
+			}
+			applyWebcam(json -> json.put("backgroundEffect", effect.wire()));
+		});
+		Label effectCaption = new Label("Background");
+		effectCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		root.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
 
 		// Layout first: the floating bubble or split screen, each with its own position control.
 		ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");
@@ -1438,13 +1453,25 @@ public final class EditorInspectorPanel extends VBox {
 			})), cropControl);
 			root.getChildren().add(cropBlock);
 
-			// Background blur mask: how crisp the cut-out edge is and how far it sits from the
-			// detected subject. Both are no-ops unless the blur is on, so they stay under Advanced
-			// beside the crop control rather than cluttering the main section.
-			root.getChildren().add(heading("Background blur", () -> applyWebcam(json -> {
+			// Background effect mask: how crisp the cut-out edge is and how far it sits from the
+			// detected subject, plus the switch that keeps the precise model on during playback.
+			// All three are no-ops unless the effect is on, so they stay under Advanced beside the
+			// crop control rather than cluttering the main section.
+			root.getChildren().add(heading("Background effect", () -> applyWebcam(json -> {
+				json.put("backgroundEffect", WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_EFFECT
+						.wire());
+				json.put("highQualityMaskWhilePlaying",
+						WebcamOverlaySettings.DEFAULT_WEBCAM_HIGH_QUALITY_MASK_WHILE_PLAYING);
 				json.put("maskPrecision", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION);
 				json.put("maskOffset", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
 			})));
+			// Positive wording: checked reads as "better, slower". Off by default, so playback runs
+			// the ~2 ms model and only a stopped frame or an export pays the ~28 ms one.
+			Switch highQuality = new Switch("High-quality mask while playing");
+			highQuality.setChecked(webcam.highQualityMaskWhilePlaying());
+			highQuality.onCheckedChange(value -> applyWebcam(
+					json -> json.put("highQualityMaskWhilePlaying", value)));
+			root.getChildren().add(highQuality);
 			root.getChildren().add(slider("Edge precision", webcam.maskPrecision(), 0, 1, 0.05,
 					value -> Math.round(value * 100) + "%",
 					value -> applyWebcam(json -> json.put("maskPrecision", value))));

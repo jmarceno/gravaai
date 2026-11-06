@@ -76,12 +76,21 @@ class ProjectDocumentTest {
 				&& !editor.has("keySound")) {
 			editor.set("keySound", ProjectDocument.writeKeySound(KeySoundSettings.DEFAULT));
 		}
-		// And the webcam background blur toggle: the canonical save always carries the default
-		// (off) for projects that predate it, along with the mask edge controls.
+		// And the webcam background effect: the canonical save always carries the default (none) for
+		// projects that predate it, the legacy boolean mirror, the slow-path switch, and the mask
+		// edge controls.
 		if (expected.get("editor") instanceof ObjectNode editor
 				&& editor.get("webcam") instanceof ObjectNode webcam) {
+			if (!webcam.has("backgroundEffect")) {
+				webcam.put("backgroundEffect", WebcamOverlaySettings.DEFAULT_WEBCAM_BACKGROUND_EFFECT
+						.wire());
+			}
 			if (!webcam.has("backgroundBlur")) {
 				webcam.put("backgroundBlur", false);
+			}
+			if (!webcam.has("highQualityMaskWhilePlaying")) {
+				webcam.put("highQualityMaskWhilePlaying",
+						WebcamOverlaySettings.DEFAULT_WEBCAM_HIGH_QUALITY_MASK_WHILE_PLAYING);
 			}
 			if (!webcam.has("maskPrecision")) {
 				webcam.put("maskPrecision",
@@ -117,13 +126,44 @@ class ProjectDocumentTest {
 		assertFalse(editor.has("zoomMotionBlurTuning"));
 		assertEquals("#123456", editor.get("wallpaper").asString());
 		assertEquals("/tmp/cam.mp4", editor.get("webcam").get("sourcePath").asString());
-		// The typed webcam rewrite carries the blur toggle (defaulting off for old projects).
+		// The typed webcam rewrite carries the effect mode (defaulting to none for old projects)
+		// plus the legacy boolean mirror a previous build still reads.
+		assertEquals("none", editor.get("webcam").get("backgroundEffect").asString());
 		assertFalse(editor.get("webcam").get("backgroundBlur").booleanValue());
-		// And the mask edge controls (defaulting to the shipped shape).
+		// And the slow-path switch plus mask edge controls (defaulting to the shipped shape).
+		assertFalse(editor.get("webcam").get("highQualityMaskWhilePlaying").booleanValue());
 		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION,
 				editor.get("webcam").get("maskPrecision").doubleValue(), 1e-9);
 		assertEquals(WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET,
 				editor.get("webcam").get("maskOffset").doubleValue(), 1e-9);
+	}
+
+	@Test
+	@DisplayName("an old project's blur boolean saves as the blur effect and keeps the legacy mirror")
+	void migratesLegacyBlurOnSave() throws IOException {
+		JsonNode project = Json.parseJsonWithByteOrderMark("""
+				{"version":2,"projectId":"p1","videoPath":"/tmp/clip.mp4",
+				"editor":{"webcam":{"enabled":true,"backgroundBlur":true}}}
+				""");
+		ProjectDocument document = ProjectDocument.load(writeTemp("legacy-blur.gravaai", project));
+		JsonNode webcam = document.toJson().get("editor").get("webcam");
+
+		assertEquals("blur", webcam.get("backgroundEffect").asString());
+		assertTrue(webcam.get("backgroundBlur").booleanValue());
+	}
+
+	@Test
+	@DisplayName("a remove-effect project saves a false legacy boolean (no equivalent upstream)")
+	void removeEffectWritesFalseLegacyBoolean() throws IOException {
+		JsonNode project = Json.parseJsonWithByteOrderMark("""
+				{"version":2,"projectId":"p1","videoPath":"/tmp/clip.mp4",
+				"editor":{"webcam":{"enabled":true,"backgroundEffect":"remove"}}}
+				""");
+		ProjectDocument document = ProjectDocument.load(writeTemp("remove.gravaai", project));
+		JsonNode webcam = document.toJson().get("editor").get("webcam");
+
+		assertEquals("remove", webcam.get("backgroundEffect").asString());
+		assertFalse(webcam.get("backgroundBlur").booleanValue());
 	}
 
 	@Test

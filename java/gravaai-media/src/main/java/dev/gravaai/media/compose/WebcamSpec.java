@@ -3,12 +3,14 @@ package dev.gravaai.media.compose;
 import java.util.List;
 import java.util.Optional;
 
+import dev.gravaai.core.project.WebcamBackgroundEffect;
+
 /** Webcam overlay settings for one compositor frame (plan §5.8 stage 7), media-local. */
 public record WebcamSpec(boolean enabled, String positionPreset, String corner, double positionX,
 		double positionY, double size, double width, double height, boolean mirror,
 		double roundness, double shadow, double margin, boolean reactToZoom, LayoutCrop cropRegion,
 		List<VisibleRange> visibleRanges, double timeOffsetMs,
-		Optional<Transition> transition, boolean backgroundBlur) {
+		Optional<Transition> transition, WebcamBackgroundEffect backgroundEffect) {
 
 	/** A webcam visibility window in timeline milliseconds (TS {@code TimeRange}). */
 	public record VisibleRange(double startMs, double endMs) {
@@ -31,13 +33,13 @@ public record WebcamSpec(boolean enabled, String positionPreset, String corner, 
 			LayoutCrop cropRegion, List<VisibleRange> visibleRanges, double timeOffsetMs) {
 		this(enabled, positionPreset, corner, positionX, positionY, size, width, height, mirror,
 				roundness, shadow, margin, reactToZoom, cropRegion, visibleRanges, timeOffsetMs,
-				Optional.empty(), false);
+				Optional.empty(), WebcamBackgroundEffect.NONE);
 	}
 
 	public WebcamSpec withTransition(Optional<Transition> next) {
 		return new WebcamSpec(enabled, positionPreset, corner, positionX, positionY, size, width,
 				height, mirror, roundness, shadow, margin, reactToZoom, cropRegion, visibleRanges,
-				timeOffsetMs, next, backgroundBlur);
+				timeOffsetMs, next, backgroundEffect);
 	}
 
 	/** No webcam overlay. */
@@ -48,11 +50,19 @@ public record WebcamSpec(boolean enabled, String positionPreset, String corner, 
 	public WebcamSpec {
 		visibleRanges = visibleRanges == null ? List.of() : List.copyOf(visibleRanges);
 		cropRegion = cropRegion == null ? LayoutCrop.FULL : cropRegion;
+		if (backgroundEffect == null) {
+			backgroundEffect = WebcamBackgroundEffect.NONE;
+		}
 		if (!Double.isFinite(positionX) || !Double.isFinite(positionY)
 				|| !Double.isFinite(size) || !Double.isFinite(width)
 				|| !Double.isFinite(height) || !Double.isFinite(timeOffsetMs)) {
 			throw new IllegalArgumentException("webcam spec values must be finite");
 		}
+	}
+
+	/** True when the card needs a person mask (blur or removal). */
+	public boolean segmentsPerson() {
+		return backgroundEffect.segmentsPerson();
 	}
 
 	/** {@code true} when the webcam should be drawn at this timeline time. */

@@ -15,6 +15,7 @@ import dev.gravaai.media.playback.PlaybackState;
 import dev.gravaai.media.playback.PlaybackStatus;
 import dev.gravaai.media.playback.PreviewVideoReadiness;
 import dev.gravaai.media.segmentation.MaskTuning;
+import dev.gravaai.media.segmentation.WebcamMaskQuality;
 import dev.gravaai.media.segmentation.WebcamSegmenter;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
@@ -110,9 +111,14 @@ public final class EditorPreviewView extends Region {
 		}
 	}
 
-	/** Current editor appearance snapshot; immutable so the decode thread can read it. */
+	/**
+	 * Current editor appearance snapshot; immutable so the decode thread can read it. A scene change
+	 * also re-evaluates the segmentation path, because the Advanced high-quality switch changes it
+	 * while the playback state stays the same.
+	 */
 	public void setScene(PreviewFrameMapper.PreviewScene nextScene) {
 		scene.set(nextScene);
+		syncMaskQuality();
 	}
 
 	/** Subscribes to a playback engine; may be called once (null clears it). */
@@ -148,13 +154,20 @@ public final class EditorPreviewView extends Region {
 	// Video wallpaper decoder: used on the engine thread, closed on dispose.
 	private final PreviewWallpaper wallpaper = new PreviewWallpaper();
 
-	// Webcam background blur: the app layer wires the segmenter (null keeps blur off). The mask
-	// cache is guarded by the frame snapshot monitor (every submitSnapshot caller holds it).
+	// Webcam background effect: the app layer wires the segmenter (null keeps the effect off). The
+	// mask cache is guarded by the frame snapshot monitor (every submitSnapshot caller holds it).
 	private @Nullable WebcamSegmenter webcamSegmenter;
 	private @Nullable RgbaFrame lastMaskedWebcamFrame;
 	private @Nullable RgbaFrame lastWebcamMask;
 	/** Edge settings the cached mask was shaped with; a change invalidates the cache. */
 	private MaskTuning lastMaskedTuning = MaskTuning.DEFAULT;
+	/** Segmentation path the cached mask came from; a fast/slow switch invalidates the cache. */
+	private @Nullable WebcamMaskQuality lastMaskQuality;
+	/**
+	 * Path last asked of the segmenter, so the status callback does not re-send an unchanged switch
+	 * (and re-trigger a repaint) on every status tick.
+	 */
+	private @Nullable WebcamMaskQuality lastRequestedQuality;
 	/**
 	 * Set while this view is repainting because a mask finished on the segmenter's worker thread:
 	 * that repaint must consume the mask already in hand rather than queue another inference.
@@ -162,7 +175,7 @@ public final class EditorPreviewView extends Region {
 	 */
 	private boolean maskRepaintPending;
 
-	/** Supplies the person segmenter backing the webcam background blur; null keeps blur off. */
+	/** Supplies the person segmenter backing the webcam background effect; null keeps it off. */
 	public void setWebcamSegmenter(@Nullable WebcamSegmenter segmenter) {
 		WebcamSegmenter previous = this.webcamSegmenter;
 		if (previous != segmenter && previous != null) {
@@ -172,6 +185,8 @@ public final class EditorPreviewView extends Region {
 		lastMaskedWebcamFrame = null;
 		lastWebcamMask = null;
 		lastMaskedTuning = MaskTuning.DEFAULT;
+		lastMaskQuality = null;
+		lastRequestedQuality = null;
 		if (segmenter != null) {
 			// The mask lands on the segmenter's worker thread, long after the frame that asked for
 			// it was drawn. Repainting then is what makes the edge controls visible while paused:
@@ -265,12 +280,12 @@ public final class EditorPreviewView extends Region {
 	}
 
 	/**
-	 * The person mask for the decoded webcam frame when the scene enables background blur, else
-	 * null. The decoded buffers rotate in turn, so identical frames return the cached mask; only
-	 * a buffer flip or an edge-control change recomputes it. The segmenter may be asynchronous
-	 * (the preview path keeps inference off this thread), so the mask it returns is the most
-	 * recent completed one, not necessarily this frame's; caching it per buffer keeps that stable
-	 * across repaints.
+	 * The person mask for the decoded webcam frame when the scene enables a background effect, else
+	 * null. The decoded buffers rotate in turn, so identical frames return the cached mask; only a
+	 * buffer flip, an edge-control change or a fast/slow path switch recomputes it. The segmenter
+	 * may be asynchronous (the preview path keeps inference off this thread), so the mask it returns
+	 * is the most recent completed one, not necessarily this frame's; caching it per buffer keeps
+	 * that stable across repaints.
 	 *
 	 * <p>On the repaint this view requests for a finished mask ({@link #onMaskReady}), the mask is
 	 * already in hand: reading {@link WebcamSegmenter#completedMask()} instead of asking again is
@@ -280,24 +295,91 @@ public final class EditorPreviewView extends Region {
 	private @Nullable RgbaFrame webcamMask(PlaybackFrame frame, PreviewFrameMapper.PreviewScene scene,
 			boolean maskAlreadyDelivered) {
 		RgbaFrame webcamFrame = frame.webcamFrame();
-		if (webcamFrame == null || !scene.webcam().backgroundBlur()) {
+		if (webcamFrame == null || !scene.webcam().segmentsPerson()) {
 			return null;
 		}
 		if (webcamSegmenter == null) {
 			return null;
 		}
 		MaskTuning tuning = ProjectEditorInputs.maskTuning(scene.editor());
-		if (webcamFrame == lastMaskedWebcamFrame && tuning.equals(lastMaskedTuning)) {
-			// Same decoded buffer and same edge settings: answer from the cache. A null entry is a
+		WebcamMaskQuality quality = currentMaskQuality(scene);
+		if (webcamFrame == lastMaskedWebcamFrame && tuning.equals(lastMaskedTuning)
+				&& quality == lastMaskQuality) {
+			// Same decoded buffer, edge settings and path: answer from the cache. A null entry is a
 			// real answer (the segmenter had no mask yet), not a cache miss.
 			return lastWebcamMask;
 		}
 		lastMaskedWebcamFrame = webcamFrame;
 		lastMaskedTuning = tuning;
+		lastMaskQuality = quality;
 		lastWebcamMask = maskAlreadyDelivered
 				? webcamSegmenter.completedMask()
 				: webcamSegmenter.maskFor(webcamFrame, tuning);
 		return lastWebcamMask;
+	}
+
+	/**
+	 * The segmentation path this frame wants: the precise model unless the timeline is playing and
+	 * the project did not ask for the high-quality mask during playback.
+	 *
+	 * <p>Scrubbing counts as a stopped state (the engine reports {@code SEEKING} for it), so a scrub
+	 * shows the same clean edge the paused frame will. {@code ENDED} is stopped too. Before the
+	 * engine reports anything, the fast path is assumed: it is the one that must never cost a frame
+	 * budget, and the first status arrives with the first frame.
+	 */
+	private WebcamMaskQuality currentMaskQuality(PreviewFrameMapper.PreviewScene scene) {
+		PlaybackStatus status = lastStatus;
+		boolean playing = status != null && status.state() == PlaybackState.PLAYING;
+		if (!playing || highQualityWhilePlaying(scene)) {
+			return WebcamMaskQuality.PRECISE;
+		}
+		return WebcamMaskQuality.FAST;
+	}
+
+	/** The project's Advanced "high-quality mask while playing" switch. */
+	private static boolean highQualityWhilePlaying(PreviewFrameMapper.PreviewScene scene) {
+		var webcam = scene.editor() == null ? null : scene.editor().webcam();
+		return webcam != null && webcam.highQualityMaskWhilePlaying();
+	}
+
+	/**
+	 * Points the segmenter at the path the current state wants. Called on every status change so a
+	 * pause starts the precise inference immediately rather than on the next decoded frame, and a
+	 * play resumes the cheap one.
+	 *
+	 * <p>Goes through the {@link WebcamSegmenter} port rather than downcasting: the app wraps the
+	 * dual-path selector in {@link AsyncWebcamSegmenter}, which forwards the switch to its delegate
+	 * and drops a queued request that belongs to the path being left. A segmenter with a single
+	 * model (export, still frames) ignores the call, which is why there is no type check here.</p>
+	 */
+	private void syncMaskQuality() {
+		WebcamSegmenter segmenter = webcamSegmenter;
+		if (segmenter == null) {
+			return;
+		}
+		PreviewFrameMapper.PreviewScene scene = this.scene.get();
+		if (scene == null) {
+			return;
+		}
+		WebcamMaskQuality wanted = currentMaskQuality(scene);
+		if (wanted == lastRequestedQuality) {
+			return;
+		}
+		lastRequestedQuality = wanted;
+		segmenter.setQuality(wanted);
+		// The cached mask belongs to the previous path; drop it so the repaint runs the new model.
+		PreviewFrameSnapshot snapshot = lastFrame;
+		if (snapshot != null) {
+			synchronized (snapshot) {
+				lastMaskedWebcamFrame = null;
+				lastWebcamMask = null;
+			}
+		}
+		// A pause delivers no new frame of its own, so ask for the precise mask right away: the
+		// repaint after it lands is what swaps the fast edge for the clean one.
+		if (wanted == WebcamMaskQuality.PRECISE) {
+			Platform.runLater(this::requestRepaint);
+		}
 	}
 
 	private void markReadiness(PlaybackFrame frame) {
@@ -315,7 +397,13 @@ public final class EditorPreviewView extends Region {
 	private void onStatus(PlaybackStatus status) {
 		// Cache the status so repaint/seek paths never take the engine lock on the FX thread. A
 		// seek keeps the last presented frame (the React hook ignores the transient drop).
+		PlaybackState previousState = lastStatus == null ? null : lastStatus.state();
 		lastStatus = status;
+		if (status.state() != previousState) {
+			// Play ⇄ pause decides which model segments the next frame; scrubbing (SEEKING) and end
+			// of playback both want the precise one.
+			syncMaskQuality();
+		}
 		if (status.state() == dev.gravaai.media.playback.PlaybackState.SEEKING) {
 			readiness.onSeeked();
 		}

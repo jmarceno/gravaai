@@ -393,7 +393,27 @@
 /* ---- Timeline panel ------------------------------------------------------ */
 
 .editor-timeline {
-	-fx-padding: 8px 16px 16px 16px;
+	/* No top padding: the resize handle owns the top edge. */
+	-fx-padding: 0 16px 16px 16px;
+}
+/* Top-edge grab strip: dragging it trades height between the preview column and the strip. */
+.editor-timeline__resize-handle {
+	-fx-cursor: v-resize;
+	-fx-padding: 0 0 2px 0;
+}
+.editor-timeline__resize-grip {
+	-fx-background-color: rgba(255, 255, 255, 0.14);
+	-fx-background-radius: 999px;
+	-fx-min-width: 44px;
+	-fx-pref-width: 44px;
+	-fx-max-width: 44px;
+	-fx-min-height: 3px;
+	-fx-pref-height: 3px;
+	-fx-max-height: 3px;
+}
+.editor-timeline__resize-handle:hover .editor-timeline__resize-grip,
+.editor-timeline__resize-handle--dragging .editor-timeline__resize-grip {
+	-fx-background-color: -g-accent;
 }
 .editor-timeline__playhead {
 	-fx-fill: #ef4444;

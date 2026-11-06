@@ -182,9 +182,7 @@ public final class EditorShellView extends VBox {
 		dropHost.setOnDragOver(this::handleRecordingDragOver);
 		dropHost.setOnDragDropped(this::handleRecordingDrop);
 
-		timelinePanel.setMinHeight(180);
-		timelinePanel.setMaxHeight(280);
-		timelinePanel.prefHeightProperty().bind(heightProperty().multiply(0.22));
+		timelinePanel.bindDefaultHeight(heightProperty());
 
 		getChildren().addAll(header, announcementBanner, dropHost);
 		// P2.11: the inspector (wallpaper grids/images) is built after the first visible pulse.

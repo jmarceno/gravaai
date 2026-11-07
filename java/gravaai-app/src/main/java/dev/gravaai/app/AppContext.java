@@ -1629,6 +1629,12 @@ public final class AppContext {
 			LOG.log(System.Logger.Level.INFO, "no D-Bus session; tray disabled");
 			return;
 		}
+		// Building a second Tray would overwrite the field with one whose exportObject() throws
+		// (the paths are taken) and whose install() never runs, leaving a dead tray that swallows
+		// every state update. The startup branches are exclusive today; this keeps them so.
+		if (tray != null && tray.isInstalled()) {
+			return;
+		}
 		if (!Tray.isSupported(bus)) {
 			LOG.log(System.Logger.Level.INFO, "no StatusNotifierWatcher on the session bus; tray disabled");
 			return;
@@ -1643,8 +1649,11 @@ public final class AppContext {
 					() -> Platform.runLater(this::openDashboard),
 					() -> Platform.runLater(this::stopRecordingFromTray),
 					() -> Platform.runLater(this::quit));
-			tray = new Tray(bus, icon, recordingIcon, actions);
-			tray.install();
+			Tray created = new Tray(bus, icon, recordingIcon, actions);
+			created.install();
+			// Assigned only after install(): a tray that failed to install must not replace a
+			// working one (or leave a non-null field that the guard above would then skip).
+			tray = created;
 			subscribeTrayRecordingState();
 			LOG.log(System.Logger.Level.INFO, "tray installed");
 		} catch (Exception error) {

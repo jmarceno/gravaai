@@ -12,7 +12,9 @@ import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
+import org.freedesktop.dbus.interfaces.DBus;
 import org.freedesktop.dbus.interfaces.DBusInterface;
+import org.freedesktop.dbus.interfaces.DBusSigHandler;
 import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.interfaces.Properties.PropertiesChanged;
 import org.freedesktop.dbus.errors.PropertyReadOnly;
@@ -73,6 +75,11 @@ public final class Tray implements AutoCloseable {
 	private final AtomicReference<State> state = new AtomicReference<>(new State(false, ""));
 	private final AtomicInteger revision = new AtomicInteger(1);
 	private volatile boolean installed;
+	/** The watcher the item is currently registered with, for the reconnect handler. */
+	private volatile String registeredWith = "";
+	/** Unique name of the watcher process that last registered this item. */
+	private volatile String registeredOwner = "";
+	private @Nullable AutoCloseable watcherSubscription;
 
 	public Tray(SessionBus bus, TrayIcon icon, TrayIcon recordingIcon, TrayMenu.Actions actions) {
 		this.bus = bus;
@@ -110,13 +117,60 @@ public final class Tray implements AutoCloseable {
 					+ WATCHER_SERVICE + " / " + COSMIC_WATCHER_SERVICE + ")");
 		}
 		DBusConnection connection = bus.connection();
-		StatusNotifierWatcher watcher = connection.getRemoteObject(service, WATCHER_PATH,
-				StatusNotifierWatcher.class, false);
 		connection.exportObject(SNI_PATH, item);
 		connection.exportObject(MENU_PATH, menu);
-		watcher.RegisterStatusNotifierItem(SNI_PATH);
+		register(connection, service);
+		subscribeWatcherRestarts(connection);
 		installed = true;
 		LOG.log(System.Logger.Level.INFO, "tray installed as " + connection.getUniqueName() + SNI_PATH);
+	}
+
+	/** Tells {@code service} that this connection exports a StatusNotifierItem at {@link #SNI_PATH}. */
+	private void register(DBusConnection connection, String service) throws DBusException {
+		connection.getRemoteObject(service, WATCHER_PATH, StatusNotifierWatcher.class, false)
+				.RegisterStatusNotifierItem(SNI_PATH);
+		registeredWith = service;
+	}
+
+	/**
+	 * Re-registers when the watcher becomes available again.
+	 *
+	 * <p>A tray item only reaches the panel through the watcher, and the watcher is restarted on
+	 * its own (COSMIC's is a separate service). Its name changes owner and the previous
+	 * registration is gone with the old process, so without this the icon stays missing until the
+	 * application restarts. Both COSMIC's own name and KDE's alias are watched, because which one
+	 * the item registered with depends on what was running at install time.
+	 */
+	private void subscribeWatcherRestarts(DBusConnection connection) throws DBusException {
+		DBusSigHandler<DBus.NameOwnerChanged> handler = signal -> {
+			if (!installed || signal.newOwner == null || signal.newOwner.isEmpty()) {
+				return;
+			}
+			if (!WATCHER_SERVICE.equals(signal.name) && !COSMIC_WATCHER_SERVICE.equals(signal.name)) {
+				return;
+			}
+			// COSMIC's watcher owns both names, so one restart reports two owner changes. The
+			// unique name identifies the process: register once per new owner.
+			if (signal.newOwner.equals(registeredOwner)) {
+				return;
+			}
+			String service = watcherService(bus);
+			if (service == null) {
+				return;
+			}
+			try {
+				register(connection, service);
+				registeredOwner = signal.newOwner;
+				LOG.log(System.Logger.Level.INFO, "tray re-registered with " + service);
+			} catch (DBusException | RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING, "tray re-registration failed: " + error);
+			}
+		};
+		try {
+			watcherSubscription = connection.addSigHandler(DBus.NameOwnerChanged.class, handler);
+		} catch (DBusException error) {
+			throw new DBusException("could not watch the tray host for restarts: " + error, error);
+		}
 	}
 
 	public boolean isInstalled() {
@@ -269,7 +323,22 @@ public final class Tray implements AutoCloseable {
 		if (!installed) {
 			return;
 		}
+		// Before the flag: the handler checks it, and a watcher that appears while
+		// the objects are being unexported must not re-register them.
 		installed = false;
+		AutoCloseable subscription = watcherSubscription;
+		watcherSubscription = null;
+		if (subscription != null) {
+			try {
+				subscription.close();
+			} catch (Exception error) {
+				LOG.log(System.Logger.Level.DEBUG, "could not remove the watcher handler: " + error);
+			}
+		}
+		// The protocol has no unregister call: the watcher drops an item when the unique name that
+		// registered it leaves the bus. Unexporting the objects first would only leave the panel
+		// pointing at paths that no longer answer, so the entry stays until the process exits
+		// (or the watcher restarts), and the unexport below is what makes it inert.
 		try {
 			bus.connection().unExportObject(MENU_PATH);
 			bus.connection().unExportObject(SNI_PATH);

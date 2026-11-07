@@ -23,18 +23,18 @@ import javafx.scene.layout.VBox;
  * {@code src/components/video-editor/SliderControl.tsx} and
  * {@code @heroui/styles/components/slider.css}.
  *
- * <p>Horizontal only (the app only uses horizontal sliders): track 20 px high radius 12 in the
- * default colour, accent fill, 28x20 thumb whose 24x16 white pill scales to 0.9 while dragging
- * over 250 ms ease-out. The {@code label}/{@code output} row matches SliderControl: label on the
- * left (text-xs with the slider-control class), formatted value on the right.
+ * <p>Horizontal only (the app only uses horizontal sliders): a 16 px hit area whose 3 px rail
+ * (Instrument mock {@code .slider}) carries the accent fill and the 9 px light knob, centered
+ * exactly on the rail line. The pill scales to 0.9 while dragging over 250 ms ease-out. The
+ * {@code label}/{@code output} row matches SliderControl: label on the left, formatted value on
+ * the right.
  */
 public final class Slider extends VBox {
 
 	private static final double TRACK_INSET = 12;
-	private static final double TRACK_HEIGHT = 20;
-	private static final double THUMB_WIDTH = 28;
-	private static final double PILL_WIDTH = 24;
-	private static final double PILL_HEIGHT = 16;
+	private static final double TRACK_HEIGHT = 16;
+	private static final double RAIL_HEIGHT = 3;
+	private static final double THUMB_SIZE = 9;
 
 	private final DoubleProperty value = new SimpleDoubleProperty(0);
 	private final DoubleProperty fraction = new SimpleDoubleProperty(0);
@@ -44,6 +44,7 @@ public final class Slider extends VBox {
 	private final Label label = new Label();
 	private final Label output = new Label();
 	private final Pane track = new Pane();
+	private final Region rail = new Region();
 	private final Region fill = new Region();
 	private final Region thumbPill = new Region();
 	private final Pane thumb = new Pane();
@@ -85,13 +86,22 @@ public final class Slider extends VBox {
 		track.setMinHeight(TRACK_HEIGHT);
 		track.setPrefHeight(TRACK_HEIGHT);
 		track.setMaxHeight(TRACK_HEIGHT);
+		rail.getStyleClass().add("slider__rail");
+		// Unmanaged: a Pane's layout pass autosizes managed children to their preferred size,
+		// which would wipe the bounds laid out below (a bare Region's pref size is 0×0).
+		rail.setManaged(false);
+		rail.setMouseTransparent(true);
 		fill.getStyleClass().add("slider__fill");
+		fill.setManaged(false);
 		fill.setMouseTransparent(true);
 		thumb.getStyleClass().add("slider__thumb");
+		thumb.setManaged(false);
 		thumb.setMouseTransparent(true);
 		thumbPill.getStyleClass().add("slider__thumb-pill");
+		thumbPill.setManaged(false);
+		thumbPill.setMouseTransparent(true);
 		thumb.getChildren().add(thumbPill);
-		track.getChildren().addAll(fill, thumb);
+		track.getChildren().addAll(rail, fill, thumb);
 		getChildren().add(track);
 		VBox.setVgrow(track, Priority.NEVER);
 
@@ -211,10 +221,13 @@ public final class Slider extends VBox {
 		double usable = Math.max(0, width - 2 * TRACK_INSET);
 		double center = TRACK_INSET + fraction.get() * usable;
 		double fillWidth = Math.max(0, center - TRACK_INSET);
-		fill.resizeRelocate(TRACK_INSET, 0, Math.max(fillWidth, 0), TRACK_HEIGHT);
-		thumb.resizeRelocate(center - THUMB_WIDTH / 2, 0, THUMB_WIDTH, TRACK_HEIGHT);
-		thumbPill.resizeRelocate((THUMB_WIDTH - PILL_WIDTH) / 2, (TRACK_HEIGHT - PILL_HEIGHT) / 2, PILL_WIDTH,
-				PILL_HEIGHT);
+		// The rail, the fill and the knob share one center line: the knob's center sits exactly
+		// on the rail (Instrument mock .slider).
+		double railY = (TRACK_HEIGHT - RAIL_HEIGHT) / 2;
+		rail.resizeRelocate(TRACK_INSET, railY, Math.max(0, width - 2 * TRACK_INSET), RAIL_HEIGHT);
+		fill.resizeRelocate(TRACK_INSET, railY, Math.max(fillWidth, 0), RAIL_HEIGHT);
+		thumb.resizeRelocate(center - THUMB_SIZE / 2, 0, THUMB_SIZE, TRACK_HEIGHT);
+		thumbPill.resizeRelocate(0, (TRACK_HEIGHT - THUMB_SIZE) / 2, THUMB_SIZE, THUMB_SIZE);
 		fill.setOpacity(fillWidth <= 0 ? 0 : 1);
 	}
 

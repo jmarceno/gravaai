@@ -76,7 +76,7 @@ public final class WallpaperGrid extends GridPane {
 		Button button = new Button();
 		button.getStyleClass().addAll("editor-tile", "editor-tile__add");
 		Icon plus = Icon.of(Icons.Plus, 14);
-		plus.setIconColor(Color.web("#8b929a"));
+		plus.setIconColor(Color.web("#8794a0"));
 		button.setGraphic(plus);
 		button.setMaxWidth(Double.MAX_VALUE);
 		button.setPrefHeight(38);

@@ -63,7 +63,7 @@ public final class TutorialHelpDialog {
 				keptLabel(track, 0.9));
 
 		Line arrow = new Line(0, 0, 0, 14);
-		arrow.setStroke(Color.web("#8b929a"));
+		arrow.setStroke(Color.web("#8794a0"));
 		HBox arrowRow = new HBox(arrow);
 		arrowRow.setAlignment(Pos.CENTER);
 		arrowRow.setPadding(new Insets(2, 0, 2, 0));

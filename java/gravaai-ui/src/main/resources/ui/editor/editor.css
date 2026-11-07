@@ -1,45 +1,13 @@
 /*
  * Editor shell styles — the Instrument layout (docs/mocks/editor-instrument.html).
  *
- * The editor scopes the kit tokens (-g-*) to the mock's palette: panel #0E1317 window base,
- * #0B0F12 chrome surfaces, #171E24/#222B33 hairlines, #2FE6D0 cyan. Structure is hairlines, not
- * shadows; radii stay 2–4px; every duration, value and timecode is tabular mono.
+ * The Instrument palette (panel #0E1317 window base, #0B0F12 chrome surfaces,
+ * #171E24/#222B33 hairlines, #2FE6D0 cyan) is the app-wide token set in kit/gravaai.css;
+ * the editor adds only its layout structure. Structure is hairlines, not shadows; radii
+ * stay 2–4px; every duration, value and timecode is tabular mono.
  */
 
 .editor-root {
-	/* Instrument palette (docs/mocks/editor-instrument.html :root), scoped to the editor. */
-	-g-bg: #0e1317;
-	-g-fg: #e9f1f4;
-	-g-surface: #0b0f12;
-	-g-surface-secondary: #141a1f;
-	-g-surface-tertiary: #1a2127;
-	-g-surface-hover: #141a1f;
-	-g-surface-secondary-hover: #1a2127;
-	-g-bg-secondary: #0b0f12;
-	-g-bg-tertiary: #10151a;
-	-g-bg-inverse: #e9f1f4;
-	-g-overlay: #141a1f;
-	-g-muted: #8794a0;
-	-g-default: #0a0e11;
-	-g-default-hover: #141a1f;
-	-g-default-soft: rgba(6, 10, 13, 0.55);
-	-g-segment: #141a1f;
-	-g-field: #0a0e11;
-	-g-field-hover: #0c1116;
-	-g-field-focus: #0a0e11;
-	-g-border: #222b33;
-	-g-separator: #171e24;
-	-g-border-secondary: #28323a;
-	-g-accent: #2fe6d0;
-	-g-accent-hover: #57f0dd;
-	-g-accent-foreground: #032522;
-	-g-accent-soft: rgba(47, 230, 208, 0.1);
-	-g-accent-soft-hover: rgba(47, 230, 208, 0.16);
-	-g-accent-soft-foreground: #2fe6d0;
-	-g-focus: #2fe6d0;
-	-g-scrollbar-thumb: #222b33;
-	-g-icon-color: #e9f1f4;
-
 	-fx-background-color: -g-bg;
 	-fx-font-family: "DM Sans";
 	-fx-font-size: 13px;
@@ -426,7 +394,8 @@
 	-fx-border-width: 1px;
 }
 
-/* Sliders (mock .slider): 3px rail, cyan-deep fill, 9px light knob, mono value. */
+/* Sliders (mock .slider): the kit draws the 3px rail, cyan-deep fill and 9px knob centered on
+   the rail line; here only the colours. */
 .editor-root .slider .slider__output {
 	-fx-font-family: "DejaVu Sans Mono";
 	-fx-font-size: 10.5px;
@@ -438,19 +407,13 @@
 	-fx-font-weight: 400;
 	-fx-text-fill: #8794a0;
 }
-.editor-root .slider .slider__track {
+.editor-root .slider .slider__rail {
 	-fx-background-color: #1c252c;
 	-fx-background-radius: 2px;
-	-fx-min-height: 3px;
-	-fx-pref-height: 3px;
-	-fx-max-height: 3px;
 }
 .editor-root .slider .slider__fill {
 	-fx-background-color: #17b3a2;
 	-fx-background-radius: 2px;
-	-fx-min-height: 3px;
-	-fx-pref-height: 3px;
-	-fx-max-height: 3px;
 }
 .editor-root .slider .slider__thumb-pill {
 	-fx-background-color: #e9f1f4;
@@ -461,6 +424,9 @@
 	-fx-min-height: 9px;
 	-fx-pref-height: 9px;
 	-fx-max-height: 9px;
+}
+.editor-root .slider .slider__track {
+	-fx-background-color: transparent;
 }
 
 /* Inspector rows: label left, control right (mock .rowline). */

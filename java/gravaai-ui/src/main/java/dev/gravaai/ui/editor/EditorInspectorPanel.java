@@ -629,8 +629,9 @@ public final class EditorInspectorPanel extends VBox {
 		Switch mute = Switch.xs("Mute clip");
 		mute.setChecked(Boolean.TRUE.equals(clip.muted()));
 		mute.onCheckedChange(value -> store.apply(new ClipCommands.SetMuted(value)));
-		root.getChildren().addAll(speed, mute, deleteSelectionButton("Delete Clip",
-				() -> store.apply(new ClipCommands.Delete(clip.id()))));
+		root.getChildren().add(group("Clip", null, speed, mute,
+				deleteSelectionButton("Delete Clip",
+						() -> store.apply(new ClipCommands.Delete(clip.id())))));
 		return root;
 	}
 
@@ -661,12 +662,12 @@ public final class EditorInspectorPanel extends VBox {
 		normalize.onCheckedChange(value -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
 				id -> new AudioCommands.SetNormalize(id, value),
 				new AudioCommands.SetNormalize(value)));
-		root.getChildren().addAll(volume, normalize,
+		root.getChildren().add(group("Audio", null, volume, normalize,
 				deleteSelectionButton(multiIds.size() > 1
 						? "Delete " + multiIds.size() + " Audio Regions" : "Delete Audio",
 						() -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
 								AudioCommands.Delete::new,
-								new AudioCommands.Delete(audio.id()))));
+								new AudioCommands.Delete(audio.id())))));
 		return root;
 	}
 
@@ -676,9 +677,9 @@ public final class EditorInspectorPanel extends VBox {
 		Label count = new Label(store.multiSelection().size() + " elements selected.");
 		count.setWrapText(true);
 		count.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
-		root.getChildren().addAll(count,
+		root.getChildren().add(group("Selection", null, count,
 				deleteSelectionButton("Delete " + store.multiSelection().size() + " Elements",
-						this::deleteMultiSelection));
+						this::deleteMultiSelection)));
 		return root;
 	}
 
@@ -770,8 +771,9 @@ public final class EditorInspectorPanel extends VBox {
 				}
 			}
 		});
-		root.getChildren().addAll(text, deleteSelectionButton("Delete Caption",
-				() -> store.apply(new CaptionCommands.Delete(cue.id()))));
+		root.getChildren().addAll(group("Caption", null, text,
+				deleteSelectionButton("Delete Caption",
+						() -> store.apply(new CaptionCommands.Delete(cue.id())))));
 		return root;
 	}
 
@@ -834,7 +836,6 @@ public final class EditorInspectorPanel extends VBox {
 			}
 		});
 		root.getChildren().add(key);
-
 		// 2 × 2 grid: the settings rail is narrow, so one row squeezes each switch's label until
 		// it wraps per letter; sharing two rows leaves every label room on one line.
 		GridPane modifiers = new GridPane();
@@ -866,10 +867,9 @@ public final class EditorInspectorPanel extends VBox {
 			modifiers.add(toggle, cell % 2, cell / 2);
 			cell++;
 		}
-		root.getChildren().add(modifiers);
-
-		root.getChildren().add(deleteSelectionButton("Delete Keystroke",
-				() -> store.apply(new KeystrokeCommands.Delete(element.id()))));
+		root.getChildren().add(group("Keystroke", null, key, modifiers,
+				deleteSelectionButton("Delete Keystroke",
+						() -> store.apply(new KeystrokeCommands.Delete(element.id())))));
 		return root;
 	}
 
@@ -1005,14 +1005,16 @@ public final class EditorInspectorPanel extends VBox {
 		layout.value(segment.layout().wire());
 		layout.onValueChange(value -> CameraLayout.fromWire(value).ifPresent(choice ->
 				store.apply(new CameraLayoutCommands.ChangeLayout(segment.id(), choice))));
-		root.getChildren().add(row("Layout", layout));
 
 		ChoiceGroup transition = choice("cut", "Cut", "smooth", "Smooth");
 		transition.setValue(segment.transition().wire());
 		transition.setAccessibleText("Switch");
 		transition.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransition(
 				segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
-		root.getChildren().add(row("Switch", transition));
+
+		// The layout group: what block this is and how the camera enters it.
+		root.getChildren().add(group("Layout", null, row("Layout", layout),
+				row("Switch", transition)));
 
 		// The switch out only matters where the project layout follows: a touching block's
 		// switch-in governs that boundary instead.
@@ -1028,43 +1030,39 @@ public final class EditorInspectorPanel extends VBox {
 		// This block's look; each slider starts at the project webcam value it overrides.
 		WebcamOverlaySettings webcam = store.state().webcam();
 		CameraLayoutStyle style = segment.style();
+		VBox styleGroup = groupRebuilding("Style", () -> {
+			for (String field : CameraLayoutStyle.FIELDS) {
+				store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
+						java.util.OptionalDouble.empty()));
+			}
+		});
 		if (segment.layout() instanceof CameraLayout.Position(var preset)) {
 			if (preset.isSplit()) {
 				boolean stacked = preset == WebcamPositionPreset.SPLIT_TOP
 						|| preset == WebcamPositionPreset.SPLIT_BOTTOM;
 				String field = stacked ? "height" : "width";
-				root.getChildren().add(styleSlider(segment, "Camera share", field,
+				styleGroup.getChildren().add(styleSlider(segment, "Camera share", field,
 						style.get(field).orElse(stacked ? webcam.height() : webcam.width()),
 						10, 90, 1, EditorInspectorPanel::formatPercent));
 			} else {
-				root.getChildren().add(styleSlider(segment, "Size", "size",
+				styleGroup.getChildren().add(styleSlider(segment, "Size", "size",
 						style.size().orElse(webcam.size()), 10, 100, 1,
 						EditorInspectorPanel::formatPercent));
-				root.getChildren().add(styleSlider(segment, "Width", "width",
+				styleGroup.getChildren().add(styleSlider(segment, "Width", "width",
 						style.width().orElse(webcam.width()), 10, 100, 1,
 						EditorInspectorPanel::formatPercent));
-				root.getChildren().add(styleSlider(segment, "Height", "height",
+				styleGroup.getChildren().add(styleSlider(segment, "Height", "height",
 						style.height().orElse(webcam.height()), 10, 100, 1,
 						EditorInspectorPanel::formatPercent));
 			}
-			root.getChildren().add(styleSlider(segment, "Roundness", "roundness",
+			styleGroup.getChildren().add(styleSlider(segment, "Roundness", "roundness",
 					style.roundness().orElse(webcam.roundness()), 0, 100, 1,
 					EditorInspectorPanel::formatPercent));
-			root.getChildren().add(styleSlider(segment, "Shadow", "shadow",
+			styleGroup.getChildren().add(styleSlider(segment, "Shadow", "shadow",
 					style.shadow().orElse(webcam.shadow()) * 100, 0, 100, 1,
 					EditorInspectorPanel::formatPercent));
-			if (!style.isInherit()) {
-				Button reset = new Button("Use the Webcam settings", Button.Variant.GHOST,
-						Button.Size.SM);
-				reset.setOnAction(event -> {
-					for (String field : CameraLayoutStyle.FIELDS) {
-						store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
-								java.util.OptionalDouble.empty()));
-					}
-				});
-				root.getChildren().add(reset);
-			}
 		}
+		root.getChildren().add(styleGroup);
 
 		Label hint = new Label("Drag the block's edges on the Camera track to move the switch. "
 				+ "The diamond at its start toggles Cut / Smooth"
@@ -1335,7 +1333,6 @@ public final class EditorInspectorPanel extends VBox {
 		Switch loop = Switch.xs("Loop cursor");
 		loop.setChecked(state.loopCursor());
 		loop.onCheckedChange(value -> apply(json -> json.put("loopCursor", value)));
-		root.getChildren().addAll(show, loop);
 
 		Select style = new Select();
 		for (String cursorStyle : List.of("tahoe", "tahoe-inverted", "macos", "windows11", "dot",
@@ -1344,7 +1341,6 @@ public final class EditorInspectorPanel extends VBox {
 		}
 		style.value(state.cursorStyle());
 		style.onValueChange(value -> apply(json -> json.put("cursorStyle", value)));
-		root.getChildren().add(row("Style", style));
 
 		ChoiceGroup motion = choice("focused", "Focused", "smooth", "Smooth");
 		String activePreset = matchedMotionPreset(state);
@@ -1352,17 +1348,14 @@ public final class EditorInspectorPanel extends VBox {
 			motion.setValue(activePreset);
 		}
 		motion.onValueChange(value -> applyMotionPreset(value));
-		root.getChildren().add(row("Motion", motion));
-
-		root.getChildren().add(slider("Sway", state.cursorSway(), 0, 2, 0.01,
+		Slider sway = slider("Sway", state.cursorSway(), 0, 2, 0.01,
 				value -> String.format(java.util.Locale.ROOT, "%.2f", value),
-				value -> apply(json -> json.put("cursorSway", value))));
+				value -> apply(json -> json.put("cursorSway", value)));
 
 		ChoiceGroup effect = choice("none", "Off", "spotlight", "Spotlight", "ripple", "Ripple",
 				"echo", "Echo");
 		effect.setValue(state.cursorClickEffect().wire());
 		effect.onValueChange(value -> apply(json -> json.put("cursorClickEffect", value)));
-		root.getChildren().add(row("Click effect", effect));
 
 		GridPane colors = new GridPane();
 		colors.getStyleClass().add("editor-tiles");
@@ -1375,19 +1368,64 @@ public final class EditorInspectorPanel extends VBox {
 			swatch.setOnAction(event -> apply(json -> json.put("cursorClickEffectColor", color)));
 			colors.add(swatch, index % 4, index / 4);
 		}
-		root.getChildren().add(colors);
 
-		root.getChildren().add(slider("Effect scale", state.cursorClickEffectScale(), 0.5, 2,
-				0.01, value -> String.format(java.util.Locale.ROOT, "%.2f", value),
-				value -> apply(json -> json.put("cursorClickEffectScale", value))));
-		root.getChildren().add(slider("Effect opacity", state.cursorClickEffectOpacity(), 0, 1,
-				0.01, value -> Math.round(value * 100) + "%",
-				value -> apply(json -> json.put("cursorClickEffectOpacity", value))));
-		root.getChildren().add(slider("Effect duration", state.cursorClickEffectDurationMs(), 120,
-				1200, 10, value -> Math.round(value) + "ms",
-				value -> apply(json -> json.put("cursorClickEffectDurationMs", value))));
+		// Cursor, Motion and Click effect: the panel's three groups, each with the chevron and
+		// hover Reset affordance; the click sound block below carries its own group.
+		root.getChildren().add(group("Cursor", this::resetCursor, show, loop, row("Style", style)));
+		root.getChildren().add(group("Motion", this::resetMotion, row("Motion", motion), sway));
+		root.getChildren().add(group("Click effect", this::resetClickEffect, row("Click effect",
+				effect), colors,
+				slider("Effect scale", state.cursorClickEffectScale(), 0.5, 2,
+						0.01, value -> String.format(java.util.Locale.ROOT, "%.2f", value),
+						value -> apply(json -> json.put("cursorClickEffectScale", value))),
+				slider("Effect opacity", state.cursorClickEffectOpacity(), 0, 1,
+						0.01, value -> Math.round(value * 100) + "%",
+						value -> apply(json -> json.put("cursorClickEffectOpacity", value))),
+				slider("Effect duration", state.cursorClickEffectDurationMs(), 120,
+						1200, 10, value -> Math.round(value) + "ms",
+						value -> apply(json -> json.put("cursorClickEffectDurationMs", value)))));
 		root.getChildren().add(clickSoundBlock(state.clickSound()));
 		return root;
+	}
+
+	/** Restores the cursor switches and style; motion fields keep their own group. */
+	private void resetCursor() {
+		apply(json -> {
+			json.remove("showCursor");
+			json.remove("loopCursor");
+			json.remove("cursorStyle");
+		});
+	}
+
+	/** Restores the motion preset fields (size, smoothing, springs, bounce) and the sway. */
+	private void resetMotion() {
+		apply(json -> {
+			json.remove("cursorSway");
+			json.remove("zoomInDurationMs");
+			json.remove("zoomOutDurationMs");
+			json.remove("cursorSize");
+			json.remove("cursorSmoothing");
+			json.remove("cursorSpringStiffnessMultiplier");
+			json.remove("cursorSpringDampingMultiplier");
+			json.remove("cursorSpringMassMultiplier");
+			json.remove("cursorClickBounce");
+			json.remove("cursorClickBounceDuration");
+		});
+	}
+
+	/** Restores the click effect and its color, scale, opacity and duration. */
+	private void resetClickEffect() {
+		apply(json -> {
+			json.remove("cursorClickEffect");
+			json.remove("cursorClickEffectColor");
+			json.remove("cursorClickEffectScale");
+			json.remove("cursorClickEffectOpacity");
+			json.remove("cursorClickEffectDurationMs");
+		});
+	}
+
+	private void resetClickSound() {
+		apply(json -> json.remove("clickSound"));
 	}
 
 	/** The Keystrokes tab: the on-screen key press overlay and the typing sounds. */
@@ -1408,12 +1446,10 @@ public final class EditorInspectorPanel extends VBox {
 				? dev.gravaai.core.project.KeySoundSettings.DEFAULT : settings;
 		VBox block = new VBox(12);
 		block.getStyleClass().add("editor-keystrokes");
-		Label title = new Label("Typing sound");
-		title.getStyleClass().add("editor-section__label");
 		Switch enabled = Switch.xs("Typing sounds");
 		enabled.setChecked(sound.enabled());
 		enabled.onCheckedChange(value -> applyKeySound(json -> json.put("enabled", value)));
-		block.getChildren().addAll(title, enabled);
+		block.getChildren().addAll(heading("Typing sound", this::resetKeySound), enabled);
 
 		if (KeystrokeEvents.count(recordingPath.get()) == 0) {
 			enabled.setDisable(true);
@@ -1458,12 +1494,10 @@ public final class EditorInspectorPanel extends VBox {
 				? dev.gravaai.core.project.ClickSoundSettings.DEFAULT : settings;
 		VBox block = new VBox(12);
 		block.getStyleClass().add("editor-keystrokes");
-		Label title = new Label("Click sound");
-		title.getStyleClass().add("editor-section__label");
 		Switch enabled = Switch.xs("Click sounds");
 		enabled.setChecked(sound.enabled());
 		enabled.onCheckedChange(value -> applyClickSound(json -> json.put("enabled", value)));
-		block.getChildren().addAll(title, enabled);
+		block.getChildren().addAll(heading("Click sound", this::resetClickSound), enabled);
 
 		if (ClickEvents.count(recordingPath.get()) == 0) {
 			enabled.setDisable(true);
@@ -1508,12 +1542,10 @@ public final class EditorInspectorPanel extends VBox {
 		KeystrokeOverlaySettings overlay = settings == null ? KeystrokeOverlaySettings.DEFAULT : settings;
 		VBox block = new VBox(12);
 		block.getStyleClass().add("editor-keystrokes");
-		Label title = new Label("Key presses");
-		title.getStyleClass().add("editor-section__label");
 		Switch show = Switch.xs("Show key presses");
 		show.setChecked(overlay.enabled());
 		show.onCheckedChange(value -> applyKeystrokes(json -> json.put("enabled", value)));
-		block.getChildren().addAll(title, show);
+		block.getChildren().addAll(heading("Key presses", this::resetKeystrokes), show);
 
 		if (KeystrokeEvents.count(recordingPath.get()) == 0) {
 			Label empty = new Label("No key presses were recorded. Turn on Record key presses in"
@@ -1551,6 +1583,14 @@ public final class EditorInspectorPanel extends VBox {
 			mutation.accept(existing instanceof ObjectNode object ? object
 					: json.putObject("keystrokeOverlay"));
 		});
+	}
+
+	private void resetKeystrokes() {
+		apply(json -> json.remove("keystrokeOverlay"));
+	}
+
+	private void resetKeySound() {
+		apply(json -> json.remove("keySound"));
 	}
 
 	/** The recording whose {@code .keys.json} sidecar holds the key presses (preview media). */
@@ -1597,6 +1637,9 @@ public final class EditorInspectorPanel extends VBox {
 	private VBox webcamSection() {
 		var webcam = store.state().webcam();
 		VBox root = new VBox(14);
+		// One Camera group carries the switch, background, layout and geometry affordances;
+		// Crop and the background-effect mask stay separate groups under Advanced.
+		VBox camera = group("Camera", this::resetWebcam);
 
 		Switch enabled = Switch.xs("Enabled");
 		enabled.setChecked(webcam.enabled());
@@ -1613,7 +1656,7 @@ public final class EditorInspectorPanel extends VBox {
 		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
 		boolean split = webcam.positionPreset().isSplit();
 		// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
-		root.getChildren().addAll(split ? List.of(enabled, mirror)
+		camera.getChildren().addAll(split ? List.of(enabled, mirror)
 				: List.of(enabled, mirror, react));
 
 		// What the card does with the room: nothing, blur it, or let the wallpaper show through.
@@ -1632,7 +1675,7 @@ public final class EditorInspectorPanel extends VBox {
 		});
 		Label effectCaption = new Label("Background");
 		effectCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		root.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
+		camera.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
 
 		// Layout first: the floating bubble or split screen, each with its own position control.
 		ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");
@@ -1647,7 +1690,7 @@ public final class EditorInspectorPanel extends VBox {
 					: webcam.corner().wire()));
 			rebuild();
 		});
-		root.getChildren().add(layout);
+		camera.getChildren().add(layout);
 
 		if (split) {
 			ChoiceGroup side = choice("split-right", "Right", "split-left", "Left",
@@ -1663,13 +1706,14 @@ public final class EditorInspectorPanel extends VBox {
 			// Four chips do not fit beside a caption in the inspector width: caption above.
 			Label sideCaption = new Label("Camera side");
 			sideCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-			root.getChildren().add(new VBox(8, sideCaption, side));
+			camera.getChildren().add(new VBox(8, sideCaption, side));
 			// The camera share of the split axis: the width percent beside the content, the
 			// height percent above/below it (the compositor reads the same fields).
 			boolean stacked = webcam.positionPreset() == WebcamPositionPreset.SPLIT_TOP
 					|| webcam.positionPreset() == WebcamPositionPreset.SPLIT_BOTTOM;
 			String shareField = stacked ? "height" : "width";
-			root.getChildren().add(slider("Camera share", stacked ? webcam.height() : webcam.width(),
+			camera.getChildren().add(slider("Camera share",
+					stacked ? webcam.height() : webcam.width(),
 					10, 90, 1, value -> formatPercent(value),
 					value -> applyWebcam(json -> json.put(shareField, value))));
 		} else {
@@ -1687,15 +1731,29 @@ public final class EditorInspectorPanel extends VBox {
 					json.put("corner", value);
 				}
 			}));
-			root.getChildren().add(row("Position", position));
+			camera.getChildren().add(row("Position", position));
 
-			root.getChildren().add(slider("Size", webcam.size(), 10, 100, 1, value -> formatPercent(value),
+			camera.getChildren().add(slider("Size", webcam.size(), 10, 100, 1,
+					value -> formatPercent(value),
 					value -> applyWebcam(json -> json.put("size", value))));
-			root.getChildren().add(slider("Width", webcam.width(), 10, 100, 1, value -> formatPercent(value),
+			camera.getChildren().add(slider("Width", webcam.width(), 10, 100, 1,
+					value -> formatPercent(value),
 					value -> applyWebcam(json -> json.put("width", value))));
-			root.getChildren().add(slider("Height", webcam.height(), 10, 100, 1, value -> formatPercent(value),
+			camera.getChildren().add(slider("Height", webcam.height(), 10, 100, 1,
+					value -> formatPercent(value),
 					value -> applyWebcam(json -> json.put("height", value))));
 		}
+		camera.getChildren().add(slider("Roundness", webcam.roundness(), 0, 100, 1,
+				value -> formatPercent(value),
+				value -> applyWebcam(json -> json.put("roundness", value))));
+		camera.getChildren().add(slider("Shadow", webcam.shadow(), 0, 1, 0.01,
+				value -> Math.round(value * 100) + "%",
+				value -> applyWebcam(json -> json.put("shadow", value))));
+		camera.getChildren().add(slider(split ? "Gap" : "Margin", webcam.margin(), 0, 96, 1,
+				value -> Math.round(value) + "px",
+				value -> applyWebcam(json -> json.put("margin", value))));
+		root.getChildren().add(camera);
+
 		if (advanced) {
 			// React: the crop control sits under Webcam > Advanced with a reset action.
 			CropRegion cropRegion = webcam.cropRegion() == null ? CropRegion.DEFAULT
@@ -1747,16 +1805,26 @@ public final class EditorInspectorPanel extends VBox {
 					value -> (value > 0 ? "+" : "") + Math.round(value) + "%",
 					value -> applyWebcam(json -> json.put("maskOffset", value))));
 		}
-		root.getChildren().add(slider("Roundness", webcam.roundness(), 0, 100, 1,
-				value -> formatPercent(value),
-				value -> applyWebcam(json -> json.put("roundness", value))));
-		root.getChildren().add(slider("Shadow", webcam.shadow(), 0, 1, 0.01,
-				value -> Math.round(value * 100) + "%",
-				value -> applyWebcam(json -> json.put("shadow", value))));
-		root.getChildren().add(slider(split ? "Gap" : "Margin", webcam.margin(), 0, 96, 1,
-				value -> Math.round(value) + "px",
-				value -> applyWebcam(json -> json.put("margin", value))));
 		return root;
+	}
+
+	/**
+	 * Restores every camera setting to its default while keeping the chosen device: the
+	 * normaliser refills missing webcam fields, so removing them (sourcePath excepted) resets.
+	 */
+	private void resetWebcam() {
+		apply(json -> {
+			JsonNode node = json.get("webcam");
+			if (node instanceof ObjectNode webcamNode) {
+				List<String> fields = new ArrayList<>(webcamNode.properties().stream()
+						.map(Map.Entry::getKey).toList());
+				for (String field : fields) {
+					if (!field.equals("sourcePath")) {
+						webcamNode.remove(field);
+					}
+				}
+			}
+		});
 	}
 
 	// ---------------------------------------------------------------------
@@ -1777,26 +1845,14 @@ public final class EditorInspectorPanel extends VBox {
 			root.getChildren().add(new CaptionListPanel(store, playback));
 		}
 
-		HBox header = new HBox(12);
-		header.setAlignment(Pos.CENTER_LEFT);
-		Label generation = new Label("Generation");
-		generation.getStyleClass().add("editor-section__label");
-		Button reset = new Button("Reset", Button.Variant.GHOST, Button.Size.SM);
-		reset.getStyleClass().add("editor-section__reset");
-		reset.setOnAction(event -> {
-			// Normalisation fills a missing autoCaptionSettings with DEFAULT_AUTO_CAPTION_SETTINGS.
-			apply(json -> json.remove("autoCaptionSettings"));
-			rebuild();
-		});
-		Region headerSpacer = new Region();
-		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-		Label showLabel = new Label("Show");
-		showLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		Switch enabled = Switch.xs();
 		enabled.setChecked(settings.enabled());
 		enabled.onCheckedChange(value -> applyCaptionSettings(json -> json.put("enabled", value)));
-		header.getChildren().addAll(generation, reset, headerSpacer, showLabel, enabled);
-		root.getChildren().add(header);
+
+		// Generation and Font settings: the two groups of the captions panel, each with the
+		// chevron and hover Reset affordance.
+		VBox generation = group("Generation", this::resetGeneration);
+		generation.getChildren().add(row("Show", enabled));
 
 		var models = captionModels == null ? null : captionModels.state();
 		boolean generating = models != null && models.generating();
@@ -1807,8 +1863,6 @@ public final class EditorInspectorPanel extends VBox {
 		@Nullable String modelId = models == null ? null : models.modelId();
 		int cueCount = store.state().autoCaptions().size();
 
-		VBox controls = new VBox(12);
-		controls.setPadding(new Insets(8, 0, 8, 0));
 		if (advanced) {
 			Button custom = new Button("Use custom", Button.Variant.OUTLINE, Button.Size.MD);
 			custom.setMaxWidth(Double.MAX_VALUE);
@@ -1817,7 +1871,7 @@ public final class EditorInspectorPanel extends VBox {
 					captionModels.pickCustomModel();
 				}
 			});
-			controls.getChildren().add(custom);
+			generation.getChildren().add(custom);
 		}
 		Select language = new Select();
 		for (String[] option : CAPTION_LANGUAGES) {
@@ -1827,7 +1881,7 @@ public final class EditorInspectorPanel extends VBox {
 				: settings.language());
 		language.onValueChange(value -> applyCaptionSettings(json -> json.put("language", value)));
 		language.setPrefWidth(180);
-		controls.getChildren().add(row("Language", language));
+		generation.getChildren().add(row("Language", language));
 
 		Select animation = new Select();
 		for (AutoCaptionAnimation style : AutoCaptionAnimation.values()) {
@@ -1837,7 +1891,7 @@ public final class EditorInspectorPanel extends VBox {
 		animation.onValueChange(
 				value -> applyCaptionSettings(json -> json.put("animationStyle", value)));
 		animation.setPrefWidth(180);
-		controls.getChildren().add(row("Animation", animation));
+		generation.getChildren().add(row("Animation", animation));
 
 		VBox modelRow = new VBox(6);
 		Label modelTitle = new Label("Whisper model");
@@ -1856,7 +1910,7 @@ public final class EditorInspectorPanel extends VBox {
 			}
 		});
 		modelRow.getChildren().addAll(modelTitle, modelDescription, modelChoice);
-		controls.getChildren().add(modelRow);
+		generation.getChildren().add(modelRow);
 
 		Button modelButton;
 		if (downloading) {
@@ -1890,7 +1944,7 @@ public final class EditorInspectorPanel extends VBox {
 			rebuild();
 		});
 		VBox modelButtons = new VBox(8, modelButton, clear);
-		controls.getChildren().add(modelButtons);
+		generation.getChildren().add(modelButtons);
 
 		String generateText = generating ? "Generating..."
 				: cueCount > 0 ? "Regenerate Captions" : "Generate Captions";
@@ -1911,32 +1965,27 @@ public final class EditorInspectorPanel extends VBox {
 			indeterminate.setMaxWidth(Double.MAX_VALUE);
 			generateBox.getChildren().add(new VBox(4, status, indeterminate));
 		}
-		controls.getChildren().add(generateBox);
+		generation.getChildren().add(generateBox);
 		if (downloading) {
 			javafx.scene.control.ProgressBar download = new javafx.scene.control.ProgressBar(
 					downloadProgress / 100.0);
 			download.setMaxWidth(Double.MAX_VALUE);
-			controls.getChildren().add(download);
+			generation.getChildren().add(download);
 		}
-		root.getChildren().add(controls);
+		root.getChildren().add(generation);
 
-		VBox fonts = new VBox(12);
-		if (advanced) {
-			Switch quickAdd = Switch.xs();
-			quickAdd.setChecked(settings.timelineQuickAdd());
-			quickAdd.onCheckedChange(
-					value -> applyCaptionSettings(json -> json.put("timelineQuickAdd", value)));
-			fonts.getChildren().add(row("Hover to add on timeline", quickAdd));
-		}
-		Label fontTitle = new Label("Font Settings");
-		fontTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: -g-fg;");
-		fonts.getChildren().add(fontTitle);
+		VBox fonts = group("Font settings", this::resetCaptionFonts);
 		fonts.getChildren().add(slider("Font size", settings.fontSize(), 16, 72, 1,
 				value -> Math.round(value) + "px",
 				value -> applyCaptionSettings(json -> json.put("fontSize", value))));
 		fonts.getChildren().add(colorInput("Text color", settings.textColor(),
 				value -> applyCaptionSettings(json -> json.put("textColor", value))));
 		if (advanced) {
+			Switch quickAdd = Switch.xs();
+			quickAdd.setChecked(settings.timelineQuickAdd());
+			quickAdd.onCheckedChange(
+					value -> applyCaptionSettings(json -> json.put("timelineQuickAdd", value)));
+			fonts.getChildren().add(row("Hover to add on timeline", quickAdd));
 			fonts.getChildren().add(slider("Rows", settings.maxRows(), 1, 4, 1,
 					value -> Long.toString(Math.round(value)),
 					value -> applyCaptionSettings(json -> json.put("maxRows", Math.round(value)))));
@@ -1957,6 +2006,24 @@ public final class EditorInspectorPanel extends VBox {
 		}
 		root.getChildren().add(fonts);
 		return root;
+	}
+
+	/** Restores the generation settings; the normaliser refills the removed object. */
+	private void resetGeneration() {
+		apply(json -> json.remove("autoCaptionSettings"));
+	}
+
+	/** Restores the caption font, colour and advanced text box settings. */
+	private void resetCaptionFonts() {
+		apply(json -> {
+			JsonNode node = json.get("autoCaptionSettings");
+			if (node instanceof ObjectNode settingsNode) {
+				for (String field : List.of("fontSize", "textColor", "maxRows", "bottomOffset",
+						"maxWidth", "boxRadius", "backgroundOpacity")) {
+					settingsNode.remove(field);
+				}
+			}
+		});
 	}
 
 	private ChoiceGroup choice(String... valuesAndLabels) {
@@ -2004,15 +2071,17 @@ public final class EditorInspectorPanel extends VBox {
 				transcriptPanel.refresh();
 			}
 			VBox.setVgrow(transcriptPanel, Priority.ALWAYS);
-			root.getChildren().add(transcriptPanel);
+			root.getChildren().add(group("Transcript", null, transcriptPanel));
 			return root;
 		}
 		var cues = store.state().autoCaptions();
+		VBox transcript = group("Transcript", null);
 		if (cues.isEmpty()) {
 			Label empty = new Label("No captions yet. Generate captions to edit the transcript.");
 			empty.setWrapText(true);
 			empty.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
-			root.getChildren().add(empty);
+			transcript.getChildren().add(empty);
+			root.getChildren().add(transcript);
 			return root;
 		}
 		for (var cue : cues) {
@@ -2032,8 +2101,9 @@ public final class EditorInspectorPanel extends VBox {
 				store.setSelectedCaptionId(cue.id());
 				playback.seek(cue.startMs() / 1000.0);
 			});
-			root.getChildren().add(row);
+			transcript.getChildren().add(row);
 		}
+		root.getChildren().add(transcript);
 		return root;
 	}
 
@@ -2042,7 +2112,7 @@ public final class EditorInspectorPanel extends VBox {
 		Label empty = new Label("Open a recording to transcribe it and write notes.");
 		empty.setWrapText(true);
 		empty.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
-		root.getChildren().add(empty);
+		root.getChildren().add(group("Notes", null, empty));
 		return root;
 	}
 
@@ -2051,7 +2121,6 @@ public final class EditorInspectorPanel extends VBox {
 		Switch autoZooms = Switch.xs("Auto-apply fresh recording auto-zooms");
 		autoZooms.setChecked(actions.autoApplyFreshRecordingAutoZooms());
 		autoZooms.onCheckedChange(actions::setAutoApplyFreshRecordingAutoZooms);
-		root.getChildren().add(autoZooms);
 
 		VBox buttons = new VBox(8);
 		buttons.getChildren().addAll(
@@ -2062,13 +2131,11 @@ public final class EditorInspectorPanel extends VBox {
 				settingsButton("Add custom font", Icons.TextB, onAddCustomFont),
 				settingsButton("Caption list", Icons.ClosedCaptioning, actions::openCaptionList),
 				settingsButton("Extensions", Icons.PuzzlePiece, actions::openExtensions));
-		root.getChildren().add(buttons);
 
 		// React editor Settings -> Permissions category (Linux parts of the page).
-		Label permissionsHeading = new Label("Permissions");
-		permissionsHeading.getStyleClass().add("editor-section__label");
-		root.getChildren().addAll(permissionsHeading,
-				new dev.gravaai.ui.dashboard.RecordingPermissionsSettings());
+		root.getChildren().add(group("General", null, autoZooms, buttons));
+		root.getChildren().add(group("Permissions", null,
+				new dev.gravaai.ui.dashboard.RecordingPermissionsSettings()));
 		return root;
 	}
 
@@ -2099,21 +2166,44 @@ public final class EditorInspectorPanel extends VBox {
 		apply(json -> mutation.accept((ObjectNode) json.get("autoCaptionSettings")));
 	}
 
-	private HBox heading(String text, Runnable reset) {
+	/** A group heading row: the title, and a hover Reset when the group has defaults to restore. */
+	private HBox heading(String text, @Nullable Runnable reset) {
 		HBox row = new HBox(8);
 		row.getStyleClass().add("editor-section__heading");
 		Label label = new Label(text);
 		label.getStyleClass().add("editor-section__label");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		Button resetButton = new Button("Reset", Button.Variant.GHOST, Button.Size.SM);
-		resetButton.getStyleClass().add("editor-section__reset");
-		resetButton.setOnAction(event -> {
+		row.getChildren().addAll(label, spacer);
+		if (reset != null) {
+			Button resetButton = new Button("Reset", Button.Variant.GHOST, Button.Size.SM);
+			resetButton.getStyleClass().add("editor-section__reset");
+			resetButton.setOnAction(event -> {
+				reset.run();
+				rebuild();
+			});
+			row.getChildren().add(resetButton);
+		}
+		return row;
+	}
+
+	/**
+	 * One collapsible group: the heading row first inside a subsection box, so
+	 * {@link #groupCollapsibleSections} turns the box into a group with the chevron affordance.
+	 */
+	private VBox group(String title, @Nullable Runnable reset, Node... children) {
+		VBox box = new VBox(12);
+		box.getChildren().add(heading(title, reset));
+		box.getChildren().addAll(children);
+		return box;
+	}
+
+	/** One collapsible group whose Reset also rebuilds, so controls re-read the stored state. */
+	private VBox groupRebuilding(String title, Runnable reset, Node... children) {
+		return group(title, () -> {
 			reset.run();
 			rebuild();
-		});
-		row.getChildren().addAll(label, spacer, resetButton);
-		return row;
+		}, children);
 	}
 
 	private HBox row(String label, Node control) {

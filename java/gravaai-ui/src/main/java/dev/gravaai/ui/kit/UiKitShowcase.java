@@ -203,7 +203,7 @@ public final class UiKitShowcase {
 			chip.setMinSize(44, 32);
 			chip.setPrefSize(44, 32);
 			chip.setStyle("-fx-background-color: " + ColorMath.toHex(color)
-					+ "; -fx-background-radius: 8px; -fx-border-color: #2a303b; -fx-border-radius: 8px;");
+					+ "; -fx-background-radius: 8px; -fx-border-color: #222b33; -fx-border-radius: 8px;");
 			Label name = new Label((String) entry[0]);
 			name.getStyleClass().add("showcase-state");
 			swatches.getChildren().add(new VBox(4, chip, name));
@@ -409,9 +409,9 @@ public final class UiKitShowcase {
 	}
 
 	private static VBox colorPickers() {
-		ColorPicker accent = new ColorPicker("Accent", "#2fb3a3");
-		accent.colors("#2fb3a3", "#e5656e", "#e8b339", "#3ecf8e", "#2a303b", "#ffffff");
-		ColorPicker compact = new ColorPicker("Background", "#232833");
+		ColorPicker accent = new ColorPicker("Accent", "#2fe6d0");
+		accent.colors("#2fe6d0", "#e5656e", "#f0b429", "#3ecf8e", "#222b33", "#ffffff");
+		ColorPicker compact = new ColorPicker("Background", "#141a1f");
 		compact.compact();
 		return section("ColorPicker — color-picker.tsx (HSB area + hue slider + presets + hex)",
 				row(accent, compact));

@@ -4,8 +4,11 @@ import org.jspecify.annotations.Nullable;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -207,7 +210,26 @@ public final class EditorSnapshot {
 															} catch (IOException error) {
 																error.printStackTrace();
 															} finally {
-																done.countDown();
+																// The remaining inspector panels:
+																// show a section, settle, capture.
+																runSequence(new ArrayDeque<>(List.of(
+																		() -> view.inspector().show(
+																				EditorSidebarRail.Section.CURSOR),
+																		() -> save(scene, output
+																				.resolve("editor-cursor.png")),
+																		() -> view.inspector().show(
+																				EditorSidebarRail.Section.KEYSTROKES),
+																		() -> save(scene, output
+																				.resolve("editor-keystrokes.png")),
+																		() -> view.inspector().show(
+																				EditorSidebarRail.Section.WEBCAM),
+																		() -> save(scene, output
+																				.resolve("editor-webcam.png")),
+																		() -> view.inspector().show(
+																				EditorSidebarRail.Section.CAPTIONS),
+																		() -> save(scene, output
+																				.resolve("editor-captions.png")))),
+																		done);
 															}
 														});
 														seventh.play();
@@ -247,6 +269,34 @@ public final class EditorSnapshot {
 			}
 		});
 		settle.play();
+	}
+
+	/** Runs each step after a settle pause, in order; ends the latch after the last one. */
+	private static void runSequence(Deque<Runnable> steps, CountDownLatch done) {
+		PauseTransition pause = new PauseTransition(Duration.millis(400));
+		pause.setOnFinished(event -> {
+			Runnable step = steps.poll();
+			if (step == null) {
+				done.countDown();
+				return;
+			}
+			try {
+				step.run();
+			} catch (RuntimeException error) {
+				error.printStackTrace();
+			}
+			runSequence(steps, done);
+		});
+		pause.play();
+	}
+
+	/** {@link #write} as a runnable step (the sequence steps cannot throw checked). */
+	private static void save(Scene scene, Path target) {
+		try {
+			write(scene, target);
+		} catch (IOException error) {
+			throw new UncheckedIOException(error);
+		}
 	}
 
 	static void write(Scene scene, Path target) throws IOException {

@@ -22,66 +22,67 @@
    ========================================================================== */
 
 .root {
-	/* Base palette (src/index.css .dark). */
-	-g-bg: #121418;
-	-g-fg: #ffffff;
-	-g-surface: #1b1e25;
-	-g-surface-secondary: #232833;
-	-g-surface-tertiary: #2a303b;
-	-g-overlay: #1b1e25;
-	-g-muted: #8b929a;
-	-g-default: #232833;
-	-g-default-foreground: #ffffff;
-	-g-segment: #343b48;
-	-g-segment-foreground: #ffffff;
-	-g-field: #12151b;
-	-g-field-foreground: #ffffff;
-	-g-field-placeholder: #6b7280;
-	-g-border: #2a303b;
-	-g-separator: #2a303b;
-	-g-accent: #2fb3a3;
-	-g-accent-foreground: #0b0d10;
-	-g-accent-hover: #3fd4c1;
-	-g-accent-soft: rgba(47, 179, 163, 0.13);
-	-g-accent-soft-hover: rgba(47, 179, 163, 0.2);
-	-g-accent-soft-foreground: #3fd4c1;
+	/* Instrument palette (docs/mocks/editor-instrument.html :root), app-wide: panel #0E1317
+	   window base, #0B0F12 chrome surfaces, #171E24/#222B33 hairlines, #2FE6D0 cyan. */
+	-g-bg: #0e1317;
+	-g-fg: #e9f1f4;
+	-g-surface: #0b0f12;
+	-g-surface-secondary: #141a1f;
+	-g-surface-tertiary: #1a2127;
+	-g-overlay: #141a1f;
+	-g-muted: #8794a0;
+	-g-default: #141a1f;
+	-g-default-foreground: #e9f1f4;
+	-g-segment: #141a1f;
+	-g-segment-foreground: #e9f1f4;
+	-g-field: #0a0e11;
+	-g-field-foreground: #e9f1f4;
+	-g-field-placeholder: #5b6872;
+	-g-border: #222b33;
+	-g-separator: #171e24;
+	-g-accent: #2fe6d0;
+	-g-accent-foreground: #032522;
+	-g-accent-hover: #57f0dd;
+	-g-accent-soft: rgba(47, 230, 208, 0.1);
+	-g-accent-soft-hover: rgba(47, 230, 208, 0.16);
+	-g-accent-soft-foreground: #2fe6d0;
 	-g-success: #3ecf8e;
 	-g-success-soft: rgba(62, 207, 142, 0.13);
-	-g-warning: #e8b339;
-	-g-warning-soft: rgba(232, 179, 57, 0.15);
+	-g-warning: #f0b429;
+	-g-warning-soft: rgba(240, 180, 41, 0.14);
 	-g-danger: #e5656e;
 	-g-danger-hover: #f07880;
 	-g-danger-soft: rgba(229, 101, 110, 0.15);
 	-g-danger-foreground: #fcfcfc;
-	-g-scrollbar-thumb: #2a2f38;
+	-g-scrollbar-thumb: #222b33;
 
-	/* Derived colours (@heroui/styles variables.css dark block, color-mix resolved). */
-	-g-surface-hover: #2a2d34;
-	-g-surface-secondary-hover: #323741;
-	-g-bg-secondary: #191b1f;
-	-g-bg-tertiary: #212327;
-	-g-bg-inverse: #ffffff;
-	-g-default-hover: #2a2f3a;
-	-g-default-soft: rgba(35, 40, 51, 0.5);
-	-g-default-soft-hover: rgba(35, 40, 51, 0.6);
+	/* Derived colours (raised/hover states onto the Instrument surfaces). */
+	-g-surface-hover: #141a1f;
+	-g-surface-secondary-hover: #1a2127;
+	-g-bg-secondary: #0b0f12;
+	-g-bg-tertiary: #10151a;
+	-g-bg-inverse: #e9f1f4;
+	-g-default-hover: #1a2127;
+	-g-default-soft: rgba(20, 26, 31, 0.6);
+	-g-default-soft-hover: rgba(26, 33, 39, 0.72);
 	-g-success-hover: #5bd499;
 	-g-success-soft-hover: rgba(62, 207, 142, 0.16);
 	-g-success-soft-foreground: #82ddac;
-	-g-warning-hover: #ebbb55;
-	-g-warning-soft-hover: rgba(232, 179, 57, 0.16);
-	-g-warning-soft-foreground: #efc87b;
+	-g-warning-hover: #f2c14e;
+	-g-warning-soft-hover: rgba(240, 180, 41, 0.18);
+	-g-warning-soft-foreground: #f0b429;
 	-g-danger-soft-hover: rgba(229, 101, 110, 0.2);
 	-g-danger-soft-foreground: #f19194;
-	-g-field-hover: #16191f;
-	-g-field-focus: #12151b;
-	-g-border-secondary: #46494f;
-	-g-border-tertiary: #5f6267;
-	-g-separator-secondary: #383a41;
-	-g-separator-tertiary: #404249;
-	-g-focus: #2fb3a3;
-	-g-link: #ffffff;
+	-g-field-hover: #0c1116;
+	-g-field-focus: #0a0e11;
+	-g-border-secondary: #28323a;
+	-g-border-tertiary: #38424b;
+	-g-separator-secondary: #222b33;
+	-g-separator-tertiary: #2a343d;
+	-g-focus: #2fe6d0;
+	-g-link: #e9f1f4;
 	-g-backdrop: rgba(0, 0, 0, 0.6);
-	-g-icon-color: #ffffff;
+	-g-icon-color: #e9f1f4;
 
 	/* Radii (@heroui/styles --radius: 0.5rem; index.css does not override it). */
 	-g-radius-xs: 2px;
@@ -606,17 +607,18 @@
 }
 
 .slider__track {
-	-fx-background-color: -g-default;
-	-fx-background-radius: 12px;
-	-fx-min-height: 20px;
-	-fx-pref-height: 20px;
+	-fx-background-color: transparent;
+}
+
+/* Instrument slider: 3px rail + fill + 9px knob on one center line (layout is code-driven). */
+.slider__rail {
+	-fx-background-color: -g-surface-tertiary;
+	-fx-background-radius: 2px;
 }
 
 .slider__fill {
 	-fx-background-color: -g-accent;
-	-fx-background-radius: 12px;
-	-fx-min-height: 20px;
-	-fx-pref-height: 20px;
+	-fx-background-radius: 2px;
 }
 
 .slider__thumb {
@@ -624,24 +626,25 @@
 }
 
 .slider__thumb-pill {
-	-fx-background-color: #ffffff;
-	-fx-background-radius: 8px;
-	-fx-min-width: 24px;
-	-fx-pref-width: 24px;
-	-fx-max-width: 24px;
-	-fx-min-height: 16px;
-	-fx-pref-height: 16px;
-	-fx-max-height: 16px;
+	-fx-background-color: #e9f1f4;
+	-fx-background-radius: 999px;
+	-fx-min-width: 9px;
+	-fx-pref-width: 9px;
+	-fx-max-width: 9px;
+	-fx-min-height: 9px;
+	-fx-pref-height: 9px;
+	-fx-max-height: 9px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 3, 0.1, 0, 1);
 }
 
 .slider:disabled {
 	-fx-opacity: 0.5;
 }
 
-.slider:focused .slider__track {
+.slider:focused .slider__rail {
 	-fx-border-color: -g-focus;
-	-fx-border-width: 2px;
-	-fx-border-radius: 12px;
+	-fx-border-width: 1px;
+	-fx-border-radius: 2px;
 }
 
 .slider__label {

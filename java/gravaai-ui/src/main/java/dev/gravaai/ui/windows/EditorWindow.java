@@ -31,13 +31,13 @@ public final class EditorWindow {
 		stage.setMinHeight(600);
 
 		Label placeholder = new Label(message);
-		placeholder.setStyle("-fx-text-fill: #e6e8eb; -fx-font-size: 18px;");
+		placeholder.setStyle("-fx-text-fill: #e9f1f4; -fx-font-size: 18px;");
 		StackPane root = new StackPane(placeholder);
 		root.getStyleClass().add("gravaai-root");
-		root.setStyle("-fx-background-color: #121418;");
+		root.setStyle("-fx-background-color: #0e1317;");
 
 		Scene scene = new Scene(root, 1280, 800);
-		scene.setFill(Color.web("#121418"));
+		scene.setFill(Color.web("#0e1317"));
 		stage.setScene(scene);
 	}
 

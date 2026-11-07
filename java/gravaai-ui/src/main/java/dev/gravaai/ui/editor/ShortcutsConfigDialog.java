@@ -16,6 +16,7 @@ import dev.gravaai.ui.kit.Label;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -36,6 +37,8 @@ public final class ShortcutsConfigDialog {
 	private final Runnable onClose;
 	private final Dialog dialog;
 	private final VBox body = new VBox(16);
+	private final VBox list = new VBox(16);
+	private final ScrollPane listScroll = new ScrollPane();
 	private final Label status = new Label();
 	private final Map<Shortcuts.Action, Button> buttons = new LinkedHashMap<>();
 	private Map<Shortcuts.Action, Shortcuts.Binding> draft;
@@ -63,6 +66,13 @@ public final class ShortcutsConfigDialog {
 		status.setStyle("-fx-font-size: 11px; -fx-text-fill: -g-warning;");
 		status.setManaged(false);
 		status.setVisible(false);
+
+		// The binding list outgrows the screen: it scrolls inside the dialog instead.
+		listScroll.setContent(list);
+		listScroll.setFitToWidth(true);
+		listScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		listScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		listScroll.getStyleClass().add("shortcuts-config__list");
 
 		Button reset = new Button("Reset to defaults", Button.Variant.GHOST, Button.Size.SM);
 		reset.icon(Icons.ArrowCounterClockwise);
@@ -93,6 +103,12 @@ public final class ShortcutsConfigDialog {
 	/** Opens the dialog inside the kit root that owns {@code owner}. */
 	public void show(javafx.scene.Node owner) {
 		rebuild();
+		// Cap the list to what fits between the dialog chrome (header, description, footer,
+		// container insets) and the screen edge, so the panel never overflows the display.
+		double screen = javafx.stage.Screen.getPrimary().getVisualBounds().getHeight();
+		double viewportMax = Math.max(240, Math.min(560, screen - 380));
+		listScroll.setPrefHeight(Math.min(list.prefHeight(-1), viewportMax));
+		listScroll.setMaxHeight(viewportMax);
 		dialog.show(owner);
 	}
 
@@ -113,11 +129,11 @@ public final class ShortcutsConfigDialog {
 	}
 
 	private void rebuild() {
-		body.getChildren().clear();
+		list.getChildren().clear();
 		buttons.clear();
 
 		Label configurable = sectionTitle("Configurable");
-		body.getChildren().add(configurable);
+		list.getChildren().add(configurable);
 		for (Shortcuts.Action action : Shortcuts.Action.values()) {
 			Button binding = new Button("", Button.Variant.SECONDARY, Button.Size.SM);
 			binding.getStyleClass().add("shortcuts-config__binding");
@@ -132,15 +148,15 @@ public final class ShortcutsConfigDialog {
 			row.setAlignment(Pos.CENTER_LEFT);
 			row.setPadding(new Insets(8, 0, 8, 0));
 			row.setStyle("-fx-border-color: transparent transparent rgba(255,255,255,0.06) transparent;");
-			body.getChildren().add(row);
+			list.getChildren().add(row);
 
 			if (conflictFor == action && conflict instanceof Shortcuts.ConfigurableConflict other) {
-				body.getChildren().add(conflictRow(other.action()));
+				list.getChildren().add(conflictRow(other.action()));
 			}
 			refreshBindingButton(action);
 		}
 
-		body.getChildren().add(sectionTitle("Fixed"));
+		list.getChildren().add(sectionTitle("Fixed"));
 		for (Shortcuts.FixedShortcut fixed : Shortcuts.FIXED_SHORTCUTS) {
 			Label keys = new Label(fixed.display());
 			keys.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.8); "
@@ -149,9 +165,9 @@ public final class ShortcutsConfigDialog {
 			HBox row = new HBox(12, new Label(fixed.label()), spacer(), keys);
 			row.setAlignment(Pos.CENTER_LEFT);
 			row.setPadding(new Insets(6, 0, 6, 0));
-			body.getChildren().add(row);
+			list.getChildren().add(row);
 		}
-		body.getChildren().add(status);
+		body.getChildren().setAll(listScroll, status);
 	}
 
 	private void refreshBindingButton(Shortcuts.Action action) {

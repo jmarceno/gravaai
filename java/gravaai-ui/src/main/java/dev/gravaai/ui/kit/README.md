@@ -137,28 +137,28 @@ hex/rgba because JavaFX CSS has neither.
 
 | Token | Value | Source |
 |---|---|---|
-| `-g-bg` | #121418 | `--background` |
-| `-g-fg` | #ffffff | `--foreground` |
-| `-g-surface` | #1b1e25 | `--surface` |
-| `-g-surface-secondary` | #232833 | `--surface-secondary` |
-| `-g-surface-tertiary` | #2a303b | `--surface-tertiary` |
-| `-g-surface-hover` | #2a2d34 | mix(surface 92 %, fg 8 %, oklab) |
-| `-g-overlay` | #1b1e25 | `--overlay` |
-| `-g-default` / `-g-default-hover` | #232833 / #2a2f3a | `--default` / mix 96/4 |
-| `-g-segment` | #343b48 | `--segment` |
-| `-g-field` / `-g-field-hover` | #12151b / #16191f | `--field-background` |
-| `-g-field-placeholder` | #6b7280 | `--field-placeholder` |
-| `-g-border` / `-g-separator` | #2a303b | `--border` / `--separator` |
-| `-g-accent` / `-g-accent-hover` | #2fb3a3 / #3fd4c1 | `--accent` / `--accent-hover` |
-| `-g-accent-soft` | rgba(47,179,163,.13) | `--accent-soft` (13 %) |
-| `-g-accent-soft-foreground` | #3fd4c1 | `--accent-soft-foreground` |
-| `-g-success` / `-g-warning` / `-g-danger` | #3ecf8e / #e8b339 / #e5656e | status colours |
-| `-g-success-soft` / `-g-warning-soft` / `-g-danger-soft` | rgba(...,.13/.15/.15) | soft variants |
-| `-g-muted` | #8b929a | `--muted` |
-| `-g-focus` | #2fb3a3 | `--focus: var(--accent)` |
-| `-g-backdrop` | rgba(0,0,0,.6) | `--backdrop` (dark) |
-| `-g-scrollbar-thumb` | #2a2f38 | `--scrollbar-thumb` |
-| `-g-icon-color` | #ffffff | **JavaFX-only**: maps SVG `currentColor` |
+| `-g-bg` | #0e1317 | Instrument `--bg` (docs/mocks/editor-instrument.html) |
+| `-g-fg` | #e9f1f4 | Instrument `--fg` |
+| `-g-surface` | #0b0f12 | Instrument `--surface` |
+| `-g-surface-secondary` | #141a1f | Instrument `--raise` |
+| `-g-surface-tertiary` | #1a2127 | Instrument `--raise-strong` |
+| `-g-surface-hover` | #141a1f | raised hover |
+| `-g-overlay` | #141a1f | Instrument `--raise` |
+| `-g-default` / `-g-default-hover` | #0a0e11 / #141a1f | Instrument `--default` / raised |
+| `-g-segment` | #141a1f | Instrument `--raise` |
+| `-g-field` / `-g-field-hover` | #0a0e11 / #0c1116 | Instrument field surfaces |
+| `-g-field-placeholder` | #5b6872 | Instrument `--faint` |
+| `-g-border` / `-g-separator` | #222b33 / #171e24 | Instrument `--hairline-strong` / `--hairline` |
+| `-g-accent` / `-g-accent-hover` | #2fe6d0 / #57f0dd | Instrument `--accent` |
+| `-g-accent-soft` | rgba(47,230,208,.1) | Instrument `--accent-soft` (10 %) |
+| `-g-accent-soft-foreground` | #2fe6d0 | Instrument `--accent` |
+| `-g-success` / `-g-warning` / `-g-danger` | #3ecf8e / #f0b429 / #e5656e | status colours; warning = Instrument `--amber` |
+| `-g-success-soft` / `-g-warning-soft` / `-g-danger-soft` | rgba(...,.13/.14/.15) | soft variants |
+| `-g-muted` | #8794a0 | Instrument `--muted` |
+| `-g-focus` | #2fe6d0 | Instrument `--accent` |
+| `-g-backdrop` | rgba(0,0,0,.6) | backdrop (unchanged) |
+| `-g-scrollbar-thumb` | #222b33 | Instrument `--hairline-strong` |
+| `-g-icon-color` | #e9f1f4 | **JavaFX-only**: maps SVG `currentColor` |
 
 Launch/source-selector aliases are ported as `-g-launch-*` and the `.source-selector-*` classes
 (`launchTheme.css`, `SourceSelector.css`, `MarqueeText.css`).

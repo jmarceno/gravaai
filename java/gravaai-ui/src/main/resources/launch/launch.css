@@ -336,11 +336,11 @@
 /* Native HUD tooltips (HudBar.tooltip): kit tooltip look. */
 .tooltip.hud-tooltip {
 	/* Literal colours: the tooltip popup does not see the scene .root tokens. */
-	-fx-background-color: #1b1e25;
-	-fx-border-color: #2a303b;
+	-fx-background-color: #141a1f;
+	-fx-border-color: #222b33;
 	-fx-border-radius: 8px;
 	-fx-background-radius: 8px;
-	-fx-text-fill: #ffffff;
+	-fx-text-fill: #e9f1f4;
 	-fx-font-size: 12px;
 	-fx-padding: 6px 10px 6px 10px;
 }

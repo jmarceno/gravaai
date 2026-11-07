@@ -71,26 +71,26 @@ public final class AnnotationSettingsPanel extends VBox {
 
 	private final EditorStore store;
 	private final EditorViewActions actions;
-	private final VBox content = new VBox(18);
 
 	public AnnotationSettingsPanel(EditorStore store, EditorViewActions actions) {
 		this.store = store;
 		this.actions = actions == null ? new EditorViewActions() { } : actions;
-		setSpacing(12);
+		// Flat root: the inspector's grouping walks these children, so every section's heading
+		// row becomes a collapsible group with the chevron affordance.
+		setSpacing(18);
 		setFillWidth(true);
-		getChildren().add(content);
 		refresh();
 	}
 
 	/** Rebuilds the controls for the selected annotation (or the empty state). */
 	public void refresh() {
-		content.getChildren().clear();
+		getChildren().clear();
 		AnnotationRegion region = selected();
 		if (region == null) {
 			Label empty = new Label("Select an annotation to edit its style.");
 			empty.setWrapText(true);
 			empty.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
-			content.getChildren().add(empty);
+			getChildren().add(empty);
 			return;
 		}
 
@@ -99,21 +99,21 @@ public final class AnnotationSettingsPanel extends VBox {
 			Label multi = new Label(multiIds.size() + " annotations selected — edits apply to all.");
 			multi.setWrapText(true);
 			multi.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-			content.getChildren().add(multi);
+			getChildren().add(multi);
 		}
-		content.getChildren().add(typeSection(region));
+		getChildren().add(typeSection(region));
 		if (region.type() != AnnotationType.LOUPE) {
 			// The loupe follows the cursor, so it has no position and its diameter lives in the
 			// loupe section instead of the generic size sliders.
-			content.getChildren().add(positionSection(region));
-			content.getChildren().add(sizeSection(region));
+			getChildren().add(positionSection(region));
+			getChildren().add(sizeSection(region));
 		}
 		switch (region.type()) {
-			case TEXT -> content.getChildren().add(textSection(region));
-			case FIGURE -> content.getChildren().add(figureSection(region));
-			case BLUR -> content.getChildren().add(blurSection(region));
-			case IMAGE -> content.getChildren().add(imageSection(region));
-			case LOUPE -> content.getChildren().add(loupeSection(region));
+			case TEXT -> getChildren().add(textSection(region));
+			case FIGURE -> getChildren().add(figureSection(region));
+			case BLUR -> getChildren().add(blurSection(region));
+			case IMAGE -> getChildren().add(imageSection(region));
+			case LOUPE -> getChildren().add(loupeSection(region));
 		}
 	}
 
@@ -132,7 +132,7 @@ public final class AnnotationSettingsPanel extends VBox {
 			applyForSelection(id -> new AnnotationCommands.ChangeType(id, type));
 			refresh();
 		});
-		return new VBox(8, sectionLabel("Annotation"), tabs);
+		return new VBox(8, sectionHeading("Annotation"), tabs);
 	}
 
 	private Node positionSection(AnnotationRegion region) {
@@ -157,7 +157,7 @@ public final class AnnotationSettingsPanel extends VBox {
 					id, new AnnotationPosition(preset.x(), preset.y()))));
 			grid.add(button, index % 3, index / 3);
 		}
-		return new VBox(8, sectionLabel("Position"), grid);
+		return new VBox(8, sectionHeading("Position"), grid);
 	}
 
 	private Node sizeSection(AnnotationRegion region) {
@@ -171,7 +171,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		height.setValue(region.size().height());
 		height.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.ChangeSize(id,
 				new AnnotationSize(region.size().width(), value))));
-		return new VBox(8, sectionLabel("Size"), width, height);
+		return new VBox(8, sectionHeading("Size"), width, height);
 	}
 
 	private Node textSection(AnnotationRegion region) {
@@ -224,7 +224,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		radius.onValueCommit(value -> applyStyle(region,
 				new StylePatch(null, null, null, null, null, null, null, null, value)));
 
-		box.getChildren().addAll(header("Text"), text, row("Font", font), fontSize, row("Weight", weight),
+		box.getChildren().addAll(sectionHeading("Text"), text, row("Font", font), fontSize, row("Weight", weight),
 				textColor.node(), background.node(), radius);
 		return box;
 	}
@@ -251,7 +251,7 @@ public final class AnnotationSettingsPanel extends VBox {
 						new FigureData(direction(arrowDirectionValue(figure)), value,
 								figure.strokeWidth()))));
 
-		return new VBox(10, header("Figure"), row("Arrow", arrow), stroke, color.node());
+		return new VBox(10, sectionHeading("Figure"), row("Arrow", arrow), stroke, color.node());
 	}
 
 	private Node blurSection(AnnotationRegion region) {
@@ -265,7 +265,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		LazyColorField color = colorField("Blur color",
 				region.blurColor() == null ? "#000000" : region.blurColor(),
 				value -> applyForSelection(id -> new AnnotationCommands.SetBlurColor(id, value)));
-		return new VBox(10, header("Blur"), strength, color.node());
+		return new VBox(10, sectionHeading("Blur"), strength, color.node());
 	}
 
 	private Node loupeSection(AnnotationRegion region) {
@@ -284,7 +284,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		Label note = new Label("The lens follows the cursor while the region is active.");
 		note.setWrapText(true);
 		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		return new VBox(10, header("Loupe"), magnification, size, note);
+		return new VBox(10, sectionHeading("Loupe"), magnification, size, note);
 	}
 
 	private @Nullable Node imageSection(AnnotationRegion region) {
@@ -293,7 +293,7 @@ public final class AnnotationSettingsPanel extends VBox {
 						+ "content is shown in the preview.");
 		note.setWrapText(true);
 		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		return new VBox(10, header("Image"), note);
+		return new VBox(10, sectionHeading("Image"), note);
 	}
 
 	// ---- helpers --------------------------------------------------------
@@ -399,19 +399,18 @@ public final class AnnotationSettingsPanel extends VBox {
 		return new LazyColorField(new VBox(6, row, input));
 	}
 
-	private static HBox header(String title) {
-		Label label = new Label(title);
-		label.setStyle("-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: -g-fg;");
-		HBox row = new HBox(label);
-		row.setAlignment(Pos.CENTER_LEFT);
-		row.setPadding(new Insets(4, 0, 0, 0));
-		return row;
-	}
-
-	private static Label sectionLabel(String text) {
+	/**
+	 * A group heading row in the {@code editor-section__heading} shape the inspector's grouping
+	 * turns into a collapsible group with the chevron affordance.
+	 */
+	private static HBox sectionHeading(String text) {
 		Label label = new Label(text);
-		label.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -g-muted;");
-		return label;
+		label.getStyleClass().add("editor-section__label");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox heading = new HBox(8, label, spacer);
+		heading.getStyleClass().add("editor-section__heading");
+		return heading;
 	}
 
 	private static HBox row(String label, Node control) {

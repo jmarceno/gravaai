@@ -10,6 +10,7 @@ import dev.gravaai.ui.kit.Popover;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -67,8 +68,11 @@ public final class KeyboardShortcutsHelp {
 		header.setAlignment(Pos.CENTER_LEFT);
 		content.getChildren().add(header);
 
+		// Every binding at once is taller than short screens: the list scrolls inside the
+		// popover instead of overflowing it.
+		VBox rows = new VBox(8);
 		for (Shortcuts.Action action : Shortcuts.Action.values()) {
-			content.getChildren().add(row(Shortcuts.label(action),
+			rows.getChildren().add(row(Shortcuts.label(action),
 					Shortcuts.formatBinding(shortcuts.getOrDefault(action,
 							Shortcuts.defaults().get(action)), isMac)));
 		}
@@ -77,12 +81,20 @@ public final class KeyboardShortcutsHelp {
 		divider.setMinHeight(1);
 		divider.setPrefHeight(1);
 		divider.setStyle("-fx-background-color: rgba(255,255,255,0.06);");
-		content.getChildren().add(divider);
-		content.getChildren().addAll(
+		rows.getChildren().add(divider);
+		rows.getChildren().addAll(
 				row("Save Project", isMac ? "⌘ S" : "Ctrl + S"),
 				row("Pan Timeline", "Shift + Scroll"),
 				row("Zoom Timeline", "Ctrl + Scroll"),
 				row("Cycle Annotations", "Tab"));
+
+		ScrollPane scroll = new ScrollPane(rows);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		scroll.getStyleClass().add("shortcuts-help__list");
+		scroll.setMaxHeight(420);
+		content.getChildren().add(scroll);
 	}
 
 	private HBox row(String label, String keys) {
@@ -108,7 +120,7 @@ public final class KeyboardShortcutsHelp {
 	/** Icon colour helper kept for screens that mount the trigger in a dark bar. */
 	public static Icon helpIcon() {
 		Icon icon = Icon.of(Icons.Keyboard, 16);
-		icon.setIconColor(Color.web("#8b929a"));
+		icon.setIconColor(Color.web("#8794a0"));
 		return icon;
 	}
 }

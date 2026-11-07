@@ -322,10 +322,18 @@ final class ElementSettingsPanel extends VBox {
 
 	// ---- helpers -------------------------------------------------------------------------------
 
-	private static Label header(String text) {
-		Label label = new Label(text.toUpperCase(Locale.ROOT));
-		label.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: -g-muted;");
-		return label;
+	/**
+	 * A group heading row in the {@code editor-section__heading} shape the inspector's grouping
+	 * turns into a collapsible group with the chevron affordance.
+	 */
+	private static HBox header(String text) {
+		Label label = new Label(text);
+		label.getStyleClass().add("editor-section__label");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox heading = new HBox(8, label, spacer);
+		heading.getStyleClass().add("editor-section__heading");
+		return heading;
 	}
 
 	private static Label muted(String text) {

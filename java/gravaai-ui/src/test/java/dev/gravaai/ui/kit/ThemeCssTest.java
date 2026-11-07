@@ -63,13 +63,13 @@ class ThemeCssTest {
 		}
 	}
 
-	@DisplayName("the DM Sans family and the resolved dark palette are wired")
+	@DisplayName("the DM Sans family and the Instrument palette are wired")
 	@Test
 	void baseRules() throws IOException {
 		String css = stylesheet();
 		assertTrue(css.contains("-fx-font-family: \"DM Sans\";"));
-		assertTrue(css.contains("-g-bg: #121418;"));
-		assertTrue(css.contains("-g-accent: #2fb3a3;"));
+		assertTrue(css.contains("-g-bg: #0e1317;"));
+		assertTrue(css.contains("-g-accent: #2fe6d0;"));
 		assertTrue(css.contains("-g-danger: #e5656e;"));
 	}
 

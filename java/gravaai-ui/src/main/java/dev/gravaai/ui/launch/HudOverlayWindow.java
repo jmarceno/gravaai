@@ -283,7 +283,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		KitRoot kitRoot = new KitRoot(root);
 		kitRoot.getStyleClass().add("hud-kit-root");
 		Scene scene = new Scene(kitRoot);
-		scene.setFill(Color.web("#1b1e25"));
+		scene.setFill(Color.web("#0e1317"));
 		installStyles(scene);
 		stage.setTitle("Gravaai HUD");
 		stage.setScene(scene);

@@ -17,6 +17,7 @@ import dev.gravaai.ui.kit.Label;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -28,22 +29,22 @@ import javafx.scene.layout.VBox;
 public final class ZoomSettingsPanel extends VBox {
 
 	private final EditorStore store;
-	private final VBox content = new VBox(14);
 	private @Nullable ChoiceGroup modeGroup;
 	private @Nullable ChoiceGroup amountGroup;
 	private @Nullable Button deleteButton;
 
 	public ZoomSettingsPanel(EditorStore store) {
 		this.store = store;
-		setSpacing(12);
+		// Flat root: the inspector's grouping walks these children, so the Mode and Amount
+		// heading rows become the collapsible groups with the chevron and hover Reset.
+		setSpacing(14);
 		setFillWidth(true);
-		getChildren().add(content);
 		refresh();
 	}
 
 	/** Rebuilds the controls for the selected zoom (or the empty state). */
 	public void refresh() {
-		content.getChildren().clear();
+		getChildren().clear();
 		modeGroup = null;
 		amountGroup = null;
 		deleteButton = null;
@@ -53,20 +54,22 @@ public final class ZoomSettingsPanel extends VBox {
 			Label empty = new Label("Select a zoom region to edit its amount.");
 			empty.setWrapText(true);
 			empty.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
-			content.getChildren().add(empty);
+			getChildren().add(empty);
 			return;
 		}
 		if (multiIds.size() > 1) {
 			Label multi = new Label(multiIds.size() + " zooms selected — edits apply to all.");
 			multi.setWrapText(true);
 			multi.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-			content.getChildren().add(multi);
+			getChildren().add(multi);
 		}
 
 		ZoomMode mode = region.mode() == null ? ZoomMode.AUTO : region.mode();
 		ZoomDepth depth = region.depth() == null ? ZoomDepth.DEFAULT : region.depth();
 
-		Label modeLabel = sectionLabel("Mode");
+		HBox modeHeading = sectionHeading("Mode", () -> applyToSelection(
+				id -> new ZoomCommands.ChangeMode(id, ZoomMode.AUTO),
+				new ZoomCommands.ChangeMode(ZoomMode.AUTO)));
 		modeGroup = new ChoiceGroup();
 		modeGroup.item(ZoomMode.AUTO.wire(), "Auto");
 		modeGroup.item(ZoomMode.MANUAL.wire(), "Manual");
@@ -79,7 +82,9 @@ public final class ZoomSettingsPanel extends VBox {
 		modeHint.setWrapText(true);
 		modeHint.setStyle("-fx-font-size: 11px; -fx-text-fill: -g-muted;");
 
-		Label amountLabel = sectionLabel("Amount");
+		HBox amountHeading = sectionHeading("Amount", () -> applyToSelection(
+				id -> new ZoomCommands.ChangeDepth(id, ZoomDepth.DEFAULT),
+				new ZoomCommands.ChangeDepth(ZoomDepth.DEFAULT)));
 		amountGroup = new ChoiceGroup();
 		for (ZoomDepth option : ZoomDepth.values()) {
 			amountGroup.item(Integer.toString(option.wire()),
@@ -99,7 +104,7 @@ public final class ZoomSettingsPanel extends VBox {
 		deleteButton.setOnAction(event -> applyToSelection(ZoomCommands.Delete::new,
 				new ZoomCommands.Delete(region.id())));
 
-		content.getChildren().addAll(modeLabel, modeGroup, modeHint, amountLabel, amountGroup,
+		getChildren().addAll(modeHeading, modeGroup, modeHint, amountHeading, amountGroup,
 				spacer(), deleteButton);
 	}
 
@@ -166,10 +171,21 @@ public final class ZoomSettingsPanel extends VBox {
 		return null;
 	}
 
-	private static Label sectionLabel(String text) {
+	/**
+	 * A group heading row: the title and a hover Reset, in the {@code editor-section__heading}
+	 * shape the inspector's grouping turns into a collapsible group.
+	 */
+	private static HBox sectionHeading(String text, Runnable reset) {
 		Label label = new Label(text);
-		label.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -g-muted;");
-		return label;
+		label.getStyleClass().add("editor-section__label");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+		Button resetButton = new Button("Reset", Button.Variant.GHOST, Button.Size.SM);
+		resetButton.getStyleClass().add("editor-section__reset");
+		resetButton.setOnAction(event -> reset.run());
+		HBox heading = new HBox(8, label, spacer, resetButton);
+		heading.getStyleClass().add("editor-section__heading");
+		return heading;
 	}
 
 	private static Region spacer() {

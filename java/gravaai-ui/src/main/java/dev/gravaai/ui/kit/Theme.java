@@ -5,7 +5,8 @@ import javafx.scene.Scene;
 import javafx.scene.paint.Color;
 
 /**
- * The Gravaai dark theme (plan §5.12), the same palette as the React app's only theme.
+ * The Gravaai theme — the Instrument palette (docs/mocks/editor-instrument.html :root),
+ * app-wide since the editor redesign. Same values as kit/gravaai.css.
  *
  * <p>Colours live in {@code resources/kit/gravaai.css} as looked-up colours so CSS can use them;
  * these constants are the programmatic mirror for nodes that paint from code (canvas, gradients,
@@ -13,57 +14,58 @@ import javafx.scene.paint.Color;
  */
 public final class Theme {
 
-	/** {@code src/index.css} {@code .dark} — base palette. */
-	public static final Color BG = Color.web("#121418");
-	public static final Color FG = Color.web("#ffffff");
-	public static final Color SURFACE = Color.web("#1b1e25");
-	public static final Color SURFACE_SECONDARY = Color.web("#232833");
-	public static final Color SURFACE_TERTIARY = Color.web("#2a303b");
-	public static final Color OVERLAY = Color.web("#1b1e25");
-	public static final Color MUTED = Color.web("#8b929a");
-	public static final Color DEFAULT = Color.web("#232833");
-	public static final Color DEFAULT_FOREGROUND = Color.web("#ffffff");
-	public static final Color SEGMENT = Color.web("#343b48");
-	public static final Color SEGMENT_FOREGROUND = Color.web("#ffffff");
-	public static final Color FIELD = Color.web("#12151b");
-	public static final Color FIELD_FOREGROUND = Color.web("#ffffff");
-	public static final Color FIELD_PLACEHOLDER = Color.web("#6b7280");
-	public static final Color BORDER = Color.web("#2a303b");
-	public static final Color SEPARATOR = Color.web("#2a303b");
-	public static final Color ACCENT = Color.web("#2fb3a3");
-	public static final Color ACCENT_FOREGROUND = Color.web("#0b0d10");
-	public static final Color ACCENT_HOVER = Color.web("#3fd4c1");
-	public static final Color ACCENT_SOFT = Color.web("#2fb3a3", 0.13);
-	public static final Color ACCENT_SOFT_HOVER = Color.web("#2fb3a3", 0.2);
-	public static final Color ACCENT_SOFT_FOREGROUND = Color.web("#3fd4c1");
+	/** Instrument palette — panel base, chrome surfaces, hairlines, cyan. */
+	public static final Color BG = Color.web("#0e1317");
+	public static final Color FG = Color.web("#e9f1f4");
+	public static final Color SURFACE = Color.web("#0b0f12");
+	public static final Color SURFACE_SECONDARY = Color.web("#141a1f");
+	public static final Color SURFACE_TERTIARY = Color.web("#1a2127");
+	public static final Color OVERLAY = Color.web("#141a1f");
+	public static final Color MUTED = Color.web("#8794a0");
+	public static final Color FAINT = Color.web("#5b6872");
+	public static final Color DEFAULT = Color.web("#141a1f");
+	public static final Color DEFAULT_FOREGROUND = Color.web("#e9f1f4");
+	public static final Color SEGMENT = Color.web("#141a1f");
+	public static final Color SEGMENT_FOREGROUND = Color.web("#e9f1f4");
+	public static final Color FIELD = Color.web("#0a0e11");
+	public static final Color FIELD_FOREGROUND = Color.web("#e9f1f4");
+	public static final Color FIELD_PLACEHOLDER = Color.web("#5b6872");
+	public static final Color BORDER = Color.web("#222b33");
+	public static final Color SEPARATOR = Color.web("#171e24");
+	public static final Color ACCENT = Color.web("#2fe6d0");
+	public static final Color ACCENT_FOREGROUND = Color.web("#032522");
+	public static final Color ACCENT_HOVER = Color.web("#57f0dd");
+	public static final Color ACCENT_SOFT = Color.web("#2fe6d0", 0.1);
+	public static final Color ACCENT_SOFT_HOVER = Color.web("#2fe6d0", 0.16);
+	public static final Color ACCENT_SOFT_FOREGROUND = Color.web("#2fe6d0");
 	public static final Color SUCCESS = Color.web("#3ecf8e");
 	public static final Color SUCCESS_SOFT = Color.web("#3ecf8e", 0.13);
 	public static final Color SUCCESS_SOFT_FOREGROUND = Color.web("#82ddac");
-	public static final Color WARNING = Color.web("#e8b339");
-	public static final Color WARNING_SOFT = Color.web("#e8b339", 0.15);
-	public static final Color WARNING_SOFT_FOREGROUND = Color.web("#efc87b");
+	public static final Color WARNING = Color.web("#f0b429");
+	public static final Color WARNING_SOFT = Color.web("#f0b429", 0.14);
+	public static final Color WARNING_SOFT_FOREGROUND = Color.web("#f0b429");
 	public static final Color DANGER = Color.web("#e5656e");
 	public static final Color DANGER_HOVER = Color.web("#f07880");
 	public static final Color DANGER_SOFT = Color.web("#e5656e", 0.15);
 	public static final Color DANGER_SOFT_FOREGROUND = Color.web("#f19194");
 	public static final Color DANGER_FOREGROUND = Color.web("#fcfcfc");
-	public static final Color FOCUS = Color.web("#2fb3a3");
+	public static final Color FOCUS = Color.web("#2fe6d0");
 	public static final Color BACKDROP = Color.web("#000000", 0.6);
-	public static final Color SCROLLBAR_THUMB = Color.web("#2a2f38");
+	public static final Color SCROLLBAR_THUMB = Color.web("#222b33");
 
-	/** Derived colours (@heroui/styles variables.css dark block, color-mix resolved). */
-	public static final Color SURFACE_HOVER = Color.web("#2a2d34");
-	public static final Color SURFACE_SECONDARY_HOVER = Color.web("#323741");
-	public static final Color BG_SECONDARY = Color.web("#191b1f");
-	public static final Color BG_TERTIARY = Color.web("#212327");
-	public static final Color DEFAULT_HOVER = Color.web("#2a2f3a");
-	public static final Color FIELD_HOVER = Color.web("#16191f");
-	public static final Color SEPARATOR_SECONDARY = Color.web("#383a41");
-	public static final Color SEPARATOR_TERTIARY = Color.web("#404249");
-	public static final Color BORDER_SECONDARY = Color.web("#46494f");
-	public static final Color BORDER_TERTIARY = Color.web("#5f6267");
+	/** Derived colours — raised/hover states onto the Instrument surfaces. */
+	public static final Color SURFACE_HOVER = Color.web("#141a1f");
+	public static final Color SURFACE_SECONDARY_HOVER = Color.web("#1a2127");
+	public static final Color BG_SECONDARY = Color.web("#0b0f12");
+	public static final Color BG_TERTIARY = Color.web("#10151a");
+	public static final Color DEFAULT_HOVER = Color.web("#1a2127");
+	public static final Color FIELD_HOVER = Color.web("#0c1116");
+	public static final Color SEPARATOR_SECONDARY = Color.web("#222b33");
+	public static final Color SEPARATOR_TERTIARY = Color.web("#2a343d");
+	public static final Color BORDER_SECONDARY = Color.web("#28323a");
+	public static final Color BORDER_TERTIARY = Color.web("#38424b");
 
-	/** Radius scale: @heroui/styles {@code --radius: 0.5rem}. */
+	/** Radius scale: the Instrument 2–4px radii plus the kit's larger dialog radii. */
 	public static final double RADIUS_XS = 2;
 	public static final double RADIUS_SM = 4;
 	public static final double RADIUS_MD = 6;

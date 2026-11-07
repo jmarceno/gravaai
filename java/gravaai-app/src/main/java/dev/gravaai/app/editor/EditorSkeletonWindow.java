@@ -64,15 +64,15 @@ public final class EditorSkeletonWindow {
 		poster.setVisible(false);
 
 		Label opening = new Label("Opening " + projectName + "…");
-		opening.setTextFill(Color.web("#8b929a"));
+		opening.setTextFill(Color.web("#8794a0"));
 		opening.setPadding(new Insets(24));
 		StackPane root = new StackPane(poster, opening);
 		StackPane.setAlignment(opening, Pos.BOTTOM_CENTER);
-		root.setStyle("-fx-background-color: #0b0d10;");
+		root.setStyle("-fx-background-color: #0b0f12;");
 		poster.fitWidthProperty().bind(root.widthProperty());
 		poster.fitHeightProperty().bind(root.heightProperty());
 
-		Scene scene = new Scene(root, 1440, 900, Color.web("#0b0d10"));
+		Scene scene = new Scene(root, 1440, 900, Color.web("#0b0f12"));
 		stage.setTitle("Gravaai - " + projectName);
 		stage.setScene(scene);
 		EditorSkeletonWindow window = new EditorSkeletonWindow(stage, poster, opening, ownsStage);

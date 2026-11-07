@@ -143,15 +143,24 @@ public final class Tray implements AutoCloseable {
 	 */
 	private void subscribeWatcherRestarts(DBusConnection connection) throws DBusException {
 		DBusSigHandler<DBus.NameOwnerChanged> handler = signal -> {
-			if (!installed || signal.newOwner == null || signal.newOwner.isEmpty()) {
+			if (!installed) {
 				return;
 			}
 			if (!WATCHER_SERVICE.equals(signal.name) && !COSMIC_WATCHER_SERVICE.equals(signal.name)) {
 				return;
 			}
+			String newOwner = signal.newOwner == null ? "" : signal.newOwner;
+			if (newOwner.isEmpty()) {
+				// The watcher went away. Forget the dedupe key: where the watcher lives in the
+				// desktop process itself (GNOME's appindicator extension runs inside
+				// gnome-shell), disabling and re-enabling it brings the name back under the
+				// same unique name, and a surviving key would skip the re-registration.
+				registeredOwner = "";
+				return;
+			}
 			// COSMIC's watcher owns both names, so one restart reports two owner changes. The
 			// unique name identifies the process: register once per new owner.
-			if (signal.newOwner.equals(registeredOwner)) {
+			if (newOwner.equals(registeredOwner)) {
 				return;
 			}
 			String service = watcherService(bus);
@@ -160,7 +169,7 @@ public final class Tray implements AutoCloseable {
 			}
 			try {
 				register(connection, service);
-				registeredOwner = signal.newOwner;
+				registeredOwner = newOwner;
 				LOG.log(System.Logger.Level.INFO, "tray re-registered with " + service);
 			} catch (DBusException | RuntimeException error) {
 				LOG.log(System.Logger.Level.WARNING, "tray re-registration failed: " + error);

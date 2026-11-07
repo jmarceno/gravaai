@@ -37,6 +37,7 @@ public final class ProjectDocument {
 			"zoomClassicMode", "cursorMotionBlur", "cursorClickBounce", "cursorClickBounceDuration",
 			"cursorSway", "borderRadius", "padding", "cropRegion", "zoomRegions", "trimRegions",
 			"clipRegions", "autoFullTrackClipId", "autoFullTrackClipEndMs", "speedRegions",
+			"gradeRegions",
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "clickSound", "keySound", "aspectRatio", "sourceAudioTrackSettingsByClip",
 			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments",
@@ -180,6 +181,10 @@ public final class ProjectDocument {
 			editor.put("autoFullTrackClipEndMs", state.autoFullTrackClipEndMs());
 		}
 		editor.set("speedRegions", writeSpeedRegions(state.speedRegions()));
+		// Only projects that use the Color track carry its key (older files round-trip as-is).
+		if (!state.gradeRegions().isEmpty()) {
+			editor.set("gradeRegions", writeGradeRegions(state.gradeRegions()));
+		}
 		editor.set("annotationRegions", writeAnnotationRegions(state.annotationRegions()));
 		editor.set("audioRegions", writeAudioRegions(state.audioRegions()));
 		editor.set("autoCaptions", writeAutoCaptions(state.autoCaptions()));
@@ -307,6 +312,23 @@ public final class ProjectDocument {
 			node.put("startMs", region.startMs());
 			node.put("endMs", region.endMs());
 			node.put("speed", region.speed());
+			array.add(node);
+		}
+		return array;
+	}
+
+	public static ArrayNode writeGradeRegions(List<GradeRegion> regions) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (GradeRegion region : regions == null ? List.<GradeRegion>of() : regions) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("id", region.id());
+			node.put("startMs", region.startMs());
+			node.put("endMs", region.endMs());
+			node.put("brightness", region.brightness());
+			node.put("contrast", region.contrast());
+			node.put("saturation", region.saturation());
+			node.put("temperature", region.temperature());
+			node.put("gamma", region.gamma());
 			array.add(node);
 		}
 		return array;

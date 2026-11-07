@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ColorAlphaType;
+import io.github.humbleui.skija.ColorFilter;
 import io.github.humbleui.skija.ColorSpace;
 import io.github.humbleui.skija.ColorType;
 import io.github.humbleui.skija.FilterMipmap;
@@ -102,6 +103,15 @@ public final class Compositor implements AutoCloseable {
 	private final GpuFrameTextures frameTextures = new GpuFrameTextures();
 	private @Nullable SkiaGlSurface currentTarget;
 	private final CursorRenderer cursorRenderer = new CursorRenderer();
+	// Stage 5.5: the grade color filter for the current sliders, rebuilt only when they change.
+	// render() runs on one thread per compositor, so the cache needs no locking; the evicted
+	// filter is closed on the same thread that finished drawing with it.
+	private @Nullable ColorFilter gradeFilter;
+	private double gradeFilterBrightness = Double.NaN;
+	private double gradeFilterContrast;
+	private double gradeFilterSaturation;
+	private double gradeFilterTemperature;
+	private double gradeFilterGamma;
 	// Extension render hooks (Phase 3, plan §5.18); NONE keeps the frame byte-identical.
 	private volatile FrameOverlayHooks overlayHooks = FrameOverlayHooks.NONE;
 	private boolean closed;
@@ -872,11 +882,19 @@ public final class Compositor implements AutoCloseable {
 	/** Same as above with an optional image filter applied to the drawn image. */
 	private static void fillImage(Canvas canvas, Image image, Matrix33 imageToCanvas, Rect box,
 			double radius, SamplingMode sampling, @Nullable ImageFilter imageFilter) {
+		fillImage(canvas, image, imageToCanvas, box, radius, sampling, imageFilter, null);
+	}
+
+	/** Same as above with an optional color filter grading the drawn image. */
+	private static void fillImage(Canvas canvas, Image image, Matrix33 imageToCanvas, Rect box,
+			double radius, SamplingMode sampling, @Nullable ImageFilter imageFilter,
+			@Nullable ColorFilter colorFilter) {
 		try (Shader shader = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP,
 				sampling, imageToCanvas); Paint paint = new Paint()) {
 			paint.setAntiAlias(true);
 			paint.setShader(shader);
 			paint.setImageFilter(imageFilter);
+			paint.setColorFilter(colorFilter);
 			if (radius <= 0.5) {
 				canvas.drawRect(box, paint);
 				return;
@@ -919,14 +937,18 @@ public final class Compositor implements AutoCloseable {
 		MotionBlur.Effect motionBlur = resolveMotionBlur(input, baseMask, transform,
 				contentWidth, contentHeight);
 		lastMotionBlurEffect = motionBlur;
+		// Stage 5.5: the Color-track grade filters the video layer only — the background, webcam
+		// and overlays keep their own look (the grade windows follow the timeline time).
+		GradeSpec.Window grade = input.grade().at(input.timeSeconds() * 1000).orElse(null);
 		SkiaGlSurface target = currentTarget();
 		try (Image image = frameTextures.image(target, GpuFrameTextures.Slot.SOURCE, frame,
 				colorSpace)) {
 			if (motionBlur.path() == MotionBlur.Path.NONE) {
-				drawVideoScene(canvas, image, source, baseMask, maskRadius, style, transform);
+				drawVideoScene(canvas, image, source, baseMask, maskRadius, style, transform,
+						grade);
 			} else {
 				drawMotionBlurredScene(canvas, image, source, baseMask, maskRadius, style,
-						transform, motionBlur);
+						transform, motionBlur, grade);
 			}
 		}
 		// Stage 6: the cursor overlay is a sibling of the video layer inside the camera
@@ -990,14 +1012,14 @@ public final class Compositor implements AutoCloseable {
 
 	private void drawMotionBlurredScene(Canvas canvas, Image image, Rect source, Rect baseMask,
 			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform,
-			MotionBlur.Effect motionBlur) {
+			MotionBlur.Effect motionBlur, GradeSpec.@Nullable Window grade) {
 		// Stage 5: the pixi filters run on the whole camera container, so capture the
 		// video layer (shadow stack + squircle-masked video) offscreen and blit the blurred
 		// result over the background.
 		Surface blurTarget = ensureBlurSurface();
 		Canvas blurCanvas = blurTarget.getCanvas();
 		blurCanvas.clear(0);
-		drawVideoScene(blurCanvas, image, source, baseMask, maskRadius, style, transform);
+		drawVideoScene(blurCanvas, image, source, baseMask, maskRadius, style, transform, grade);
 		Image blurredLayer = blurTarget.makeImageSnapshot();
 		try {
 			Shader shader = motionBlur.path() == MotionBlur.Path.DIRECTIONAL
@@ -1016,13 +1038,14 @@ public final class Compositor implements AutoCloseable {
 
 	/** Draws the camera-transformed video layer (shadow stack + masked video) onto a canvas. */
 	private void drawVideoScene(Canvas canvas, Image image, Rect source, Rect baseMask,
-			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform) {
+			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform,
+			GradeSpec.@Nullable Window grade) {
 		canvas.save();
 		canvas.translate((float) transform.x(), (float) transform.y());
 		canvas.scale((float) transform.scale(), (float) transform.scale());
 		drawVideoShadowLayers(canvas, baseMask, maskRadius, style);
 		fillImage(canvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
-				SamplingMode.LINEAR);
+				SamplingMode.LINEAR, null, gradeFilter(grade));
 		canvas.restore();
 	}
 
@@ -1041,6 +1064,47 @@ public final class Compositor implements AutoCloseable {
 		return MotionBlur.update(motionBlurState, baseMask, transform,
 				new RenderTargetSize(contentWidth, contentHeight), true, amount,
 				MotionBlur.Tuning.DEFAULT, input.timeSeconds() * 1000, null, false);
+	}
+
+	/**
+	 * The color filter for the frame's grade, cached across frames: a new Skia filter is built only
+	 * when a slider value changed. {@code grade == null} returns null (no filtering) and retires the
+	 * cached filter.
+	 */
+	private @Nullable ColorFilter gradeFilter(GradeSpec.@Nullable Window grade) {
+		if (grade == null) {
+			closeGradeFilter();
+			return null;
+		}
+		if (gradeFilter != null && grade.brightness() == gradeFilterBrightness
+				&& grade.contrast() == gradeFilterContrast
+				&& grade.saturation() == gradeFilterSaturation
+				&& grade.temperature() == gradeFilterTemperature
+				&& grade.gamma() == gradeFilterGamma) {
+			return gradeFilter;
+		}
+		closeGradeFilter();
+		ColorFilter filter = GradeShaders.filter(grade.brightness(), grade.contrast(),
+				grade.saturation(), grade.temperature(), grade.gamma());
+		gradeFilter = filter;
+		gradeFilterBrightness = grade.brightness();
+		gradeFilterContrast = grade.contrast();
+		gradeFilterSaturation = grade.saturation();
+		gradeFilterTemperature = grade.temperature();
+		gradeFilterGamma = grade.gamma();
+		return filter;
+	}
+
+	private void closeGradeFilter() {
+		if (gradeFilter != null) {
+			gradeFilter.close();
+			gradeFilter = null;
+		}
+		gradeFilterBrightness = Double.NaN;
+		gradeFilterContrast = 0;
+		gradeFilterSaturation = 0;
+		gradeFilterTemperature = 0;
+		gradeFilterGamma = 0;
 	}
 
 	private Surface ensureBlurSurface() {
@@ -1220,6 +1284,7 @@ public final class Compositor implements AutoCloseable {
 		}
 		closed = true;
 		invalidateBackgroundCache();
+		closeGradeFilter();
 		// GPU resources go with the GL context; release them early only on the GL thread (an owner
 		// that closes after its context is gone has nothing left to free).
 		if (glCurrentOnThisThread()) {

@@ -23,8 +23,8 @@ import tools.jackson.databind.node.ObjectNode;
 public final class AgentSettings {
 
 	private static final Set<String> ARRAY_SETTINGS = Set.of("zoomRegions", "trimRegions",
-			"clipRegions", "speedRegions", "annotationRegions", "audioRegions", "autoCaptions",
-			"sourceAudioTrackSettingsByClip", "defaultSourceAudioTrackSettings",
+			"clipRegions", "speedRegions", "gradeRegions", "annotationRegions", "audioRegions",
+			"autoCaptions", "sourceAudioTrackSettingsByClip", "defaultSourceAudioTrackSettings",
 			"autoFullTrackClipId", "autoFullTrackClipEndMs", "visibleRanges", "sourcePath");
 
 	private static final Pattern HEX_COLOUR = Pattern.compile("^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$",

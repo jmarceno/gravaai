@@ -39,7 +39,8 @@ public final class TimelineModel {
 			java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
 			List<TimelineSourceAudioTrack> sourceAudioTracks,
 			List<KeystrokeElement> keystrokeElements,
-			List<CameraLayoutSegment> cameraLayoutSegments) {
+			List<CameraLayoutSegment> cameraLayoutSegments,
+			List<dev.gravaai.core.project.GradeRegion> gradeRegions) {
 
 		public ItemsRequest {
 			cameraLayoutSegments = List.copyOf(cameraLayoutSegments);
@@ -53,6 +54,7 @@ public final class TimelineModel {
 			sourceAudioTracks = sourceAudioTracks == null ? List.of()
 					: List.copyOf(sourceAudioTracks);
 			keystrokeElements = keystrokeElements == null ? List.of() : List.copyOf(keystrokeElements);
+			gradeRegions = gradeRegions == null ? List.of() : List.copyOf(gradeRegions);
 		}
 
 		/** Backwards-compatible request without source-audio lanes (Phase A fixtures/tests). */
@@ -60,7 +62,7 @@ public final class TimelineModel {
 				List<AnnotationRegion> annotationRegions, List<AudioRegion> audioRegions,
 				List<CaptionCue> captionCues) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					java.util.Map.of(), List.of(), List.of(), List.of());
+					java.util.Map.of(), List.of(), List.of(), List.of(), List.of());
 		}
 
 		/** Backwards-compatible request without camera layout segments. */
@@ -71,7 +73,8 @@ public final class TimelineModel {
 				List<TimelineSourceAudioTrack> sourceAudioTracks,
 				List<KeystrokeElement> keystrokeElements) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					sourceAudioTrackSettings, sourceAudioTracks, keystrokeElements, List.of());
+					sourceAudioTrackSettings, sourceAudioTracks, keystrokeElements, List.of(),
+					List.of());
 		}
 
 		/** Backwards-compatible request without keystroke elements. */
@@ -81,7 +84,7 @@ public final class TimelineModel {
 				java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings,
 				List<TimelineSourceAudioTrack> sourceAudioTracks) {
 			this(zoomRegions, clipRegions, annotationRegions, audioRegions, captionCues,
-					sourceAudioTrackSettings, sourceAudioTracks, List.of(), List.of());
+					sourceAudioTrackSettings, sourceAudioTracks, List.of(), List.of(), List.of());
 		}
 	}
 
@@ -244,6 +247,13 @@ public final class TimelineModel {
 					getCaptionLabel(fragment.sourceCue()),
 					null, null, null, null, null, null, null, null, null, null, null,
 					TimelineRenderItem.Variant.CAPTION));
+		}
+
+		for (dev.gravaai.core.project.GradeRegion region : request.gradeRegions()) {
+			items.add(new TimelineRenderItem(region.id(), TimelineConstants.GRADE_ROW_ID,
+					new Span(region.startMs(), region.endMs()), null, region.label(),
+					null, null, null, null, null, null, null, null, null, null, null,
+					TimelineRenderItem.Variant.GRADE));
 		}
 
 		buildKeystrokeItems(items, request.keystrokeElements());

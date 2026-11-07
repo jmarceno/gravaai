@@ -147,4 +147,8 @@ public interface TimelineCommands {
 
 	/** Add a caption cue for the hover/click ghost in the caption strip. */
 	void addCaption(double startMs, double endMs);
+
+	/** Add a color/luminosity grade over the empty-lane click / playhead span on the Color track. */
+	default void addGrade(double startMs, double endMs) {
+	}
 }

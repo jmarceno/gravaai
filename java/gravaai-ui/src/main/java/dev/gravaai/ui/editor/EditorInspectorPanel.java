@@ -13,6 +13,7 @@ import dev.gravaai.core.editor.CameraLayoutCommands;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
+import dev.gravaai.core.editor.GradeCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.ZoomCommands;
@@ -27,6 +28,7 @@ import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.CursorMotionPresets;
+import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.Padding;
@@ -79,6 +81,7 @@ public final class EditorInspectorPanel extends VBox {
 		KEYSTROKE,
 		CAMERA_LAYOUT,
 		ELEMENT,
+		GRADE,
 		MULTI
 	}
 
@@ -225,6 +228,13 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	/** Shows the editor for the selected Color-track grade. */
+	public void showGradeSettings() {
+		this.annotationMode = false;
+		this.selectionEditor = SelectionEditor.GRADE;
+		rebuild();
+	}
+
 	/**
 	 * Picks the editor from the store's timeline selection. A multi-selection of one kind reuses
 	 * that kind's editor (edits batch over all selected ids); a mixed multi-selection gets the
@@ -265,6 +275,8 @@ public final class EditorInspectorPanel extends VBox {
 			showCameraLayoutSettings();
 		} else if (store.selectedElementId().isPresent()) {
 			showElementSettings();
+		} else if (store.selectedGradeId() != null) {
+			showGradeSettings();
 		} else if (isSelectionMode()) {
 			show(section);
 		}
@@ -302,7 +314,7 @@ public final class EditorInspectorPanel extends VBox {
 			// Only sections with controls rendered behind the Advanced switch. Cursor and
 			// Settings currently have no advanced-only rows, so showing the toggle there is inert.
 			case SCENE, WEBCAM, CAPTIONS, KEYSTROKES -> true;
-			case CURSOR, TRANSCRIPT, MEETING, SETTINGS -> false;
+			case COLOR, CURSOR, TRANSCRIPT, MEETING, SETTINGS -> false;
 		};
 	}
 
@@ -369,6 +381,7 @@ public final class EditorInspectorPanel extends VBox {
 			case KEYSTROKE -> "Keystroke";
 			case CAMERA_LAYOUT -> "Camera layout";
 			case ELEMENT -> "Element";
+			case GRADE -> "Color grade";
 			case MULTI -> "Multiple";
 			case NONE -> section.label();
 		};
@@ -409,11 +422,15 @@ public final class EditorInspectorPanel extends VBox {
 		}
 		return elementPanel;
 	}
+	if (selectionEditor == SelectionEditor.GRADE) {
+		return gradeSection();
+	}
 	if (selectionEditor == SelectionEditor.MULTI) {
 		return multiSelectionSection();
 	}
 		return switch (section) {
 			case SCENE -> sceneSection();
+			case COLOR -> gradeSection();
 			case CURSOR -> cursorSection();
 			case KEYSTROKES -> keystrokesSection();
 			case WEBCAM -> webcamSection();
@@ -713,6 +730,103 @@ public final class EditorInspectorPanel extends VBox {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The Color & luminosity editor: the sliders of the grade being edited — the timeline
+	 * selection when there is one, otherwise the grade under the playhead. With neither, the
+	 * section explains the Color track and offers the add-at-playhead gesture.
+	 */
+	private Node gradeSection() {
+		GradeRegion selected = selectedGrade();
+		GradeRegion grade = selected != null ? selected : gradeAtPlayhead();
+		VBox root = new VBox(14);
+		if (grade == null) {
+			root.getChildren().add(emptySelection(
+					"Grade the footage over a span: click the COLOR lane in the timeline, press G, "
+							+ "or use Add Layer → Color. The grade then shades every clip it covers."));
+			Button add = new Button("Add grade at playhead", Button.Variant.SECONDARY,
+					Button.Size.SM);
+			add.setMaxWidth(Double.MAX_VALUE);
+			add.setAlignment(Pos.CENTER_LEFT);
+			add.setOnAction(event -> actions.addColorGrade());
+			root.getChildren().add(add);
+			return root;
+		}
+		Label span = new Label(PlaybackControls.formatTime(grade.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatTime(grade.endMs() / 1000.0));
+		span.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		root.getChildren().add(span);
+		root.getChildren().add(heading("Luminosity", () -> resetGrade(grade.id())));
+		root.getChildren().add(slider("Brightness", grade.brightness(), GradeRegion.MIN_ADJUST,
+				GradeRegion.MAX_ADJUST, 1, EditorInspectorPanel::formatSigned,
+				value -> applyGrade(grade.id(), value, grade.contrast(), grade.saturation(),
+						grade.temperature(), grade.gamma())));
+		root.getChildren().add(slider("Contrast", grade.contrast(), GradeRegion.MIN_ADJUST,
+				GradeRegion.MAX_ADJUST, 1, EditorInspectorPanel::formatSigned,
+				value -> applyGrade(grade.id(), grade.brightness(), value, grade.saturation(),
+						grade.temperature(), grade.gamma())));
+		root.getChildren().add(slider("Gamma", grade.gamma(), GradeRegion.MIN_GAMMA,
+				GradeRegion.MAX_GAMMA, 0.05,
+				value -> String.format(java.util.Locale.ROOT, "%.2f", value),
+				value -> applyGrade(grade.id(), grade.brightness(), grade.contrast(),
+						grade.saturation(), grade.temperature(), value)));
+		root.getChildren().add(heading("Color", () -> resetGrade(grade.id())));
+		root.getChildren().add(slider("Saturation", grade.saturation(), GradeRegion.MIN_ADJUST,
+				GradeRegion.MAX_ADJUST, 1, EditorInspectorPanel::formatSigned,
+				value -> applyGrade(grade.id(), grade.brightness(), grade.contrast(), value,
+						grade.temperature(), grade.gamma())));
+		root.getChildren().add(slider("Temperature", grade.temperature(), GradeRegion.MIN_ADJUST,
+				GradeRegion.MAX_ADJUST, 1, EditorInspectorPanel::formatSigned,
+				value -> applyGrade(grade.id(), grade.brightness(), grade.contrast(),
+						grade.saturation(), value, grade.gamma())));
+		root.getChildren().add(deleteSelectionButton("Delete Grade",
+				() -> store.apply(new GradeCommands.Delete(grade.id()))));
+		return root;
+	}
+
+	private void applyGrade(String id, double brightness, double contrast, double saturation,
+			double temperature, double gamma) {
+		store.apply(new GradeCommands.ChangeParams(id, brightness, contrast, saturation,
+				temperature, gamma));
+	}
+
+	private void resetGrade(String id) {
+		applyGrade(id, 0, 0, 0, 0, GradeRegion.DEFAULT_GAMMA);
+	}
+
+	private @Nullable GradeRegion selectedGrade() {
+		String id = store.selectedGradeId();
+		if (id == null) {
+			return null;
+		}
+		for (GradeRegion region : store.state().gradeRegions()) {
+			if (region.id().equals(id)) {
+				return region;
+			}
+		}
+		return null;
+	}
+
+	/** The grade covering the playhead, latest start winning (the renderer's overlap rule). */
+	private @Nullable GradeRegion gradeAtPlayhead() {
+		double timeMs = playback.state().currentTimeSeconds() * 1000;
+		GradeRegion active = null;
+		for (GradeRegion region : store.state().gradeRegions()) {
+			if (timeMs >= region.startMs() && timeMs < region.endMs()
+					&& (active == null || region.startMs() >= active.startMs())) {
+				active = region;
+			}
+		}
+		return active;
+	}
+
+	/** Signed slider output: {@code 0}, {@code +12}, {@code -8}. */
+	private static String formatSigned(double value) {
+		if (value == 0) {
+			return "0";
+		}
+		return String.format(java.util.Locale.ROOT, "%+.0f", value);
 	}
 
 	/** The Camera layout segment editor: its time span, the layout to switch to, remove. */

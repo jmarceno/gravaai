@@ -116,7 +116,7 @@ public final class PreviewFrameQueue {
 					webcamMaskFrame, input.cursorSamples(), background, input.backgroundBlur(),
 					input.layout(), input.zoom(), input.style(), input.cursor(), input.webcam(),
 					input.annotations(), input.captions(), input.keystrokes(), input.fade(),
-					input.scene(), input.sourceTimeSeconds());
+					input.scene(), input.grade(), input.sourceTimeSeconds());
 		}
 
 		private enum BufferKind { SOURCE, WEBCAM, WEBCAM_MASK }

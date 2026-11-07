@@ -296,6 +296,7 @@ public final class ProjectPersistence {
 				: null;
 
 		List<SpeedRegion> normalizedSpeedRegions = normalizeSpeedRegions(field(editor, "speedRegions"));
+		List<GradeRegion> normalizedGradeRegions = normalizeGradeRegions(field(editor, "gradeRegions"));
 		List<AnnotationRegion> normalizedAnnotationRegions =
 				normalizeAnnotationRegions(field(editor, "annotationRegions"));
 		List<AudioRegion> normalizedAudioRegions = normalizeAudioRegions(field(editor, "audioRegions"));
@@ -425,6 +426,10 @@ public final class ProjectPersistence {
 				normalizedAutoFullTrackClipId,
 				normalizedAutoFullTrackClipEndMs,
 				normalizedSpeedRegions,
+				sequenceChanged
+						? ClipSequence.rippleRegions(normalizedGradeRegions, normalizedClipRegions,
+								sequenceClips, ClipSequence.GRADE_SPAN)
+						: normalizedGradeRegions,
 				sequenceChanged
 						? ClipSequence.rippleRegions(normalizedAnnotationRegions, normalizedClipRegions,
 								sequenceClips, ClipSequence.ANNOTATION_SPAN)
@@ -664,6 +669,31 @@ public final class ProjectPersistence {
 				}
 			}
 			regions.add(new SpeedRegion(id, span.startMs(), span.endMs(), speed));
+		}
+		return List.copyOf(regions);
+	}
+
+	/** {@code normalizeGradeRegions}: span + clamped grading sliders; invalid entries are dropped. */
+	private static List<GradeRegion> normalizeGradeRegions(JsonNode rawRegions) {
+		if (rawRegions == null || !rawRegions.isArray()) {
+			return List.of();
+		}
+		List<GradeRegion> regions = new ArrayList<>();
+		for (JsonNode region : rawRegions) {
+			if (region == null || !region.isObject()) {
+				continue;
+			}
+			String id = text(field(region, "id"));
+			if (id == null || id.isBlank()) {
+				continue;
+			}
+			Span span = normalizeSpan(region);
+			regions.add(new GradeRegion(id, span.startMs(), span.endMs(),
+					numberOr(field(region, "brightness"), 0),
+					numberOr(field(region, "contrast"), 0),
+					numberOr(field(region, "saturation"), 0),
+					numberOr(field(region, "temperature"), 0),
+					numberOr(field(region, "gamma"), GradeRegion.DEFAULT_GAMMA)));
 		}
 		return List.copyOf(regions);
 	}

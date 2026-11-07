@@ -1422,6 +1422,19 @@ public final class EditorWindow {
 		}
 
 		@Override
+		public void addColorGrade() {
+			// Add Layer → Color: a 1 s neutral grade at the playhead, pulled back so it fits.
+			double totalMs = session.timelineDataSource().totalDurationMs();
+			double duration = Math.min(1000, totalMs);
+			if (duration <= 0) {
+				return;
+			}
+			double start = Math.max(0, Math.min(playheadMs(), totalMs - duration));
+			session.store().apply(new dev.gravaai.core.editor.GradeCommands.Add(start,
+					start + duration));
+		}
+
+		@Override
 		public void suggestZooms() {
 			suggestInteractionZooms();
 		}

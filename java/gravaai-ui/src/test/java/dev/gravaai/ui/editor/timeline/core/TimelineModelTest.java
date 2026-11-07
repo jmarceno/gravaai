@@ -75,6 +75,22 @@ class TimelineModelTest {
 	}
 
 	@Test
+	@DisplayName("maps color grades onto the Color row and labels the moved sliders")
+	void mapsGradeRegionsToItems() {
+		List<TimelineRenderItem> items = TimelineModel.buildTimelineItems(new TimelineModel.ItemsRequest(
+				List.of(), List.of(), List.of(), List.of(), List.of(), java.util.Map.of(),
+				List.of(), List.of(), List.of(),
+				List.of(new dev.gravaai.core.project.GradeRegion("grade-1", 200, 1400, 20, 0, -40, 30, 1),
+						new dev.gravaai.core.project.GradeRegion("grade-2", 1500, 1800, 0, 0, 0, 0, 1))));
+
+		assertEquals(2, items.size());
+		assertEquals("row-grade", find(items, "grade-1").rowId());
+		assertEquals(TimelineRenderItem.Variant.GRADE, find(items, "grade-1").variant());
+		assertEquals("+20 light warm -40 sat", find(items, "grade-1").label());
+		assertEquals("Grade", find(items, "grade-2").label());
+	}
+
+	@Test
 	@DisplayName("labels zoom blocks with their amount, not their index")
 	void labelsZoomBlocksWithDepthAmount() {
 		assertEquals("1.25x", TimelineModel.formatZoomScale(ZoomDepth.ONE.scale()));

@@ -87,6 +87,7 @@ public final class PlaybackControls extends GridPane {
 		addMenu.item("Image", actions::addImageAnnotation);
 		addMenu.item("Blur", actions::addBlurAnnotation);
 		addMenu.item("Loupe", actions::addLoupeAnnotation);
+		addMenu.item("Color", actions::addColorGrade);
 		addMenu.item("Audio", actions::addAudioLayer);
 
 		Button zoom = iconButton(Icons.MagnifyingGlassPlus, "Add zoom", actions::addZoom);

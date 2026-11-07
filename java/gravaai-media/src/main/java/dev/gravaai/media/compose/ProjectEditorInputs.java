@@ -497,6 +497,22 @@ public final class ProjectEditorInputs {
 		return windows.isEmpty() ? FadeSpec.NONE : new FadeSpec(windows);
 	}
 
+	/** Maps the project's Color-track grade regions (stage 5.5, applied to the video layer). */
+	public static GradeSpec gradeSpec(ProjectEditorState editor) {
+		List<GradeSpec.Window> windows = new ArrayList<>();
+		if (editor.gradeRegions() != null) {
+			for (var region : editor.gradeRegions()) {
+				if (region == null) {
+					continue;
+				}
+				windows.add(new GradeSpec.Window(region.startMs(), region.endMs(),
+						region.brightness(), region.contrast(), region.saturation(),
+						region.temperature(), region.gamma()));
+			}
+		}
+		return windows.isEmpty() ? GradeSpec.NONE : new GradeSpec(windows);
+	}
+
 	/** Parses a CSS colour, falling back to the TS default blue for absent/invalid values. */
 	private static int parseColour(@Nullable String value) {
 		if (value == null || value.length() < 7) {

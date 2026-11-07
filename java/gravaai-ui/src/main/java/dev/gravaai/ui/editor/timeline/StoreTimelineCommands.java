@@ -17,6 +17,7 @@ import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorCommand;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.CameraLayoutCommands;
+import dev.gravaai.core.editor.GradeCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.editor.SelectionCommands;
@@ -99,6 +100,7 @@ public final class StoreTimelineCommands implements TimelineCommands {
 				store.apply(new CameraLayoutCommands.Select(selection.id()));
 			case TimelineSelection.ELEMENT ->
 				store.apply(new dev.gravaai.core.editor.ElementCommands.Select(selection.id()));
+			case TimelineSelection.GRADE -> store.apply(new GradeCommands.Select(selection.id()));
 			default -> store.clearSelectionsExcept(null, null, null, null, null);
 		}
 	}
@@ -135,6 +137,10 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		}
 		if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
 			store.apply(new KeystrokeCommands.ChangeSpan(itemId, span.start(), span.end()));
+			return;
+		}
+		if (TimelineConstants.GRADE_ROW_ID.equals(rowId)) {
+			store.apply(new GradeCommands.ChangeSpan(itemId, span.start(), span.end()));
 			return;
 		}
 		if (rowId.startsWith(TimelineConstants.ELEMENTS_ROW_ID)) {
@@ -257,6 +263,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 			store.apply(new CameraLayoutCommands.Delete(cameraLayout));
 			return;
 		}
+		String grade = store.selectedGradeId();
+		if (grade != null) {
+			store.apply(new GradeCommands.Delete(grade));
+			return;
+		}
 		java.util.Optional<String> element = store.selectedElementId();
 		if (element.isPresent()) {
 			store.apply(new dev.gravaai.core.editor.ElementCommands.Delete(element.get()));
@@ -316,6 +327,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	@Override
 	public void addCaption(double startMs, double endMs) {
 		store.apply(new CaptionCommands.Add(startMs, endMs));
+	}
+
+	@Override
+	public void addGrade(double startMs, double endMs) {
+		store.apply(new GradeCommands.Add(startMs, endMs));
 	}
 
 	private void retimeCaption(String id, Span span) {
@@ -404,6 +420,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		for (var segment : store.state().cameraLayoutSegments()) {
 			if (segment.id().equals(itemId)) {
 				return TimelineConstants.CAMERA_LAYOUT_ROW_ID;
+			}
+		}
+		for (var grade : store.state().gradeRegions()) {
+			if (grade.id().equals(itemId)) {
+				return TimelineConstants.GRADE_ROW_ID;
 			}
 		}
 		return "";

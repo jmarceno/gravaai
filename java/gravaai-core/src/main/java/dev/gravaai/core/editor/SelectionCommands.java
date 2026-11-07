@@ -82,6 +82,7 @@ public final class SelectionCommands {
 		public static final String CAPTION = "caption";
 		public static final String KEYSTROKE = "keystroke";
 		public static final String CAMERA_LAYOUT = "camera-layout";
+		public static final String GRADE = "grade";
 
 		private TimelineSelections() {}
 	}
@@ -121,6 +122,11 @@ public final class SelectionCommands {
 		for (var segment : store.state().cameraLayoutSegments()) {
 			if (segment.id().equals(id)) {
 				return TimelineSelections.CAMERA_LAYOUT;
+			}
+		}
+		for (var region : store.state().gradeRegions()) {
+			if (region.id().equals(id)) {
+				return TimelineSelections.GRADE;
 			}
 		}
 		return null;

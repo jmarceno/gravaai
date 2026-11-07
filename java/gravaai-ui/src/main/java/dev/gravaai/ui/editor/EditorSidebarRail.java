@@ -18,6 +18,7 @@ public final class EditorSidebarRail extends VBox {
 	/** Editor inspector sections, in the React rail's visual order. */
 	public enum Section {
 		SCENE("Scene", Icons.FrameCorners),
+		COLOR("Color & luminosity", Icons.Palette),
 		CURSOR("Cursor", Icons.Cursor),
 		KEYSTROKES("Keystrokes", Icons.Keyboard),
 		WEBCAM("Webcam", Icons.Camera),

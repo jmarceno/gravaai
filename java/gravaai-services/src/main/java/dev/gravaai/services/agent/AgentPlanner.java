@@ -30,6 +30,7 @@ import dev.gravaai.core.project.AutoCaptionSettings;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.CaptionOps;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.ClipSequence;
 import dev.gravaai.core.project.ClipSplits;
 import dev.gravaai.core.project.ClipTransition;
@@ -78,7 +79,7 @@ public final class AgentPlanner {
 	/** Region kinds that can be created by an op; each has its own id counter. */
 	public enum IdKind {
 		ZOOM("zoom"), CLIP("clip"), ANNOTATION("annotation"), AUDIO("audio"), SPEED("speed"),
-		CAMERA("camera"), ELEMENT("element");
+		CAMERA("camera"), ELEMENT("element"), GRADE("grade");
 
 		private final String wire;
 
@@ -726,6 +727,10 @@ public final class AgentPlanner {
 				id = annotation.id();
 				startMs = annotation.startMs();
 				endMs = annotation.endMs();
+			} else if (region instanceof GradeRegion grade) {
+				id = grade.id();
+				startMs = grade.startMs();
+				endMs = grade.endMs();
 			} else {
 				continue;
 			}
@@ -847,14 +852,15 @@ public final class AgentPlanner {
 		for (Map.Entry<String, String> entry : AgentIds.elementShortById(state).entrySet()) {
 			result = result.replace("{{e:" + entry.getKey() + "}}", entry.getValue());
 		}
-		for (String kind : List.of("z", "s", "a", "m", "q")) {
-			Map<String, String> lookup = switch (kind) {
-				case "z" -> map.zoomShortById();
-				case "s" -> map.speedShortById();
-				case "a" -> map.annotationShortById();
-				case "m" -> map.audioShortById();
-				default -> map.cueShortById();
-			};
+		for (String kind : List.of("z", "s", "a", "m", "q", "g")) {
+				Map<String, String> lookup = switch (kind) {
+					case "z" -> map.zoomShortById();
+					case "s" -> map.speedShortById();
+					case "a" -> map.annotationShortById();
+					case "m" -> map.audioShortById();
+					case "g" -> map.gradeShortById();
+					default -> map.cueShortById();
+				};
 			for (Map.Entry<String, String> entry : lookup.entrySet()) {
 				result = result.replace("{{" + kind + ":" + entry.getKey() + "}}",
 						entry.getValue());
@@ -869,6 +875,7 @@ public final class AgentPlanner {
 			case "s" -> draft.ids.speedShortById();
 			case "a" -> draft.ids.annotationShortById();
 			case "m" -> draft.ids.audioShortById();
+			case "g" -> draft.ids.gradeShortById();
 			default -> draft.ids.cueShortById();
 		};
 	}
@@ -906,6 +913,9 @@ public final class AgentPlanner {
 			case "auto_zoom" -> autoZoom(draft, raw);
 			case "speed" -> addSpeed(draft, raw);
 			case "delete_speed" -> deleteSpeed(draft, raw);
+			case "grade" -> addGrade(draft, raw);
+			case "update_grade" -> updateGrade(draft, raw);
+			case "delete_grade" -> deleteGrade(draft, raw);
 			case "text", "image", "figure", "blur", "loupe" -> addAnnotation(draft, op, raw);
 			case "update_annotation" -> updateAnnotation(draft, raw);
 			case "delete_annotation" -> deleteAnnotation(draft, raw);
@@ -1487,6 +1497,110 @@ public final class AgentPlanner {
 			throw fail(shortId + " not found");
 		}
 		draft.state = draft.state.toBuilder().speedRegions(draft.state.speedRegions().stream()
+						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
+		draft.summary.add("deleted " + shortId);
+	}
+
+	/** A grade adjust slider: omitted stays neutral, out-of-range fails (never silently clamps). */
+	private static double gradeAdjust(ObjectNode raw, String name) {
+		Double value = AgentOpReader.optionalNumber(raw, name);
+		if (value == null) {
+			return 0;
+		}
+		return requireAdjust(value, name);
+	}
+
+	private static double requireAdjust(double value, String name) {
+		if (value < GradeRegion.MIN_ADJUST || value > GradeRegion.MAX_ADJUST) {
+			throw fail(name + " must be between -100 and 100");
+		}
+		return value;
+	}
+
+	private static double gradeGamma(ObjectNode raw) {
+		Double value = AgentOpReader.optionalNumber(raw, "gamma");
+		if (value == null) {
+			return GradeRegion.DEFAULT_GAMMA;
+		}
+		if (value < GradeRegion.MIN_GAMMA || value > GradeRegion.MAX_GAMMA) {
+			throw fail("gamma must be between " + GradeRegion.MIN_GAMMA + " and "
+					+ GradeRegion.MAX_GAMMA);
+		}
+		return value;
+	}
+
+	private static void addGrade(Draft draft, ObjectNode raw) {
+		double[] range = AgentOpReader.readRange(raw, "from", "to");
+		Span span = clampTimelineSpan(draft, toMs(range[0]), toMs(range[1]));
+		assertSpanFree(draft.state.gradeRegions(), span, draft.ids.gradeShortById(), "grade",
+				null);
+		String id = draft.ctx.createId().apply(IdKind.GRADE);
+		GradeRegion region = new GradeRegion(id, span.startMs(), span.endMs(),
+				gradeAdjust(raw, "brightness"), gradeAdjust(raw, "contrast"),
+				gradeAdjust(raw, "saturation"), gradeAdjust(raw, "temperature"),
+				gradeGamma(raw));
+		List<GradeRegion> grades = new ArrayList<>(draft.state.gradeRegions());
+		grades.add(region);
+		draft.state = draft.state.toBuilder().gradeRegions(grades).build();
+		draft.summary.add("grade " + shortRef("g", id) + " " + region.label() + " at "
+				+ AgentIds.formatSeconds(span.startMs()) + "–"
+				+ AgentIds.formatSeconds(span.endMs()) + "s");
+		push(draft, Highlight.Kind.ADDED, span.startMs(), span.endMs(), "color grade");
+	}
+
+	private static void updateGrade(Draft draft, ObjectNode raw) {
+		String shortId = AgentOpReader.string(raw, "id");
+		String id = draft.ids.gradeIdByShort().get(shortId.trim());
+		GradeRegion grade = id == null ? null
+				: draft.state.gradeRegions().stream()
+						.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
+		if (grade == null) {
+			throw fail(shortId + " not found");
+		}
+		Double from = AgentOpReader.optionalNumber(raw, "from");
+		Double to = AgentOpReader.optionalNumber(raw, "to");
+		Double brightness = AgentOpReader.optionalNumber(raw, "brightness");
+		Double contrast = AgentOpReader.optionalNumber(raw, "contrast");
+		Double saturation = AgentOpReader.optionalNumber(raw, "saturation");
+		Double temperature = AgentOpReader.optionalNumber(raw, "temperature");
+		Double gamma = AgentOpReader.optionalNumber(raw, "gamma");
+		GradeRegion next = new GradeRegion(grade.id(),
+				from == null ? grade.startMs() : toMs(from),
+				to == null ? grade.endMs() : toMs(to),
+				brightness == null ? grade.brightness() : requireAdjust(brightness, "brightness"),
+				contrast == null ? grade.contrast() : requireAdjust(contrast, "contrast"),
+				saturation == null ? grade.saturation() : requireAdjust(saturation, "saturation"),
+				temperature == null ? grade.temperature()
+						: requireAdjust(temperature, "temperature"),
+				gamma == null ? grade.gamma() : gradeGamma(raw));
+		if (next.endMs() <= next.startMs()) {
+			throw fail("\"to\" must be after \"from\"");
+		}
+		assertSpanFree(draft.state.gradeRegions(),
+				new Span(next.startMs(), next.endMs()), draft.ids.gradeShortById(), "grade", id);
+		draft.state = draft.state.toBuilder().gradeRegions(draft.state.gradeRegions().stream()
+						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
+		draft.summary.add("updated " + shortId);
+		push(draft, Highlight.Kind.CHANGED, next.startMs(), next.endMs(), "color grade");
+	}
+
+	private static void deleteGrade(Draft draft, ObjectNode raw) {
+		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
+		if (Boolean.TRUE.equals(all)) {
+			int count = draft.state.gradeRegions().size();
+			draft.state = draft.state.toBuilder().gradeRegions(List.of()).build();
+			draft.summary.add("deleted " + count + " grades");
+			return;
+		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_grade needs \"id\" or \"all\": true");
+		}
+		String id = draft.ids.gradeIdByShort().get(shortId.trim());
+		if (id == null) {
+			throw fail(shortId + " not found");
+		}
+		draft.state = draft.state.toBuilder().gradeRegions(draft.state.gradeRegions().stream()
 						.filter(candidate -> !candidate.id().equals(id)).toList()).build();
 		draft.summary.add("deleted " + shortId);
 	}

@@ -53,6 +53,7 @@ public final class EditorStore {
 	private @Nullable String selectedAudioId;
 	private @Nullable String selectedCaptionId;
 	private @Nullable String selectedKeystrokeId;
+	private @Nullable String selectedGradeId;
 	private @Nullable String selectedCameraLayoutId;
 	private java.util.Optional<String> selectedElementId = java.util.Optional.empty();
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
@@ -120,6 +121,12 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	public void setGradeRegions(List<dev.gravaai.core.project.GradeRegion> regions) {
+		ObjectNode json = editorJson();
+		json.set("gradeRegions", ProjectDocument.writeGradeRegions(regions));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
 	public void setAudioRegions(List<AudioRegion> regions) {
 		ObjectNode json = editorJson();
 		json.set("audioRegions", ProjectDocument.writeAudioRegions(regions));
@@ -166,6 +173,16 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	/** The selected Color-track grade, if any. */
+	public @Nullable String selectedGradeId() {
+		return selectedGradeId;
+	}
+
+	/** Selects a grade; call after {@link #clearSelectionsExcept}, which clears it. */
+	public void setSelectedGradeId(@Nullable String id) {
+		this.selectedGradeId = id;
+	}
+
 	/** Replaces the canonical raw source-audio settings map (unknown keys preserved). */
 	public void setSourceAudioTrackSettingsByClip(tools.jackson.databind.node.@Nullable ObjectNode next) {
 		state = state.withSourceAudioTrackSettingsByClip(next);
@@ -204,6 +221,7 @@ public final class EditorStore {
 				state.sourceAudioTrackSettingsByClip() == null ? null
 						: state.sourceAudioTrackSettingsByClip().deepCopy(),
 				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId,
+				state.gradeRegions(), selectedGradeId,
 				state.cameraLayoutSegments(), selectedCameraLayoutId, state.elementComponents(),
 				state.elements(), state.elementAssets(), selectedElementId);
 	}
@@ -217,6 +235,7 @@ public final class EditorStore {
 				"snapshot audio regions"));
 		setAutoCaptions(snapshot.autoCaptions());
 		setKeystrokeElements(snapshot.keystrokeElements());
+		setGradeRegions(snapshot.gradeRegions());
 		setCameraLayoutSegments(snapshot.cameraLayoutSegments());
 		setElementComponents(snapshot.elementComponents());
 		setElements(snapshot.elements());
@@ -227,6 +246,7 @@ public final class EditorStore {
 		selectedAnnotationId = snapshot.selectedAnnotationId();
 		selectedAudioId = snapshot.selectedAudioId();
 		selectedKeystrokeId = snapshot.selectedKeystrokeId();
+		selectedGradeId = snapshot.selectedGradeId();
 		selectedCameraLayoutId = snapshot.selectedCameraLayoutId();
 		multiSelection.clear();
 		multiSelection.addAll(snapshot.multiSelectedIds());
@@ -328,12 +348,21 @@ public final class EditorStore {
 	/** As above, also keeping (or clearing) the keystroke selection. */
 	public void clearSelectionsExcept(@Nullable String keepClip, @Nullable String keepZoom, @Nullable String keepAnnotation,
 			@Nullable String keepAudio, @Nullable String keepCaption, @Nullable String keepKeystroke) {
+		clearSelectionsExcept(keepClip, keepZoom, keepAnnotation, keepAudio, keepCaption,
+				keepKeystroke, null);
+	}
+
+	/** As above, also keeping (or clearing) the Color-track grade selection. */
+	public void clearSelectionsExcept(@Nullable String keepClip, @Nullable String keepZoom, @Nullable String keepAnnotation,
+			@Nullable String keepAudio, @Nullable String keepCaption, @Nullable String keepKeystroke,
+			@Nullable String keepGrade) {
 		selectedClipId = keepClip;
 		selectedZoomId = keepZoom;
 		selectedAnnotationId = keepAnnotation;
 		selectedAudioId = keepAudio;
 		selectedCaptionId = keepCaption;
 		selectedKeystrokeId = keepKeystroke;
+		selectedGradeId = keepGrade;
 		selectedCameraLayoutId = null;
 		selectedElementId = java.util.Optional.empty();
 		multiSelection.clear();

@@ -94,6 +94,9 @@ public final class TimelineView extends Region {
 	private static final Color CLIP_SELECTED = Color.web("#2563eb");
 	private static final Color ZOOM_FILL = Color.web("#2fb3a3");
 	private static final Color ZOOM_BORDER = Color.web("#3fd4c1");
+	private static final Color GRADE_FILL = Color.web("#1f3a5c");
+	private static final Color GRADE_BORDER = Color.web("#e8b64c");
+	private static final Color GRADE_SELECTED = Color.web("#f5d78a");
 	private static final Color ANNOTATION_FILL = Color.web("#4e4726");
 	private static final Color ANNOTATION_BORDER = Color.web("#62582c");
 	private static final Color ANNOTATION_SELECTED = Color.web("#b4a046");
@@ -456,7 +459,8 @@ public final class TimelineView extends Region {
 				project.zoomRegions(), project.clipRegions(), project.annotationRegions(),
 				project.audioRegions(), project.autoCaptions(),
 				project.sourceAudioTrackSettings(), sourceAudioTracks,
-				project.keystrokeElements(), project.cameraLayoutSegments()));
+				project.keystrokeElements(), project.cameraLayoutSegments(),
+				project.gradeRegions()));
 		items = withElementItems(items, project.elements());
 		cameraLayouts = new java.util.HashMap<>();
 		for (CameraLayoutSegment segment : project.cameraLayoutSegments()) {
@@ -593,6 +597,11 @@ public final class TimelineView extends Region {
 		double zoomHeight = extras > 0 ? COMPACT_ROW_HEIGHT : CLIP_ROW_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.ZOOM_ROW_ID, top, zoomHeight));
 		top += zoomHeight + ROW_GAP;
+
+		// The Color track sits under the zooms: like them it is always present, and clicking the
+		// empty lane drops a grade over the footage at that time.
+		rows.add(new RowLayout(TimelineConstants.GRADE_ROW_ID, top, COMPACT_ROW_HEIGHT));
+		top += COMPACT_ROW_HEIGHT + ROW_GAP;
 
 		List<Integer> annotationTrackIndexes = new ArrayList<>();
 		for (TimelineRenderItem item : items) {
@@ -757,6 +766,12 @@ public final class TimelineView extends Region {
 		if (hit == null) {
 			if (inZoomRow(y)) {
 				// The zoom lane adds a zoom on click instead of seeking (React stops propagation).
+				pressedEmpty = true;
+				dragStartX = x;
+				return;
+			}
+			if (inGradeRow(y)) {
+				// The Color lane drops a grade over the footage at that time.
 				pressedEmpty = true;
 				dragStartX = x;
 				return;
@@ -1003,6 +1018,11 @@ public final class TimelineView extends Region {
 		return zoomRow != null && y >= zoomRow.top() && y <= zoomRow.top() + zoomRow.height();
 	}
 
+	private boolean inGradeRow(double y) {
+		RowLayout gradeRow = rowById(TimelineConstants.GRADE_ROW_ID);
+		return gradeRow != null && y >= gradeRow.top() && y <= gradeRow.top() + gradeRow.height();
+	}
+
 	/**
 	 * The playhead cap on the axis, or the line itself within a few pixels where no block sits
 	 * under it (a block under the line keeps its own move/trim gesture).
@@ -1027,6 +1047,15 @@ public final class TimelineView extends Region {
 			start = Math.max(0, Math.min(start, fullRange.end()));
 			double end = Math.min(fullRange.end(), start + Math.min(GHOST_ZOOM_MS, fullRange.end()));
 			commands.addZoom(start, end);
+			return;
+		}
+		if (inGradeRow(y)) {
+			double displayTime = timeAtX(x);
+			double start = ClipPresentation.getTimeAtClipSeam(
+					Math.max(0, Math.min(displayTime, fullRange.end())), clipPresentation);
+			start = Math.max(0, Math.min(start, fullRange.end()));
+			double end = Math.min(fullRange.end(), start + Math.min(GHOST_ZOOM_MS, fullRange.end()));
+			commands.addGrade(start, end);
 			return;
 		}
 		if (hasCaptions() && inCaptionStrip(y)) {
@@ -1099,6 +1128,16 @@ public final class TimelineView extends Region {
 				hoverGhost = ClipPresentation.getRegionDisplaySpan(new Span(start, end),
 						clipPresentation);
 				hoverGhostKind = "zoom";
+			} else if (inGradeRow(y)) {
+				double displayTime = timeAtX(x);
+				double start = ClipPresentation.getTimeAtClipSeam(
+						Math.max(0, Math.min(displayTime, fullRange.end())), clipPresentation);
+				start = Math.max(0, Math.min(start, fullRange.end()));
+				double end = Math.min(fullRange.end(),
+						start + Math.min(GHOST_ZOOM_MS, fullRange.end()));
+				hoverGhost = ClipPresentation.getRegionDisplaySpan(new Span(start, end),
+						clipPresentation);
+				hoverGhostKind = "grade";
 			}
 		}
 		canvas.setCursor(cursor);
@@ -1264,6 +1303,12 @@ public final class TimelineView extends Region {
 			consume(event);
 			return;
 		}
+		if (code == KeyCode.G && !ctrl && !meta && !alt && !shift) {
+			// G: drop a Color-track grade at the playhead (same gesture as the empty-lane click).
+			addGradeAtPlayhead();
+			consume(event);
+			return;
+		}
 		if (TimelineShortcuts.matches(code, ctrl, meta, shift, alt, shortcutBindings.splitClip(),
 				macPlatform)) {
 			TimelineRenderItem clip = clipAtPlayhead();
@@ -1328,6 +1373,53 @@ public final class TimelineView extends Region {
 			return;
 		}
 		commands.addZoom(startPos, startPos + defaultDuration);
+	}
+
+	/** Places a default-length grade at the playhead if it fits inside the active clip. */
+	public void addGradeAtPlayhead() {
+		double total = fullRange.end();
+		if (total <= 0) {
+			return;
+		}
+		double defaultDuration = Math.min(1_000, total);
+		if (defaultDuration <= 0) {
+			return;
+		}
+		double startPos = Math.max(0, Math.min(currentTimeMs, total));
+		Span activeClip = null;
+		boolean hasClips = false;
+		for (TimelineRenderItem item : items) {
+			if (!TimelineConstants.CLIP_ROW_ID.equals(item.rowId())) {
+				continue;
+			}
+			hasClips = true;
+			if (startPos >= item.span().start() && startPos < item.span().end()) {
+				activeClip = item.span();
+				break;
+			}
+		}
+		if (hasClips && activeClip == null) {
+			return;
+		}
+		double clipEnd = activeClip == null ? total : activeClip.end();
+		double nextGradeStart = total;
+		boolean overlapping = false;
+		for (TimelineRenderItem item : items) {
+			if (!TimelineConstants.GRADE_ROW_ID.equals(item.rowId())) {
+				continue;
+			}
+			if (startPos >= item.span().start() && startPos < item.span().end()) {
+				overlapping = true;
+			}
+			if (item.span().start() > startPos) {
+				nextGradeStart = Math.min(nextGradeStart, item.span().start());
+			}
+		}
+		double available = Math.min(clipEnd - startPos, nextGradeStart - startPos);
+		if (overlapping || available < defaultDuration) {
+			return;
+		}
+		commands.addGrade(startPos, startPos + defaultDuration);
 	}
 
 	/** Port of {@code cycleAnnotationsAtCurrentTime}. */
@@ -1640,6 +1732,10 @@ public final class TimelineView extends Region {
 				RowLayout clipRow = rowById(TimelineConstants.CLIP_ROW_ID);
 				top = (clipRow == null ? AXIS_HEIGHT : clipRow.top()) + CAPTION_STRIP_TOP_OFFSET;
 				height = CAPTION_STRIP_HEIGHT;
+			} else if ("grade".equals(hoverGhostKind)) {
+				RowLayout gradeRow = rowById(TimelineConstants.GRADE_ROW_ID);
+				top = gradeRow == null ? AXIS_HEIGHT : gradeRow.top() + gradeRow.height() * 0.1;
+				height = gradeRow == null ? 24 : gradeRow.height() * 0.8;
 			} else {
 				RowLayout zoomRow = rowById(TimelineConstants.ZOOM_ROW_ID);
 				top = zoomRow == null ? AXIS_HEIGHT : zoomRow.top() + zoomRow.height() * 0.1;
@@ -1706,6 +1802,7 @@ public final class TimelineView extends Region {
 			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
 			case CAMERA_LAYOUT -> TimelineSelection.CAMERA_LAYOUT;
 			case ELEMENT -> TimelineSelection.ELEMENT;
+			case GRADE -> TimelineSelection.GRADE;
 			case TRIM, SPEED -> TimelineSelection.CLIP;
 		};
 	}
@@ -1789,6 +1886,12 @@ public final class TimelineView extends Region {
 				for (TimelineRenderItem item : items) {
 					if (TimelineConstants.ZOOM_ROW_ID.equals(item.rowId())) {
 						drawZoom(graphics, item, row, width);
+					}
+				}
+			} else if (TimelineConstants.GRADE_ROW_ID.equals(row.id())) {
+				for (TimelineRenderItem item : items) {
+					if (TimelineConstants.GRADE_ROW_ID.equals(item.rowId())) {
+						drawGrade(graphics, item, row, width);
 					}
 				}
 			} else if (row.id().startsWith(TimelineConstants.ELEMENTS_ROW_ID)) {
@@ -2085,6 +2188,36 @@ public final class TimelineView extends Region {
 		}
 		if (isSelected(TimelineSelection.ZOOM, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, ZOOM_BORDER);
+		}
+		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
+	/** The Color-track grade block: a warm-edged card whose label names the applied sliders. */
+	private void drawGrade(GraphicsContext graphics, TimelineRenderItem item, RowLayout row,
+			double width) {
+		Span display = getRegionDisplaySpan(item.span());
+		double startX = xForTime(display.start());
+		double endX = xForTime(display.end());
+		double blockWidth = Math.max(6, endX - startX);
+		if (endX < 0 || startX > width) {
+			return;
+		}
+		double x = Math.max(-blockWidth, startX);
+		double height = row.height() * 0.85;
+		double y = row.top() + (row.height() - height) / 2;
+		graphics.setFill(GRADE_FILL);
+		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.setStroke(GRADE_BORDER);
+		graphics.setLineWidth(1);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		if (blockWidth > 24) {
+			graphics.setFont(BLOCK_FONT);
+			graphics.setFill(BLOCK_TEXT);
+			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 4,
+					y + height / 2 + 4);
+		}
+		if (isSelected(TimelineSelection.GRADE, item.id())) {
+			drawSelection(graphics, x, y, blockWidth, height, GRADE_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
@@ -2646,10 +2779,11 @@ public final class TimelineView extends Region {
 		graphics.setFont(ROW_LABEL_FONT);
 		graphics.setFill(ROW_LABEL);
 		for (RowLayout row : rowLayouts) {
-			String label = switch (row.id()) {
-				case TimelineConstants.CLIP_ROW_ID -> "CLIP";
-				case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
-				case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
+				String label = switch (row.id()) {
+					case TimelineConstants.CLIP_ROW_ID -> "CLIP";
+					case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
+					case TimelineConstants.GRADE_ROW_ID -> "COLOR";
+					case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
 				case TimelineConstants.CAMERA_LAYOUT_ROW_ID -> "CAMERA";
 				case TimelineConstants.ELEMENTS_ROW_ID + "-0" -> "ANIM";
 				default -> {

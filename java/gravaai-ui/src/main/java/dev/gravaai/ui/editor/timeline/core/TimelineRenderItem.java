@@ -47,6 +47,8 @@ public record TimelineRenderItem(
 		CAMERA_LAYOUT,
 		/** An animated element (JS component) on the elements lane; the label is the component. */
 		ELEMENT,
+		/** A color/luminosity grade on the Color track; the label names the sliders. */
+		GRADE,
 		KEYSTROKE
 	}
 }

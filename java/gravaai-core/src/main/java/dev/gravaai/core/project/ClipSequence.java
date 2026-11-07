@@ -235,6 +235,23 @@ public final class ClipSequence {
 		}
 	};
 
+	public static final Span<GradeRegion> GRADE_SPAN = new Span<>() {
+		@Override
+		public long startMs(GradeRegion value) {
+			return value.startMs();
+		}
+
+		@Override
+		public long endMs(GradeRegion value) {
+			return value.endMs();
+		}
+
+		@Override
+		public GradeRegion withSpan(GradeRegion value, long startMs, long endMs) {
+			return value.withSpan(startMs, endMs);
+		}
+	};
+
 	public static final Span<AnnotationRegion> ANNOTATION_SPAN = new Span<>() {
 		@Override
 		public long startMs(AnnotationRegion value) {

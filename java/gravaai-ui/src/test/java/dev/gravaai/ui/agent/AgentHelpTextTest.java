@@ -13,9 +13,11 @@ class AgentHelpTextTest {
 	@DisplayName("the topic list matches help.ts order")
 	@Test
 	void topics() {
-		assertEquals(18, AgentHelpText.TOPICS.size());
+		assertEquals(19, AgentHelpText.TOPICS.size());
 		assertEquals("clips", AgentHelpText.TOPICS.get(0));
-		assertEquals("conventions", AgentHelpText.TOPICS.get(17));
+		// The Color-track grade ops sit with the other region families, after speed.
+		assertEquals("color", AgentHelpText.TOPICS.get(4));
+		assertEquals("conventions", AgentHelpText.TOPICS.get(18));
 		assertTrue(AgentHelpText.TOPICS.contains("export"));
 		assertTrue(AgentHelpText.TOPICS.contains("jobs"));
 	}

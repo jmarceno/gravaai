@@ -17,6 +17,7 @@ public record TimelineSelection(String kind, String id) {
 	public static final String KEYSTROKE = "keystroke";
 	public static final String CAMERA_LAYOUT = "camera-layout";
 	public static final String ELEMENT = "element";
+	public static final String GRADE = "grade";
 
 	public TimelineSelection {
 		if (kind == null || kind.isBlank()) {

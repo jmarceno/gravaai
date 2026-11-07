@@ -71,6 +71,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final CaptionSpec captions;
 	private final KeystrokeSpec keystrokes;
 	private final FadeSpec fade;
+	private final GradeSpec grade;
 	private @Nullable MediaFrameReader wallpaperFrames;
 	private boolean closed;
 
@@ -124,6 +125,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		this.captions = ProjectEditorInputs.captionSpec(editor);
 		this.keystrokes = ProjectEditorInputs.keystrokeSpec(editor, videoPath);
 		this.fade = ProjectEditorInputs.fadeSpec(editor);
+		this.grade = ProjectEditorInputs.gradeSpec(editor);
 	}
 
 	/** Convenience: probes the media duration, empty cursor telemetry, black wallpapers, 60 fps. */
@@ -178,6 +180,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				keystrokes,
 				fade,
 				ProjectEditorInputs.sceneSpec(editor, timelineMs),
+				grade,
 				sourceTime);
 	}
 

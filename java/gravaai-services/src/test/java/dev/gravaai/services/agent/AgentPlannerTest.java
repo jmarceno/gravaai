@@ -26,6 +26,7 @@ import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.CaptionCueWord;
 import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -391,6 +392,54 @@ class AgentPlannerTest {
 		Ok cleared = ok(apply(added.state(),
 				"[{\"op\":\"delete_speed\",\"all\":true}]"));
 		assertEquals(0, cleared.state().speedRegions().size());
+	}
+
+	@Test
+	@DisplayName("adds, updates and deletes color grades; omitted sliders stay neutral")
+	void gradeCrud() {
+		Ok added = ok(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":5,\"to\":10,\"brightness\":20,\"temperature\":-30}]"));
+		assertEquals(1, added.state().gradeRegions().size());
+		GradeRegion grade = added.state().gradeRegions().get(0);
+		assertEquals("g1", added.summary().lines()
+				.filter(line -> line.startsWith("grade ")).findFirst().orElse("").split(" ")[1]);
+		assertEquals(20, grade.brightness());
+		assertEquals(-30, grade.temperature());
+		assertEquals(0, grade.contrast());
+		assertEquals(0, grade.saturation());
+		assertEquals(GradeRegion.DEFAULT_GAMMA, grade.gamma());
+
+		Ok updated = ok(apply(added.state(),
+				"[{\"op\":\"update_grade\",\"id\":\"g1\",\"saturation\":100,\"gamma\":1.4}]"));
+		GradeRegion next = updated.state().gradeRegions().get(0);
+		assertEquals(100, next.saturation());
+		assertEquals(1.4, next.gamma());
+		assertEquals(20, next.brightness());
+
+		Ok deleted = ok(apply(updated.state(),
+				"[{\"op\":\"delete_grade\",\"id\":\"g1\"}]"));
+		assertEquals(0, deleted.state().gradeRegions().size());
+	}
+
+	@Test
+	@DisplayName("rejects overlapping grades and out-of-range sliders")
+	void gradeValidation() {
+		ProjectEditorState graded = ok(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":5,\"to\":10,\"brightness\":50}]")).state();
+		failed(apply(graded, "[{\"op\":\"grade\",\"from\":7,\"to\":12}]"), "overlaps g1");
+		failed(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":1,\"to\":2,\"brightness\":500}]"),
+				"brightness must be between -100 and 100");
+		failed(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":1,\"to\":2,\"gamma\":9}]"),
+				"gamma must be between 0.2 and 2.4");
+	}
+
+	@Test
+	@DisplayName("delete_grade refuses to run without an id or all:true")
+	void gradeDeleteRequiresTarget() {
+		failed(apply(baseState(), "[{\"op\":\"delete_grade\"}]"),
+				"delete_grade needs \"id\" or \"all\": true");
 	}
 
 	@Test

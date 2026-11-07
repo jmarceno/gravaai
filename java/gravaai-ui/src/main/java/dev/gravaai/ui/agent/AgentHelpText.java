@@ -18,8 +18,8 @@ public final class AgentHelpText {
 
 	/** {@code HELP_TOPICS}: the topic names in help order. */
 	public static final List<String> TOPICS = List.of("clips", "zoom", "transcript", "speed",
-			"annotations", "elements", "audio", "captions", "settings", "sources", "history", "inspect",
-			"project", "export", "meeting", "frames", "jobs", "conventions");
+			"color", "annotations", "elements", "audio", "captions", "settings", "sources", "history",
+			"inspect", "project", "export", "meeting", "frames", "jobs", "conventions");
 
 	/** {@code HELP_INDEX}. */
 	public static final String INDEX = """
@@ -30,6 +30,7 @@ public final class AgentHelpText {
 			zoom         zoom update_zoom delete_zoom auto_zoom
 			transcript   cut_words restore_words cut_fillers cut_pauses cut_range_src
 			speed        speed delete_speed
+			color        grade update_grade delete_grade — brightness/contrast/saturation/temperature/gamma over a span
 			annotations  text image figure blur update_annotation delete_annotation
 			elements     component delete_component element update_element delete_element asset delete_asset — animated JS components (title cards, lower thirds, Lottie, shaders, 3D, anything you can draw)
 			audio        audio update_audio delete_audio source_audio
@@ -45,7 +46,7 @@ public final class AgentHelpText {
 
 	private static final String CONVENTIONS = """
 			Times are seconds on the EDITED timeline (2 decimals) unless an op says src/transcript.
-			Short ids are stable per read: c1 clip, z1 zoom, s1 speed, a1 annotation, e1 element, m1 audio, q1 caption cue, w1 transcript word. Within one edit batch every id means what your last read showed, even after earlier ops renumber things; re-read after the batch.
+			Short ids are stable per read: c1 clip, z1 zoom, s1 speed, a1 annotation, e1 element, m1 audio, q1 caption cue, w1 transcript word, g1 color grade. Within one edit batch every id means what your last read showed, even after earlier ops renumber things; re-read after the batch.
 			Every read returns rev. edit accepts rev; if the project changed since you read it, the edit fails with STALE + a fresh overview — re-read and retry.
 			edit ops run in order on a copy; one failing op rolls the whole batch back and names its index.""".stripTrailing();
 
@@ -80,6 +81,13 @@ public final class AgentHelpText {
 			speed {from,to,rate} — rate is one of 0.25,0.5,0.75,1.25,1.5,1.75,2.
 			delete_speed {id} | {all:true}
 			Speed regions are timeline overlays; to actually shorten footage use clip {speed} instead.""".stripTrailing();
+
+	private static final String COLOR = """
+			grade {from,to, brightness?, contrast?, saturation?, temperature?, gamma?} — a color/luminosity grade over that timeline span; omitted sliders stay neutral.
+			  brightness -100..100 (additive light), contrast -100..100, saturation -100..100 (0 = grayscale), temperature -100..100 (positive = warm, negative = cool), gamma 0.2..2.4 (1 = neutral, >1 lifts midtones).
+			update_grade {id, from?,to?, brightness?, contrast?, saturation?, temperature?, gamma?}
+			delete_grade {id} | {all:true}
+			Grades shade the recorded screen only (webcam, captions and overlays keep their look) and may not overlap; when two spans should look different, delete or shrink the first.""".stripTrailing();
 
 	private static final String ANNOTATIONS = """
 			text {from,to,text, x?,y?,w?,h?, style?:{fontSize?,bold?,italic?,color?,backgroundColor?,align?}}
@@ -240,6 +248,7 @@ public final class AgentHelpText {
 			case "zoom" -> ZOOM;
 			case "transcript" -> TRANSCRIPT;
 			case "speed" -> SPEED;
+			case "color" -> COLOR;
 			case "annotations" -> ANNOTATIONS;
 			case "elements" -> ELEMENTS;
 			case "audio" -> AUDIO;

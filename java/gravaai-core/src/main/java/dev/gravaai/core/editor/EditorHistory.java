@@ -10,6 +10,7 @@ import dev.gravaai.core.project.AnnotationRegion;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.ZoomRegion;
 
@@ -41,6 +42,8 @@ public final class EditorHistory {
 			List<String> multiSelectedIds,
 			List<dev.gravaai.core.project.KeystrokeElement> keystrokeElements,
 			@Nullable String selectedKeystrokeId,
+			List<dev.gravaai.core.project.GradeRegion> gradeRegions,
+			@Nullable String selectedGradeId,
 			List<dev.gravaai.core.project.CameraLayoutSegment> cameraLayoutSegments,
 			@Nullable String selectedCameraLayoutId,
 			List<dev.gravaai.core.project.ElementComponent> elementComponents,
@@ -63,8 +66,8 @@ public final class EditorHistory {
 			this(zoomRegions, clipRegions, speedRegions, annotationRegions, audioRegions,
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
 				sourceAudioTrackSettingsByClip, multiSelectedIds, keystrokeElements,
-				selectedKeystrokeId, cameraLayoutSegments, selectedCameraLayoutId, List.of(),
-				List.of(), List.of(), java.util.Optional.empty());
+				selectedKeystrokeId, List.of(), null, cameraLayoutSegments, selectedCameraLayoutId,
+				List.of(), List.of(), List.of(), java.util.Optional.empty());
 		}
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
@@ -173,6 +176,8 @@ public final class EditorHistory {
 				List.copyOf(snapshot.multiSelectedIds()),
 				List.copyOf(snapshot.keystrokeElements()),
 				snapshot.selectedKeystrokeId(),
+				List.copyOf(snapshot.gradeRegions()),
+				snapshot.selectedGradeId(),
 				List.copyOf(snapshot.cameraLayoutSegments()),
 				snapshot.selectedCameraLayoutId(),
 				List.copyOf(snapshot.elementComponents()),

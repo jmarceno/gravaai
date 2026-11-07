@@ -399,6 +399,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 			case ELEMENT -> state.elements().stream().map(element -> element.id()).toList();
 			case CAMERA -> state.cameraLayoutSegments().stream()
 					.map(segment -> segment.id()).toList();
+			case GRADE -> state.gradeRegions().stream().map(grade -> grade.id()).toList();
 		};
 	}
 

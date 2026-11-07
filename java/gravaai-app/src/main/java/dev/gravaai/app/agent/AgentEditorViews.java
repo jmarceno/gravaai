@@ -18,6 +18,7 @@ import dev.gravaai.core.project.AutoCaptionSettings;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
+import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.SceneElement;
@@ -110,7 +111,8 @@ final class AgentEditorViews {
 		lines.add("edited: " + seconds(editedMs) + "s \u2022 aspect " + state.aspectRatio());
 		lines.add("clips " + count(state.clipRegions()) + " \u2022 zooms "
 				+ count(state.zoomRegions()) + " \u2022 speed "
-				+ count(state.speedRegions()) + " \u2022 annotations "
+				+ count(state.speedRegions()) + " \u2022 grades "
+				+ count(state.gradeRegions()) + " \u2022 annotations "
 				+ count(state.annotationRegions()) + " \u2022 audio "
 				+ count(state.audioRegions()) + " \u2022 caption cues "
 				+ count(state.autoCaptions()) + (hasTranscript ? " (transcript)" : ""));
@@ -346,6 +348,20 @@ final class AgentEditorViews {
 				lines.add("  " + ids.speedShortById().getOrDefault(region.id(), "?") + " "
 						+ seconds(region.startMs()) + "\u2013" + seconds(region.endMs()) + " "
 						+ String.format(Locale.ROOT, "%.2fx", region.speed()));
+			}
+		}
+
+		List<GradeRegion> grades = new ArrayList<>(state.gradeRegions());
+		grades.sort(Comparator.comparingLong(GradeRegion::startMs));
+		List<GradeRegion> visibleGrades = grades.stream()
+				.filter(region -> overlaps(region.startMs(), region.endMs(), windowFrom, windowTo))
+				.toList();
+		if (!visibleGrades.isEmpty()) {
+			lines.add("grades:");
+			for (GradeRegion region : visibleGrades) {
+				lines.add("  " + ids.gradeShortById().getOrDefault(region.id(), "?") + " "
+						+ seconds(region.startMs()) + "\u2013" + seconds(region.endMs()) + " "
+						+ gradeFlags(region));
 			}
 		}
 
@@ -604,6 +620,32 @@ final class AgentEditorViews {
 
 	private static boolean overlaps(long startMs, long endMs, long fromMs, long toMs) {
 		return endMs > fromMs && startMs < toMs;
+	}
+
+	/** The moved grade sliders of one region, e.g. {@code +20 light warm -30 sat 1.20 gamma}. */
+	private static String gradeFlags(GradeRegion region) {
+		StringBuilder flags = new StringBuilder();
+		if (region.brightness() != 0) {
+			flags.append(' ').append(String.format(Locale.ROOT, "%+.0f", region.brightness()))
+					.append(" light");
+		}
+		if (region.contrast() != 0) {
+			flags.append(' ').append(String.format(Locale.ROOT, "%+.0f", region.contrast()))
+					.append(" contrast");
+		}
+		if (region.saturation() != 0) {
+			flags.append(' ').append(String.format(Locale.ROOT, "%+.0f", region.saturation()))
+					.append(" sat");
+		}
+		if (region.temperature() != 0) {
+			flags.append(region.temperature() > 0 ? " warm " : " cool ")
+					.append(String.format(Locale.ROOT, "%.0f", Math.abs(region.temperature())));
+		}
+		if (region.gamma() != GradeRegion.DEFAULT_GAMMA) {
+			flags.append(' ').append(String.format(Locale.ROOT, "%.2f", region.gamma()))
+					.append(" gamma");
+		}
+		return flags.isEmpty() ? "neutral" : flags.toString().strip();
 	}
 
 	private static int count(List<?> values) {

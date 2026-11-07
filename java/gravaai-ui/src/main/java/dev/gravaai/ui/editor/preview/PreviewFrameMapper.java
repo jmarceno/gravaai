@@ -10,6 +10,7 @@ import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.media.compose.Background;
 import dev.gravaai.media.compose.FrameInput;
+import dev.gravaai.media.compose.GradeSpec;
 import dev.gravaai.media.compose.ProjectEditorInputs;
 import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.compose.CursorSample;
@@ -306,11 +307,13 @@ public final class PreviewFrameMapper {
 		WebcamSpec webcam = scene.editor() == null ? scene.webcam()
 				: ProjectEditorInputs.webcamSpecAt(scene.webcam(), scene.editor(),
 						frame.timelineSeconds() * 1000);
+		GradeSpec grade = scene.editor() == null ? GradeSpec.NONE
+				: ProjectEditorInputs.gradeSpec(scene.editor());
 		return new FrameInput(frame.frameIndex(), frame.timelineSeconds(), frame.sourceFrame(),
 				frame.webcamFrame(), webcamMask, scene.cursor().around(sourceSeconds), background,
 				scene.backgroundBlur(), scene.layout(), scene.zoom(), scene.style(),
 				scene.cursorSpec(), webcam, scene.annotations(), scene.captions(),
-				keystrokes, scene.fade(), sceneSpec, sourceSeconds);
+				keystrokes, scene.fade(), sceneSpec, grade, sourceSeconds);
 	}
 
 	/** A background-only frame (idle preview, gap over the timeline start). */

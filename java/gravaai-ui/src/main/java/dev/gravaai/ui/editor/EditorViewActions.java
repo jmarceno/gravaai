@@ -167,6 +167,9 @@ public interface EditorViewActions {
 	/** Timeline toolbar: add a zoom region at the playhead. */
 	default void addZoom() {}
 
+	/** Timeline toolbar: add a color/luminosity grade at the playhead (the Color track). */
+	default void addColorGrade() {}
+
 	/** Timeline toolbar: request auto-zoom suggestions from the cursor telemetry. */
 	default void suggestZooms() {}
 

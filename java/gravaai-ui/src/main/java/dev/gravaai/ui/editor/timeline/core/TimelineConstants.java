@@ -4,6 +4,7 @@ package dev.gravaai.ui.editor.timeline.core;
 public final class TimelineConstants {
 
 	public static final String ZOOM_ROW_ID = "row-zoom";
+	public static final String GRADE_ROW_ID = "row-grade";
 	public static final String CLIP_ROW_ID = "row-clip";
 	public static final String ANNOTATION_ROW_ID = "row-annotation";
 	public static final String AUDIO_ROW_ID = "row-audio";

@@ -62,6 +62,7 @@ public record ProjectEditorState(
 		@Nullable String autoFullTrackClipId,
 		@Nullable Long autoFullTrackClipEndMs,
 		List<SpeedRegion> speedRegions,
+		List<GradeRegion> gradeRegions,
 		List<AnnotationRegion> annotationRegions,
 		List<AudioRegion> audioRegions,
 		List<CaptionCue> autoCaptions,
@@ -97,6 +98,7 @@ public record ProjectEditorState(
 				zoomClassicMode, cursorMotionBlur, cursorClickBounce, cursorClickBounceDuration,
 				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
+				gradeRegions,
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, sourceAudioTrackSettingsByClip,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
@@ -123,6 +125,7 @@ public record ProjectEditorState(
 				zoomClassicMode, cursorMotionBlur, cursorClickBounce, cursorClickBounceDuration,
 				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
 				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
+				gradeRegions,
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, normalized,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
@@ -192,6 +195,7 @@ public record ProjectEditorState(
 		private @Nullable String autoFullTrackClipId;
 		private @Nullable Long autoFullTrackClipEndMs;
 		private List<SpeedRegion> speedRegions;
+		private List<GradeRegion> gradeRegions;
 		private List<AnnotationRegion> annotationRegions;
 		private List<AudioRegion> audioRegions;
 		private List<CaptionCue> autoCaptions;
@@ -255,6 +259,7 @@ public record ProjectEditorState(
 			autoFullTrackClipId = state.autoFullTrackClipId;
 			autoFullTrackClipEndMs = state.autoFullTrackClipEndMs;
 			speedRegions = state.speedRegions;
+			gradeRegions = state.gradeRegions;
 			annotationRegions = state.annotationRegions;
 			audioRegions = state.audioRegions;
 			autoCaptions = state.autoCaptions;
@@ -498,6 +503,11 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder gradeRegions(List<GradeRegion> value) {
+			gradeRegions = value;
+			return this;
+		}
+
 		public Builder annotationRegions(List<AnnotationRegion> value) {
 			annotationRegions = value;
 			return this;
@@ -629,6 +639,7 @@ public record ProjectEditorState(
 				case "autoFullTrackClipId" -> autoFullTrackClipId = from.autoFullTrackClipId;
 				case "autoFullTrackClipEndMs" -> autoFullTrackClipEndMs = from.autoFullTrackClipEndMs;
 				case "speedRegions" -> speedRegions = from.speedRegions;
+				case "gradeRegions" -> gradeRegions = from.gradeRegions;
 				case "annotationRegions" -> annotationRegions = from.annotationRegions;
 				case "audioRegions" -> audioRegions = from.audioRegions;
 				case "autoCaptions" -> autoCaptions = from.autoCaptions;
@@ -697,6 +708,7 @@ public record ProjectEditorState(
 					autoFullTrackClipId,
 					autoFullTrackClipEndMs,
 					speedRegions,
+					gradeRegions,
 					annotationRegions,
 					audioRegions,
 					autoCaptions,

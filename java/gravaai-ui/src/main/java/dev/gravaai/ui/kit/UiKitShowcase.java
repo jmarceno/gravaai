@@ -203,7 +203,7 @@ public final class UiKitShowcase {
 			chip.setMinSize(44, 32);
 			chip.setPrefSize(44, 32);
 			chip.setStyle("-fx-background-color: " + ColorMath.toHex(color)
-					+ "; -fx-background-radius: 8px; -fx-border-color: #222b33; -fx-border-radius: 8px;");
+					+ "; -fx-background-radius: 4px; -fx-border-color: #222b33; -fx-border-radius: 4px;");
 			Label name = new Label((String) entry[0]);
 			name.getStyleClass().add("showcase-state");
 			swatches.getChildren().add(new VBox(4, chip, name));
@@ -338,7 +338,7 @@ public final class UiKitShowcase {
 		for (int i = 0; i < 3; i++) {
 			VBox card = new VBox(8, new Skeleton(180, 100), new Skeleton(120, 14), new Skeleton(90, 14));
 			card.setPadding(new Insets(12));
-			card.setStyle("-fx-background-color: -g-surface; -fx-background-radius: 16px;");
+			card.setStyle("-fx-background-color: -g-surface; -fx-background-radius: 6px;");
 			cards.getChildren().add(card);
 		}
 		return section("Skeleton — skeleton.tsx (shimmer 2 s linear infinite)",

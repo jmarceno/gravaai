@@ -164,7 +164,7 @@ public final class CapturePickerOverlay implements AutoCloseable {
 						+ "-fx-text-fill: -g-fg;"
 						+ "-fx-font-size: 12px;"
 						+ "-fx-padding: 6 12;"
-						+ "-fx-background-radius: 12;");
+						+ "-fx-background-radius: 4px;");
 		StackPane.setAlignment(hint, Pos.BOTTOM_CENTER);
 		StackPane.setMargin(hint, new Insets(0, 0, 24, 0));
 

@@ -110,7 +110,7 @@ public final class AgentTimelineHighlights extends Pane {
 		pill.setMouseTransparent(true);
 		pill.setStyle("-fx-background-color: " + colour
 				+ "; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: 600;"
-				+ " -fx-padding: 1 6 1 6; -fx-background-radius: 999;");
+				+ " -fx-padding: 1 6 1 6; -fx-background-radius: 2px;");
 		pill.applyCss();
 		pill.autosize();
 		pill.setLayoutX(x - pill.prefWidth(-1) / 2);
@@ -140,7 +140,7 @@ public final class AgentTimelineHighlights extends Pane {
 		pill.setMouseTransparent(true);
 		pill.setStyle("-fx-background-color: " + colour
 				+ "; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: 600;"
-				+ " -fx-padding: 1 6 1 6; -fx-background-radius: 999;");
+				+ " -fx-padding: 1 6 1 6; -fx-background-radius: 2px;");
 		pill.applyCss();
 		pill.autosize();
 		pill.setLayoutX(x);

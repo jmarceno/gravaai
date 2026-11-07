@@ -103,7 +103,7 @@ public final class KeyboardShortcutsHelp {
 		Label kbd = new Label(keys);
 		kbd.setStyle(
 				"-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.8); "
-						+ "-fx-background-color: rgba(255,255,255,0.08); "
+						+ " -fx-background-color: #1a2127; "
 						+ "-fx-background-radius: 4px; -fx-padding: 1 5 1 5; "
 						+ "-fx-font-family: monospace;");
 		HBox row = new HBox(8, name, spacer(), kbd);

@@ -45,7 +45,7 @@ public final class CaptionListPanel extends VBox {
 		this.playback = playback;
 		setSpacing(12);
 		setPadding(new Insets(10));
-		setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 8px;");
+		setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 4px;");
 		refresh();
 		subscription = store.onChange(changed -> Platform.runLater(this::refresh));
 	}

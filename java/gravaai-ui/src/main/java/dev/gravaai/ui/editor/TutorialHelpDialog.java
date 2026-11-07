@@ -36,8 +36,8 @@ public final class TutorialHelpDialog {
 		VBox explanationCard = new VBox(explanation);
 		explanationCard.setPadding(new Insets(16));
 		explanationCard.setStyle("-fx-background-color: rgba(255,255,255,0.04); "
-				+ "-fx-background-radius: 8px; -fx-border-color: rgba(255,255,255,0.05); "
-				+ "-fx-border-radius: 8px;");
+				+ "-fx-background-radius: 4px; -fx-border-color: rgba(255,255,255,0.05); "
+				+ "-fx-border-radius: 4px;");
 
 		Label visualTitle = new Label("VISUAL EXAMPLE");
 		visualTitle.setStyle("-fx-font-size: 11px; -fx-text-fill: -g-muted; "
@@ -46,8 +46,8 @@ public final class TutorialHelpDialog {
 		Pane track = new Pane();
 		track.setPrefHeight(96);
 		track.setMinHeight(96);
-		track.setStyle("-fx-background-color: #000000; -fx-background-radius: 8px; "
-				+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 8px;");
+		track.setStyle("-fx-background-color: #000000; -fx-background-radius: 4px; "
+				+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 4px;");
 		Rectangle kept = new Rectangle();
 		kept.setHeight(8);
 		kept.setArcWidth(8);
@@ -72,8 +72,8 @@ public final class TutorialHelpDialog {
 		result.setMinHeight(48);
 		result.setPrefHeight(48);
 		result.setAlignment(Pos.CENTER);
-		result.setStyle("-fx-background-color: #000000; -fx-background-radius: 8px; "
-				+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 8px;");
+		result.setStyle("-fx-background-color: #000000; -fx-background-radius: 4px; "
+				+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 4px;");
 		for (int part = 1; part <= 3; part++) {
 			Label label = new Label("Part " + part);
 			label.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");

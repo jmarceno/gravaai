@@ -65,15 +65,15 @@ public final class Theme {
 	public static final Color BORDER_SECONDARY = Color.web("#28323a");
 	public static final Color BORDER_TERTIARY = Color.web("#38424b");
 
-	/** Radius scale: the Instrument 2–4px radii plus the kit's larger dialog radii. */
+	/** Radius scale — the Instrument shape language: 2px rails, 3px segments, 4px controls, 8px panels. */
 	public static final double RADIUS_XS = 2;
-	public static final double RADIUS_SM = 4;
-	public static final double RADIUS_MD = 6;
-	public static final double RADIUS_LG = 8;
-	public static final double RADIUS_XL = 12;
-	public static final double RADIUS_2XL = 16;
-	public static final double RADIUS_3XL = 24;
-	public static final double RADIUS_4XL = 32;
+	public static final double RADIUS_SM = 3;
+	public static final double RADIUS_MD = 4;
+	public static final double RADIUS_LG = 5;
+	public static final double RADIUS_XL = 6;
+	public static final double RADIUS_2XL = 8;
+	public static final double RADIUS_3XL = 8;
+	public static final double RADIUS_4XL = 8;
 
 	/** {@code --disabled-opacity}. */
 	public static final double DISABLED_OPACITY = 0.5;

@@ -84,16 +84,17 @@
 	-g-backdrop: rgba(0, 0, 0, 0.6);
 	-g-icon-color: #e9f1f4;
 
-	/* Radii (@heroui/styles --radius: 0.5rem; index.css does not override it). */
+	/* Radii — the Instrument shape language (docs/mocks/editor-instrument.html): 2px rails and
+	   swatches, 3px segmented/fields, 4px buttons and controls, 5px containers, 8px panels. */
 	-g-radius-xs: 2px;
-	-g-radius-sm: 4px;
-	-g-radius-md: 6px;
-	-g-radius-lg: 8px;
-	-g-radius-xl: 12px;
-	-g-radius-2xl: 16px;
-	-g-radius-3xl: 24px;
-	-g-radius-4xl: 32px;
-	-g-radius-field: 12px;
+	-g-radius-sm: 3px;
+	-g-radius-md: 4px;
+	-g-radius-lg: 5px;
+	-g-radius-xl: 6px;
+	-g-radius-2xl: 8px;
+	-g-radius-3xl: 8px;
+	-g-radius-4xl: 8px;
+	-g-radius-field: 4px;
 
 	/* Typography (index.css @font-face "DM Sans", loaded by AppFonts before any scene). */
 	-fx-font-family: "DM Sans";
@@ -140,13 +141,13 @@
 }
 
 /* ==========================================================================
-   Button — @heroui/styles components/button.css
-   h-9 (36px) desktop value, rounded-3xl (24px), px-4 (16px), gap-2 (8px), text-sm (14px)
+   Button — Instrument mock .btn: 4px radius, 28px height, 12.5px text. The 36px
+   height is kept for hit area; the radius follows the mock's squared language.
    ========================================================================== */
 
 .button {
 	-fx-background-color: -g-accent;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 	-fx-background-insets: 0;
 	-fx-text-fill: -g-accent-foreground;
 	-fx-font-size: 14px;
@@ -163,11 +164,11 @@
 	-fx-cursor: default;
 }
 
-/* Focus ring: ring-2 ring-focus, drawn as an outer background layer (no layout shift). */
+/* Focus ring: 2px halo, drawn as an outer background layer (no layout shift). */
 .button:focused {
 	-fx-background-color: -g-focus, -g-accent;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 26px, 24px;
+	-fx-background-radius: 6px, 4px;
 }
 
 .button .g-icon {
@@ -182,7 +183,10 @@
 
 .button--secondary {
 	-fx-background-color: -g-default;
-	-fx-text-fill: -g-accent-soft-foreground;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 4px;
+	-fx-text-fill: -g-default-foreground;
 }
 
 .button--tertiary {
@@ -199,7 +203,7 @@
 .button--outline {
 	-fx-border-color: -g-border;
 	-fx-border-width: 1px;
-	-fx-border-radius: 24px;
+	-fx-border-radius: 4px;
 }
 
 .button--danger {
@@ -354,7 +358,7 @@
 
 .toggle-button {
 	-fx-background-color: -g-default;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 	-fx-text-fill: -g-default-foreground;
 	-fx-font-size: 14px;
 	-fx-font-weight: 500;
@@ -381,7 +385,7 @@
 .toggle-button:focused {
 	-fx-background-color: -g-focus, -g-default;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 26px, 24px;
+	-fx-background-radius: 6px, 4px;
 }
 
 /* Opaque accent-soft (pre-blended over -g-bg) so the focus layer does not show through. */
@@ -405,7 +409,7 @@
 .toggle-button--outline {
 	-fx-border-color: -g-border;
 	-fx-border-width: 1px;
-	-fx-border-radius: 24px;
+	-fx-border-radius: 4px;
 }
 
 .toggle-button--sm {
@@ -438,15 +442,15 @@
 }
 
 .toggle-group .toggle-button:first-child {
-	-fx-background-radius: 24px 0 0 24px;
+	-fx-background-radius: 4px 0 0 4px;
 }
 
 .toggle-group .toggle-button:last-child {
-	-fx-background-radius: 0 24px 24px 0;
+	-fx-background-radius: 0 4px 4px 0;
 }
 
 .toggle-group .toggle-button:first-child:last-child {
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 }
 
 .toggle-group__separator {
@@ -466,7 +470,7 @@
 .toggle-group--detached .toggle-button,
 .toggle-group--detached .toggle-button:first-child,
 .toggle-group--detached .toggle-button:last-child {
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 }
 
 /* ==========================================================================
@@ -627,7 +631,7 @@
 
 .slider__thumb-pill {
 	-fx-background-color: #e9f1f4;
-	-fx-background-radius: 999px;
+	-fx-background-radius: 2px;
 	-fx-min-width: 9px;
 	-fx-pref-width: 9px;
 	-fx-max-width: 9px;
@@ -695,7 +699,7 @@
 .text-field,
 .input {
 	-fx-background-color: -g-field;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-background-insets: 0;
 	-fx-text-fill: -g-field-foreground;
 	-fx-prompt-text-fill: -g-field-placeholder;
@@ -715,7 +719,7 @@
 .input:focused {
 	-fx-background-color: -g-focus, -g-field-focus;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 14px, 12px;
+	-fx-background-radius: 6px, 4px;
 }
 
 .text-field:disabled,
@@ -726,7 +730,7 @@
 .text-area,
 .textarea {
 	-fx-background-color: -g-field;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-text-fill: -g-field-foreground;
 	-fx-prompt-text-fill: -g-field-placeholder;
 	-fx-font-size: 14px;
@@ -735,22 +739,22 @@
 
 .text-area .content {
 	-fx-background-color: transparent;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 }
 
 .text-area:focused {
 	-fx-background-color: -g-focus, -g-field-focus;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 14px, 12px;
+	-fx-background-radius: 6px, 4px;
 }
 
 /* ==========================================================================
-   Card — card.css. bg-surface, radius 24, p-4 (16), gap-3 (12).
+   Card — Instrument panel surface: 8px radius, p-4 (16), gap-3 (12).
    ========================================================================== */
 
 .card {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 16px;
 	-fx-spacing: 12px;
 }
@@ -827,7 +831,7 @@
 
 .popover {
 	-fx-background-color: -g-overlay;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 0;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.15, 0, 8);
 }
@@ -860,7 +864,7 @@
 
 .menu-item {
 	-fx-background-color: transparent;
-	-fx-background-radius: 16px;
+	-fx-background-radius: 4px;
 	-fx-padding: 6px 8px 6px 8px;
 	-fx-spacing: 12px;
 	-fx-min-height: 36px;
@@ -877,7 +881,7 @@
 .menu-item:focused {
 	-fx-background-color: -g-focus, -g-default;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 18px, 16px;
+	-fx-background-radius: 6px, 4px;
 }
 
 .menu-item:disabled {
@@ -890,7 +894,7 @@
 
 .menu-item__shortcut {
 	-fx-background-color: -g-default;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 3px;
 	-fx-padding: 2px 6px 2px 6px;
 	-fx-font-size: 11px;
 	-fx-text-fill: -g-muted;
@@ -914,7 +918,7 @@
 
 .list-box-item {
 	-fx-background-color: transparent;
-	-fx-background-radius: 16px;
+	-fx-background-radius: 4px;
 	-fx-padding: 6px 28px 6px 8px;
 	-fx-spacing: 12px;
 	-fx-min-height: 36px;
@@ -931,7 +935,7 @@
 .list-box-item:focused {
 	-fx-background-color: -g-focus, -g-default;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 18px, 16px;
+	-fx-background-radius: 6px, 4px;
 }
 
 .list-box-item__indicator {
@@ -949,7 +953,7 @@
 
 .select__trigger {
 	-fx-background-color: -g-field;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-padding: 8px 28px 8px 12px;
 	-fx-min-height: 36px;
 	-fx-text-fill: -g-field-foreground;
@@ -967,7 +971,7 @@
 .select__trigger:showing {
 	-fx-background-color: -g-focus, -g-field-focus;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 14px, 12px;
+	-fx-background-radius: 6px, 4px;
 }
 
 .select__trigger:disabled {
@@ -998,7 +1002,7 @@
 
 .tooltip {
 	-fx-background-color: -g-overlay;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-padding: 8px;
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-fg;
@@ -1016,7 +1020,7 @@
 
 .dialog {
 	-fx-background-color: -g-overlay;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 24px;
 	-fx-spacing: 16px;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 40, 0.12, 0, 12);
@@ -1044,7 +1048,7 @@
 
 .dialog__close-button {
 	-fx-background-color: transparent;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 6px;
 	-fx-cursor: hand;
 	-g-icon-color: -g-muted;
@@ -1056,8 +1060,8 @@
 }
 
 /* ==========================================================================
-   Tabs — tabs.css. Container bg-default r20, list p-1 (4), tab h-8 (32) r24
-   px-4 (16) text-sm (14) medium; indicator bg-segment r24, 250ms ease-out-fluid.
+   Tabs — Instrument segmented language: container 5px, tab 4px, px-4, 32px high.
+
    ========================================================================== */
 
 .tabs {
@@ -1065,8 +1069,11 @@
 }
 
 .tabs__list-container {
-	-fx-background-color: -g-default;
-	-fx-background-radius: 20px;
+	-fx-background-color: -g-field;
+	-fx-background-radius: 4px;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 4px;
 	-fx-padding: 0;
 }
 
@@ -1078,7 +1085,7 @@
 
 .tabs__tab {
 	-fx-background-color: transparent;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 	-fx-min-height: 32px;
 	-fx-pref-height: 32px;
 	-fx-padding: 0 16px 0 16px;
@@ -1099,7 +1106,7 @@
 
 .tabs__indicator {
 	-fx-background-color: -g-segment;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 4px;
 }
 
 .tabs__tab:disabled {
@@ -1109,7 +1116,7 @@
 .tabs__tab:focused {
 	-fx-background-color: -g-focus, -g-segment;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 26px, 24px;
+	-fx-background-radius: 6px, 4px;
 	-fx-text-fill: -g-segment-foreground;
 }
 
@@ -1199,7 +1206,7 @@
 
 .toast {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 12px 16px 12px 16px;
 	-fx-spacing: 6px;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.15, 0, 8);
@@ -1229,7 +1236,7 @@
 
 .toast__close-button {
 	-fx-background-color: transparent;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-padding: 4px;
 	-fx-cursor: hand;
 	-g-icon-color: -g-muted;
@@ -1259,45 +1266,58 @@
 }
 
 .tag-group__list {
-	-fx-spacing: 8px;
+	/* Instrument .seg: a sunken well with a hairline, 2px inner padding, 2px chips. */
+	-fx-background-color: -g-field;
+	-fx-background-radius: 4px;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
+	-fx-padding: 2px;
+	-fx-hgap: 2px;
+	-fx-vgap: 2px;
 }
 
 .tag {
-	-fx-background-color: -g-default;
-	-fx-background-radius: 12px;
-	-fx-padding: 4px 8px 4px 8px;
-	-fx-min-height: 32px;
-	-fx-font-size: 12px;
+	-fx-background-color: transparent;
+	-fx-background-radius: 3px;
+	-fx-border-width: 0;
+	-fx-padding: 2px 8px 2px 8px;
+	-fx-min-height: 22px;
+	-fx-font-size: 11px;
 	-fx-font-weight: 500;
-	-fx-text-fill: -g-default-foreground;
+	-fx-text-fill: -g-muted;
 	-fx-alignment: center;
 	-fx-cursor: hand;
 	-fx-graphic-text-gap: 4px;
 }
 
 .tag:hover {
-	-fx-background-color: -g-default-hover;
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-fg;
 }
 
 .tag:selected {
-	-fx-background-color: -g-accent-soft;
-	-fx-text-fill: -g-accent-soft-foreground;
+	-fx-background-color: -g-surface-tertiary;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1px;
+	-fx-border-radius: 3px;
+	-fx-text-fill: -g-fg;
 }
 
 .tag:selected:hover {
-	-fx-background-color: -g-accent-soft-hover;
+	-fx-background-color: -g-surface-tertiary;
 }
 
 .tag:focused {
-	-fx-background-color: -g-focus, -g-default;
+	-fx-background-color: -g-focus, -g-surface-tertiary;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 14px, 12px;
+	-fx-background-radius: 5px, 3px;
 }
 
 .tag:selected:focused {
-	-fx-background-color: -g-focus, #162a2a;
+	-fx-background-color: -g-focus, -g-surface-tertiary;
 	-fx-background-insets: -2, 0;
-	-fx-background-radius: 14px, 12px;
+	-fx-background-radius: 5px, 3px;
 }
 
 .tag:disabled {
@@ -1357,7 +1377,7 @@
 }
 
 .color-area {
-	-fx-background-radius: 8px;
+	-fx-background-radius: 4px;
 	-fx-min-height: 160px;
 	-fx-pref-height: 160px;
 }
@@ -1366,7 +1386,7 @@
 	-fx-background-color: transparent;
 	-fx-border-color: #ffffff;
 	-fx-border-width: 2px;
-	-fx-border-radius: 10px;
+	-fx-border-radius: 5px;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 6, 0.2, 0, 1);
 	-fx-min-width: 20px;
 	-fx-pref-width: 20px;
@@ -1379,14 +1399,14 @@
 .color-slider__track {
 	-fx-min-height: 20px;
 	-fx-pref-height: 20px;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 }
 
 .color-slider__thumb {
 	-fx-background-color: transparent;
 	-fx-border-color: #ffffff;
 	-fx-border-width: 2px;
-	-fx-border-radius: 8px;
+	-fx-border-radius: 4px;
 	-fx-min-width: 24px;
 	-fx-pref-width: 24px;
 	-fx-max-width: 24px;
@@ -1403,7 +1423,7 @@
 	-fx-background-color: transparent;
 	-fx-padding: 2px;
 	-fx-cursor: hand;
-	-fx-background-radius: 8px;
+	-fx-background-radius: 4px;
 }
 
 .color-picker__swatch-button:hover {
@@ -1483,7 +1503,7 @@
 .source-selector-scroll .scroll-bar:horizontal { -fx-pref-height: 5px; }
 .source-selector-scroll .scroll-bar .thumb {
 	-fx-background-color: rgba(107, 107, 120, 0.4);
-	-fx-background-radius: 20px;
+	-fx-background-radius: 2px;
 }
 
 /* ==========================================================================
@@ -1502,7 +1522,7 @@
 
 .scroll-bar .thumb {
 	-fx-background-color: -g-scrollbar-thumb;
-	-fx-background-radius: 8px;
+	-fx-background-radius: 2px;
 }
 
 .scroll-bar .increment-button,
@@ -1540,7 +1560,7 @@
 
 .showcase-section {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 24px;
+	-fx-background-radius: 8px;
 	-fx-padding: 16px;
 	-fx-spacing: 12px;
 }
@@ -1623,12 +1643,12 @@
 .progress-bar > .track {
 	-fx-background-color: rgba(255, 255, 255, 0.05);
 	-fx-background-insets: 0;
-	-fx-background-radius: 999px;
+	-fx-background-radius: 2px;
 }
 
 .progress-bar > .bar {
 	-fx-background-color: -g-accent;
 	-fx-background-insets: 0;
-	-fx-background-radius: 999px;
+	-fx-background-radius: 2px;
 	-fx-padding: 4px;
 }

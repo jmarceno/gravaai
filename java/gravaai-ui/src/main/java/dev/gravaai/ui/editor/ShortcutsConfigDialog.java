@@ -147,7 +147,7 @@ public final class ShortcutsConfigDialog {
 			HBox row = new HBox(12, new Label(Shortcuts.label(action)), spacer(), binding);
 			row.setAlignment(Pos.CENTER_LEFT);
 			row.setPadding(new Insets(8, 0, 8, 0));
-			row.setStyle("-fx-border-color: transparent transparent rgba(255,255,255,0.06) transparent;");
+			row.setStyle("-fx-border-color: transparent transparent #171e24 transparent;");
 			list.getChildren().add(row);
 
 			if (conflictFor == action && conflict instanceof Shortcuts.ConfigurableConflict other) {
@@ -160,7 +160,7 @@ public final class ShortcutsConfigDialog {
 		for (Shortcuts.FixedShortcut fixed : Shortcuts.FIXED_SHORTCUTS) {
 			Label keys = new Label(fixed.display());
 			keys.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.8); "
-					+ "-fx-background-color: rgba(255,255,255,0.08); "
+					+ " -fx-background-color: #1a2127; "
 					+ "-fx-background-radius: 4px; -fx-padding: 2 8 2 8;");
 			HBox row = new HBox(12, new Label(fixed.label()), spacer(), keys);
 			row.setAlignment(Pos.CENTER_LEFT);

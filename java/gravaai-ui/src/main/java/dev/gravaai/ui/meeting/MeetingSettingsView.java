@@ -129,7 +129,7 @@ public final class MeetingSettingsView extends VBox {
 			Label label = new Label(error);
 			label.setWrapText(true);
 			label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.DANGER)
-					+ "; -fx-background-color: rgba(229,101,110,0.1); -fx-background-radius: 12;"
+					+ "; -fx-background-color: rgba(229,101,110,0.1); -fx-background-radius: 4px;"
 					+ " -fx-padding: 8 12 8 12;");
 			rows.getChildren().add(label);
 		}
@@ -217,8 +217,8 @@ public final class MeetingSettingsView extends VBox {
 	private Node buildApi(MeetingSettings settings) {
 		VBox card = new VBox(16);
 		card.setPadding(new Insets(16));
-		card.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 16;"
-				+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 16;");
+		card.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 6px;"
+				+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 6px;");
 		Label title = new Label("API");
 		title.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "
 				+ css(Theme.FG) + ";");
@@ -375,7 +375,7 @@ public final class MeetingSettingsView extends VBox {
 	}
 
 	private void styleField(javafx.scene.control.TextInputControl field) {
-		field.setStyle("-fx-background-color: " + css(Theme.FIELD) + "; -fx-background-radius: 12;"
+		field.setStyle("-fx-background-color: " + css(Theme.FIELD) + "; -fx-background-radius: 4px;"
 				+ " -fx-text-fill: " + css(Theme.FG) + "; -fx-prompt-text-fill: "
 				+ css(Theme.MUTED) + "; -fx-padding: 0 12 0 12;");
 	}

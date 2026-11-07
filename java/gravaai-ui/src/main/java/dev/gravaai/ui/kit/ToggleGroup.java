@@ -102,22 +102,22 @@ public final class ToggleGroup extends HBox {
 				getChildren().add(separator);
 			}
 		}
-		// Only the outer edges stay rounded (toggle-button-group.css).
+		// Only the outer edges stay squared (Instrument segmented language, 4px).
 		for (int i = 0; i < items.size(); i++) {
 			Toggle button = items.get(i).button();
 			button.setStyle("-fx-background-radius: "
-					+ (i == 0 && i == items.size() - 1 ? "24px"
-							: i == 0 ? "24px 0 0 24px" : i == items.size() - 1 ? "0 24px 24px 0" : "0")
+					+ (i == 0 && i == items.size() - 1 ? "4px"
+							: i == 0 ? "4px 0 0 4px" : i == items.size() - 1 ? "0 4px 4px 0" : "0")
 					+ ";");
 		}
 	}
 
-	/** Detached mode: separate pills with a 4 px gap ({@code --detached}). */
+	/** Detached mode: separate chips with a 4 px gap ({@code --detached}). */
 	public ToggleGroup detached() {
 		getStyleClass().add("toggle-group--detached");
 		setSpacing(4);
 		for (Item item : items) {
-			item.button().setStyle("-fx-background-radius: 24px;");
+			item.button().setStyle("-fx-background-radius: 4px;");
 		}
 		return this;
 	}

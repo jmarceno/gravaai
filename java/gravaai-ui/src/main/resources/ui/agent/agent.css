@@ -24,9 +24,9 @@
 
 .agent-settings__section {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 4px;
 	-fx-border-color: -g-border;
-	-fx-border-radius: 12px;
+	-fx-border-radius: 4px;
 	-fx-padding: 16px;
 	-fx-spacing: 10px;
 }
@@ -49,7 +49,7 @@
 
 .agent-settings__pill {
 	-fx-background-color: -g-default;
-	-fx-background-radius: 999px;
+	-fx-background-radius: 4px;
 	-fx-padding: 3px 10px;
 }
 
@@ -69,7 +69,7 @@
 	-fx-font-size: 11px;
 	-fx-text-fill: rgba(255, 255, 255, 0.92);
 	-fx-background-color: -g-field;
-	-fx-background-radius: 8px;
+	-fx-background-radius: 3px;
 	-fx-padding: 10px;
 }
 
@@ -98,8 +98,8 @@
 .agent-status-chip {
 	-fx-background-color: rgba(139, 92, 246, 0.10);
 	-fx-border-color: rgba(139, 92, 246, 0.40);
-	-fx-border-radius: 999px;
-	-fx-background-radius: 999px;
+	-fx-border-radius: 4px;
+	-fx-background-radius: 4px;
 	-fx-padding: 0 4px 0 12px;
 }
 

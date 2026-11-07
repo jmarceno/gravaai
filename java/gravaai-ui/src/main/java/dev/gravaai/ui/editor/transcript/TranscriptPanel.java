@@ -126,7 +126,7 @@ public final class TranscriptPanel extends VBox {
 		HBox.setHgrow(generationProgress, Priority.ALWAYS);
 		generationBox.getChildren().addAll(generationMessage, progressRow);
 		generationBox.setStyle("-fx-background-color: " + css(Theme.SURFACE)
-				+ "; -fx-background-radius: 10; -fx-padding: 8 10 8 10;");
+				+ "; -fx-background-radius: 4px; -fx-padding: 8 10 8 10;");
 		generationBox.setVisible(false);
 		generationBox.setManaged(false);
 

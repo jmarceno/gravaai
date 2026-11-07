@@ -127,10 +127,10 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 		VBox root = new VBox();
 		root.setStyle(
 				"-fx-background-color: -g-surface;"
-						+ "-fx-background-radius: 16;"
+						+ "-fx-background-radius: 6px;"
 						+ "-fx-border-color: -g-separator;"
 						+ "-fx-border-width: 1;"
-						+ "-fx-border-radius: 16;");
+						+ "-fx-border-radius: 6px;");
 
 		Label title = new Label(TITLE);
 		title.setStyle("-fx-text-fill: -g-fg; -fx-font-size: 18px; -fx-font-weight: 600;");
@@ -153,7 +153,7 @@ public final class SourceSelectorOverlay implements SourceService.SourceSelector
 				"-fx-background-color: rgba(229,101,110,0.10);"
 						+ "-fx-text-fill: -g-danger;"
 						+ "-fx-padding: 12;"
-						+ "-fx-background-radius: 8;");
+						+ "-fx-background-radius: 4px;");
 		errorLabel.setManaged(false);
 		errorLabel.setVisible(false);
 

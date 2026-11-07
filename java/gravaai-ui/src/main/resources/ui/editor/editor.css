@@ -700,7 +700,7 @@
 }
 .editor-timeline__resize-grip {
 	-fx-background-color: #222b33;
-	-fx-background-radius: 999px;
+	-fx-background-radius: 2px;
 	-fx-min-width: 44px;
 	-fx-pref-width: 44px;
 	-fx-max-width: 44px;
@@ -831,9 +831,9 @@
 	-fx-padding: 0 0 0 52px;
 }
 
-/* HeroUI Tag size lg (tag.css): rounded-2xl, px-2.5 py-1.5, text-sm, min-h-10. */
+/* Export tag: Instrument control language (4px radius, px-2.5 py-1.5, text-sm). */
 .export-tag.toggle-button {
-	-fx-background-radius: 16px;
+	-fx-background-radius: 4px;
 	-fx-padding: 6px 10px;
 	-fx-min-height: 40px;
 	-fx-pref-height: 40px;
@@ -844,7 +844,7 @@
 .toggle-group--detached .export-tag.toggle-button,
 .toggle-group--detached .export-tag.toggle-button:first-child,
 .toggle-group--detached .export-tag.toggle-button:last-child {
-	-fx-background-radius: 16px;
+	-fx-background-radius: 4px;
 }
 
 .export-tag__description {

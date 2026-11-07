@@ -246,7 +246,7 @@ public final class MeetingView extends Region {
 		VBox placeholder = new VBox(8);
 		placeholder.setAlignment(Pos.CENTER);
 		placeholder.setMinHeight(hasVideo ? 220 : 80);
-		placeholder.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 12;");
+		placeholder.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 4px;");
 		Icon icon = Icon.of(hasVideo ? Icons.VideoCamera : Icons.MusicNotes, 28, "fill");
 		Label label = new Label("Player arrives with the media layer.");
 		label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.MUTED) + ";");

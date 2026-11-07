@@ -98,8 +98,8 @@ public final class ColorPicker extends Button {
 
 		area.getStyleClass().add("color-area");
 		Rectangle areaClip = new Rectangle(AREA_WIDTH, AREA_HEIGHT);
-		areaClip.setArcWidth(16);
-		areaClip.setArcHeight(16);
+		areaClip.setArcWidth(8);
+		areaClip.setArcHeight(8);
 		area.setClip(areaClip);
 		areaThumb.getStyleClass().add("color-area__thumb");
 		areaPane.getChildren().addAll(area, areaThumb);

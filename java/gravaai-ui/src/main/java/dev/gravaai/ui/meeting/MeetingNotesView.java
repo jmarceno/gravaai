@@ -226,8 +226,8 @@ public final class MeetingNotesView extends VBox {
 		if (currentJob != null && currentJob.isActive()) {
 			VBox card = new VBox(6);
 			card.setPadding(new Insets(12));
-			card.setStyle("-fx-background-color: rgba(35,40,51,0.5); -fx-background-radius: 12;"
-					+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 12;");
+			card.setStyle("-fx-background-color: rgba(35,40,51,0.5); -fx-background-radius: 4px;"
+					+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 4px;");
 			Label stage = new Label(MeetingText.stageLabel(currentJob.stage()));
 			stage.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: "
 					+ css(Theme.FG) + ";");
@@ -268,8 +268,8 @@ public final class MeetingNotesView extends VBox {
 		}
 		VBox card = new VBox(4);
 		card.setPadding(new Insets(12));
-		card.setStyle("-fx-background-color: rgba(229,101,110,0.08); -fx-background-radius: 12;"
-				+ " -fx-border-color: rgba(229,101,110,0.4); -fx-border-radius: 12;");
+		card.setStyle("-fx-background-color: rgba(229,101,110,0.08); -fx-background-radius: 4px;"
+				+ " -fx-border-color: rgba(229,101,110,0.4); -fx-border-radius: 4px;");
 		Label title = new Label(interrupted ? "Processing was interrupted" : "Processing failed");
 		title.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: "
 				+ css(Theme.DANGER) + ";");

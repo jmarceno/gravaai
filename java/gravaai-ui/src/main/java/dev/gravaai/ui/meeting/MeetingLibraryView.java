@@ -202,7 +202,7 @@ public final class MeetingLibraryView extends VBox {
 		thumbnail.setPrefSize(264, 198);
 		thumbnail.setMinSize(264, 198);
 		thumbnail.setMaxSize(264, 198);
-		thumbnail.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 12;");
+		thumbnail.setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 4px;");
 		return thumbnail;
 	}
 

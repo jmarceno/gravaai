@@ -29,8 +29,8 @@ public final class ExtensionManager extends StackPane {
 		mark.setPrefSize(48, 48);
 		mark.setMaxSize(48, 48);
 		mark.setStyle(
-				"-fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 16px; "
-						+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 16px;");
+				"-fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 6px; "
+						+ "-fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 6px;");
 
 		VBox column = new VBox(12, mark, title, detail);
 		column.setAlignment(Pos.CENTER);

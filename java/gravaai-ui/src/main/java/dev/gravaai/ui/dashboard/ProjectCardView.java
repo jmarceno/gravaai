@@ -110,8 +110,8 @@ final class ProjectCardView extends VBox {
 		host.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 		host.setMaxSize(Double.MAX_VALUE, Region.USE_PREF_SIZE);
 		Rectangle clip = new Rectangle();
-		clip.setArcWidth(24);
-		clip.setArcHeight(24);
+		clip.setArcWidth(8);
+		clip.setArcHeight(8);
 		clip.widthProperty().bind(host.widthProperty());
 		clip.heightProperty().bind(host.heightProperty());
 		host.setClip(clip);

@@ -56,8 +56,8 @@ public final class CaptionListPanel extends VBox {
 		getStyleClass().add("caption-list-panel");
 		setSpacing(10);
 		setPadding(new Insets(12));
-		setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 12;"
-				+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 12;");
+		setStyle("-fx-background-color: " + css(Theme.SURFACE) + "; -fx-background-radius: 4px;"
+				+ " -fx-border-color: " + css(Theme.SEPARATOR) + "; -fx-border-radius: 4px;");
 		setVisible(false);
 		setManaged(false);
 
@@ -307,7 +307,7 @@ public final class CaptionListPanel extends VBox {
 	private static void styleField(Input field) {
 		field.setPrefHeight(30);
 		field.setStyle("-fx-font-family: 'monospace'; -fx-font-size: 11px;"
-				+ " -fx-background-color: " + css(Theme.FIELD) + "; -fx-background-radius: 8;"
+				+ " -fx-background-color: " + css(Theme.FIELD) + "; -fx-background-radius: 4px;"
 				+ " -fx-text-fill: " + css(Theme.FG) + "; -fx-padding: 0 8 0 8;");
 	}
 

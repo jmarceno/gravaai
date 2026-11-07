@@ -42,8 +42,8 @@ public final class HudWebcamPreview extends StackPane {
 		Rectangle clip = new Rectangle();
 		clip.widthProperty().bind(widthProperty());
 		clip.heightProperty().bind(heightProperty());
-		clip.setArcWidth(48);
-		clip.setArcHeight(48);
+		clip.setArcWidth(16);
+		clip.setArcHeight(16);
 		setClip(clip);
 
 		setOnMousePressed(event -> {

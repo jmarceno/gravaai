@@ -147,13 +147,13 @@ public final class CropEditorDialog {
 		private @Nullable CropRegion startCrop;
 
 		CropSurface() {
-			setStyle("-fx-background-color: #000000; -fx-background-radius: 8px; "
+			setStyle("-fx-background-color: #000000; -fx-background-radius: 4px; "
 					+ "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 40, 0, 0, 20);");
 			image.setPreserveRatio(false);
 			image.setSmooth(true);
 			Rectangle clip = new Rectangle();
-			clip.setArcWidth(16);
-			clip.setArcHeight(16);
+			clip.setArcWidth(8);
+			clip.setArcHeight(8);
 			clip.widthProperty().bind(widthProperty());
 			clip.heightProperty().bind(heightProperty());
 			image.setClip(clip);

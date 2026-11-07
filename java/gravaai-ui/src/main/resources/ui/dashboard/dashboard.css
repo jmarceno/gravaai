@@ -88,7 +88,7 @@
 	-fx-min-height: 40;
 	-fx-pref-height: 40;
 	-fx-padding: 0 4 0 4;
-	-fx-background-radius: 8;
+	-fx-background-radius: 4;
 }
 
 .folder-row--active {
@@ -103,7 +103,7 @@
 .folder-row--drop {
 	-fx-background-color: -g-accent-soft-hover;
 	-fx-border-color: -g-accent;
-	-fx-border-radius: 8;
+	-fx-border-radius: 4;
 	-fx-border-width: 1;
 	-fx-border-insets: 0;
 }
@@ -143,7 +143,7 @@
 /* ---- Content card ---- */
 .dashboard-content {
 	-fx-background-color: -g-bg;
-	-fx-background-radius: 16;
+	-fx-background-radius: 4;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 12, 0.0, 0, 2);
 }
 
@@ -156,7 +156,7 @@
 
 .dashboard-search {
 	-fx-background-color: -g-default-soft;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 	-fx-border-width: 0;
 	-fx-padding: 0 12 0 40;
 	-fx-font-size: 14px;
@@ -180,7 +180,7 @@
 	-fx-min-height: 28;
 	-fx-pref-height: 28;
 	-fx-padding: 0 12 0 12;
-	-fx-background-radius: 8;
+	-fx-background-radius: 4;
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-muted;
 }
@@ -217,11 +217,11 @@
 
 .project-thumbnail {
 	-fx-background-color: -g-default-soft;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 }
 
 .project-thumbnail__image {
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 }
 
 .project-thumbnail__icon {
@@ -262,9 +262,9 @@
 	-fx-pref-width: 20;
 	-fx-pref-height: 20;
 	-fx-background-color: -g-bg;
-	-fx-background-radius: 6;
+	-fx-background-radius: 3;
 	-fx-border-color: -g-border;
-	-fx-border-radius: 6;
+	-fx-border-radius: 3;
 }
 
 .project-card__selection--checked {
@@ -281,7 +281,7 @@
 	-fx-min-height: 24;
 	-fx-pref-height: 24;
 	-fx-padding: 0 10 0 10;
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 	-fx-background-color: -g-default-soft;
 	-fx-font-size: 11px;
 	-fx-text-fill: -g-muted;
@@ -291,7 +291,7 @@
 	-fx-min-height: 24;
 	-fx-pref-height: 24;
 	-fx-padding: 0 10 0 10;
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 	-fx-font-size: 11px;
 	-fx-text-fill: -g-muted;
 }
@@ -350,8 +350,8 @@
 .recoverable-banner__card {
 	-fx-background-color: -g-warning-soft;
 	-fx-border-color: rgba(232, 179, 57, 0.3);
-	-fx-border-radius: 16;
-	-fx-background-radius: 16;
+	-fx-border-radius: 4;
+	-fx-background-radius: 4;
 	-fx-padding: 12 16 12 16;
 }
 
@@ -359,7 +359,7 @@
 	-fx-min-width: 36;
 	-fx-min-height: 36;
 	-fx-background-color: -g-warning-soft;
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 }
 
 .recoverable-banner__title {
@@ -379,7 +379,7 @@
 }
 
 .dashboard-announcements__card {
-	-fx-background-radius: 16;
+	-fx-background-radius: 4;
 	-fx-padding: 0;
 }
 
@@ -448,7 +448,7 @@
 }
 
 .skeleton--round {
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 }
 
 /* ---- In-window delete dialog (ProjectDeleteDialog.tsx) ---- */
@@ -458,7 +458,7 @@
 
 .dashboard-dialog {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 24;
+	-fx-background-radius: 4;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 24, 0.0, 0, 8);
 }
 
@@ -481,7 +481,7 @@
 .global-shortcuts-settings__error {
 	-fx-text-fill: -g-danger;
 	-fx-background-color: -g-danger-soft;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 	-fx-padding: 8 12 8 12;
 	-fx-font-size: 12px;
 }
@@ -507,7 +507,7 @@
 	-fx-font-size: 11px;
 	-fx-text-fill: -g-muted;
 	-fx-background-color: -g-field;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 	-fx-padding: 12 12 12 12;
 }
 
@@ -531,7 +531,7 @@
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-danger;
 	-fx-background-color: -g-danger-soft;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 	-fx-padding: 8 12 8 12;
 }
 
@@ -541,8 +541,8 @@
 	-fx-border-color: -g-border;
 	-fx-border-style: dashed;
 	-fx-border-width: 1;
-	-fx-border-radius: 16;
-	-fx-background-radius: 16;
+	-fx-border-radius: 4;
+	-fx-background-radius: 4;
 }
 
 .automations-settings__empty-icon {
@@ -551,7 +551,7 @@
 	-fx-pref-width: 40;
 	-fx-pref-height: 40;
 	-fx-background-color: rgba(255, 255, 255, 0.06);
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 }
 
 .automations-settings__empty-title {
@@ -562,9 +562,9 @@
 
 .automations-settings__rule {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 16;
+	-fx-background-radius: 4;
 	-fx-border-color: rgba(42, 48, 59, 0.7);
-	-fx-border-radius: 16;
+	-fx-border-radius: 4;
 	-fx-padding: 0;
 }
 
@@ -598,7 +598,7 @@
 .automations-settings__action {
 	-fx-padding: 10;
 	-fx-background-color: rgba(255, 255, 255, 0.035);
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 }
 
 .automations-settings__action {
@@ -615,7 +615,7 @@
 	-fx-pref-width: 20;
 	-fx-pref-height: 20;
 	-fx-background-color: rgba(255, 255, 255, 0.08);
-	-fx-background-radius: 999;
+	-fx-background-radius: 4;
 	-fx-font-size: 10px;
 	-fx-font-weight: 600;
 	-fx-text-fill: -g-muted;
@@ -630,16 +630,16 @@
 	-fx-font-size: 10.5px;
 	-fx-text-fill: -g-muted;
 	-fx-background-color: rgba(255, 255, 255, 0.06);
-	-fx-background-radius: 6;
+	-fx-background-radius: 3;
 	-fx-padding: 0 6 0 6;
 }
 
 .automations-settings__issues {
 	-fx-padding: 8 12 8 12;
 	-fx-background-color: -g-warning-soft;
-	-fx-background-radius: 12;
+	-fx-background-radius: 4;
 	-fx-border-color: rgba(232, 179, 57, 0.25);
-	-fx-border-radius: 12;
+	-fx-border-radius: 4;
 }
 
 .automations-settings__issue {

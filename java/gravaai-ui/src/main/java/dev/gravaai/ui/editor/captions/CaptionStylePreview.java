@@ -31,7 +31,7 @@ public final class CaptionStylePreview extends Pane {
 
 	public CaptionStylePreview() {
 		getStyleClass().add("caption-style-preview");
-		setStyle("-fx-background-color: #0b0d11; -fx-background-radius: 12;");
+		setStyle("-fx-background-color: #0b0d11; -fx-background-radius: 4px;");
 		setPrefSize(560, 260);
 		setMinSize(240, 140);
 		caption.setWrapText(true);

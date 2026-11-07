@@ -2,8 +2,11 @@
  * HUD overlay + HUD menu styles (plan §5.4, §5.12, §7.1 P1.7).
  *
  * Ported from src/components/launch/LaunchWindow.module.css, launchTheme.css and the Tailwind
- * classes in LaunchWindow.tsx / HudMenuWindow.tsx. Uses the kit's -g- tokens (see
- * dev/gravaai/ui/kit/README.md for the Tailwind -> px table).
+ * classes in LaunchWindow.tsx / HudMenuWindow.tsx.
+ *
+ * Shape language: the HUD's own surfaces (bar, menu panel, webcam frames, hints, tooltips) are
+ * square — they belong to the Instrument window chrome. The buttons inside the bar stay round:
+ * the recorder's controls read as physical keys, and the round record button is its anchor.
  */
 
 /* The HUD is an opaque floating window; the bar fills it. */
@@ -17,8 +20,8 @@
 	-fx-background-color: transparent;
 }
 
-/* LaunchWindow.module.css .bar: gap 10, px-3 (12), py-2 (8), radius-xl (12), bg surface,
-   1px border. */
+/* LaunchWindow.module.css .bar: gap 10, px-3 (12), py-2 (8), square corners (HUD chrome),
+   bg surface, 1px border. */
 .hud-bar {
 	-fx-background-color: -g-surface;
 	-fx-background-radius: 0;
@@ -29,6 +32,26 @@
 	-fx-spacing: 10px;
 	-fx-alignment: center-left;
 	-fx-max-width: 1200px;
+}
+
+/* The bar's own buttons stay round: the recorder reads as physical keys, and the round record
+   button is the anchor of the bar. Variant rules in the kit set their own radius, so the
+   overrides carry the variant classes too. */
+.hud-bar .button,
+.hud-bar .button--primary,
+.hud-bar .button--secondary,
+.hud-bar .button--outline,
+.hud-bar .button--ghost,
+.hud-bar .button--danger,
+.hud-bar .button--danger-soft,
+.hud-bar .toggle-button {
+	-fx-background-radius: 24px;
+	-fx-border-radius: 24px;
+}
+
+.hud-bar .button:focused,
+.hud-bar .toggle-button:focused {
+	-fx-background-radius: 26px, 24px;
 }
 
 /* .barState: gap 8, centred row, no wrapping. */
@@ -73,7 +96,7 @@
 	-fx-max-height: 14px;
 }
 
-/* .stopSquare: 15px white square radius 3 (recording state). */
+/* .stopSquare: 15px white square (recording state). */
 .hud-stop-square {
 	-fx-background-color: #ffffff;
 	-fx-background-radius: 3px;
@@ -141,7 +164,7 @@
 	-fx-spacing: 8px;
 }
 
-/* Recording webcam preview (LaunchWindow.module.css .recordingWebcamPreview): radius 24,
+/* Recording webcam preview (LaunchWindow.module.css .recordingWebcamPreview): square chrome,
    bg launch-surface, 1px border, draggable/resizable. */
 .hud-webcam-preview {
 	-fx-background-color: -g-overlay;
@@ -173,14 +196,14 @@
 	-fx-background-color: rgba(0, 0, 0, 0.45);
 }
 
-/* Panel: w-[520px], rounded-2xl (16), border launch-border, bg launch-panel, p-3 (12),
+/* Panel: w-[520px], square corners (HUD chrome), border launch-border, bg launch-panel, p-3 (12),
    max 82vh / 720. */
 .hud-menu-panel {
 	-fx-background-color: -g-surface;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 0;
 	-fx-border-color: -g-border;
 	-fx-border-width: 1px;
-	-fx-border-radius: 6px;
+	-fx-border-radius: 0;
 	-fx-padding: 12px;
 	-fx-spacing: 2px;
 	-fx-max-width: 520px;
@@ -243,13 +266,13 @@
 	-fx-alignment: center;
 }
 
-/* Webcam menu live preview: aspect 4/3, max 420 wide, radius 16, ring 1px. */
+/* Webcam menu live preview: aspect 4/3, max 420 wide, square chrome, ring 1px. */
 .hud-menu-webcam-frame {
 	-fx-background-color: -g-default;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 4px;
 	-fx-border-color: -g-separator;
 	-fx-border-width: 1px;
-	-fx-border-radius: 6px;
+	-fx-border-radius: 4px;
 	-fx-padding: 12px;
 }
 

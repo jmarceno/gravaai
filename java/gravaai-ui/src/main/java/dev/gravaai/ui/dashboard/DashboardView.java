@@ -22,7 +22,6 @@ import dev.gravaai.ui.kit.Label;
 import dev.gravaai.ui.kit.Skeleton;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.kit.Toast;
-import dev.gravaai.ui.kit.ToggleGroup;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
@@ -80,7 +79,7 @@ public final class DashboardView {
 	private final ScrollPane gridScroll;
 	private final ScrollPane settingsScroll;
 	private final VBox settingsContent = new VBox();
-	private final ToggleGroup settingsTabs = new ToggleGroup(ToggleGroup.Mode.SINGLE);
+	private final VBox settingsRail = new VBox(2);
 	private final VBox settingsSectionsHost = new VBox();
 	private final Map<String, List<Node>> settingsSections = new LinkedHashMap<>();
 	private String activeSettingsCategory = "general";
@@ -137,7 +136,11 @@ public final class DashboardView {
 		settingsScroll = new ScrollPane(settingsContent);
 		settingsScroll.getStyleClass().addAll("dashboard-settings-scroll", "custom-scrollbar");
 		settingsScroll.setFitToWidth(true);
+		// The two-pane panel fills the viewport height even when the category is short; the
+		// ScrollPane only scrolls once the content exceeds it.
+		settingsScroll.setFitToHeight(true);
 		settingsScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		settingsScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 		VBox.setVgrow(settingsScroll, Priority.ALWAYS);
 		settingsScroll.setVisible(false);
 		settingsScroll.setManaged(false);
@@ -200,7 +203,6 @@ public final class DashboardView {
 	/** Switches the dashboard to Settings and selects one category (for the app and screenshots). */
 	public void showSettingsSection(String category) {
 		activeSettingsCategory = category == null || category.isBlank() ? "general" : category;
-		settingsTabs.setSelected(activeSettingsCategory);
 		model.setSection(DashboardSection.SETTINGS);
 		rebuildSettingsSections();
 	}
@@ -446,27 +448,69 @@ public final class DashboardView {
 		}
 	}
 
+	/**
+	 * Settings as the Instrument editor's two-pane layout: a vertical category rail on the left
+	 * (icon-less text rows, selected row raised with a hairline, like the inspector's section list)
+	 * and the section content in a scrolling pane on the right under a mono-uppercase header.
+	 * The horizontal tab strip it replaces did not scale: nine categories squeezed into one line
+	 * and the content sat under a floating row of chips.
+	 */
 	private void buildSettingsContent() {
 		settingsContent.getStyleClass().add("dashboard-settings");
-		Label title = new Label("Settings");
+
+		Label title = new Label("SETTINGS");
 		title.getStyleClass().add("dashboard-settings__title");
-		settingsTabs.getStyleClass().add("dashboard-settings__tabs");
+
+		Label categoryLabel = new Label("CATEGORIES");
+		categoryLabel.getStyleClass().add("dashboard-settings__rail-label");
+
+		VBox rail = settingsRail;
+		rail.getStyleClass().add("dashboard-settings__rail");
 		for (Map.Entry<String, String> category : SETTINGS_CATEGORIES.entrySet()) {
-			settingsTabs.item(category.getKey(), category.getValue());
+			Button item = new Button(category.getValue(), Button.Variant.GHOST, Button.Size.SM);
+			item.getStyleClass().add("dashboard-settings__rail-item");
+			item.setMaxWidth(Double.MAX_VALUE);
+			item.setAlignment(Pos.CENTER_LEFT);
+			item.setOnAction(event -> {
+				activeSettingsCategory = category.getKey();
+				rebuildSettingsSections();
+			});
+			rail.getChildren().add(item);
 		}
-		settingsTabs.setSelected("general");
-		settingsTabs.onValueChange(value -> {
-			activeSettingsCategory = value == null || value.isBlank() ? "general" : value;
-			rebuildSettingsSections();
-		});
+
+		VBox railColumn = new VBox(8, categoryLabel, rail);
+		railColumn.getStyleClass().add("dashboard-settings__rail-column");
+		railColumn.setFillWidth(true);
+
+		VBox right = new VBox(0, title, settingsSectionsHost);
+		right.getStyleClass().add("dashboard-settings__content");
+		HBox.setHgrow(right, Priority.ALWAYS);
+
 		settingsSectionsHost.getStyleClass().add("dashboard-settings__sections");
-		settingsSectionsHost.setSpacing(24);
-		settingsContent.getChildren().addAll(title, settingsTabs, settingsSectionsHost);
+		settingsSectionsHost.setSpacing(0);
+
+		HBox panes = new HBox(0, railColumn, right);
+		panes.getStyleClass().add("dashboard-settings__panes");
+		panes.setFillHeight(true);
+		VBox.setVgrow(panes, Priority.ALWAYS);
+
+		settingsContent.getChildren().setAll(panes);
+		VBox.setVgrow(settingsContent, Priority.ALWAYS);
 		rebuildSettingsSections();
 	}
 
 	private void rebuildSettingsSections() {
 		settingsSectionsHost.getChildren().clear();
+		// The rail marks the active category, like the inspector's selected section tab.
+		for (Node item : settingsRail.getChildren()) {
+			if (item instanceof Button button) {
+				button.getStyleClass().remove("is-selected");
+				if (button.getText() != null
+						&& button.getText().equals(SETTINGS_CATEGORIES.get(activeSettingsCategory))) {
+					button.getStyleClass().add("is-selected");
+				}
+			}
+		}
 		List<Node> injected = settingsSections.getOrDefault(activeSettingsCategory, List.of());
 		settingsSectionsHost.getChildren().addAll(injected);
 		if ("meetings".equals(activeSettingsCategory) && injected.isEmpty()) {

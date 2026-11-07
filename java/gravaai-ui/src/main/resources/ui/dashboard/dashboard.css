@@ -398,26 +398,96 @@
 	-fx-font-size: 10px;
 }
 
-/* ---- Settings (DashboardSettings.tsx / SettingsRow.tsx / SettingsSections.tsx) ---- */
+/* ---- Settings (Instrument two-pane: category rail + content) ---- */
 .dashboard-settings-scroll,
 .dashboard-settings-scroll > .viewport {
 	-fx-background-color: transparent;
 }
 
 .dashboard-settings {
-	-fx-padding: 40 40 40 40;
-	-fx-spacing: 24;
+	-fx-background-color: -g-surface;
+	-fx-border-color: -g-separator;
+	-fx-border-width: 1px;
+	-fx-border-radius: 8;
+	-fx-background-radius: 8;
+	-fx-padding: 0;
 }
 
-.dashboard-settings__title {
-	-fx-font-size: 18px;
-	-fx-font-weight: 600;
+.dashboard-settings__panes {
+	-fx-spacing: 0;
+}
+
+/* The category rail: the inspector's section list, standing upright. */
+.dashboard-settings__rail-column {
+	-fx-min-width: 188px;
+	-fx-pref-width: 188px;
+	-fx-max-width: 188px;
+	-fx-padding: 16px 10px 16px 10px;
+	-fx-spacing: 10px;
+	-fx-background-color: -g-bg-secondary;
+	-fx-border-color: transparent -g-separator transparent transparent;
+	-fx-border-width: 0 1 0 0;
+}
+
+.dashboard-settings__rail-label {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 9.5px;
+	-fx-text-fill: #5b6872;
+	-fx-padding: 0 0 0 8px;
+}
+
+.dashboard-settings__rail {
+	-fx-spacing: 2px;
+}
+
+.dashboard-settings__rail-item.button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 4;
+	-fx-border-width: 0;
+	-fx-border-radius: 4;
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 12px;
+	-fx-font-weight: 400;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
+	-fx-padding: 0 8px 0 8px;
+	-fx-alignment: center-left;
+	-fx-cursor: hand;
+}
+
+.dashboard-settings__rail-item.button:hover {
+	-fx-background-color: -g-surface-secondary;
 	-fx-text-fill: -g-fg;
 }
 
+.dashboard-settings__rail-item.button.is-selected {
+	-fx-background-color: -g-surface-secondary;
+	-fx-border-color: -g-border;
+	-fx-border-width: 1;
+	-fx-border-radius: 4;
+	-fx-text-fill: -g-fg;
+}
+
+/* The content pane: mono-uppercase header, then the section blocks. */
+.dashboard-settings__content {
+	-fx-padding: 0;
+	-fx-spacing: 0;
+}
+
+.dashboard-settings__title {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 15px 16px 15px 16px;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
+}
+
 .dashboard-settings__sections {
-	-fx-spacing: 24;
-	-fx-max-width: 672;
+	-fx-spacing: 0;
+	-fx-padding: 8px 20px 24px 20px;
+	-fx-max-width: 820;
 }
 
 .dashboard-settings__hint {
@@ -425,20 +495,42 @@
 	-fx-text-fill: -g-muted;
 }
 
+/* A settings block: the inspector group head + body, hairline-separated. */
 .settings-row {
-	-fx-max-width: 672;
+	-fx-max-width: 820;
 	-fx-alignment: CENTER_LEFT;
+	-fx-padding: 12 0 12 0;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
 }
 
 .settings-row__title {
-	-fx-font-size: 13px;
+	-fx-font-size: 12px;
 	-fx-font-weight: 500;
 	-fx-text-fill: -g-fg;
 }
 
 .settings-row__description {
+	-fx-font-size: 11.5px;
+	-fx-text-fill: -g-muted;
+}
+
+/* Settings -> Permissions (RecordingPermissionsSettings): the same block language. */
+.recording-permissions {
+	-fx-spacing: 0;
+	-fx-max-width: 820;
+}
+
+.recording-permissions__hint {
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-muted;
+	-fx-padding: 12 0 8 0;
+}
+
+.recording-permissions__status {
+	-fx-font-size: 12px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
 }
 
 /* ---- Skeletons (LibrarySkeleton.tsx) ---- */

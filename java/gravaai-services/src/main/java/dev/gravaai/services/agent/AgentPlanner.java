@@ -31,6 +31,7 @@ import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.CaptionOps;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.GradeRegion;
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.ClipSequence;
 import dev.gravaai.core.project.ClipSplits;
 import dev.gravaai.core.project.ClipTransition;
@@ -742,6 +743,30 @@ public final class AgentPlanner {
 				throw fail(label + " overlaps " + (shortId == null ? "another region" : shortId) + " ("
 						+ AgentIds.formatSeconds(startMs) + "–"
 						+ AgentIds.formatSeconds(endMs) + "s); update it or delete it first");
+			}
+		}
+	}
+
+	/**
+	 * Grade spans may overlap only across layers: two grades shading the same picture (screen or
+	 * camera) fight over its look, so the candidate span must be free of grades whose targets
+	 * share a layer with {@code candidateTargets}. A screen grade and a camera grade over the
+	 * same span are exactly how each picture gets its own calibration.
+	 */
+	private static void assertGradeSpanFree(List<GradeRegion> grades, Span candidate,
+			Map<String, String> shortById, GradeTarget candidateTargets,
+			@Nullable String ignoreId) {
+		for (GradeRegion grade : grades) {
+			if (grade.id().equals(ignoreId) || !grade.targets().overlaps(candidateTargets)) {
+				continue;
+			}
+			if (grade.startMs() < candidate.endMs() && grade.endMs() > candidate.startMs()) {
+				String shortId = shortById.get(grade.id());
+				throw fail("grade shading the same picture overlaps "
+						+ (shortId == null ? "another grade" : shortId) + " ("
+						+ AgentIds.formatSeconds(grade.startMs()) + "–"
+						+ AgentIds.formatSeconds(grade.endMs())
+						+ "s); update it or delete it first");
 			}
 		}
 	}
@@ -1529,16 +1554,31 @@ public final class AgentPlanner {
 		return value;
 	}
 
+	/** The grade layer choice: omitted keeps {@code fallback}; anything but main/camera/both fails. */
+	private static GradeTarget gradeTargets(ObjectNode raw, GradeTarget fallback) {
+		String wire = AgentOpReader.optionalString(raw, "targets");
+		if (wire == null || wire.isBlank()) {
+			return fallback;
+		}
+		for (GradeTarget target : GradeTarget.values()) {
+			if (target.wire().equalsIgnoreCase(wire.trim())) {
+				return target;
+			}
+		}
+		throw fail("targets must be \"main\", \"camera\" or \"both\"");
+	}
+
 	private static void addGrade(Draft draft, ObjectNode raw) {
 		double[] range = AgentOpReader.readRange(raw, "from", "to");
 		Span span = clampTimelineSpan(draft, toMs(range[0]), toMs(range[1]));
-		assertSpanFree(draft.state.gradeRegions(), span, draft.ids.gradeShortById(), "grade",
+		GradeTarget targets = gradeTargets(raw, GradeRegion.DEFAULT_TARGET);
+		assertGradeSpanFree(draft.state.gradeRegions(), span, draft.ids.gradeShortById(), targets,
 				null);
 		String id = draft.ctx.createId().apply(IdKind.GRADE);
 		GradeRegion region = new GradeRegion(id, span.startMs(), span.endMs(),
 				gradeAdjust(raw, "brightness"), gradeAdjust(raw, "contrast"),
 				gradeAdjust(raw, "saturation"), gradeAdjust(raw, "temperature"),
-				gradeGamma(raw));
+				gradeGamma(raw), targets);
 		List<GradeRegion> grades = new ArrayList<>(draft.state.gradeRegions());
 		grades.add(region);
 		draft.state = draft.state.toBuilder().gradeRegions(grades).build();
@@ -1564,6 +1604,7 @@ public final class AgentPlanner {
 		Double saturation = AgentOpReader.optionalNumber(raw, "saturation");
 		Double temperature = AgentOpReader.optionalNumber(raw, "temperature");
 		Double gamma = AgentOpReader.optionalNumber(raw, "gamma");
+		GradeTarget targets = gradeTargets(raw, grade.targets());
 		GradeRegion next = new GradeRegion(grade.id(),
 				from == null ? grade.startMs() : toMs(from),
 				to == null ? grade.endMs() : toMs(to),
@@ -1572,12 +1613,13 @@ public final class AgentPlanner {
 				saturation == null ? grade.saturation() : requireAdjust(saturation, "saturation"),
 				temperature == null ? grade.temperature()
 						: requireAdjust(temperature, "temperature"),
-				gamma == null ? grade.gamma() : gradeGamma(raw));
+				gamma == null ? grade.gamma() : gradeGamma(raw), targets);
 		if (next.endMs() <= next.startMs()) {
 			throw fail("\"to\" must be after \"from\"");
 		}
-		assertSpanFree(draft.state.gradeRegions(),
-				new Span(next.startMs(), next.endMs()), draft.ids.gradeShortById(), "grade", id);
+		assertGradeSpanFree(draft.state.gradeRegions(),
+				new Span(next.startMs(), next.endMs()), draft.ids.gradeShortById(), next.targets(),
+				id);
 		draft.state = draft.state.toBuilder().gradeRegions(draft.state.gradeRegions().stream()
 						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);

@@ -329,6 +329,11 @@ public final class ProjectDocument {
 			node.put("saturation", region.saturation());
 			node.put("temperature", region.temperature());
 			node.put("gamma", region.gamma());
+			// Omitted means screen-only, so grades that never left the default keep the saved
+			// bytes unchanged.
+			if (region.targets() != GradeRegion.DEFAULT_TARGET) {
+				node.put("targets", region.targets().wire());
+			}
 			array.add(node);
 		}
 		return array;

@@ -6,16 +6,20 @@ package dev.gravaai.core.project;
  *
  * <p>Brightness, contrast, saturation and temperature are signed values in {@code -100..100}
  * (0 = neutral); gamma is the midtone exponent in {@code 0.2..2.4} (1 = neutral). The values ride
- * the timeline: like every region they ripple with the clip sequence.
+ * the timeline: like every region they ripple with the clip sequence. {@code targets} picks the
+ * layers the grade shades — the screen, the camera or both — so each picture can carry its own
+ * calibration (two grades over one span, one per layer, is legal; they may not share a layer).
  */
 public record GradeRegion(String id, long startMs, long endMs, double brightness, double contrast,
-		double saturation, double temperature, double gamma) {
+		double saturation, double temperature, double gamma, GradeTarget targets) {
 
 	public static final double MIN_ADJUST = -100;
 	public static final double MAX_ADJUST = 100;
 	public static final double MIN_GAMMA = 0.2;
 	public static final double MAX_GAMMA = 2.4;
 	public static final double DEFAULT_GAMMA = 1;
+	/** The layer choice every grade starts with: shade the recorded screen only. */
+	public static final GradeTarget DEFAULT_TARGET = GradeTarget.MAIN;
 
 	public GradeRegion {
 		if (endMs < startMs) {
@@ -26,6 +30,15 @@ public record GradeRegion(String id, long startMs, long endMs, double brightness
 		saturation = clamp(saturation, MIN_ADJUST, MAX_ADJUST, 0);
 		temperature = clamp(temperature, MIN_ADJUST, MAX_ADJUST, 0);
 		gamma = clamp(gamma, MIN_GAMMA, MAX_GAMMA, DEFAULT_GAMMA);
+		// Lenient callers (old JSON without the field) read as screen-only.
+		targets = targets == null ? DEFAULT_TARGET : targets;
+	}
+
+	/** The pre-targets constructor shape, for callers that do not care about the layers. */
+	public GradeRegion(String id, long startMs, long endMs, double brightness, double contrast,
+			double saturation, double temperature, double gamma) {
+		this(id, startMs, endMs, brightness, contrast, saturation, temperature, gamma,
+				DEFAULT_TARGET);
 	}
 
 	/** A neutral grade over the given span: every slider at its default. */
@@ -36,14 +49,20 @@ public record GradeRegion(String id, long startMs, long endMs, double brightness
 	/** Copies this region with a new span, keeping the grading params. */
 	public GradeRegion withSpan(long nextStartMs, long nextEndMs) {
 		return new GradeRegion(id, nextStartMs, nextEndMs, brightness, contrast, saturation,
-				temperature, gamma);
+				temperature, gamma, targets);
 	}
 
-	/** Copies this region with new grading params, keeping the span. */
+	/** Copies this region with new grading params, keeping the span and layers. */
 	public GradeRegion withParams(double nextBrightness, double nextContrast,
 			double nextSaturation, double nextTemperature, double nextGamma) {
 		return new GradeRegion(id, startMs, endMs, nextBrightness, nextContrast, nextSaturation,
-				nextTemperature, nextGamma);
+				nextTemperature, nextGamma, targets);
+	}
+
+	/** Copies this region with a new layer choice, keeping the span and sliders. */
+	public GradeRegion withTargets(GradeTarget nextTargets) {
+		return new GradeRegion(id, startMs, endMs, brightness, contrast, saturation, temperature,
+				gamma, nextTargets);
 	}
 
 	/** True when no slider moved away from neutral, so the region changes nothing on screen. */
@@ -52,11 +71,16 @@ public record GradeRegion(String id, long startMs, long endMs, double brightness
 				&& gamma == DEFAULT_GAMMA;
 	}
 
-	/** The timeline label, e.g. {@code "+20 warm"}; a neutral region reads "Grade". */
+	/** The timeline label, e.g. {@code "Cam +20 warm"}; a neutral region reads "Grade". */
 	public String label() {
-		if (isNeutral()) {
-			return "Grade";
+		String sliders = sliderLabel();
+		if (sliders.isEmpty()) {
+			return targets == DEFAULT_TARGET ? "Grade" : targetPrefix() + "Grade";
 		}
+		return targetPrefix() + sliders;
+	}
+
+	private String sliderLabel() {
 		StringBuilder label = new StringBuilder();
 		if (brightness != 0) {
 			label.append(label.isEmpty() ? "" : " ").append(signed(brightness)).append(" light");
@@ -77,6 +101,15 @@ public record GradeRegion(String id, long startMs, long endMs, double brightness
 					.append(String.format(java.util.Locale.ROOT, "γ%.2f", gamma));
 		}
 		return label.toString();
+	}
+
+	/** The layer tag ahead of the sliders: {@code "Cam "}, {@code "Both "}, or none. */
+	private String targetPrefix() {
+		return switch (targets) {
+			case CAMERA -> "Cam ";
+			case BOTH -> "Both ";
+			case MAIN -> "";
+		};
 	}
 
 	private static String signed(double value) {

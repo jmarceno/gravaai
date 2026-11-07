@@ -26,6 +26,7 @@ import io.github.humbleui.skija.Shader;
 import io.github.humbleui.skija.Surface;
 import io.github.humbleui.types.Rect;
 
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.media.gl.SkiaGlSurface;
 
@@ -103,15 +104,12 @@ public final class Compositor implements AutoCloseable {
 	private final GpuFrameTextures frameTextures = new GpuFrameTextures();
 	private @Nullable SkiaGlSurface currentTarget;
 	private final CursorRenderer cursorRenderer = new CursorRenderer();
-	// Stage 5.5: the grade color filter for the current sliders, rebuilt only when they change.
-	// render() runs on one thread per compositor, so the cache needs no locking; the evicted
-	// filter is closed on the same thread that finished drawing with it.
-	private @Nullable ColorFilter gradeFilter;
-	private double gradeFilterBrightness = Double.NaN;
-	private double gradeFilterContrast;
-	private double gradeFilterSaturation;
-	private double gradeFilterTemperature;
-	private double gradeFilterGamma;
+	// Stage 5.5: one grade color filter per picture layer (the screen and the camera carry their
+	// own calibration), rebuilt only when a slider value changes. render() runs on one thread per
+	// compositor, so the caches need no locking; an evicted filter is closed on the same thread
+	// that finished drawing with it.
+	private final GradeFilterCache screenGrade = new GradeFilterCache();
+	private final GradeFilterCache cameraGrade = new GradeFilterCache();
 	// Extension render hooks (Phase 3, plan §5.18); NONE keeps the frame byte-identical.
 	private volatile FrameOverlayHooks overlayHooks = FrameOverlayHooks.NONE;
 	private boolean closed;
@@ -506,6 +504,10 @@ public final class Compositor implements AutoCloseable {
 		SceneSpec scene = input.scene();
 		double fill = clamp01(scene.cameraFill());
 		double opacity = clamp01(scene.cameraOpacity());
+		// Stage 5.5 for the camera: its own grade window (a camera-only or both grade), while the
+		// card's shadow layers keep their plain black.
+		ColorFilter cameraGradeFilter = cameraGrade.filter(
+				input.grade().at(input.timeSeconds() * 1000, GradeTarget.CAMERA).orElse(null));
 		WebcamBox placed = webcamBox(spec, input, frame);
 		double shadow = spec.shadow();
 		if (spec.transition().isPresent()) {
@@ -544,7 +546,8 @@ public final class Compositor implements AutoCloseable {
 					// as it always was. An unavailable model must never blank the webcam.
 					drawWebcamShadowLayers(canvas, box, radius, shadow * (1 - fill),
 							Math.min(box.getWidth(), box.getHeight()));
-					fillImage(canvas, image, cover, box, radius, WEBCAM_SAMPLING);
+					fillImage(canvas, image, cover, box, radius, WEBCAM_SAMPLING, null,
+							cameraGradeFilter);
 				} else if (effect == WebcamBackgroundEffect.REMOVE) {
 					// Background removal: the camera frame is gone entirely — no card fill, no
 					// shadow, nothing of the room. Only the cut-out person is drawn, floating over
@@ -553,7 +556,8 @@ public final class Compositor implements AutoCloseable {
 					// webcam frame and both textures sample with CLAMP, so a person touching the
 					// frame border would otherwise smear past it. Inside the frame the mask alone
 					// decides visibility, so where it is 0 the scene shows through untouched.
-					drawRemovalComposite(canvas, image, maskFrame, frame, cover, box, radius);
+					drawRemovalComposite(canvas, image, maskFrame, frame, cover, box, radius,
+							cameraGradeFilter);
 				} else {
 					// Background blur: blur the card and draw the sharp person back through the
 					// segmentation mask. Both passes run on one GPU offscreen surface and the
@@ -571,22 +575,27 @@ public final class Compositor implements AutoCloseable {
 							box, radius, blur)) {
 						// The composite is stage-sized and already holds the card at its stage
 						// position: blit that region onto itself (src == dst). Passing the whole
-						// stage rect as the source would squash the composite into the card.
+						// stage rect as the source would squash the composite into the card. The
+						// blit carries the camera's grade, so the blurred room and the person get
+						// one consistent look.
 						Rect card = box;
-						if (radius > 0.5) {
-							canvas.save();
-							try (Path cardPath = SquircleGeometry.toPath(
-									squircleRect(box, radius))) {
-								if (cardPath != null) {
-									canvas.clipPath(cardPath);
+						try (Paint blit = new Paint()) {
+							blit.setColorFilter(cameraGradeFilter);
+							if (radius > 0.5) {
+								canvas.save();
+								try (Path cardPath = SquircleGeometry.toPath(
+										squircleRect(box, radius))) {
+									if (cardPath != null) {
+										canvas.clipPath(cardPath);
+									}
 								}
+								canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR,
+										blit, true);
+								canvas.restore();
+							} else {
+								canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR,
+										blit, true);
 							}
-							canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR, null,
-									true);
-							canvas.restore();
-						} else {
-							canvas.drawImageRect(composite, card, card, SamplingMode.LINEAR, null,
-									true);
 						}
 					}
 				}
@@ -670,7 +679,8 @@ public final class Compositor implements AutoCloseable {
 	 * draw is fully transparent and the scene shows through untouched.
 	 */
 	private void drawRemovalComposite(Canvas canvas, Image image, RgbaFrame maskFrame,
-			RgbaFrame frame, Matrix33 cover, Rect box, double radius) {
+			RgbaFrame frame, Matrix33 cover, Rect box, double radius,
+			@Nullable ColorFilter cameraGradeFilter) {
 		Matrix33 maskMatrix = maskToCanvasMatrix(maskFrame, frame.width(), frame.height(), cover);
 		canvas.save();
 		try {
@@ -681,6 +691,7 @@ public final class Compositor implements AutoCloseable {
 							maskMatrix, WEBCAM_SAMPLING);
 					Paint paint = new Paint()) {
 				paint.setShader(person);
+				paint.setColorFilter(cameraGradeFilter);
 				canvas.drawRect(Rect.makeWH(width, height), paint);
 			}
 		} finally {
@@ -937,9 +948,10 @@ public final class Compositor implements AutoCloseable {
 		MotionBlur.Effect motionBlur = resolveMotionBlur(input, baseMask, transform,
 				contentWidth, contentHeight);
 		lastMotionBlurEffect = motionBlur;
-		// Stage 5.5: the Color-track grade filters the video layer only — the background, webcam
-		// and overlays keep their own look (the grade windows follow the timeline time).
-		GradeSpec.Window grade = input.grade().at(input.timeSeconds() * 1000).orElse(null);
+		// Stage 5.5: the Color-track grade shades the screen layer; the camera resolves its own
+		// grade (the windows follow the timeline time for both pictures).
+		GradeSpec.Window grade = input.grade()
+				.at(input.timeSeconds() * 1000, GradeTarget.MAIN).orElse(null);
 		SkiaGlSurface target = currentTarget();
 		try (Image image = frameTextures.image(target, GpuFrameTextures.Slot.SOURCE, frame,
 				colorSpace)) {
@@ -1045,7 +1057,7 @@ public final class Compositor implements AutoCloseable {
 		canvas.scale((float) transform.scale(), (float) transform.scale());
 		drawVideoShadowLayers(canvas, baseMask, maskRadius, style);
 		fillImage(canvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
-				SamplingMode.LINEAR, null, gradeFilter(grade));
+				SamplingMode.LINEAR, null, screenGrade.filter(grade));
 		canvas.restore();
 	}
 
@@ -1067,44 +1079,51 @@ public final class Compositor implements AutoCloseable {
 	}
 
 	/**
-	 * The color filter for the frame's grade, cached across frames: a new Skia filter is built only
-	 * when a slider value changed. {@code grade == null} returns null (no filtering) and retires the
+	 * One layer's grade color filter, cached across frames: a new Skia filter is built only when a
+	 * slider value changed. {@code grade == null} returns null (no filtering) and retires the
 	 * cached filter.
 	 */
-	private @Nullable ColorFilter gradeFilter(GradeSpec.@Nullable Window grade) {
-		if (grade == null) {
-			closeGradeFilter();
-			return null;
-		}
-		if (gradeFilter != null && grade.brightness() == gradeFilterBrightness
-				&& grade.contrast() == gradeFilterContrast
-				&& grade.saturation() == gradeFilterSaturation
-				&& grade.temperature() == gradeFilterTemperature
-				&& grade.gamma() == gradeFilterGamma) {
-			return gradeFilter;
-		}
-		closeGradeFilter();
-		ColorFilter filter = GradeShaders.filter(grade.brightness(), grade.contrast(),
-				grade.saturation(), grade.temperature(), grade.gamma());
-		gradeFilter = filter;
-		gradeFilterBrightness = grade.brightness();
-		gradeFilterContrast = grade.contrast();
-		gradeFilterSaturation = grade.saturation();
-		gradeFilterTemperature = grade.temperature();
-		gradeFilterGamma = grade.gamma();
-		return filter;
-	}
+	private static final class GradeFilterCache {
+		private @Nullable ColorFilter filter;
+		private double brightness = Double.NaN;
+		private double contrast;
+		private double saturation;
+		private double temperature;
+		private double gamma;
 
-	private void closeGradeFilter() {
-		if (gradeFilter != null) {
-			gradeFilter.close();
-			gradeFilter = null;
+		private @Nullable ColorFilter filter(GradeSpec.@Nullable Window grade) {
+			if (grade == null) {
+				close();
+				return null;
+			}
+			if (filter != null && grade.brightness() == brightness
+					&& grade.contrast() == contrast && grade.saturation() == saturation
+					&& grade.temperature() == temperature && grade.gamma() == gamma) {
+				return filter;
+			}
+			close();
+			ColorFilter built = GradeShaders.filter(grade.brightness(), grade.contrast(),
+					grade.saturation(), grade.temperature(), grade.gamma());
+			filter = built;
+			brightness = grade.brightness();
+			contrast = grade.contrast();
+			saturation = grade.saturation();
+			temperature = grade.temperature();
+			gamma = grade.gamma();
+			return built;
 		}
-		gradeFilterBrightness = Double.NaN;
-		gradeFilterContrast = 0;
-		gradeFilterSaturation = 0;
-		gradeFilterTemperature = 0;
-		gradeFilterGamma = 0;
+
+		private void close() {
+			if (filter != null) {
+				filter.close();
+				filter = null;
+			}
+			brightness = Double.NaN;
+			contrast = 0;
+			saturation = 0;
+			temperature = 0;
+			gamma = 0;
+		}
 	}
 
 	private Surface ensureBlurSurface() {
@@ -1284,7 +1303,8 @@ public final class Compositor implements AutoCloseable {
 		}
 		closed = true;
 		invalidateBackgroundCache();
-		closeGradeFilter();
+		screenGrade.close();
+		cameraGrade.close();
 		// GPU resources go with the GL context; release them early only on the GL thread (an owner
 		// that closes after its context is gone has nothing left to free).
 		if (glCurrentOnThisThread()) {

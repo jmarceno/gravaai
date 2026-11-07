@@ -625,6 +625,9 @@ final class AgentEditorViews {
 	/** The moved grade sliders of one region, e.g. {@code +20 light warm -30 sat 1.20 gamma}. */
 	private static String gradeFlags(GradeRegion region) {
 		StringBuilder flags = new StringBuilder();
+		if (region.targets() != GradeRegion.DEFAULT_TARGET) {
+			flags.append(" targets=").append(region.targets().wire());
+		}
 		if (region.brightness() != 0) {
 			flags.append(' ').append(String.format(Locale.ROOT, "%+.0f", region.brightness()))
 					.append(" light");

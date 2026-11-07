@@ -27,6 +27,7 @@ import dev.gravaai.core.project.CaptionCueWord;
 import dev.gravaai.core.project.ClipCameraLayout;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.GradeRegion;
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -440,6 +441,37 @@ class AgentPlannerTest {
 	void gradeDeleteRequiresTarget() {
 		failed(apply(baseState(), "[{\"op\":\"delete_grade\"}]"),
 				"delete_grade needs \"id\" or \"all\": true");
+	}
+
+	@Test
+	@DisplayName("grade targets pick the layers; grades over one span need different pictures")
+	void gradeTargets() {
+		Ok added = ok(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":5,\"to\":10,\"brightness\":20,\"targets\":\"camera\"}]"));
+		assertEquals(GradeTarget.CAMERA, added.state().gradeRegions().get(0).targets());
+		assertTrue(added.summary().lines()
+				.anyMatch(line -> line.startsWith("grade ") && line.contains("Cam ")));
+
+		// update_grade keeps the current targets when omitted and can switch them.
+		Ok kept = ok(apply(added.state(),
+				"[{\"op\":\"update_grade\",\"id\":\"g1\",\"brightness\":-20}]"));
+		assertEquals(GradeTarget.CAMERA, kept.state().gradeRegions().get(0).targets());
+		Ok switched = ok(apply(added.state(),
+				"[{\"op\":\"update_grade\",\"id\":\"g1\",\"targets\":\"both\"}]"));
+		assertEquals(GradeTarget.BOTH, switched.state().gradeRegions().get(0).targets());
+
+		// A screen grade may share the camera grade's span: different pictures, own calibrations.
+		Ok layered = ok(apply(added.state(),
+				"[{\"op\":\"grade\",\"from\":5,\"to\":10,\"contrast\":30}]"));
+		assertEquals(2, layered.state().gradeRegions().size());
+		// ...but two grades shading the same picture still collide, and both does too.
+		failed(apply(layered.state(), "[{\"op\":\"grade\",\"from\":5,\"to\":10,\"contrast\":30}]"),
+				"overlaps g2");
+		failed(apply(layered.state(),
+				"[{\"op\":\"grade\",\"from\":5,\"to\":10,\"targets\":\"both\"}]"), "overlaps");
+		failed(apply(baseState(),
+				"[{\"op\":\"grade\",\"from\":1,\"to\":2,\"targets\":\"vibes\"}]"),
+				"targets must be \"main\", \"camera\" or \"both\"");
 	}
 
 	@Test

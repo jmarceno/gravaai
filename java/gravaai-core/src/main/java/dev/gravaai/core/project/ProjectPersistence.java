@@ -673,7 +673,10 @@ public final class ProjectPersistence {
 		return List.copyOf(regions);
 	}
 
-	/** {@code normalizeGradeRegions}: span + clamped grading sliders; invalid entries are dropped. */
+	/**
+	 * {@code normalizeGradeRegions}: span + clamped grading sliders + layer choice (unknown reads
+	 * as screen-only); invalid entries are dropped.
+	 */
 	private static List<GradeRegion> normalizeGradeRegions(JsonNode rawRegions) {
 		if (rawRegions == null || !rawRegions.isArray()) {
 			return List.of();
@@ -693,7 +696,8 @@ public final class ProjectPersistence {
 					numberOr(field(region, "contrast"), 0),
 					numberOr(field(region, "saturation"), 0),
 					numberOr(field(region, "temperature"), 0),
-					numberOr(field(region, "gamma"), GradeRegion.DEFAULT_GAMMA)));
+					numberOr(field(region, "gamma"), GradeRegion.DEFAULT_GAMMA),
+					GradeTarget.fromWire(text(field(region, "targets")))));
 		}
 		return List.copyOf(regions);
 	}

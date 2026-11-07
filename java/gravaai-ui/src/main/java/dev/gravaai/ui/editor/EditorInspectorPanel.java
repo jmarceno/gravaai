@@ -31,6 +31,7 @@ import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.CursorMotionPresets;
 import dev.gravaai.core.project.GradeRegion;
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.KeystrokeElement;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.Padding;
@@ -911,6 +912,14 @@ public final class EditorInspectorPanel extends VBox {
 				+ PlaybackControls.formatDuration(grade.endMs() / 1000.0));
 		span.setStyle("-fx-font-family: \"DejaVu Sans Mono\"; -fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(span);
+		// Which picture this grade shades: screen and camera usually need their own calibration,
+		// so two grades can cover one span with a target each.
+		ChoiceGroup targets = choice("main", "Screen", "camera", "Camera", "both", "Both");
+		targets.setValue(grade.targets().wire());
+		targets.setAccessibleText("Applies to");
+		targets.onValueChange(value -> store.apply(new GradeCommands.ChangeTarget(grade.id(),
+				GradeTarget.fromWire(value))));
+		root.getChildren().add(row("Applies to", targets));
 		root.getChildren().add(heading("Luminosity", () -> resetGrade(grade.id())));
 		root.getChildren().add(slider("Brightness", grade.brightness(), GradeRegion.MIN_ADJUST,
 				GradeRegion.MAX_ADJUST, 1, EditorInspectorPanel::formatSigned,

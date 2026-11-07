@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.GradeRegion;
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -161,5 +162,77 @@ class GradeCommandsTest {
 		assertEquals("+10 light warm +30 sat", new GradeRegion("g", 0, 1000, 10, 0, 30, 40, 1)
 				.label());
 		assertEquals("Grade", new GradeRegion("g", 0, 1000, 0, 0, 0, 0, 1).label());
+	}
+
+	@Test
+	@DisplayName("normalizes the layer choice: camera and both survive, unknown reads as main")
+	void normalizesTargets() {
+		ProjectEditorState normalized = state("""
+				{"gradeRegions":[
+					{"id":"grade-1","startMs":0,"endMs":100,"targets":"camera"},
+					{"id":"grade-2","startMs":0,"endMs":100,"targets":"both"},
+					{"id":"grade-3","startMs":0,"endMs":100,"targets":"vibes"},
+					{"id":"grade-4","startMs":0,"endMs":100}]}
+				""");
+
+		assertEquals(GradeTarget.CAMERA, normalized.gradeRegions().get(0).targets());
+		assertEquals(GradeTarget.BOTH, normalized.gradeRegions().get(1).targets());
+		assertEquals(GradeTarget.MAIN, normalized.gradeRegions().get(2).targets());
+		assertEquals(GradeTarget.MAIN, normalized.gradeRegions().get(3).targets());
+	}
+
+	@Test
+	@DisplayName("changing the target keeps the span and sliders; undo restores it")
+	void changesTarget() {
+		EditorStore store = new EditorStore(state(REGIONS));
+
+		store.apply(new GradeCommands.ChangeTarget("grade-1", GradeTarget.CAMERA));
+
+		GradeRegion retargeted = store.state().gradeRegions().get(0);
+		assertEquals(GradeTarget.CAMERA, retargeted.targets());
+		assertEquals(10, retargeted.brightness());
+		assertEquals(100, retargeted.startMs());
+		// An unknown id changes nothing.
+		assertFalse(store.apply(new GradeCommands.ChangeTarget("nope", GradeTarget.BOTH)));
+
+		store.undo();
+
+		assertEquals(GradeTarget.MAIN, store.state().gradeRegions().get(0).targets());
+	}
+
+	@Test
+	@DisplayName("the layer choice survives a project save/load round trip; main stays omitted")
+	void roundTripsTargets() {
+		ProjectEditorState graded = state("""
+				{"gradeRegions":[
+					{"id":"grade-1","startMs":0,"endMs":100,"brightness":5},
+					{"id":"grade-2","startMs":200,"endMs":300,"targets":"camera"},
+					{"id":"grade-3","startMs":400,"endMs":500,"targets":"both"}]}
+				""");
+		ProjectDocument document = ProjectDocument.create("video.mp4", graded);
+
+		// The default target is omitted so grades that never left it keep the saved bytes.
+		assertTrue(document.toJson().get("editor").get("gradeRegions").get(0)
+				.get("targets") == null);
+		assertEquals("camera", document.toJson().get("editor").get("gradeRegions").get(1)
+				.get("targets").asString());
+		ProjectEditorState reloaded = ProjectPersistence.normalizeProjectEditor(
+				document.toJson().get("editor"));
+		assertEquals(GradeTarget.MAIN, reloaded.gradeRegions().get(0).targets());
+		assertEquals(GradeTarget.CAMERA, reloaded.gradeRegions().get(1).targets());
+		assertEquals(GradeTarget.BOTH, reloaded.gradeRegions().get(2).targets());
+	}
+
+	@Test
+	@DisplayName("labels name the layers a non-default grade shades")
+	void labelsTheTargets() {
+		assertEquals("Cam +10 light", new GradeRegion("g", 0, 1000, 10, 0, 0, 0, 1,
+				GradeTarget.CAMERA).label());
+		assertEquals("Both warm", new GradeRegion("g", 0, 1000, 0, 0, 0, 20, 1,
+				GradeTarget.BOTH).label());
+		assertEquals("Cam Grade", new GradeRegion("g", 0, 1000, 0, 0, 0, 0, 1,
+				GradeTarget.CAMERA).label());
+		assertEquals("Both Grade", new GradeRegion("g", 0, 1000, 0, 0, 0, 0, 1,
+				GradeTarget.BOTH).label());
 	}
 }

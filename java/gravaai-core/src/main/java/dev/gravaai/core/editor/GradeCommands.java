@@ -6,6 +6,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.core.project.GradeRegion;
+import dev.gravaai.core.project.GradeTarget;
 
 /**
  * The Color-track operations (one class per command, like {@link ZoomCommands}): selecting,
@@ -128,6 +129,36 @@ public final class GradeCommands {
 							temperature, gamma);
 					next.add(graded);
 					changed = !graded.equals(region);
+				} else {
+					next.add(region);
+				}
+			}
+			if (changed) {
+				store.setGradeRegions(next);
+			}
+			return changed;
+		}
+	}
+
+	/** Sets which layers one grade shades (screen, camera or both). */
+	public static final class ChangeTarget implements EditorCommand {
+		private final String id;
+		private final GradeTarget targets;
+
+		public ChangeTarget(String id, GradeTarget targets) {
+			this.id = id;
+			this.targets = targets;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			List<GradeRegion> next = new ArrayList<>();
+			boolean changed = false;
+			for (GradeRegion region : store.state().gradeRegions()) {
+				if (region.id().equals(id)) {
+					GradeRegion retargeted = region.withTargets(targets);
+					next.add(retargeted);
+					changed = !retargeted.equals(region);
 				} else {
 					next.add(region);
 				}

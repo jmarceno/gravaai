@@ -497,7 +497,7 @@ public final class ProjectEditorInputs {
 		return windows.isEmpty() ? FadeSpec.NONE : new FadeSpec(windows);
 	}
 
-	/** Maps the project's Color-track grade regions (stage 5.5, applied to the video layer). */
+	/** Maps the project's Color-track grade regions (stage 5.5) with their layer choices. */
 	public static GradeSpec gradeSpec(ProjectEditorState editor) {
 		List<GradeSpec.Window> windows = new ArrayList<>();
 		if (editor.gradeRegions() != null) {
@@ -507,7 +507,7 @@ public final class ProjectEditorInputs {
 				}
 				windows.add(new GradeSpec.Window(region.startMs(), region.endMs(),
 						region.brightness(), region.contrast(), region.saturation(),
-						region.temperature(), region.gamma()));
+						region.temperature(), region.gamma(), region.targets()));
 			}
 		}
 		return windows.isEmpty() ? GradeSpec.NONE : new GradeSpec(windows);

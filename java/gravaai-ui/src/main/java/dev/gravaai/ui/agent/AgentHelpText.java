@@ -83,11 +83,12 @@ public final class AgentHelpText {
 			Speed regions are timeline overlays; to actually shorten footage use clip {speed} instead.""".stripTrailing();
 
 	private static final String COLOR = """
-			grade {from,to, brightness?, contrast?, saturation?, temperature?, gamma?} — a color/luminosity grade over that timeline span; omitted sliders stay neutral.
+			grade {from,to, brightness?, contrast?, saturation?, temperature?, gamma?, targets?} — a color/luminosity grade over that timeline span; omitted sliders stay neutral.
 			  brightness -100..100 (additive light), contrast -100..100, saturation -100..100 (0 = grayscale), temperature -100..100 (positive = warm, negative = cool), gamma 0.2..2.4 (1 = neutral, >1 lifts midtones).
-			update_grade {id, from?,to?, brightness?, contrast?, saturation?, temperature?, gamma?}
+			  targets "main"(default)|"camera"|"both" — which picture the grade shades.
+			update_grade {id, from?,to?, brightness?, contrast?, saturation?, temperature?, gamma?, targets?}
 			delete_grade {id} | {all:true}
-			Grades shade the recorded screen only (webcam, captions and overlays keep their look) and may not overlap; when two spans should look different, delete or shrink the first.""".stripTrailing();
+			Grades shade the recorded screen by default (webcam, captions and overlays keep their look); targets camera or both shades the camera too. Grades shading the same picture may not overlap; over one span, add two grades with different targets so screen and camera each get their own calibration.""".stripTrailing();
 
 	private static final String ANNOTATIONS = """
 			text {from,to,text, x?,y?,w?,h?, style?:{fontSize?,bold?,italic?,color?,backgroundColor?,align?}}

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.media.gl.GlPreviewThread;
 import dev.gravaai.media.gl.PboFormat;
 
@@ -309,6 +310,41 @@ class CompositorWebcamTest {
 					"background pixel must match the full-size mask within resampling noise: "
 							+ fullBackground[channel] + " vs " + smallBackground[channel]);
 		}
+	}
+
+	@Test
+	@Timeout(60)
+	@DisplayName("the camera grade shades the webcam card; a screen grade leaves it alone")
+	void gradesTheWebcamByTarget() throws Exception {
+		WebcamSpec webcam = spec(true, "center", 50, false, 0, List.of(), false);
+		RgbaFrame webcamFrame = solid(40, 40, 100, 100, 100);
+		GradeSpec.Window cameraGrade = new GradeSpec.Window(0, 1000, 100, 0, 0, 0, 1,
+				GradeTarget.CAMERA);
+		GradeSpec.Window screenGrade = new GradeSpec.Window(0, 1000, 100, 0, 0, 0, 1,
+				GradeTarget.MAIN);
+
+		ByteBuffer plain = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE));
+		ByteBuffer cameraGraded = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+				.withGrade(new GradeSpec(List.of(cameraGrade))));
+		ByteBuffer screenGraded = render(input(0.0, webcamFrame, webcam, ZoomSpec.NONE)
+				.withGrade(new GradeSpec(List.of(screenGrade))));
+
+		int[] plainWebcam = pixel(plain, 200, 100);
+		int[] gradedWebcam = pixel(cameraGraded, 200, 100);
+		int[] untouchedWebcam = pixel(screenGraded, 200, 100);
+		// Brightness +100 lifts the mid-grey card to near white only under the camera grade.
+		assertTrue(gradedWebcam[0] > 180 && gradedWebcam[1] > 180 && gradedWebcam[2] > 180,
+				"camera grade must shade the webcam card: " + gradedWebcam[0] + ","
+						+ gradedWebcam[1] + "," + gradedWebcam[2]);
+		for (int channel = 0; channel < 3; channel++) {
+			assertTrue(Math.abs(plainWebcam[channel] - untouchedWebcam[channel]) <= 2,
+					"screen grade must leave the webcam card alone: " + untouchedWebcam[0] + ","
+							+ untouchedWebcam[1] + "," + untouchedWebcam[2]);
+		}
+		// The same screen grade does lift the screen footage (20,20,20 mid grey).
+		int[] gradedScreen = pixel(screenGraded, 3, 3);
+		assertTrue(gradedScreen[0] > 180, "screen grade must shade the screen footage: "
+				+ gradedScreen[0] + "," + gradedScreen[1] + "," + gradedScreen[2]);
 	}
 
 	private static byte[] toArray(ByteBuffer frame) {

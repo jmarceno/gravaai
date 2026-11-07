@@ -27,6 +27,7 @@ import dev.gravaai.ui.editor.timeline.core.TimelineRangeMath;
 import dev.gravaai.ui.editor.timeline.core.TimelineRegionSpan;
 import dev.gravaai.ui.editor.timeline.core.TimelineShortcuts;
 import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack;
+import dev.gravaai.ui.AppFonts;
 import dev.gravaai.ui.agent.AgentHighlightView;
 import dev.gravaai.ui.agent.AgentHighlightsController;
 import dev.gravaai.ui.agent.AgentTimelineHighlights;
@@ -37,18 +38,32 @@ import dev.gravaai.ui.editor.timeline.core.TimelineRenderItem;
 import dev.gravaai.ui.editor.timeline.core.TimelineRows;
 import dev.gravaai.ui.editor.timeline.core.TimelineScale;
 import dev.gravaai.ui.editor.timeline.core.TimelineConstants;
+import dev.gravaai.ui.kit.Icon;
+import dev.gravaai.ui.kit.Icons;
+import javafx.geometry.HPos;
+import javafx.geometry.Pos;
+import javafx.geometry.VPos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.Cursor;
+import javafx.scene.control.Label;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.image.Image;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Paint;
+import javafx.scene.paint.Stop;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -74,81 +89,101 @@ public final class TimelineView extends Region {
 	private static final double AXIS_HEIGHT = TimelineLayout.TIMELINE_AXIS_HEIGHT_PX;
 	private static final double CLIP_ROW_HEIGHT = TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX;
 	private static final double COMPACT_ROW_HEIGHT = TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX;
-	private static final double ROW_GAP = 2;
+	private static final double ROW_GAP = 0;
 	private static final double MIN_VISIBLE_RANGE_MS = 300;
 	private static final int WAVEFORM_BARS = 96;
 	private static final double RESIZE_EDGE_PX = 6;
 	private static final double DRAG_THRESHOLD_PX = 3;
 	private static final double GHOST_ZOOM_MS = 1000;
 	private static final double CAPTION_GHOST_MS = 1500;
-	private static final double CAPTION_STRIP_TOP_OFFSET = 36;
-	private static final double CAPTION_STRIP_HEIGHT = 20;
+	/** Fixed left track-header gutter (mock {@code .tlbody}: 112px column). */
+	private static final double GUTTER_WIDTH = 112;
+	/** Timeline toolbar row above the ruler (mock {@code .tlbar}: 30px). */
+	private static final double TLBAR_HEIGHT = 30;
 	/** Thickness of the horizontal (time) and vertical (rows) scroll bars. */
 	private static final double SCROLL_BAR_SIZE = 10;
 	/** Vertical wheel step for the rows scroll, in pixels per wheel unit. */
 	private static final double ROW_SCROLL_STEP = 1;
 
-	/* ItemGlass.module.css colours (dark theme). */
-	private static final Color CLIP_FILL = Color.web("#183065");
-	private static final Color CLIP_BORDER = Color.web("#1b3a7f");
-	private static final Color CLIP_SELECTED = Color.web("#2563eb");
-	private static final Color ZOOM_FILL = Color.web("#2fb3a3");
-	private static final Color ZOOM_BORDER = Color.web("#3fd4c1");
-	private static final Color GRADE_FILL = Color.web("#1f3a5c");
-	private static final Color GRADE_BORDER = Color.web("#e8b64c");
-	private static final Color GRADE_SELECTED = Color.web("#f5d78a");
-	private static final Color ANNOTATION_FILL = Color.web("#4e4726");
-	private static final Color ANNOTATION_BORDER = Color.web("#62582c");
-	private static final Color ANNOTATION_SELECTED = Color.web("#b4a046");
+	/* Instrument mock surfaces (docs/mocks/editor-instrument.html). */
+	private static final Color LANES_BG = Color.web("#080b0e");
+	private static final Color CHROME_BG = Color.web("#0b0f12");
+	private static final Color HAIRLINE = Color.web("#171e24");
+	private static final Color FAINT = Color.web("#5b6872");
+	private static final Color CYAN = Color.web("#2fe6d0");
+	private static final Color CYAN_INK = Color.web("#032522");
+	private static final Color AMBER = Color.web("#f0b429");
+	private static final Color GUTTER_TEXT = Color.web("#e9f1f4");
+
+	/* Instrument mock clip treatments. */
+	private static final Paint CLIP_FILL = new LinearGradient(0, 0, 0, 1, true,
+			CycleMethod.NO_CYCLE, new Stop(0, Color.web("#153e3b")), new Stop(1,
+					Color.web("#10312f")));
+	private static final Color CLIP_BORDER = Color.web("#1e5a54");
+	private static final Color CLIP_TEXT = Color.web("#9df3e8");
+	private static final Color CLIP_SELECTED = Color.web("#2fe6d0");
+	private static final Color ZOOM_FILL = Color.web("#2fe6d0", 0.10);
+	private static final Color ZOOM_BORDER = Color.web("#2fe6d0", 0.26);
+	private static final Color ZOOM_SELECTED = Color.web("#2fe6d0");
+	private static final Color GRADE_FILL = Color.web("#f0b429", 0.10);
+	private static final Color GRADE_BORDER = Color.web("#f0b429", 0.35);
+	private static final Color GRADE_SELECTED = Color.web("#f0b429");
+	private static final Color ANNOTATION_FILL = Color.web("#141a1f");
+	private static final Color ANNOTATION_BORDER = Color.web("#28323a");
+	private static final Color ANNOTATION_SELECTED = Color.web("#f0b429");
 	/* Loupe blocks: a cool glass tint so a magnifying glass reads apart from text overlays. */
-	private static final Color LOUPE_FILL = Color.web("#1d4250");
+	private static final Color LOUPE_FILL = Color.web("#16242b");
 	private static final Color LOUPE_BORDER = Color.web("#2f6d80");
 	private static final Color LOUPE_SELECTED = Color.web("#67d4f0");
 	private static final Color LOUPE_GLYPH = Color.web("#a5ecff");
-	private static final Color AUDIO_FILL = Color.web("#164f2d");
-	private static final Color AUDIO_BORDER = Color.web("#196b38");
-	private static final Color AUDIO_SELECTED = Color.web("#22c55e");
-	private static final Color SOURCE_AUDIO_FILL = Color.web("#0f3b2a");
-	private static final Color KEYSTROKE_FILL = Color.web("#3b2a63");
-	private static final Color KEYSTROKE_BORDER = Color.web("#8b5cf6");
+	private static final Color AUDIO_FILL = Color.web("#1a2128");
+	private static final Color AUDIO_BORDER = Color.web("#28323b");
+	private static final Color AUDIO_TEXT = Color.web("#a9b6c0");
+	private static final Color AUDIO_SELECTED = Color.web("#2fe6d0");
+	private static final Color WAVEFORM_COLOR = Color.web("#8fa3b0", 0.55);
+	private static final Color SOURCE_AUDIO_FILL = Color.web("#12171d");
+	private static final Color KEYSTROKE_FILL = Color.web("#241d38");
+	private static final Color KEYSTROKE_BORDER = Color.web("#8b5cf6", 0.55);
 	private static final Color KEYSTROKE_SELECTED = Color.web("#a78bfa");
-	private static final Color CAMERA_SPLIT_FILL = Color.web("#14532d");
-	private static final Color CAMERA_BUBBLE_FILL = Color.web("#134e4a");
-	private static final Color CAMERA_ONLY_FILL = Color.web("#713f12");
-	private static final Color CAMERA_HIDDEN_FILL = Color.web("#3f3f46");
-	private static final Color CAMERA_LAYOUT_BORDER = Color.web("#2dd4bf");
+	private static final Color CAMERA_SPLIT_FILL = Color.web("#12271f");
+	private static final Color CAMERA_BUBBLE_FILL = Color.web("#0f2624");
+	private static final Color CAMERA_ONLY_FILL = Color.web("#2a2412");
+	private static final Color CAMERA_HIDDEN_FILL = Color.web("#1a1d21");
+	private static final Color CAMERA_LAYOUT_BORDER = Color.web("#2dd4bf", 0.6);
 	private static final Color CAMERA_LAYOUT_SELECTED = Color.web("#5eead4");
 	private static final Color CAMERA_LAYOUT_LANE = Color.web("#2dd4bf", 0.35);
 	private static final Color CAMERA_LAYOUT_RAMP = Color.web("#2dd4bf", 0.25);
-	private static final Color ELEMENT_FILL = Color.web("#4c1d95");
-	private static final Color ELEMENT_BORDER = Color.web("#a78bfa");
+	private static final Color ELEMENT_FILL = Color.web("#221a38");
+	private static final Color ELEMENT_BORDER = Color.web("#a78bfa", 0.6);
 	private static final Color ELEMENT_SELECTED = Color.web("#ddd6fe");
-	private static final Color ELEMENT_ERROR = Color.web("#ef4444");
+	private static final Color ELEMENT_ERROR = Color.web("#ff5f6d");
 	private static final Color ELEMENT_RAMP = Color.web("#c4b5fd", 0.35);
-	private static final Color CAPTION_FILL = Color.web("#b58b12");
-	private static final Color CAPTION_BORDER = Color.web("#facc15");
-	private static final Color CAPTION_SELECTED = Color.web("#60a5fa");
-	private static final Color TRIM_FILL = Color.web("#652425", 0.35);
-	private static final Color TRIM_BORDER = Color.web("#802a2b");
-	private static final Color SPEED_FILL = Color.web("#67460f", 0.55);
-	private static final Color SPEED_BORDER = Color.web("#83570f");
-	private static final Color PLAYHEAD = Color.web("#ef4444");
-	private static final double PLAYHEAD_CAP_WIDTH = 16;
-	private static final double PLAYHEAD_CAP_EXPANDED = 68;
-	private static final double PLAYHEAD_CAP_HEIGHT = 16;
+	private static final Color CAPTION_FILL = Color.web("#1b1c25");
+	private static final Color CAPTION_BORDER = Color.web("#2a2c39");
+	private static final Color CAPTION_TEXT = Color.web("#b3b7c8");
+	private static final Color CAPTION_SELECTED = Color.web("#2fe6d0");
+	private static final Color TRIM_FILL = Color.web("#ff5f6d", 0.12);
+	private static final Color TRIM_BORDER = Color.web("#ff5f6d", 0.4);
+	private static final Color SPEED_FILL = Color.web("#f0b429", 0.14);
+	private static final Color SPEED_BORDER = Color.web("#f0b429", 0.45);
+	private static final Color SPEED_TEXT = Color.web("#f0b429");
+	private static final Color PLAYHEAD = Color.web("#2fe6d0");
+	private static final double PLAYHEAD_CAP_WIDTH = 8;
+	private static final double PLAYHEAD_CAP_HEIGHT = 8;
+	private static final double PLAYHEAD_TAG_HEIGHT = 15;
 	/** Grab tolerance around the playhead line in the lanes. */
 	private static final double PLAYHEAD_GRAB_PX = 4;
-	private static final Font PLAYHEAD_FONT = Font.font("System",
-			javafx.scene.text.FontWeight.MEDIUM, 10);
-	private static final Color ROW_LABEL = Color.web("#666666");
-	private static final Color GRID_LINE = Color.web("#ffffff", 0.04);
-	private static final Color BLOCK_TEXT = Color.web("#ffffff", 0.92);
-	private static final Color BADGE_FILL = Color.web("#000000", 0.65);
+	private static final Font PLAYHEAD_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9);
+	private static final Color GRID_LINE = Color.web("#171e24");
+	private static final Color BLOCK_TEXT = Color.web("#e9f1f4", 0.92);
+	/** Dark pill behind clip labels (mock {@code .clip__lbl}). */
+	private static final Color BADGE_FILL = Color.web("#060a0d", 0.55);
+	private static final Color BADGE_TEXT = Color.web("#e9f1f4", 0.92);
 
-	private static final Font AXIS_FONT = Font.font("DM Sans", 10);
-	private static final Font BLOCK_FONT = Font.font("DM Sans", FontWeight.MEDIUM, 11);
-	private static final Font SMALL_FONT = Font.font("DM Sans", 10);
-	private static final Font ROW_LABEL_FONT = Font.font("DM Sans", FontWeight.BOLD, 9);
+	private static final Font AXIS_FONT = AppFonts.monoFont(9);
+	private static final Font BLOCK_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9.5);
+	private static final Font SMALL_FONT = AppFonts.monoFont(9);
+	private static final Font ROW_LABEL_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9.5);
 
 	private record RowLayout(String id, double top, double height) {
 	}
@@ -179,6 +214,9 @@ public final class TimelineView extends Region {
 
 	private final TimelineDataSource dataSource;
 	private final TimelineCommands commands;
+	/** Toolbar above the ruler (mock {@code .tlbar}): split, suggest-zooms, live scale readout. */
+	private final HBox toolbar = new HBox(2);
+	private final Label scaleLabel = new Label("");
 	private final Canvas canvas = new Canvas(1000, 200);
 	/** Time scroll bar under the lanes: thumb = visible range inside the whole timeline. */
 	private final ScrollBar timeScrollBar = new ScrollBar();
@@ -199,6 +237,8 @@ public final class TimelineView extends Region {
 	/** Camera layout segment id to its layout, for the block tint. */
 	private java.util.Map<String, CameraLayoutSegment> cameraLayouts = java.util.Map.of();
 	private Runnable onCameraLayoutShortcut = () -> {};
+	/** The suggest-zooms action the toolbar Auto button fires (the app's guarded action). */
+	private Runnable onSuggestZooms = () -> {};
 	private java.util.Map<String, dev.gravaai.core.project.SceneElement> elementsById = java.util.Map.of();
 	private java.util.Set<String> elementErrorIds = java.util.Set.of();
 	/** Switch diamonds drawn at Camera layout segment starts (click toggles cut/smooth). */
@@ -250,6 +290,8 @@ public final class TimelineView extends Region {
 	}
 	private @Nullable AgentTimelineHighlights agentOverlay;
 	private @Nullable AgentHighlightsController agentController;
+	/** Row-header icons rendered once (kit SVG snapshots), keyed by icon constant. */
+	private final Map<String, Image> gutterIconCache = new LinkedHashMap<>();
 	private javafx.collections.@Nullable ListChangeListener<AgentHighlightView> agentHighlightsListener;
 	private java.util.function.@Nullable Consumer<String> onCaptionSelected;
 	private @Nullable Runnable onItemPressed;
@@ -263,7 +305,8 @@ public final class TimelineView extends Region {
 	public TimelineView(TimelineDataSource dataSource, TimelineCommands commands) {
 		this.dataSource = dataSource;
 		this.commands = commands == null ? TimelineCommands.NONE : commands;
-		getChildren().addAll(canvas, timeScrollBar, rowScrollBar);
+		buildToolbar();
+		getChildren().addAll(toolbar, canvas, timeScrollBar, rowScrollBar);
 		getStyleClass().add("timeline-view");
 		java.net.URL timelineCss = TimelineView.class.getResource("/ui/editor/timeline.css");
 		if (timelineCss != null) {
@@ -287,7 +330,8 @@ public final class TimelineView extends Region {
 				setScrollY(value.doubleValue());
 			}
 		});
-		setMinHeight(AXIS_HEIGHT);
+		// The toolbar, ruler and one lane are the minimum; the rest scrolls inside the panel.
+		setMinHeight(TLBAR_HEIGHT + AXIS_HEIGHT + COMPACT_ROW_HEIGHT + SCROLL_BAR_SIZE);
 		setFocusTraversable(false);
 		canvas.setOnScroll(this::handleScroll);
 		canvas.setOnMousePressed(this::handleMousePressed);
@@ -307,6 +351,52 @@ public final class TimelineView extends Region {
 		refreshData();
 	}
 
+	/**
+	 * The timeline toolbar (mock {@code .tlbar}): split at the playhead and the zoom suggester —
+	 * the editing commands the transport used to host — plus the live ruler-division readout.
+	 */
+	private void buildToolbar() {
+		toolbar.getStyleClass().add("timeline-toolbar");
+		toolbar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		dev.gravaai.ui.kit.Button split = toolbarButton(Icons.Scissors, "Split clip at the playhead",
+				this::splitAtPlayhead);
+		dev.gravaai.ui.kit.Button suggest = toolbarButton(Icons.MagicWand, "Suggest zooms",
+				this::suggestZoomsAction);
+		javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		scaleLabel.getStyleClass().add("timeline-toolbar__scale");
+		toolbar.getChildren().addAll(split, suggest, spacer, scaleLabel);
+	}
+
+	/** One ghost icon button in the timeline toolbar, wired to a timeline action. */
+	private static dev.gravaai.ui.kit.Button toolbarButton(String icon, String tooltip,
+			Runnable action) {
+		dev.gravaai.ui.kit.Button button = new dev.gravaai.ui.kit.Button("",
+				dev.gravaai.ui.kit.Button.Variant.GHOST, dev.gravaai.ui.kit.Button.Size.ICON);
+		button.icon(Icon.of(icon, 12));
+		button.setOnAction(event -> action.run());
+		dev.gravaai.ui.kit.Tooltip.install(button, tooltip);
+		return button;
+	}
+
+	/** The C-key split path: cut the clip under the playhead at the playhead time. */
+	private void splitAtPlayhead() {
+		TimelineRenderItem clip = clipAtPlayhead();
+		if (clip != null) {
+			commands.splitClip(clip.id(), currentTimeMs);
+		}
+	}
+
+	/** The toolbar's suggest button: the app seam keeps the guards and toasts of the action. */
+	private void suggestZoomsAction() {
+		onSuggestZooms.run();
+	}
+
+	/** Replaces the suggest-zooms action (the app owns the guards and the result toast). */
+	public void setOnSuggestZooms(Runnable action) {
+		this.onSuggestZooms = action == null ? () -> { } : action;
+	}
+
 	/* ---------- public API (tests / shell wiring) ---------- */
 
 	public Span range() {
@@ -317,20 +407,26 @@ public final class TimelineView extends Region {
 		return fullRange;
 	}
 
-	/** Visible milliseconds per screen pixel. */
+	/** Visible milliseconds per screen pixel, across the lanes right of the header gutter. */
 	public double msPerPixel() {
-		double width = Math.max(1, contentWidth());
+		double width = Math.max(1, lanesWidth());
 		return range.duration() / width;
 	}
 
-	/** Screen x for a timeline time. */
+	/** Screen x for a timeline time (offset by the track-header gutter). */
 	public double xForTime(double timeMs) {
-		return (timeMs - range.start()) / msPerPixel();
+		return GUTTER_WIDTH + (timeMs - range.start()) / msPerPixel();
 	}
 
 	/** Timeline time for a screen x. */
 	public double timeAtX(double x) {
-		return Math.max(0, Math.min(range.start() + x * msPerPixel(), fullRange.end()));
+		return Math.max(0, Math.min(range.start() + (x - GUTTER_WIDTH) * msPerPixel(),
+				fullRange.end()));
+	}
+
+	/** The drawable width right of the fixed header gutter. */
+	private double lanesWidth() {
+		return Math.max(1, contentWidth() - GUTTER_WIDTH);
 	}
 
 	public void setRange(Span next) {
@@ -487,33 +583,36 @@ public final class TimelineView extends Region {
 
 	@Override
 	protected double computePrefHeight(double width) {
-		return contentHeight() + SCROLL_BAR_SIZE;
+		return TLBAR_HEIGHT + contentHeight() + SCROLL_BAR_SIZE;
 	}
 
 	/**
-	 * Only the ruler and one lane are required: the rest scrolls inside the panel (React's
-	 * {@code timeline-scroll} is {@code overflow-y-auto}), so the timeline never grows past it.
+	 * Only the toolbar, the ruler and one lane are required: the rest scrolls inside the panel
+	 * (React's {@code timeline-scroll} is {@code overflow-y-auto}), so the timeline never grows
+	 * past it.
 	 */
 	@Override
 	protected double computeMinHeight(double width) {
-		return AXIS_HEIGHT + COMPACT_ROW_HEIGHT + SCROLL_BAR_SIZE;
+		return TLBAR_HEIGHT + AXIS_HEIGHT + COMPACT_ROW_HEIGHT + SCROLL_BAR_SIZE;
 	}
 
 	@Override
 	protected void layoutChildren() {
 		double width = Math.max(1, getWidth());
-		double lanesHeight = Math.max(AXIS_HEIGHT, getHeight() - SCROLL_BAR_SIZE);
+		double lanesHeight = Math.max(AXIS_HEIGHT, getHeight() - SCROLL_BAR_SIZE - TLBAR_HEIGHT);
 		boolean rowsOverflow = contentHeight() > lanesHeight + 0.5;
 		double lanesWidth = Math.max(1, width - (rowsOverflow ? SCROLL_BAR_SIZE : 0));
+		toolbar.resizeRelocate(0, 0, lanesWidth, TLBAR_HEIGHT);
 		canvas.setWidth(lanesWidth);
 		canvas.setHeight(lanesHeight);
-		timeScrollBar.resizeRelocate(0, lanesHeight, lanesWidth, SCROLL_BAR_SIZE);
+		canvas.resizeRelocate(0, TLBAR_HEIGHT, lanesWidth, lanesHeight);
+		timeScrollBar.resizeRelocate(0, TLBAR_HEIGHT + lanesHeight, lanesWidth, SCROLL_BAR_SIZE);
 		rowScrollBar.setVisible(rowsOverflow);
-		rowScrollBar.resizeRelocate(lanesWidth, AXIS_HEIGHT, SCROLL_BAR_SIZE,
+		rowScrollBar.resizeRelocate(lanesWidth, TLBAR_HEIGHT + AXIS_HEIGHT, SCROLL_BAR_SIZE,
 				Math.max(1, lanesHeight - AXIS_HEIGHT));
 		scrollY = Math.max(0, Math.min(scrollY, maxScrollY()));
 		if (agentOverlay != null) {
-			agentOverlay.resizeRelocate(0, 0, lanesWidth, lanesHeight);
+			agentOverlay.resizeRelocate(0, TLBAR_HEIGHT, lanesWidth, lanesHeight);
 		}
 		redraw();
 	}
@@ -578,6 +677,11 @@ public final class TimelineView extends Region {
 		double top = AXIS_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.CLIP_ROW_ID, top, CLIP_ROW_HEIGHT));
 		top += CLIP_ROW_HEIGHT + ROW_GAP;
+		// Captions get their own lane (mock CAP row) right under the footage they caption.
+		if (!captionFragments.isEmpty()) {
+			rows.add(new RowLayout(TimelineConstants.CAPTION_ROW_ID, top, COMPACT_ROW_HEIGHT));
+			top += COMPACT_ROW_HEIGHT + ROW_GAP;
+		}
 		// The Camera layout track sits right under the clips it re-frames; it appears once the
 		// first layout switch exists (Camera layout in the toolbar).
 		if (cameraLayoutRow) {
@@ -594,9 +698,9 @@ public final class TimelineView extends Region {
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
 
-		double zoomHeight = extras > 0 ? COMPACT_ROW_HEIGHT : CLIP_ROW_HEIGHT;
-		rows.add(new RowLayout(TimelineConstants.ZOOM_ROW_ID, top, zoomHeight));
-		top += zoomHeight + ROW_GAP;
+		// Every lane is one 44px row in the Instrument layout.
+		rows.add(new RowLayout(TimelineConstants.ZOOM_ROW_ID, top, COMPACT_ROW_HEIGHT));
+		top += COMPACT_ROW_HEIGHT + ROW_GAP;
 
 		// The Color track sits under the zooms: like them it is always present, and clicking the
 		// empty lane drops a grade over the footage at that time.
@@ -1029,10 +1133,10 @@ public final class TimelineView extends Region {
 	 */
 	private boolean isOnPlayhead(double x, double y) {
 		double playheadX = xForTime(currentTimeMs);
-		if (playheadX < 0 || playheadX > contentWidth()) {
+		if (playheadX < GUTTER_WIDTH || playheadX > contentWidth()) {
 			return false;
 		}
-		double capHalfWidth = (playheadHovered ? PLAYHEAD_CAP_EXPANDED : PLAYHEAD_CAP_WIDTH) / 2;
+		double capHalfWidth = PLAYHEAD_CAP_WIDTH / 2;
 		if (y <= AXIS_HEIGHT && Math.abs(x - playheadX) <= capHalfWidth) {
 			return true;
 		}
@@ -1487,9 +1591,10 @@ public final class TimelineView extends Region {
 	}
 
 	private boolean inCaptionStrip(double y) {
-		RowLayout clipRow = rowById(TimelineConstants.CLIP_ROW_ID);
-		return clipRow != null && y >= clipRow.top() + CAPTION_STRIP_TOP_OFFSET
-				&& y <= clipRow.top() + CAPTION_STRIP_TOP_OFFSET + CAPTION_STRIP_HEIGHT;
+		// The former strip under the clips is now the CAP lane itself.
+		RowLayout captionRow = rowById(TimelineConstants.CAPTION_ROW_ID);
+		return captionRow != null && y >= captionRow.top()
+				&& y <= captionRow.top() + captionRow.height();
 	}
 
 	/**
@@ -1729,9 +1834,9 @@ public final class TimelineView extends Region {
 			double top;
 			double height;
 			if ("caption".equals(hoverGhostKind)) {
-				RowLayout clipRow = rowById(TimelineConstants.CLIP_ROW_ID);
-				top = (clipRow == null ? AXIS_HEIGHT : clipRow.top()) + CAPTION_STRIP_TOP_OFFSET;
-				height = CAPTION_STRIP_HEIGHT;
+				RowLayout captionRow = rowById(TimelineConstants.CAPTION_ROW_ID);
+				top = captionRow == null ? AXIS_HEIGHT : captionRow.top();
+				height = captionRow == null ? 24 : captionRow.height();
 			} else if ("grade".equals(hoverGhostKind)) {
 				RowLayout gradeRow = rowById(TimelineConstants.GRADE_ROW_ID);
 				top = gradeRow == null ? AXIS_HEIGHT : gradeRow.top() + gradeRow.height() * 0.1;
@@ -1742,19 +1847,19 @@ public final class TimelineView extends Region {
 				height = zoomRow == null ? 24 : zoomRow.height() * 0.8;
 			}
 			graphics.setFill(Color.web("#2fb3a3", 0.18));
-			graphics.fillRoundRect(startX, top, width, height, 8, 8);
+			graphics.fillRoundRect(startX, top, width, height, 3, 3);
 			graphics.setStroke(Color.web("#3fd4c1", 0.7));
 			graphics.setLineWidth(1);
 			graphics.setLineDashes(4, 4);
-			graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 8,
-					8);
+			graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 3,
+					3);
 			graphics.setLineDashes(null);
 			double centerX = startX + width / 2;
 			double centerY = top + height / 2;
 			graphics.setFill(Color.web("#2fb3a3", 0.9));
 			graphics.fillOval(centerX - 9, centerY - 9, 18, 18);
 			graphics.setFont(Font.font("DM Sans", FontWeight.BOLD, 13));
-			graphics.setFill(Color.WHITE);
+			graphics.setFill(CYAN_INK);
 			graphics.fillText("+", centerX - 4.5, centerY + 5);
 		}
 	}
@@ -1766,12 +1871,12 @@ public final class TimelineView extends Region {
 		double top = row == null ? AXIS_HEIGHT : row.top() + 2;
 		double height = row == null ? 24 : row.height() - 4;
 		graphics.setFill(Color.web("#2fb3a3", 0.25));
-		graphics.fillRoundRect(startX, top, width, height, 8, 8);
+		graphics.fillRoundRect(startX, top, width, height, 3, 3);
 		graphics.setStroke(Color.web("#3fd4c1", 0.8));
 		graphics.setLineWidth(1.5);
 		graphics.setLineDashes(5, 4);
-		graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 8,
-				8);
+		graphics.strokeRoundRect(startX + 0.5, top + 0.5, Math.max(1, width - 1), height - 1, 3,
+				3);
 		graphics.setLineDashes(null);
 	}
 
@@ -1781,8 +1886,11 @@ public final class TimelineView extends Region {
 		releaseAt(x, y);
 	}
 
-	/** Which block is under a point, if any (top-most rows win). */
+	/** Which block is under a point, if any (top-most rows win; the header gutter is inert). */
 	public @Nullable TimelineSelection hitTest(double x, double y) {
+		if (x < GUTTER_WIDTH) {
+			return null;
+		}
 		for (TimelineRenderItem item : items) {
 			BlockBounds bounds = blockBounds.get(item.id());
 			if (bounds != null && bounds.contains(x, y)) {
@@ -1813,8 +1921,11 @@ public final class TimelineView extends Region {
 		GraphicsContext graphics = canvas.getGraphicsContext2D();
 		double width = contentWidth();
 		double height = canvas.getHeight();
-		graphics.setFill(Color.web("#121418"));
+		graphics.setFill(LANES_BG);
 		graphics.fillRect(0, 0, width, height);
+		// The ruler strip (mock .ruler) and the header corner share the chrome surface.
+		graphics.setFill(CHROME_BG);
+		graphics.fillRect(0, 0, width, AXIS_HEIGHT);
 		blockBounds.clear();
 		cameraSwitchBounds.clear();
 		cameraSwitchOutBounds.clear();
@@ -1822,22 +1933,33 @@ public final class TimelineView extends Region {
 			agentOverlay.range((long) range.start(), (long) range.end());
 		}
 		if (items.isEmpty() && dataSource.project() == null) {
+			drawGutterChrome(graphics, width, height);
 			return;
 		}
 		syncScrollBars();
 		drawGrid(graphics, width, height);
 		drawRuler(graphics, width);
-		// Lanes scroll under the pinned ruler: clip below the axis and shift by scrollY.
+		// Lanes scroll under the pinned ruler: clip right of the gutter, below the axis.
 		graphics.save();
 		graphics.beginPath();
-		graphics.rect(0, AXIS_HEIGHT, width, Math.max(0, height - AXIS_HEIGHT));
+		graphics.rect(GUTTER_WIDTH, AXIS_HEIGHT, Math.max(0, width - GUTTER_WIDTH),
+				Math.max(0, height - AXIS_HEIGHT));
 		graphics.clip();
 		graphics.translate(0, -scrollY);
 		drawRows(graphics, width);
+		drawLaneSeparators(graphics, width);
 		drawInteractionOverlays(graphics);
-		drawRowLabels(graphics);
+		graphics.restore();
+		// Track headers (mock .tlheads) live in the fixed gutter and scroll with the lanes.
+		graphics.save();
+		graphics.beginPath();
+		graphics.rect(0, AXIS_HEIGHT, GUTTER_WIDTH, Math.max(0, height - AXIS_HEIGHT));
+		graphics.clip();
+		graphics.translate(0, -scrollY);
+		drawTrackHeaders(graphics);
 		graphics.restore();
 		drawAgentHighlights(graphics, width);
+		drawGutterChrome(graphics, width, height);
 		drawPlayhead(graphics, height);
 	}
 
@@ -1848,7 +1970,7 @@ public final class TimelineView extends Region {
 		double first = Math.floor(range.start() / Math.max(1, axis.gridMs())) * axis.gridMs();
 		for (double time = first; time <= range.end(); time += axis.gridMs()) {
 			double x = Math.round(xForTime(time)) + 0.5;
-			if (x >= 0 && x <= width) {
+			if (x >= GUTTER_WIDTH && x <= width) {
 				graphics.strokeLine(x, AXIS_HEIGHT, x, height);
 			}
 		}
@@ -1856,19 +1978,63 @@ public final class TimelineView extends Region {
 
 	private void drawRuler(GraphicsContext graphics, double width) {
 		TimelineScale.AxisScale axis = TimelineScale.calculateAxisScale(range.duration(), width);
+		updateScaleLabel(axis);
 		graphics.setFont(AXIS_FONT);
-		graphics.setFill(Color.web("#8b929a"));
-		graphics.setStroke(Color.web("#8b929a", 0.45));
+		graphics.setFill(FAINT);
 		graphics.setLineWidth(1);
 		double first = Math.max(0,
 				Math.floor(range.start() / Math.max(1, axis.intervalMs())) * axis.intervalMs());
 		for (double time = first; time <= range.end(); time += axis.intervalMs()) {
 			double x = Math.round(xForTime(time)) + 0.5;
-			if (x < 0 || x > width) {
+			if (x < GUTTER_WIDTH || x > width) {
 				continue;
 			}
-			graphics.strokeLine(x, AXIS_HEIGHT - 6, x, AXIS_HEIGHT);
-			graphics.fillText(TimelineScale.formatTimeLabel(time, axis.intervalMs()), x + 4, 13);
+			// Mock .ruler: a 9px big tick under each label, 5px small ticks between (drawGrid).
+			graphics.setStroke(Color.web("#39454e"));
+			graphics.strokeLine(x, AXIS_HEIGHT - 9, x, AXIS_HEIGHT);
+			graphics.fillText(TimelineScale.formatTimeLabel(time, axis.intervalMs()), x + 4, 14);
+		}
+		// Small ticks (mock .ruler i) at the grid positions between labels.
+		double gridFirst = Math.floor(range.start() / Math.max(1, axis.gridMs())) * axis.gridMs();
+		graphics.setStroke(Color.web("#28323a"));
+		for (double time = gridFirst; time <= range.end(); time += axis.gridMs()) {
+			double x = Math.round(xForTime(time)) + 0.5;
+			if (x < GUTTER_WIDTH || x > width) {
+				continue;
+			}
+			graphics.strokeLine(x, AXIS_HEIGHT - 5, x, AXIS_HEIGHT);
+		}
+	}
+
+	/** The toolbar's live readout of the ruler division (mock "1 lane = 5 s", renamed). */
+	private void updateScaleLabel(TimelineScale.AxisScale axis) {
+		long interval = axis.intervalMs();
+		String text = interval >= 1000
+				? "1 div = " + (interval / 1000) + " s"
+				: "1 div = " + interval + " ms";
+		if (!text.equals(scaleLabel.getText())) {
+			scaleLabel.setText(text);
+		}
+	}
+
+	/** Gutter edge, ruler hairline and the TRACKS corner (mock .tlheads .corner). */
+	private void drawGutterChrome(GraphicsContext graphics, double width, double height) {
+		graphics.setStroke(HAIRLINE);
+		graphics.setLineWidth(1);
+		graphics.strokeLine(GUTTER_WIDTH - 0.5, AXIS_HEIGHT, GUTTER_WIDTH - 0.5, height);
+		graphics.strokeLine(0, AXIS_HEIGHT - 0.5, width, AXIS_HEIGHT - 0.5);
+		graphics.setFont(AXIS_FONT);
+		graphics.setFill(FAINT);
+		graphics.fillText("TRACKS", 8, 14);
+	}
+
+	/** 1px lane separators (mock .lane border-bottom) at every row bottom. */
+	private void drawLaneSeparators(GraphicsContext graphics, double width) {
+		graphics.setStroke(HAIRLINE);
+		graphics.setLineWidth(1);
+		for (RowLayout row : rowLayouts) {
+			double y = Math.round(row.top() + row.height()) - 0.5;
+			graphics.strokeLine(GUTTER_WIDTH, y, width, y);
 		}
 	}
 
@@ -1881,6 +2047,7 @@ public final class TimelineView extends Region {
 				// and the lead's row/indicator checklist).
 				drawSpeedBands(graphics, project.speedRegions(), row, width);
 				drawTrimGaps(graphics, project.trimRegions(), row, width);
+			} else if (TimelineConstants.CAPTION_ROW_ID.equals(row.id())) {
 				drawCaptions(graphics, row, width);
 			} else if (TimelineConstants.ZOOM_ROW_ID.equals(row.id())) {
 				for (TimelineRenderItem item : items) {
@@ -1936,8 +2103,9 @@ public final class TimelineView extends Region {
 	}
 
 	private void drawClips(GraphicsContext graphics, RowLayout row, double width) {
-		double blockHeight = row.height() * 0.85;
-		double blockTop = row.top() + (row.height() - blockHeight) / 2;
+		// Mock .clip: inset 5px top/bottom, 3px radius, label on a dark pill.
+		double blockHeight = row.height() - 10;
+		double blockTop = row.top() + 5;
 		List<TimelineRenderItem> clips = items.stream()
 				.filter(item -> TimelineConstants.CLIP_ROW_ID.equals(item.rowId()))
 				.toList();
@@ -1947,22 +2115,30 @@ public final class TimelineView extends Region {
 			double startX = xForTime(display.start());
 			double endX = xForTime(display.end());
 			double blockWidth = Math.max(6, endX - startX);
-			if (endX < 0 || startX > width) {
+			if (endX < GUTTER_WIDTH || startX > width) {
 				continue;
 			}
 			double x = Math.max(-blockWidth, startX);
+			boolean muted = Boolean.TRUE.equals(item.muted());
+			if (muted) {
+				// Mock .clip--muted: the whole block at half opacity.
+				graphics.setGlobalAlpha(0.5);
+			}
 			graphics.setFill(CLIP_FILL);
-			graphics.fillRoundRect(x, blockTop, blockWidth, blockHeight, 8, 8);
+			graphics.fillRoundRect(x, blockTop, blockWidth, blockHeight, 3, 3);
 			drawFilmstrip(graphics, item, x, blockTop, blockWidth, blockHeight);
 			drawFade(graphics, item, x, blockTop, blockWidth, blockHeight);
 			graphics.setStroke(CLIP_BORDER);
 			graphics.setLineWidth(1);
 			graphics.strokeRoundRect(x + 0.5, blockTop + 0.5, Math.max(1, blockWidth - 1),
-					blockHeight - 1, 8, 8);
+					blockHeight - 1, 3, 3);
 			drawClipIndicators(graphics, item, x, blockTop, blockWidth, blockHeight);
+			drawBlockLabel(graphics, item.label(), x + 6, blockTop + blockHeight / 2,
+					blockWidth - 12, CLIP_TEXT);
 			if (isSelected(TimelineSelection.CLIP, item.id())) {
 				drawSelection(graphics, x, blockTop, blockWidth, blockHeight, CLIP_SELECTED);
 			}
+			graphics.setGlobalAlpha(1);
 			blockBounds.put(item.id(), new BlockBounds(x, blockTop, blockWidth, blockHeight));
 		}
 		for (int index = 0; index + 1 < clips.size(); index++) {
@@ -1970,11 +2146,29 @@ public final class TimelineView extends Region {
 			Span right = displaySpanFor(clips.get(index + 1));
 			if (left.end() == right.start()) {
 				double seam = (xForTime(left.end()) + xForTime(right.start())) / 2;
-				graphics.setFill(Color.web("#ffffff", 0.88));
+				graphics.setFill(Color.web("#e9f1f4", 0.88));
 				graphics.fillRoundRect(seam - 2, blockTop + blockHeight * 0.2, 4,
 						blockHeight * 0.6, 2, 2);
 			}
 		}
+	}
+
+	/**
+	 * A clip label on the mock's dark pill ({@code .clip__lbl}): mono 9.5px, fitted, centered
+	 * vertically at {@code centerY}.
+	 */
+	private void drawBlockLabel(GraphicsContext graphics, String text, double x, double centerY,
+			double maxWidth, Color textColor) {
+		if (text == null || text.isBlank() || maxWidth < 24) {
+			return;
+		}
+		String fitted = fitText(text, maxWidth, BLOCK_FONT);
+		double textWidth = textWidth(fitted, BLOCK_FONT);
+		graphics.setFill(BADGE_FILL);
+		graphics.fillRoundRect(x - 4, centerY - 8, textWidth + 8, 15, 2, 2);
+		graphics.setFont(BLOCK_FONT);
+		graphics.setFill(textColor);
+		graphics.fillText(fitted, x, centerY + 3.5);
 	}
 
 	private void drawFilmstrip(GraphicsContext graphics, TimelineRenderItem item, double x,
@@ -2062,8 +2256,8 @@ public final class TimelineView extends Region {
 			double fadeWidth = Math.max(6,
 					Math.min(width, width * (item.fadeInMs() / spanDurationMs)));
 			graphics.setFill(Color.web("#000000", 0.55));
-			graphics.fillRoundRect(x, y, fadeWidth, height, 8, 8);
-			graphics.setStroke(Color.web("#ffffff", 0.9));
+			graphics.fillRoundRect(x, y, fadeWidth, height, 3, 3);
+			graphics.setStroke(Color.web("#e9f1f4", 0.9));
 			graphics.setLineWidth(1.5);
 			graphics.strokeLine(x + 1, y + height - 2, x + fadeWidth - 1, y + 2);
 		}
@@ -2071,8 +2265,8 @@ public final class TimelineView extends Region {
 			double fadeWidth = Math.max(6,
 					Math.min(width, width * (item.fadeOutMs() / spanDurationMs)));
 			graphics.setFill(Color.web("#000000", 0.55));
-			graphics.fillRoundRect(x + width - fadeWidth, y, fadeWidth, height, 8, 8);
-			graphics.setStroke(Color.web("#ffffff", 0.9));
+			graphics.fillRoundRect(x + width - fadeWidth, y, fadeWidth, height, 3, 3);
+			graphics.setStroke(Color.web("#e9f1f4", 0.9));
 			graphics.setLineWidth(1.5);
 			graphics.strokeLine(x + width - fadeWidth + 1, y + 2, x + width - 1, y + height - 2);
 		}
@@ -2102,9 +2296,9 @@ public final class TimelineView extends Region {
 			if (width > badgeWidth + 16) {
 				graphics.setFill(BADGE_FILL);
 				graphics.fillRoundRect(x + width - badgeWidth - 8, y + height - 19, badgeWidth, 14,
-						5, 5);
+						2, 2);
 				graphics.setFont(SMALL_FONT);
-				graphics.setFill(Color.WHITE);
+				graphics.setFill(BADGE_TEXT);
 				graphics.fillText(label, x + width - badgeWidth - 3, y + height - 8);
 			}
 		}
@@ -2115,24 +2309,24 @@ public final class TimelineView extends Region {
 			double labelWidth = textWidth(label, SMALL_FONT) + 12;
 			if (width > labelWidth + 24) {
 				graphics.setFill(BADGE_FILL);
-				graphics.fillRoundRect(x + 8, y + 4, labelWidth, 16, 8, 8);
+				graphics.fillRoundRect(x + 8, y + 4, labelWidth, 16, 2, 2);
 				graphics.setFont(SMALL_FONT);
-				graphics.setFill(Color.WHITE);
+				graphics.setFill(BADGE_TEXT);
 				graphics.fillText(label, x + 14, y + 16);
 			}
 		}
 	}
 
-	private void drawCaptions(GraphicsContext graphics, RowLayout clipRow, double width) {
-		double captionTop = clipRow.top() + 36;
-		double captionHeight = 20;
-		List<ClipPresentation.Presentation> clips = clipPresentation;
+	private void drawCaptions(GraphicsContext graphics, RowLayout captionRow, double width) {
+		// Caption cues are blocks on their own CAP lane (mock .clip--cap).
+		double captionTop = captionRow.top() + 5;
+		double captionHeight = captionRow.height() - 10;
 		for (TimelineRenderItem item : items) {
 			if (item.variant() != TimelineRenderItem.Variant.CAPTION) {
 				continue;
 			}
 			// Caption items are already projected onto the edited timeline (CaptionTimeline),
-			// so their span is the display span inside the clip row.
+			// so their span is the display span inside the caption lane.
 			Span embedded = item.span();
 			if (embedded == null) {
 				continue;
@@ -2140,22 +2334,18 @@ public final class TimelineView extends Region {
 			double startX = xForTime(embedded.start());
 			double endX = xForTime(embedded.end());
 			double blockWidth = Math.max(6, endX - startX);
-			if (endX < 0 || startX > width) {
+			if (endX < GUTTER_WIDTH || startX > width) {
 				continue;
 			}
 			double x = Math.max(-blockWidth, startX);
 			graphics.setFill(CAPTION_FILL);
-			graphics.fillRoundRect(x, captionTop, blockWidth, captionHeight, 4, 4);
+			graphics.fillRoundRect(x, captionTop, blockWidth, captionHeight, 3, 3);
 			graphics.setStroke(CAPTION_BORDER);
 			graphics.setLineWidth(1);
 			graphics.strokeRoundRect(x + 0.5, captionTop + 0.5, Math.max(1, blockWidth - 1),
-					captionHeight - 1, 4, 4);
-			if (blockWidth > 30) {
-				graphics.setFont(SMALL_FONT);
-				graphics.setFill(BLOCK_TEXT);
-				graphics.fillText(fitText(item.label(), blockWidth - 8, SMALL_FONT), x + 4,
-						captionTop + 14);
-			}
+					captionHeight - 1, 3, 3);
+			drawBlockLabel(graphics, item.label(), x + 6, captionTop + captionHeight / 2,
+					blockWidth - 12, CAPTION_TEXT);
 			if (isSelected(TimelineSelection.CAPTION, captionSourceId(item.id()))) {
 				drawSelection(graphics, x, captionTop, blockWidth, captionHeight, CAPTION_SELECTED);
 			}
@@ -2169,25 +2359,21 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(ZOOM_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		graphics.setStroke(ZOOM_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		String label = zoomLabel(item);
-		if (blockWidth > textWidth(label, BLOCK_FONT) + 8) {
-			graphics.setFont(BLOCK_FONT);
-			graphics.setFill(Color.WHITE);
-			graphics.fillText(label, x + 6, y + height / 2 + 4);
-		}
+		drawBlockLabel(graphics, label, x + 6, y + height / 2, blockWidth - 12, CYAN);
 		if (isSelected(TimelineSelection.ZOOM, item.id())) {
-			drawSelection(graphics, x, y, blockWidth, height, ZOOM_BORDER);
+			drawSelection(graphics, x, y, blockWidth, height, ZOOM_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
@@ -2199,23 +2385,18 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(GRADE_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		graphics.setStroke(GRADE_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 24) {
-			graphics.setFont(BLOCK_FONT);
-			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 4,
-					y + height / 2 + 4);
-		}
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
+		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, AMBER);
 		if (isSelected(TimelineSelection.GRADE, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, GRADE_SELECTED);
 		}
@@ -2227,17 +2408,17 @@ public final class TimelineView extends Region {
 	 * gaps read as "the project layout applies here".
 	 */
 	private void drawProjectLayoutLane(GraphicsContext graphics, RowLayout row, double width) {
-		double startX = Math.max(0, xForTime(fullRange.start()));
+		double startX = Math.max(GUTTER_WIDTH, xForTime(fullRange.start()));
 		double endX = Math.min(width, xForTime(fullRange.end()));
 		if (endX <= startX) {
 			return;
 		}
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setStroke(CAMERA_LAYOUT_LANE);
 		graphics.setLineWidth(1);
 		graphics.setLineDashes(4, 4);
-		graphics.strokeRoundRect(startX + 0.5, y + 0.5, endX - startX - 1, height - 1, 8, 8);
+		graphics.strokeRoundRect(startX + 0.5, y + 0.5, endX - startX - 1, height - 1, 3, 3);
 		graphics.setLineDashes();
 	}
 
@@ -2302,20 +2483,20 @@ public final class TimelineView extends Region {
 		Span display = getRegionDisplaySpan(item.span());
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double blockWidth = Math.max(6, endX - startX);
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		boolean failing = elementErrorIds.contains(item.id());
 		graphics.setFill(ELEMENT_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		// A spark glyph marks animated content; the block border turns red when it fails.
 		graphics.setStroke(failing ? ELEMENT_ERROR : ELEMENT_BORDER);
 		graphics.setLineWidth(failing ? 2 : 1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		double labelX = x + 6;
 		if (blockWidth > 18) {
 			graphics.setFill(ELEMENT_BORDER);
@@ -2402,7 +2583,7 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		CameraLayoutSegment segment = cameraLayouts.get(item.id());
@@ -2417,13 +2598,13 @@ public final class TimelineView extends Region {
 			case CameraLayout.HideCamera() -> CAMERA_HIDDEN_FILL;
 		};
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(fill);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		graphics.setStroke(CAMERA_LAYOUT_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		if (segment.transition() == CameraLayoutSegment.Transition.SMOOTH) {
 			// The smooth move's length, shaded at the block start.
 			double rampWidth = Math.min(blockWidth,
@@ -2526,23 +2707,18 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(KEYSTROKE_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		graphics.setStroke(KEYSTROKE_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 24) {
-			graphics.setFont(BLOCK_FONT);
-			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, BLOCK_FONT), x + 4,
-					y + height / 2 + 4);
-		}
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
+		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, BLOCK_TEXT);
 		if (isSelected(TimelineSelection.KEYSTROKE, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, KEYSTROKE_SELECTED);
 		}
@@ -2555,18 +2731,18 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		boolean loupe = item.variant() == TimelineRenderItem.Variant.LOUPE;
 		graphics.setFill(loupe ? LOUPE_FILL : ANNOTATION_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		graphics.setStroke(loupe ? LOUPE_BORDER : ANNOTATION_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		double textX = x + 4;
 		if (loupe && blockWidth > 18) {
 			// A small lens glyph marks the block as a magnifying glass at any zoom level.
@@ -2582,12 +2758,8 @@ public final class TimelineView extends Region {
 					lensY + handle + 3.5);
 			textX = lensX + lensRadius + 6;
 		}
-		if (blockWidth - (textX - x) > 20) {
-			graphics.setFont(BLOCK_FONT);
-			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - (textX - x) - 4, BLOCK_FONT),
-					textX, y + height / 2 + 4);
-		}
+		drawBlockLabel(graphics, item.label(), textX + 4, y + height / 2,
+				blockWidth - (textX - x) - 8, BLOCK_TEXT);
 		if (isSelected(TimelineSelection.ANNOTATION, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height,
 					loupe ? LOUPE_SELECTED : ANNOTATION_SELECTED);
@@ -2601,24 +2773,19 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(AUDIO_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		drawWaveform(graphics, item, x, y, blockWidth, height);
 		graphics.setStroke(AUDIO_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 30) {
-			graphics.setFont(SMALL_FONT);
-			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, SMALL_FONT), x + 4,
-					y + height / 2 + 4);
-		}
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
+		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, AUDIO_TEXT);
 		if (isSelected(TimelineSelection.AUDIO, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, AUDIO_SELECTED);
 		}
@@ -2631,24 +2798,19 @@ public final class TimelineView extends Region {
 		double startX = xForTime(display.start());
 		double endX = xForTime(display.end());
 		double blockWidth = Math.max(6, endX - startX);
-		if (endX < 0 || startX > width) {
+		if (endX < GUTTER_WIDTH || startX > width) {
 			return;
 		}
 		double x = Math.max(-blockWidth, startX);
-		double height = row.height() * 0.85;
-		double y = row.top() + (row.height() - height) / 2;
+		double height = row.height() - 10;
+		double y = row.top() + 5;
 		graphics.setFill(SOURCE_AUDIO_FILL);
-		graphics.fillRoundRect(x, y, blockWidth, height, 8, 8);
+		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
 		drawWaveform(graphics, item, x, y, blockWidth, height);
 		graphics.setStroke(AUDIO_BORDER);
 		graphics.setLineWidth(1);
-		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 8, 8);
-		if (blockWidth > 34) {
-			graphics.setFont(SMALL_FONT);
-			graphics.setFill(BLOCK_TEXT);
-			graphics.fillText(fitText(item.label(), blockWidth - 8, SMALL_FONT), x + 4,
-					y + height / 2 + 4);
-		}
+		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
+		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, AUDIO_TEXT);
 		double volume = item.audioGain() == null ? 1 : item.audioGain();
 		String badge = String.format(java.util.Locale.ROOT, "%.1fx", volume);
 		if (Boolean.TRUE.equals(item.audioNormalize())) {
@@ -2661,9 +2823,9 @@ public final class TimelineView extends Region {
 		if (blockWidth > badgeWidth + 8) {
 			graphics.setFill(BADGE_FILL);
 			graphics.fillRoundRect(x + blockWidth - badgeWidth - 4, y + height - 15, badgeWidth,
-					13, 5, 5);
+					13, 2, 2);
 			graphics.setFont(SMALL_FONT);
-			graphics.setFill(Color.WHITE);
+			graphics.setFill(BADGE_TEXT);
 			graphics.fillText(badge, x + blockWidth - badgeWidth + 1, y + height - 5);
 		}
 		if (isSelected(TimelineSelection.CLIP,
@@ -2704,7 +2866,7 @@ public final class TimelineView extends Region {
 			return;
 		}
 		double gain = item.audioGain() == null ? 1 : Math.max(0, Math.min(1, item.audioGain()));
-		graphics.setFill(Color.web("#ffffff", 0.45));
+		graphics.setFill(WAVEFORM_COLOR);
 		double centerY = y + height / 2;
 		double maxAmplitude = height * 0.35;
 		int bars = Math.min(peaks.length, Math.max(1, (int) Math.floor(width / 3)));
@@ -2727,10 +2889,10 @@ public final class TimelineView extends Region {
 		for (TrimRegion trim : trims) {
 			double startX = xForTime(trim.startMs());
 			double endX = xForTime(trim.endMs());
-			if (endX < 0 || startX > width || endX <= startX) {
+			if (endX < GUTTER_WIDTH || startX > width || endX <= startX) {
 				continue;
 			}
-			double x = Math.max(0, startX);
+			double x = Math.max(GUTTER_WIDTH, startX);
 			double trimWidth = Math.min(width, endX) - x;
 			graphics.setFill(TRIM_FILL);
 			graphics.fillRect(x, y, trimWidth, height);
@@ -2738,7 +2900,7 @@ public final class TimelineView extends Region {
 			graphics.setLineWidth(1);
 			graphics.strokeRect(x + 0.5, y + 0.5, Math.max(1, trimWidth - 1), height - 1);
 			graphics.setFont(SMALL_FONT);
-			graphics.setFill(Color.web("#ffffff", 0.9));
+			graphics.setFill(Color.web("#e9f1f4", 0.9));
 			double seconds = (trim.endMs() - trim.startMs()) / 1000.0;
 			graphics.fillText(String.format(java.util.Locale.ROOT, "%.1fs", seconds), x + 4,
 					y + height - 6);
@@ -2755,60 +2917,128 @@ public final class TimelineView extends Region {
 		for (SpeedRegion speed : speeds) {
 			double startX = xForTime(speed.startMs());
 			double endX = xForTime(speed.endMs());
-			if (endX < 0 || startX > width || endX <= startX) {
+			if (endX < GUTTER_WIDTH || startX > width || endX <= startX) {
 				continue;
 			}
-			double x = Math.max(0, startX);
+			double x = Math.max(GUTTER_WIDTH, startX);
 			double bandWidth = Math.min(width, endX) - x;
 			graphics.setFill(SPEED_FILL);
-			graphics.fillRoundRect(x, y, bandWidth, height, 6, 6);
+			graphics.fillRoundRect(x, y, bandWidth, height, 3, 3);
 			graphics.setStroke(SPEED_BORDER);
 			graphics.setLineWidth(1);
-			graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, bandWidth - 1), height - 1, 6,
-					6);
+			graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, bandWidth - 1), height - 1, 3,
+					3);
 			if (bandWidth > 34) {
 				graphics.setFont(SMALL_FONT);
-				graphics.setFill(Color.web("#ffe9c2"));
+				graphics.setFill(SPEED_TEXT);
 				graphics.fillText(String.format(java.util.Locale.ROOT, "%.2fx", speed.speed()),
 						x + 4, y + height / 2 + 3);
 			}
 		}
 	}
 
-	private void drawRowLabels(GraphicsContext graphics) {
-		graphics.setFont(ROW_LABEL_FONT);
-		graphics.setFill(ROW_LABEL);
+	/**
+	 * Track headers (mock {@code .tlheads}): a faint icon and the mono uppercase row name in the
+	 * fixed 112px gutter, scrolling vertically with the lanes.
+	 */
+	private void drawTrackHeaders(GraphicsContext graphics) {
 		for (RowLayout row : rowLayouts) {
-				String label = switch (row.id()) {
-					case TimelineConstants.CLIP_ROW_ID -> "CLIP";
-					case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
-					case TimelineConstants.GRADE_ROW_ID -> "COLOR";
-					case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
-				case TimelineConstants.CAMERA_LAYOUT_ROW_ID -> "CAMERA";
-				case TimelineConstants.ELEMENTS_ROW_ID + "-0" -> "ANIM";
-				default -> {
-					if (row.id().startsWith(TimelineConstants.ELEMENTS_ROW_ID + "-")) {
-						yield "";
-					}
-					if (TimelineRows.isSourceAudioTrackRowId(row.id())) {
-						yield sourceAudioTrackFor(row.id())
-								.map(track -> track.label().toUpperCase(java.util.Locale.ROOT))
-								.orElse("SOURCE");
-					}
-					if (TimelineRows.isKeystrokeLaneRowId(row.id())) {
-						yield "KEYS";
-					}
-					if (TimelineRows.isAnnotationTrackRowId(row.id())) {
-						yield "NOTE";
-					}
-					if (TimelineRows.isAudioTrackRowId(row.id())) {
-						yield "AUDIO";
-					}
-					yield row.id().toUpperCase(java.util.Locale.ROOT);
-				}
-			};
-			graphics.fillText(label, 6, row.top() + row.height() / 2 + 3);
+			double centerY = row.top() + row.height() / 2;
+			Image icon = gutterIcon(row.id());
+			if (icon != null) {
+				graphics.drawImage(icon, 8, Math.round(centerY) - 6);
+			}
+			String label = rowLabel(row.id());
+			if (!label.isEmpty()) {
+				graphics.setFont(ROW_LABEL_FONT);
+				graphics.setFill(GUTTER_TEXT);
+				graphics.fillText(label, 8 + 18, centerY + 3.5);
+			}
 		}
+	}
+
+	/** The row name shown in its track header (the previous on-lane labels, kept). */
+	private String rowLabel(String rowId) {
+		return switch (rowId) {
+			case TimelineConstants.CLIP_ROW_ID -> "CLIP";
+			case TimelineConstants.ZOOM_ROW_ID -> "ZOOM";
+			case TimelineConstants.GRADE_ROW_ID -> "COLOR";
+			case TimelineConstants.CAPTION_ROW_ID -> "CAPTION";
+			case TimelineConstants.CAMERA_LAYOUT_ROW_ID -> "CAMERA";
+			default -> {
+				if (rowId.startsWith(TimelineConstants.ELEMENTS_ROW_ID + "-")) {
+					yield (TimelineConstants.ELEMENTS_ROW_ID + "-0").equals(rowId) ? "ANIM" : "";
+				}
+				if (TimelineRows.isSourceAudioTrackRowId(rowId)) {
+					yield sourceAudioTrackFor(rowId)
+							.map(track -> track.label().toUpperCase(java.util.Locale.ROOT))
+							.orElse("SOURCE");
+				}
+				if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
+					yield "KEYS";
+				}
+				if (TimelineRows.isAnnotationTrackRowId(rowId)) {
+					yield "NOTE";
+				}
+				if (TimelineRows.isAudioTrackRowId(rowId)) {
+					yield "AUDIO";
+				}
+				yield rowId.toUpperCase(java.util.Locale.ROOT);
+			}
+		};
+	}
+
+	/** The header icon per row type, rendered once from the kit's SVG set; null when nameless. */
+	private @Nullable Image gutterIcon(String rowId) {
+		String iconKey = rowIconKey(rowId);
+		if (iconKey.isEmpty()) {
+			return null;
+		}
+		Image cached = gutterIconCache.get(iconKey);
+		if (cached != null) {
+			return cached;
+		}
+		Icon icon = Icon.of(iconKey, 12);
+		icon.setIconColor(Color.web("#5b6872"));
+		SnapshotParameters params = new SnapshotParameters();
+		params.setFill(javafx.scene.paint.Color.TRANSPARENT);
+		WritableImage image = icon.snapshot(params, new WritableImage(12, 12));
+		gutterIconCache.put(iconKey, image);
+		return image;
+	}
+
+	private String rowIconKey(String rowId) {
+		if (TimelineConstants.CLIP_ROW_ID.equals(rowId)) {
+			return Icons.FilmStrip;
+		}
+		if (TimelineConstants.CAPTION_ROW_ID.equals(rowId)) {
+			return Icons.ClosedCaptioning;
+		}
+		if (TimelineConstants.CAMERA_LAYOUT_ROW_ID.equals(rowId)) {
+			return Icons.VideoCamera;
+		}
+		if (rowId.startsWith(TimelineConstants.ELEMENTS_ROW_ID + "-")) {
+			return Icons.PuzzlePiece;
+		}
+		if (TimelineRows.isSourceAudioTrackRowId(rowId)) {
+			return Icons.MusicNotes;
+		}
+		if (TimelineConstants.ZOOM_ROW_ID.equals(rowId)) {
+			return Icons.MagnifyingGlass;
+		}
+		if (TimelineConstants.GRADE_ROW_ID.equals(rowId)) {
+			return Icons.Palette;
+		}
+		if (TimelineRows.isAnnotationTrackRowId(rowId)) {
+			return Icons.TextT;
+		}
+		if (TimelineRows.isAudioTrackRowId(rowId)) {
+			return Icons.SpeakerHigh;
+		}
+		if (TimelineRows.isKeystrokeLaneRowId(rowId)) {
+			return Icons.Keyboard;
+		}
+		return "";
 	}
 
 	private void drawAgentHighlights(GraphicsContext graphics, double width) {
@@ -2820,17 +3050,17 @@ public final class TimelineView extends Region {
 		for (AgentHighlight highlight : agentHighlights) {
 			double startX = xForTime(highlight.span().start());
 			double endX = xForTime(highlight.span().end());
-			if (endX < 0 || startX > width || endX <= startX) {
+			if (endX < GUTTER_WIDTH || startX > width || endX <= startX) {
 				continue;
 			}
-			double x = Math.max(0, startX);
+			double x = Math.max(GUTTER_WIDTH, startX);
 			double highlightWidth = Math.min(width, endX) - x;
 			graphics.setFill(Color.web("#a78bfa", 0.16));
-			graphics.fillRoundRect(x, top, highlightWidth, height, 8, 8);
+			graphics.fillRoundRect(x, top, highlightWidth, height, 3, 3);
 			graphics.setStroke(Color.web("#a78bfa", 0.5));
 			graphics.setLineWidth(1);
 			graphics.strokeRoundRect(x + 0.5, top + 0.5, Math.max(1, highlightWidth - 1),
-					Math.max(6, height - 1), 8, 8);
+					Math.max(6, height - 1), 3, 3);
 			if (highlight.label() != null && highlightWidth > 48) {
 				graphics.setFont(SMALL_FONT);
 				graphics.setFill(Color.web("#ddd6fe"));
@@ -2841,38 +3071,29 @@ public final class TimelineView extends Region {
 	}
 
 	/**
-	 * PlaybackCursor: a 1px red line over every lane and a 16px red cap on the axis that grows to
-	 * show the playhead time while hovered or dragged (kept inside the viewport at both ends).
+	 * PlaybackCursor, Instrument style: a 1px cyan line over ruler and lanes, an 8px cap at the
+	 * ruler top and a mono timecode tag always visible beside it (mock {@code .playhead}).
 	 */
 	private void drawPlayhead(GraphicsContext graphics, double height) {
 		double x = xForTime(currentTimeMs);
 		double width = contentWidth();
-		if (x < 0 || x > width) {
+		if (x < GUTTER_WIDTH || x > width) {
 			return;
 		}
 		graphics.setStroke(PLAYHEAD);
 		graphics.setLineWidth(1);
-		graphics.strokeLine(x, 0, x, height);
-		boolean expanded = playheadHovered || scrubbing;
-		double capWidth = expanded ? PLAYHEAD_CAP_EXPANDED : PLAYHEAD_CAP_WIDTH;
-		double capShift = expanded
-				? Math.max(0, PLAYHEAD_CAP_EXPANDED / 2 - x)
-						- Math.max(0, PLAYHEAD_CAP_EXPANDED / 2 - (width - x))
-				: 0;
-		double capX = x - capWidth / 2 + capShift;
+		graphics.strokeLine(Math.round(x) + 0.5, 0, Math.round(x) + 0.5, height);
+		double capX = Math.max(GUTTER_WIDTH - 1, Math.round(x) - 3);
 		graphics.setFill(PLAYHEAD);
-		graphics.fillRoundRect(capX, 0, capWidth, PLAYHEAD_CAP_HEIGHT, PLAYHEAD_CAP_HEIGHT,
-				PLAYHEAD_CAP_HEIGHT);
-		if (expanded) {
-			graphics.setFill(Color.WHITE);
-			graphics.setFont(PLAYHEAD_FONT);
-			graphics.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-			graphics.setTextBaseline(javafx.geometry.VPos.CENTER);
-			graphics.fillText(TimelineScale.formatPlayheadTime(currentTimeMs), capX + capWidth / 2,
-					PLAYHEAD_CAP_HEIGHT / 2);
-			graphics.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
-			graphics.setTextBaseline(javafx.geometry.VPos.BASELINE);
-		}
+		graphics.fillRoundRect(capX, 0, PLAYHEAD_CAP_WIDTH, PLAYHEAD_CAP_HEIGHT, 2, 2);
+		// The tag (mock .playhead .tag): cyan pill, dark mono text, pinned right of the line.
+		String tag = TimelineScale.formatPlayheadTime(currentTimeMs);
+		double tagWidth = textWidth(tag, PLAYHEAD_FONT) + 8;
+		double tagX = Math.min(x + 6, width - tagWidth);
+		graphics.fillRoundRect(tagX, 3, tagWidth, PLAYHEAD_TAG_HEIGHT, 2, 2);
+		graphics.setFill(CYAN_INK);
+		graphics.setFont(PLAYHEAD_FONT);
+		graphics.fillText(tag, tagX + 4, 3 + 11);
 	}
 
 	private boolean isSelected(String kind, String id) {
@@ -2886,8 +3107,8 @@ public final class TimelineView extends Region {
 			double height, Color color) {
 		graphics.setStroke(color);
 		graphics.setLineWidth(2);
-		graphics.strokeRoundRect(x + 1, y + 1, Math.max(1, width - 2), Math.max(1, height - 2), 8,
-				8);
+		graphics.strokeRoundRect(x + 1, y + 1, Math.max(1, width - 2), Math.max(1, height - 2), 3,
+				3);
 	}
 
 	private Span displaySpanFor(TimelineRenderItem item) {

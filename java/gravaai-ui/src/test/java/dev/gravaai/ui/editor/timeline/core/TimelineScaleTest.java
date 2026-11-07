@@ -28,19 +28,23 @@ class TimelineScaleTest {
 	}
 
 	@Test
-	@DisplayName("formats timeline labels in fractional, whole-second, and hour modes")
+	@DisplayName("formats timeline labels as zero-padded MM:SS (Instrument mock ruler)")
 	void formatsTimelineLabels() {
-		assertEquals("0:01.23", TimelineScale.formatTimeLabel(1234, 100));
-		assertEquals("0:01.2", TimelineScale.formatTimeLabel(1234, 500));
-		assertEquals("1:01", TimelineScale.formatTimeLabel(61_900, 1000));
-		assertEquals("1:01:01", TimelineScale.formatTimeLabel(3_661_999, 1000));
+		assertEquals("00:01.23", TimelineScale.formatTimeLabel(1234, 100));
+		assertEquals("00:01.2", TimelineScale.formatTimeLabel(1234, 500));
+		assertEquals("01:01", TimelineScale.formatTimeLabel(61_900, 1000));
+		assertEquals("00:05", TimelineScale.formatTimeLabel(5_000, 5_000));
+		assertEquals("00:00", TimelineScale.formatTimeLabel(0, 5_000));
+		assertEquals("01:01:01", TimelineScale.formatTimeLabel(3_661_999, 1000));
 	}
 
 	@Test
-	@DisplayName("formats playhead labels for sub-minute and minute timelines")
+	@DisplayName("formats the playhead tag as HH:MM:SS (mock .playhead .tag)")
 	void formatsPlayheadLabels() {
-		assertEquals("1.2s", TimelineScale.formatPlayheadTime(1234));
-		assertEquals("1:01.4", TimelineScale.formatPlayheadTime(61_400));
+		assertEquals("00:00:01", TimelineScale.formatPlayheadTime(1234));
+		assertEquals("00:01:01", TimelineScale.formatPlayheadTime(61_400));
+		assertEquals("00:14:22", TimelineScale.formatPlayheadTime(14 * 60_000 + 22_034));
+		assertEquals("00:00:00", TimelineScale.formatPlayheadTime(-5));
 	}
 
 	@Test
@@ -66,11 +70,11 @@ class TimelineScaleTest {
 	}
 
 	@Test
-	@DisplayName("carries fractional rounding into the next minute")
+	@DisplayName("ruler labels round, the playhead tag truncates like a timecode")
 	void carriesFractionalRounding() {
-		assertEquals("1:00.00", TimelineScale.formatTimeLabel(59_999, 100));
-		assertEquals("1:00.0", TimelineScale.formatPlayheadTime(59_999));
-		assertEquals("1:00:00.00", TimelineScale.formatTimeLabel(3_599_999, 100));
+		assertEquals("01:00.00", TimelineScale.formatTimeLabel(59_999, 100));
+		assertEquals("00:00:59", TimelineScale.formatPlayheadTime(59_999));
+		assertEquals("01:00:00.00", TimelineScale.formatTimeLabel(3_599_999, 100));
 	}
 
 	@Test

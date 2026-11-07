@@ -25,6 +25,7 @@ public final class EditorHeaderView extends HBox {
 	private final EditorViewActions actions;
 	private final StackPane titleHost = new StackPane();
 	private final Label projectName = new Label("Untitled Project");
+	private final Label saveState = new Label("Saved");
 	private final Button undo;
 	private final Button redo;
 	private final Button clips;
@@ -39,10 +40,11 @@ public final class EditorHeaderView extends HBox {
 		getStyleClass().add("editor-header");
 		setAlignment(Pos.CENTER_LEFT);
 
+		// Brand mark: the app logo on the raised tile where the mock places its mark.
+		StackPane mark = new StackPane(appMark());
+		mark.getStyleClass().add("editor-header__mark");
+
 		home = new Button("Home", Button.Variant.GHOST, Button.Size.SM);
-		home.icon(Icons.House, "fill");
-		home.setGraphicTextGap(8);
-		home.setContentDisplay(ContentDisplay.LEFT);
 		home.setOnAction(event -> actions.goHome());
 
 		Label slash = new Label("/");
@@ -51,6 +53,10 @@ public final class EditorHeaderView extends HBox {
 		projectName.getStyleClass().add("editor-header__project-name");
 		titleHost.setAlignment(Pos.CENTER_LEFT);
 		titleHost.getChildren().add(projectButton());
+
+		// Saved/Unsaved readout (mock .crumb .badge): the dirty flag surfaces here instead of
+		// tinting the Save button, which the mock keeps plain.
+		saveState.getStyleClass().add("editor-header__save-state");
 
 		Separator divider = Separator.vertical();
 		divider.setMinHeight(20);
@@ -93,7 +99,7 @@ public final class EditorHeaderView extends HBox {
 		save = new Button("Save", Button.Variant.SECONDARY, Button.Size.SM);
 		save.getStyleClass().add("editor-header__save");
 		save.icon(Icons.DownloadSimple);
-		save.setGraphicTextGap(8);
+		save.setGraphicTextGap(6);
 		save.setContentDisplay(ContentDisplay.LEFT);
 		save.setAccessibleText("Save project");
 		save.setOnAction(event -> {
@@ -103,8 +109,8 @@ public final class EditorHeaderView extends HBox {
 				actions.save();
 			}
 		});
-		// Changes that are not on disk tint the button (kit accent-soft, the same language as the
-		// active rail icons), so the state reads without moving anything.
+		// Changes that are not on disk show in the title badge; the button stays plain, as in the
+		// mock, and keeps the shortcut discoverable.
 		dev.gravaai.ui.kit.Tooltip.install(save, "Save (Ctrl + S)");
 
 		export = new Button("Export", Button.Variant.DEFAULT, Button.Size.MD);
@@ -123,9 +129,21 @@ public final class EditorHeaderView extends HBox {
 		browser.setAccessibleText("Projects");
 		browser.setOnAction(event -> openProjectBrowser());
 
-		getChildren().addAll(home, slash, titleHost, browser, divider, clips, spacer, undo, redo,
-				save, export);
+		getChildren().addAll(mark, home, slash, titleHost, saveState, browser, divider, clips,
+				spacer, undo, redo, save, export);
 		refresh();
+	}
+
+	/** The app logo at topbar-mark size; the shell's first element in the mock. */
+	private static javafx.scene.image.ImageView appMark() {
+		java.net.URL url = EditorHeaderView.class.getResource("/app-icons/gravaai-32.png");
+		javafx.scene.image.ImageView view = new javafx.scene.image.ImageView(
+				url == null ? null : new javafx.scene.image.Image(url.toExternalForm()));
+		view.setFitWidth(16);
+		view.setFitHeight(16);
+		view.setPreserveRatio(true);
+		view.setSmooth(true);
+		return view;
 	}
 
 	private boolean clipsOpen;
@@ -218,12 +236,16 @@ public final class EditorHeaderView extends HBox {
 		this.onSave = onSave;
 	}
 
-	/** Marks changes that are not on disk: tints the Save button and says so to readers. */
+	/**
+	 * Marks changes that are not on disk: the badge next to the title flips to Unsaved (amber) and
+	 * the Save button states it to readers — the mock keeps the button itself plain.
+	 */
 	public void setDirty(boolean dirty) {
 		this.dirty = dirty;
-		save.getStyleClass().remove("is-dirty");
+		saveState.setText(dirty ? "Unsaved" : "Saved");
+		saveState.getStyleClass().remove("is-dirty");
 		if (dirty) {
-			save.getStyleClass().add("is-dirty");
+			saveState.getStyleClass().add("is-dirty");
 		}
 		save.setAccessibleText(dirty
 				? "Save project, unsaved changes"

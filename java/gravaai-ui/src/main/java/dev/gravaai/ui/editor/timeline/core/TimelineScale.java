@@ -89,7 +89,10 @@ public final class TimelineScale {
 		return delta;
 	}
 
-	/** Port of {@code formatTimeLabel}. */
+	/**
+	 * Ruler labels (mock {@code .ruler span}): zero-padded {@code MM:SS}, centiseconds only when
+	 * the tick interval drops under a second, {@code HH:MM:SS} past an hour.
+	 */
 	public static String formatTimeLabel(double milliseconds, double intervalMs) {
 		int digits = intervalMs < 250 ? 2 : intervalMs < 1000 ? 1 : 0;
 		double factor = Math.pow(10, digits);
@@ -98,21 +101,20 @@ public final class TimelineScale {
 				/ factor;
 		long hours = (long) Math.floor(total / 3600);
 		long minutes = (long) Math.floor(total / 60) % 60;
-		String seconds = String.format(java.util.Locale.ROOT, "%." + digits + "f", total % 60);
-		int minimumLength = digits > 0 ? 3 + digits : 2;
-		while (seconds.length() < minimumLength) {
-			seconds = "0" + seconds;
-		}
+		// Zero-pad the seconds to a fixed width; the decimal point only exists with digits.
+		int secondsWidth = 2 + digits + (digits > 0 ? 1 : 0);
+		String seconds = String.format(java.util.Locale.ROOT, "%0" + secondsWidth + "." + digits + "f",
+				total % 60);
 		return hours != 0
-				? hours + ":" + String.format(java.util.Locale.ROOT, "%02d", minutes) + ":" + seconds
-				: minutes + ":" + seconds;
+				? String.format(java.util.Locale.ROOT, "%02d:%02d:%s", hours, minutes, seconds)
+				: String.format(java.util.Locale.ROOT, "%02d:%s", minutes, seconds);
 	}
 
-	/** Port of {@code formatPlayheadTime}. */
+	/** Playhead tag over the ruler (mock {@code .playhead .tag}): {@code HH:MM:SS}, truncated. */
 	public static String formatPlayheadTime(double ms) {
-		long rounded = Math.round(Math.max(0, ms) / 100) * 100;
-		return rounded < 60000
-				? String.format(java.util.Locale.ROOT, "%.1fs", rounded / 1000.0)
-				: formatTimeLabel(rounded, 500);
+		double safeMs = Double.isFinite(ms) ? Math.max(0, ms) : 0;
+		long total = (long) Math.floor(safeMs / 1000);
+		return String.format(java.util.Locale.ROOT, "%02d:%02d:%02d",
+				total / 3600, (total % 3600) / 60, total % 60);
 	}
 }

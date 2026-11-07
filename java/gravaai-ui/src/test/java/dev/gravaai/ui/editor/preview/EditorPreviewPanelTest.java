@@ -27,13 +27,38 @@ class EditorPreviewPanelTest {
 		assertEquals(16.0 / 9.0, EditorPreviewPanel.aspectValue(null), 1e-9);
 	}
 
-	@DisplayName("formatTime matches the React m:ss formatting")
+	@DisplayName("formatClock matches the mock's HH:MM:SS transport timecode")
 	@Test
-	void formatTime() {
-		assertEquals("0:00", PlaybackControls.formatTime(0));
-		assertEquals("0:09", PlaybackControls.formatTime(9.9));
-		assertEquals("1:05", PlaybackControls.formatTime(65));
-		assertEquals("0:00", PlaybackControls.formatTime(-3));
-		assertEquals("0:00", PlaybackControls.formatTime(Double.NaN));
+	void formatClock() {
+		assertEquals("00:00:00", PlaybackControls.formatClock(0));
+		assertEquals("00:00:09", PlaybackControls.formatClock(9.9));
+		assertEquals("00:01:05", PlaybackControls.formatClock(65));
+		assertEquals("00:14:22", PlaybackControls.formatClock(14 * 60 + 22.03));
+		assertEquals("01:01:01", PlaybackControls.formatClock(3661));
+		assertEquals("00:00:00", PlaybackControls.formatClock(-3));
+		assertEquals("00:00:00", PlaybackControls.formatClock(Double.NaN));
+	}
+
+	@DisplayName("formatCentis truncates against the floored second the clock shows")
+	@Test
+	void formatCentis() {
+		assertEquals(".00", PlaybackControls.formatCentis(0));
+		assertEquals(".03", PlaybackControls.formatCentis(14 * 60 + 22.03));
+		assertEquals(".90", PlaybackControls.formatCentis(9.9));
+		assertEquals(".99", PlaybackControls.formatCentis(65.999));
+		assertEquals(".00", PlaybackControls.formatCentis(-3));
+		assertEquals(".00", PlaybackControls.formatCentis(Double.NaN));
+	}
+
+	@DisplayName("formatDuration matches the mock's MM:SS.cs, hours included past 1h")
+	@Test
+	void formatDuration() {
+		assertEquals("00:00.00", PlaybackControls.formatDuration(0));
+		assertEquals("00:09.90", PlaybackControls.formatDuration(9.9));
+		assertEquals("01:05.00", PlaybackControls.formatDuration(65));
+		assertEquals("42:18.11", PlaybackControls.formatDuration(42 * 60 + 18.11));
+		assertEquals("01:01:01.50", PlaybackControls.formatDuration(3661.5));
+		assertEquals("00:00.00", PlaybackControls.formatDuration(-3));
+		assertEquals("00:00.00", PlaybackControls.formatDuration(Double.NaN));
 	}
 }

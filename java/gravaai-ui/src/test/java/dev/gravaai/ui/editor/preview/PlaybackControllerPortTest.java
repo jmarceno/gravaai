@@ -110,7 +110,7 @@ class PlaybackControllerPortTest {
 		assertEquals(2.25, EditorPlaybackPort.stepRate(2, 1), 1e-9);
 		assertEquals(0.25, EditorPlaybackPort.stepRate(0.25, -1), 1e-9);
 		assertEquals(4, EditorPlaybackPort.stepRate(4, 1), 1e-9);
-		assertEquals("1×", EditorPlaybackPort.formatRate(1));
+		assertEquals("1.0×", EditorPlaybackPort.formatRate(1));
 		assertEquals("1.5×", EditorPlaybackPort.formatRate(1.5));
 		assertEquals("1.25×", EditorPlaybackPort.formatRate(1.25));
 		assertEquals("0.25×", EditorPlaybackPort.formatRate(0.25));

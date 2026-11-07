@@ -6,19 +6,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Port of {@code timeline/timelineLayout.test.ts}. */
+/**
+ * Instrument-mock geometry: a 22px ruler over uniform 44px lanes, no gaps ({@code .lane} is
+ * 44px and every row is a lane).
+ */
 class TimelineLayoutTest {
 
 	@Test
-	@DisplayName("reserves vertical space for every rendered timeline row")
+	@DisplayName("every lane is one uniform 44px row, with no gaps")
 	void reservesVerticalSpace() {
-		assertEquals(TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX
-						+ 4 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX + 10,
+		assertEquals(5 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX,
 				TimelineLayout.getTimelineRowsMinHeightPx(5));
 		assertEquals(TimelineLayout.TIMELINE_AXIS_HEIGHT_PX
-						+ TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX
-						+ 4 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX + 10,
+						+ 5 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX,
 				TimelineLayout.getTimelineContentMinHeightPx(5));
+		assertEquals(TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX,
+				TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX);
 	}
 
 	@Test
@@ -33,21 +36,19 @@ class TimelineLayoutTest {
 	@Test
 	@DisplayName("floors fractional row counts")
 	void floorsFractionalRowCounts() {
-		assertEquals(TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX
-						+ 2 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX + 4,
+		assertEquals(2 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX,
 				TimelineLayout.getTimelineRowsMinHeightPx(2.9));
 		assertEquals(TimelineLayout.TIMELINE_AXIS_HEIGHT_PX
-						+ TimelineLayout.TIMELINE_CLIP_ROW_HEIGHT_PX
-						+ 2 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX + 4,
+						+ 2 * TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX,
 				TimelineLayout.getTimelineContentMinHeightPx(2.9));
 	}
 
 	@Test
-	@DisplayName("fits clip and full zoom, or clip and two compact tracks, in the minimum viewport")
-	void fitsMinimumViewport() {
-		double availableHeight = 180 - 24;
-		assertTrue(TimelineLayout.getTimelineContentMinHeightPx(2) <= availableHeight);
-		assertTrue(TimelineLayout.getTimelineContentMinHeightPx(3) <= availableHeight);
-		assertTrue(TimelineLayout.getTimelineContentMinHeightPx(4) > availableHeight);
+	@DisplayName("four lanes plus the toolbar fit the raised default strip without scrolling")
+	void fitsDefaultStrip() {
+		// Toolbar 30 + ruler 22 + 4 x 44 lanes = 228, inside the 400px default cap.
+		double strip = 30 + TimelineLayout.getTimelineContentMinHeightPx(4);
+		assertTrue(strip <= 400);
+		assertTrue(TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX == 44);
 	}
 }

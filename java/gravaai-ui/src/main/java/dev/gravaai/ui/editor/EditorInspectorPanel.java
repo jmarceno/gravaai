@@ -3,7 +3,9 @@ package dev.gravaai.ui.editor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.DoubleFunction;
 
@@ -97,8 +99,15 @@ public final class EditorInspectorPanel extends VBox {
 	private java.util.function.Supplier<java.nio.file.Path> recordingPath = () -> null;
 	private final java.util.Map<EditorSidebarRail.Section, Boolean> advancedSections =
 			new java.util.EnumMap<>(EditorSidebarRail.Section.class);
-	private final Switch advancedSwitch = new Switch();
+	private final Switch advancedSwitch = Switch.xs();
 	private final Label advancedLabel = new Label("Advanced");
+	private final Map<EditorSidebarRail.Section, Button> sectionTabs = new EnumMap<>(
+			EditorSidebarRail.Section.class);
+	/** Which inspector groups are collapsed, keyed by section + heading title. */
+	private final Map<String, Boolean> collapsedGroups = new java.util.HashMap<>();
+	private java.util.function.LongSupplier trackCount = () -> 3;
+	private final Label footLabel = new Label("");
+	private java.util.function.Consumer<EditorSidebarRail.Section> onSectionTab = section -> { };
 	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
 	private @Nullable AutoCloseable captionModelSubscription;
 	private dev.gravaai.ui.editor.transcript.@Nullable TranscriptPanel transcriptPanel;
@@ -146,8 +155,43 @@ public final class EditorInspectorPanel extends VBox {
 		VBox.setVgrow(scroll, Priority.ALWAYS);
 		scroll.setMinHeight(0);
 
-		getChildren().addAll(header, scroll);
+		footLabel.getStyleClass().add("editor-inspector__foot-label");
+		HBox foot = new HBox(footLabel);
+		foot.getStyleClass().add("editor-inspector__foot");
+
+		getChildren().addAll(header, buildSectionTabs(), scroll, foot);
 		rebuild();
+	}
+
+	/**
+	 * The icon tab row under the header (mock {@code .insp__tabs}): one tab per rail section,
+	 * routed through the same {@code rail.select} path so the rail, tabs and panel agree.
+	 */
+	private HBox buildSectionTabs() {
+		HBox tabs = new HBox(2);
+		tabs.getStyleClass().add("editor-inspector__tabs");
+		for (EditorSidebarRail.Section candidate : EditorSidebarRail.Section.values()) {
+			Button tab = new Button("", Button.Variant.GHOST, Button.Size.SM);
+			tab.getStyleClass().add("editor-inspector__tab");
+			tab.icon(Icon.of(candidate.icon(), 14));
+			tab.setMaxWidth(Double.MAX_VALUE);
+			HBox.setHgrow(tab, Priority.ALWAYS);
+			dev.gravaai.ui.kit.Tooltip.install(tab, candidate.label());
+			tab.setOnAction(event -> onSectionTab.accept(candidate));
+			sectionTabs.put(candidate, tab);
+			tabs.getChildren().add(tab);
+		}
+		return tabs;
+	}
+
+	/** Replaces the section-tab action (the shell routes tabs through {@code rail.select}). */
+	public void onSectionTab(java.util.function.Consumer<EditorSidebarRail.Section> listener) {
+		this.onSectionTab = listener == null ? section -> { } : listener;
+	}
+
+	/** Supplies the live timeline row count for the footer's track readout. */
+	public void setTrackCount(java.util.function.LongSupplier count) {
+		this.trackCount = count == null ? () -> 3 : count;
 	}
 
 	/** Called by the Settings section's "Add custom font" entry (shell owns the dialog). */
@@ -362,9 +406,119 @@ public final class EditorInspectorPanel extends VBox {
 		advancedSwitch.setVisible(showAdvanced);
 		advancedSwitch.setManaged(showAdvanced);
 		advancedSwitch.setChecked(advanced);
-		title.setText(selectionMode ? selectionTitle() : section.label());
-		content.getChildren().setAll(sectionContent());
+		// Mock .insp__head h2: mono uppercase section title.
+		title.setText((selectionMode ? selectionTitle() : section.label())
+				.toUpperCase(java.util.Locale.ROOT));
+		for (Map.Entry<EditorSidebarRail.Section, Button> entry : sectionTabs.entrySet()) {
+			entry.getValue().getStyleClass().remove("is-selected");
+			if (entry.getKey() == section) {
+				entry.getValue().getStyleClass().add("is-selected");
+			}
+		}
+		footLabel.setText("PROJECT · " + trackCount.getAsLong() + " TRACKS");
+		content.getChildren().setAll(groupCollapsibleSections(sectionContent()));
 		scroll.setVvalue(0);
+	}
+
+	/**
+	 * Wraps the section's groups into collapsible {@code .sec} blocks. Section builders nest their
+	 * groups as subsection VBoxes whose first child is a heading row (Background, Frame, …), and
+	 * some build headings inline; both become one group: a 30px head with chevron and hover Reset,
+	 * the body below, a hairline under the block. Groups keep their collapsed state per section.
+	 */
+	private Node groupCollapsibleSections(@Nullable Node root) {
+		if (root == null) {
+			return new Region();
+		}
+		if (!(root instanceof VBox box) || box.getChildren().isEmpty()) {
+			return root;
+		}
+		List<Node> result = new ArrayList<>();
+		VBox currentBody = null;
+		// Grouping re-parents children (groups wrap the subsection VBoxes), so iterate a copy.
+		for (Node child : new ArrayList<>(box.getChildren())) {
+			if (child instanceof HBox heading
+					&& heading.getStyleClass().contains("editor-section__heading")) {
+				currentBody = startCollapsibleGroup(heading, result);
+			} else if (currentBody != null) {
+				currentBody.getChildren().add(asCollapsibleGroup(child));
+			} else {
+				result.add(asCollapsibleGroup(child));
+			}
+		}
+		VBox grouped = new VBox(0);
+		grouped.setFillWidth(true);
+		grouped.getChildren().setAll(result);
+		return grouped;
+	}
+
+	/** A subsection VBox that opens with a heading becomes the group itself. */
+	private Node asCollapsibleGroup(Node child) {
+		if (child instanceof VBox box && !box.getChildren().isEmpty()
+				&& box.getChildren().get(0) instanceof HBox first
+				&& first.getStyleClass().contains("editor-section__heading")) {
+			HBox heading = (HBox) box.getChildren().get(0);
+			box.getChildren().remove(0);
+			// The body keeps the subsection's own spacing; the group adds head + hairline.
+			VBox group = collapsibleGroup(heading, box, box.getSpacing());
+			return group;
+		}
+		return child;
+	}
+
+	/**
+	 * Starts one group from an inline heading: the head goes into {@code result} and the body is
+	 * returned for the following controls, until the next heading.
+	 */
+	private VBox startCollapsibleGroup(HBox heading, List<Node> result) {
+		VBox body = new VBox(14);
+		result.add(collapsibleGroup(heading, body, 14));
+		return body;
+	}
+
+	/**
+	 * One collapsible group: head (chevron + the heading row with its hover Reset) over the body,
+	 * a hairline under the block. Toggling collapses the body in place.
+	 */
+	private VBox collapsibleGroup(HBox heading, VBox body, double bodySpacing) {
+		String key = section.name() + "/" + headingText(heading);
+		boolean collapsed = collapsedGroups.getOrDefault(key, false);
+		Icon chevron = Icon.of(dev.gravaai.ui.kit.Icons.CaretDown, 11);
+		chevron.getStyleClass().add("editor-section__chevron");
+		chevron.setRotate(collapsed ? -90 : 0);
+		HBox head = new HBox(6, chevron, heading);
+		head.getStyleClass().add("editor-section__head");
+		head.setAlignment(Pos.CENTER_LEFT);
+		head.setPadding(new Insets(0, 10, 0, 10));
+		// The heading row (label + spacer + Reset) stretches so Reset sits at the far edge.
+		HBox.setHgrow(heading, Priority.ALWAYS);
+		heading.setMaxWidth(Double.MAX_VALUE);
+		body.setSpacing(bodySpacing);
+		body.getStyleClass().add("editor-section__body");
+		body.setPadding(new Insets(0, 10, 10, 10));
+		body.setVisible(!collapsed);
+		body.setManaged(!collapsed);
+		head.setOnMouseClicked(event -> {
+			boolean nowCollapsed = !collapsedGroups.getOrDefault(key, false);
+			collapsedGroups.put(key, nowCollapsed);
+			body.setVisible(!nowCollapsed);
+			body.setManaged(!nowCollapsed);
+			chevron.setRotate(nowCollapsed ? -90 : 0);
+		});
+		VBox group = new VBox(0, head, body);
+		group.getStyleClass().add("editor-section");
+		return group;
+	}
+
+	/** The heading's title text (its first labeled child), for the collapse key. */
+	private static String headingText(HBox heading) {
+		for (Node child : heading.getChildren()) {
+			if (child instanceof javafx.scene.control.Labeled labeled
+					&& labeled.getText() != null) {
+				return labeled.getText();
+			}
+		}
+		return "";
 	}
 
 	private boolean isSelectionMode() {
@@ -472,7 +626,7 @@ public final class EditorInspectorPanel extends VBox {
 		speed.setValue(speedValue);
 		speed.onValueCommit(value -> store.apply(new ClipCommands.ChangeSpeed(value)));
 
-		Switch mute = new Switch("Mute clip");
+		Switch mute = Switch.xs("Mute clip");
 		mute.setChecked(Boolean.TRUE.equals(clip.muted()));
 		mute.onCheckedChange(value -> store.apply(new ClipCommands.SetMuted(value)));
 		root.getChildren().addAll(speed, mute, deleteSelectionButton("Delete Clip",
@@ -502,7 +656,7 @@ public final class EditorInspectorPanel extends VBox {
 				id -> new AudioCommands.ChangeVolume(id, value),
 				new AudioCommands.ChangeVolume(value)));
 
-		Switch normalize = new Switch("Normalize");
+		Switch normalize = Switch.xs("Normalize");
 		normalize.setChecked(Boolean.TRUE.equals(audio.normalize()));
 		normalize.onCheckedChange(value -> applyMulti(SelectionCommands.TimelineSelections.AUDIO,
 				id -> new AudioCommands.SetNormalize(id, value),
@@ -695,7 +849,7 @@ public final class EditorInspectorPanel extends VBox {
 		for (String wire : KeystrokeElement.MODIFIER_ORDER) {
 			// Wires are the canonical constants, so capitalizing is the display label.
 			String label = wire.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + wire.substring(1);
-			Switch toggle = new Switch(label);
+			Switch toggle = Switch.xs(label);
 			toggle.setMaxWidth(Double.MAX_VALUE);
 			toggle.setChecked(element.modifiers().contains(wire));
 			toggle.onCheckedChange(checked -> {
@@ -753,9 +907,9 @@ public final class EditorInspectorPanel extends VBox {
 			root.getChildren().add(add);
 			return root;
 		}
-		Label span = new Label(PlaybackControls.formatTime(grade.startMs() / 1000.0) + " – "
-				+ PlaybackControls.formatTime(grade.endMs() / 1000.0));
-		span.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		Label span = new Label(PlaybackControls.formatDuration(grade.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatDuration(grade.endMs() / 1000.0));
+		span.setStyle("-fx-font-family: \"DejaVu Sans Mono\"; -fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(span);
 		root.getChildren().add(heading("Luminosity", () -> resetGrade(grade.id())));
 		root.getChildren().add(slider("Brightness", grade.brightness(), GradeRegion.MIN_ADJUST,
@@ -839,9 +993,9 @@ public final class EditorInspectorPanel extends VBox {
 		}
 		CameraLayoutSegment segment = selected.get();
 		VBox root = new VBox(14);
-		Label span = new Label(PlaybackControls.formatTime(segment.startMs() / 1000.0) + " – "
-				+ PlaybackControls.formatTime(segment.endMs() / 1000.0));
-		span.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		Label span = new Label(PlaybackControls.formatDuration(segment.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatDuration(segment.endMs() / 1000.0));
+		span.setStyle("-fx-font-family: \"DejaVu Sans Mono\"; -fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(span);
 
 		Select layout = new Select();
@@ -1117,7 +1271,7 @@ public final class EditorInspectorPanel extends VBox {
 			linkRow.setAlignment(Pos.CENTER_LEFT);
 			Label linkLabel = new Label("Link padding sides");
 			linkLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-			Switch link = new Switch();
+			Switch link = Switch.xs();
 			link.setChecked(linked);
 			link.onCheckedChange(value -> apply(json -> {
 				ObjectNode node = (ObjectNode) json.get("padding");
@@ -1175,10 +1329,10 @@ public final class EditorInspectorPanel extends VBox {
 		var state = store.state();
 		VBox root = new VBox(14);
 
-		Switch show = new Switch("Show cursor");
+		Switch show = Switch.xs("Show cursor");
 		show.setChecked(state.showCursor());
 		show.onCheckedChange(value -> apply(json -> json.put("showCursor", value)));
-		Switch loop = new Switch("Loop cursor");
+		Switch loop = Switch.xs("Loop cursor");
 		loop.setChecked(state.loopCursor());
 		loop.onCheckedChange(value -> apply(json -> json.put("loopCursor", value)));
 		root.getChildren().addAll(show, loop);
@@ -1256,7 +1410,7 @@ public final class EditorInspectorPanel extends VBox {
 		block.getStyleClass().add("editor-keystrokes");
 		Label title = new Label("Typing sound");
 		title.getStyleClass().add("editor-section__label");
-		Switch enabled = new Switch("Typing sounds");
+		Switch enabled = Switch.xs("Typing sounds");
 		enabled.setChecked(sound.enabled());
 		enabled.onCheckedChange(value -> applyKeySound(json -> json.put("enabled", value)));
 		block.getChildren().addAll(title, enabled);
@@ -1306,7 +1460,7 @@ public final class EditorInspectorPanel extends VBox {
 		block.getStyleClass().add("editor-keystrokes");
 		Label title = new Label("Click sound");
 		title.getStyleClass().add("editor-section__label");
-		Switch enabled = new Switch("Click sounds");
+		Switch enabled = Switch.xs("Click sounds");
 		enabled.setChecked(sound.enabled());
 		enabled.onCheckedChange(value -> applyClickSound(json -> json.put("enabled", value)));
 		block.getChildren().addAll(title, enabled);
@@ -1356,7 +1510,7 @@ public final class EditorInspectorPanel extends VBox {
 		block.getStyleClass().add("editor-keystrokes");
 		Label title = new Label("Key presses");
 		title.getStyleClass().add("editor-section__label");
-		Switch show = new Switch("Show key presses");
+		Switch show = Switch.xs("Show key presses");
 		show.setChecked(overlay.enabled());
 		show.onCheckedChange(value -> applyKeystrokes(json -> json.put("enabled", value)));
 		block.getChildren().addAll(title, show);
@@ -1444,17 +1598,17 @@ public final class EditorInspectorPanel extends VBox {
 		var webcam = store.state().webcam();
 		VBox root = new VBox(14);
 
-		Switch enabled = new Switch("Enabled");
+		Switch enabled = Switch.xs("Enabled");
 		enabled.setChecked(webcam.enabled());
 		enabled.onCheckedChange(value -> applyWebcam(json -> json.put("enabled", value)));
-		Switch mirror = new Switch("Mirror");
+		Switch mirror = Switch.xs("Mirror");
 		mirror.setChecked(webcam.mirror());
 		mirror.onCheckedChange(value -> {
 			applyWebcam(json -> json.put("mirror", value));
 			// The crop control edits a flipped rectangle when mirrored.
 			rebuild();
 		});
-		Switch react = new Switch("React to zoom");
+		Switch react = Switch.xs("React to zoom");
 		react.setChecked(webcam.reactToZoom());
 		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
 		boolean split = webcam.positionPreset().isSplit();
@@ -1581,7 +1735,7 @@ public final class EditorInspectorPanel extends VBox {
 			})));
 			// Positive wording: checked reads as "better, slower". Off by default, so playback runs
 			// the ~2 ms model and only a stopped frame or an export pays the ~28 ms one.
-			Switch highQuality = new Switch("High-quality mask while playing");
+			Switch highQuality = Switch.xs("High-quality mask while playing");
 			highQuality.setChecked(webcam.highQualityMaskWhilePlaying());
 			highQuality.onCheckedChange(value -> applyWebcam(
 					json -> json.put("highQualityMaskWhilePlaying", value)));
@@ -1638,7 +1792,7 @@ public final class EditorInspectorPanel extends VBox {
 		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 		Label showLabel = new Label("Show");
 		showLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		Switch enabled = new Switch();
+		Switch enabled = Switch.xs();
 		enabled.setChecked(settings.enabled());
 		enabled.onCheckedChange(value -> applyCaptionSettings(json -> json.put("enabled", value)));
 		header.getChildren().addAll(generation, reset, headerSpacer, showLabel, enabled);
@@ -1768,7 +1922,7 @@ public final class EditorInspectorPanel extends VBox {
 
 		VBox fonts = new VBox(12);
 		if (advanced) {
-			Switch quickAdd = new Switch();
+			Switch quickAdd = Switch.xs();
 			quickAdd.setChecked(settings.timelineQuickAdd());
 			quickAdd.onCheckedChange(
 					value -> applyCaptionSettings(json -> json.put("timelineQuickAdd", value)));
@@ -1866,9 +2020,9 @@ public final class EditorInspectorPanel extends VBox {
 			row.setAlignment(Pos.TOP_LEFT);
 			row.setPadding(new Insets(4, 4, 4, 4));
 			row.setStyle("-fx-background-radius: 6px;");
-			Label time = new Label(PlaybackControls.formatTime(cue.startMs() / 1000.0));
-			time.setStyle("-fx-font-size: 10px; -fx-text-fill: -g-muted;");
-			time.setMinWidth(38);
+			Label time = new Label(PlaybackControls.formatDuration(cue.startMs() / 1000.0));
+			time.setStyle("-fx-font-family: \"DejaVu Sans Mono\"; -fx-font-size: 10px; -fx-text-fill: -g-muted;");
+			time.setMinWidth(52);
 			Label text = new Label(cue.text());
 			text.setWrapText(true);
 			text.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.85);");
@@ -1894,7 +2048,7 @@ public final class EditorInspectorPanel extends VBox {
 
 	private VBox settingsSection() {
 		VBox root = new VBox(14);
-		Switch autoZooms = new Switch("Auto-apply fresh recording auto-zooms");
+		Switch autoZooms = Switch.xs("Auto-apply fresh recording auto-zooms");
 		autoZooms.setChecked(actions.autoApplyFreshRecordingAutoZooms());
 		autoZooms.onCheckedChange(actions::setAutoApplyFreshRecordingAutoZooms);
 		root.getChildren().add(autoZooms);
@@ -1965,8 +2119,9 @@ public final class EditorInspectorPanel extends VBox {
 	private HBox row(String label, Node control) {
 		HBox row = new HBox(12);
 		row.setAlignment(Pos.CENTER_LEFT);
+		row.getStyleClass().add("editor-row");
 		Label caption = new Label(label);
-		caption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		caption.getStyleClass().add("row-label");
 		// A wide control must not squeeze the caption down to an ellipsis.
 		caption.setMinWidth(Region.USE_PREF_SIZE);
 		Region spacer = new Region();

@@ -70,6 +70,7 @@ public final class EditorShellView extends VBox {
 	private final ExportMenu exportMenu;
 	private final EditorAnnouncementBanner announcementBanner;
 	private final Subscription storeSubscription;
+	private final Subscription playbackSubscription;
 
 	public EditorShellView(EditorStore store, EditorViewActions actions,
 			EditorPlaybackPort playback) {
@@ -168,7 +169,8 @@ public final class EditorShellView extends VBox {
 		previewColumn.setMinWidth(0);
 		previewColumn.setFillWidth(true);
 
-		body = new HBox(8, rail, inspectorPlaceholder, previewColumn);
+		// The Instrument layout docks the three columns flush; hairlines separate them (editor.css).
+		body = new HBox(0, rail, inspectorPlaceholder, previewColumn);
 		body.getStyleClass().add("editor-body");
 		HBox.setHgrow(previewColumn, Priority.ALWAYS);
 		VBox.setVgrow(body, Priority.ALWAYS);
@@ -195,6 +197,9 @@ public final class EditorShellView extends VBox {
 			preview.refresh();
 			playbackControls.refresh();
 		}));
+		// The frame timecode (mock .playheadframe) rides the same port updates the transport uses.
+		playbackSubscription = playback.changes().subscribe(state -> Platform.runLater(() ->
+				preview.setPlayheadSeconds(state.currentTimeSeconds())));
 	}
 
 	/** Forwards the extension render hooks to the preview panel (P3.3, wire into AppContext). */
@@ -277,6 +282,11 @@ public final class EditorShellView extends VBox {
 		inspector.setOnShortcutsConfig(this::openShortcutsConfigDialog);
 		inspector.setOnTutorial(() -> new TutorialHelpDialog().show(this));
 		inspector.setRecordingPath(preview::mediaPath);
+		// Inspector tabs ride the same path as the rail (mock build notes: rail.select).
+		inspector.onSectionTab(rail::select);
+		if (timelineContent instanceof dev.gravaai.ui.editor.timeline.TimelineView timelineView) {
+			inspector.setTrackCount(timelineView::rowCount);
+		}
 		if (captionModels != null) {
 			inspector.setCaptionModelService(captionModels);
 		}
@@ -590,6 +600,7 @@ public final class EditorShellView extends VBox {
 	/** Detaches from the store events and the playback seam. */
 	public void dispose() {
 		storeSubscription.close();
+		playbackSubscription.close();
 		if (agentStatusChip != null) {
 			agentStatusChip.dispose();
 		}

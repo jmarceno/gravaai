@@ -1,12 +1,12 @@
 /*
- * Editor preview styles (P2.5, task-17): the compositor-backed preview frame plus playback-bar
- * state that differs from the shell defaults. Loaded after ui/editor/editor.css.
+ * Editor preview styles — Instrument layout (docs/mocks/editor-instrument.html). The compositor
+ * frame and playback-bar state that differs from the shell defaults. Loaded after
+ * ui/editor/editor.css.
  */
 
 .editor-preview__frame {
-	-fx-background-color: #0b0e12;
-	-fx-background-radius: 10px;
-	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 24, 0.18, 0, 8);
+	-fx-background-color: #10161b;
+	-fx-background-radius: 3px;
 }
 
 .editor-preview__surface {
@@ -14,13 +14,16 @@
 }
 
 .editor-playback__volume-percent {
-	-fx-font-size: 10px;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10.5px;
 	-fx-text-fill: -g-muted;
+	-fx-font-weight: 500;
 }
 
 .editor-playback__volume-slider {
 	-fx-pref-width: 120px;
 }
+
 .editor-preview__skeleton {
-	-fx-background-radius: 10px;
+	-fx-background-radius: 3px;
 }

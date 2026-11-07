@@ -542,6 +542,31 @@
 	-fx-background-radius: 8px;
 }
 
+/* Extra-small switch (editor inspector, Instrument mock .switch): 26x15 track, 11px thumb. */
+.switch--xs .switch__control {
+	-fx-min-width: 26px;
+	-fx-pref-width: 26px;
+	-fx-max-width: 26px;
+	-fx-min-height: 15px;
+	-fx-pref-height: 15px;
+	-fx-max-height: 15px;
+	-fx-background-radius: 9px;
+}
+
+.switch--xs .switch__thumb {
+	-fx-min-width: 11px;
+	-fx-pref-width: 11px;
+	-fx-max-width: 11px;
+	-fx-min-height: 11px;
+	-fx-pref-height: 11px;
+	-fx-max-height: 11px;
+	-fx-background-radius: 9px;
+}
+
+.switch--xs .switch__label {
+	-fx-font-size: 11.5px;
+}
+
 .switch--sm .switch__thumb {
 	-fx-min-width: 17px;
 	-fx-pref-width: 17px;

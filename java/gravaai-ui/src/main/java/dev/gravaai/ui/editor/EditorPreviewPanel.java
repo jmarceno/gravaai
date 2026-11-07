@@ -65,6 +65,8 @@ public final class EditorPreviewPanel extends VBox {
 	private final StackPane plateHost = new StackPane();
 	private final StackPane previewFrame = new StackPane();
 	private final EditorPreviewView previewView = new EditorPreviewView();
+	/** Playhead timecode over the frame (mock {@code .playheadframe}); display only. */
+	private final Label playheadTimecode = new Label("");
 	/** Interactive annotation overlay (selection outline, drag/resize) over the preview. */
 	private final AnnotationOverlayController annotationOverlay;
 	private final Skeleton loadingSkeleton = new Skeleton();
@@ -95,12 +97,11 @@ public final class EditorPreviewPanel extends VBox {
 			}
 		});
 
-		// ---- toolbar: aspect ratio + crop -------------------------------------
-		HBox toolbar = new HBox(12);
+		// ---- stage header: aspect ratio + crop (mock .stagehead) ---------------
+		HBox toolbar = new HBox(6);
 		toolbar.getStyleClass().add("editor-preview__toolbar");
-		toolbar.setAlignment(Pos.CENTER);
+		toolbar.setAlignment(Pos.CENTER_LEFT);
 
-		aspectLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 500; -fx-text-fill: rgba(255,255,255,0.8);");
 		Button aspectButton = new Button("", Button.Variant.GHOST, Button.Size.SM);
 		HBox aspectGraphic = new HBox(4, aspectLabel, Icon.of(Icons.CaretDown, 10));
 		aspectGraphic.setAlignment(Pos.CENTER);
@@ -149,12 +150,17 @@ public final class EditorPreviewPanel extends VBox {
 		annotationOverlay.layer().setPickOnBounds(false);
 		previewFrame.setManaged(false);
 		previewFrame.setVisible(false);
-		previewFrame.getChildren().addAll(previewView, annotationOverlay.layer());
+		playheadTimecode.getStyleClass().add("editor-preview__timecode");
+		playheadTimecode.setManaged(false);
+		playheadTimecode.setMouseTransparent(true);
+		previewFrame.getChildren().addAll(previewView, annotationOverlay.layer(),
+				playheadTimecode);
 		Rectangle frameClip = new Rectangle();
 		frameClip.widthProperty().bind(previewFrame.widthProperty());
 		frameClip.heightProperty().bind(previewFrame.heightProperty());
-		frameClip.setArcWidth(20);
-		frameClip.setArcHeight(20);
+		// Mock .frame: 3px radius.
+		frameClip.setArcWidth(3);
+		frameClip.setArcHeight(3);
 		previewFrame.setClip(frameClip);
 
 		loadingSkeleton.getStyleClass().add("editor-preview__skeleton");
@@ -208,6 +214,7 @@ public final class EditorPreviewPanel extends VBox {
 		}
 		boolean live = controller != null;
 		previewFrame.setVisible(live);
+		playheadTimecode.setVisible(live);
 		wallpaper.setVisible(!live);
 		plateHost.setVisible(!live);
 		if (live) {
@@ -356,6 +363,18 @@ public final class EditorPreviewPanel extends VBox {
 		return status == null ? 0 : status.timelineSeconds();
 	}
 
+	/**
+	 * Updates the playhead timecode over the frame (mock {@code .playheadframe}). Display only:
+	 * the shell forwards the port's current time, and the label skips writes when the text is
+	 * unchanged so playback updates stay cheap.
+	 */
+	public void setPlayheadSeconds(double seconds) {
+		String text = PlaybackControls.formatClock(seconds);
+		if (!text.equals(playheadTimecode.getText())) {
+			playheadTimecode.setText(text);
+		}
+	}
+
 	private double clampToTimeline(double seconds) {
 		PlaybackStatus status = lastStatus;
 		double duration = status == null ? 0 : status.durationSeconds();
@@ -423,7 +442,7 @@ public final class EditorPreviewPanel extends VBox {
 			wallpaper.setImage(null);
 			wallpaper.setVisible(false);
 			stage.setBackground(new Background(new BackgroundFill(
-					EditorWallpapers.paintFor(value, Color.web("#121418")),
+					EditorWallpapers.paintFor(value, Color.web("#07090c")),
 					CornerRadii.EMPTY, Insets.EMPTY)));
 		}
 	}
@@ -444,6 +463,10 @@ public final class EditorPreviewPanel extends VBox {
 		double y = (stage.getHeight() - height) / 2;
 		plateHost.resizeRelocate(x, y, width, height);
 		previewFrame.resizeRelocate(x, y, width, height);
+		// Frame timecode (mock .playheadframe): pinned just inside the frame's top-right corner.
+		double timecodeWidth = Math.min(width, playheadTimecode.prefWidth(-1));
+		playheadTimecode.resizeRelocate(width - timecodeWidth - 10, 6, timecodeWidth,
+				playheadTimecode.prefHeight(-1));
 		// Both nodes are unmanaged (the StackPane stage does not lay them out), so drive their
 		// size here; this is what triggers the preview renderer for the new target size.
 		previewView.resizeRelocate(0, 0, width, height);

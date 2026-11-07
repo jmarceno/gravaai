@@ -2,6 +2,7 @@ package dev.gravaai.ui.editor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import dev.gravaai.core.event.Subscription;
 import dev.gravaai.ui.kit.Button;
@@ -37,8 +38,9 @@ public final class PlaybackControls extends GridPane {
 	private final EditorPlaybackPort port;
 	private final EditorViewActions actions;
 	private final DropdownMenu cameraMenu;
-	private final Label currentTime = new Label("0:00");
-	private final Label duration = new Label("0:00");
+	private final Label currentTime = new Label("00:00:00");
+	private final Label timeFraction = new Label(".00");
+	private final Label duration = new Label("00:00.00");
 	private final Button playButton;
 	private final Button volumeButton;
 	private final Slider volumeSlider;
@@ -91,8 +93,7 @@ public final class PlaybackControls extends GridPane {
 		addMenu.item("Audio", actions::addAudioLayer);
 
 		Button zoom = iconButton(Icons.MagnifyingGlassPlus, "Add zoom", actions::addZoom);
-		Button suggest = iconButton(Icons.MagicWand, "Suggest zooms", actions::suggestZooms);
-		Button split = iconButton(Icons.Scissors, "Split clip", actions::splitClip);
+		// Split and suggest-zoom live in the timeline toolbar (Instrument mock .tlbar).
 
 		// Camera layout from the playhead on: a split screen, a bubble position, camera only or
 		// no camera, shown as a block on the Camera track.
@@ -117,13 +118,14 @@ public final class PlaybackControls extends GridPane {
 			}
 			cameraMenu.item(layout.label(), () -> actions.switchCameraLayout(layout));
 		}
-		tools.getChildren().addAll(addLayer, zoom, suggest, split, cameraLayout);
+		tools.getChildren().addAll(addLayer, zoom, cameraLayout);
 
-		// ---- centre: time / transport / duration ------------------------------
+		// ---- centre: timecode / transport / duration ----------------------------
 		HBox centerBox = new HBox(6);
 		centerBox.getStyleClass().add("editor-playback__center");
 		centerBox.setAlignment(Pos.CENTER);
 		currentTime.getStyleClass().add("editor-playback__time");
+		timeFraction.getStyleClass().add("editor-playback__time-fraction");
 		duration.getStyleClass().add("editor-playback__duration");
 		Button skipBack = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		skipBack.icon(Icons.SkipBack, "fill");
@@ -131,9 +133,9 @@ public final class PlaybackControls extends GridPane {
 		dev.gravaai.ui.kit.Tooltip.install(skipBack, "Skip back");
 
 		playIcon = Icon.of(Icons.Play, 14, "fill");
-		playIcon.setIconColor(Color.web("#0b0d10"));
+		playIcon.setIconColor(Color.web("#032522"));
 		pauseIcon = Icon.of(Icons.Pause, 14, "fill");
-		pauseIcon.setIconColor(Color.web("#0b0d10"));
+		pauseIcon.setIconColor(Color.web("#032522"));
 		playButton = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		playButton.getStyleClass().add("editor-playback__play");
 		playButton.setGraphic(playIcon);
@@ -147,7 +149,8 @@ public final class PlaybackControls extends GridPane {
 		skipForward.setOnAction(event -> port.skip(5));
 		dev.gravaai.ui.kit.Tooltip.install(skipForward, "Skip forward");
 
-		centerBox.getChildren().addAll(currentTime, skipBack, playButton, skipForward, duration);
+		centerBox.getChildren().addAll(currentTime, timeFraction, skipBack, playButton, skipForward,
+				duration);
 
 		// ---- right: preview speed popover + volume -----------------------------
 		HBox rightCluster = new HBox(4);
@@ -189,7 +192,7 @@ public final class PlaybackControls extends GridPane {
 		volumePopover.content(volumeContent);
 		volumePopover.side(dev.gravaai.ui.kit.Anchors.Side.TOP);
 		volumePopover.align(dev.gravaai.ui.kit.Anchors.Align.END);
-		rightCluster.getChildren().addAll(rateButton, volumeRow);
+		rightCluster.getChildren().addAll(volumeRow, rateButton);
 
 		add(tools, 0, 0);
 		add(centerBox, 1, 0);
@@ -268,10 +271,12 @@ public final class PlaybackControls extends GridPane {
 	/** Re-renders from the playback seam. */
 	public void refresh() {
 		EditorPlaybackPort.PlaybackState state = port.state();
-		currentTime.setText(formatTime(state.currentTimeSeconds()));
-		duration.setText(formatTime(state.durationSeconds()));
+		currentTime.setText(formatClock(state.currentTimeSeconds()));
+		timeFraction.setText(formatCentis(state.currentTimeSeconds()));
+		duration.setText(formatDuration(state.durationSeconds()));
 		playButton.setGraphic(state.isPlaying() ? pauseIcon : playIcon);
-		Color iconColour = state.isPlaying() ? Color.web("#f2f5f7") : Color.web("#0b0d10");
+		// Mock .tplay: dark glyph on the cyan disc; light glyph on the dark playing disc.
+		Color iconColour = state.isPlaying() ? Color.web("#e9f1f4") : Color.web("#032522");
 		playIcon.setIconColor(iconColour);
 		pauseIcon.setIconColor(iconColour);
 		if (state.isPlaying()) {
@@ -305,14 +310,57 @@ public final class PlaybackControls extends GridPane {
 		return volume < 0.5 ? Icons.SpeakerLow : Icons.SpeakerHigh;
 	}
 
-	/** {@code formatTime}: {@code m:ss} with a 0:00 floor. */
-	public static String formatTime(double seconds) {
-		if (!Double.isFinite(seconds) || seconds < 0) {
-			return "0:00";
+	/**
+	 * {@code formatClock}: the transport's main timecode, {@code HH:MM:SS} zero-padded with a
+	 * 00:00:00 floor (mock {@code .tc}).
+	 */
+	public static String formatClock(double seconds) {
+		long total = wholeSeconds(seconds);
+		return String.format(Locale.ROOT, "%02d:%02d:%02d",
+				total / 3600, (total % 3600) / 60, total % 60);
+	}
+
+	/**
+	 * The centiseconds tail of the transport timecode, {@code .ss} — rendered faint in the mock.
+	 * Truncated against the same floored second {@link #formatClock} shows, so clock and fraction
+	 * never disagree.
+	 */
+	public static String formatCentis(double seconds) {
+		long centis = 0;
+		if (Double.isFinite(seconds) && seconds > 0) {
+			double fraction = (seconds - Math.floor(seconds)) * 100.0;
+			centis = Math.min(99, Math.max(0, Math.round(fraction)));
 		}
-		long minutes = (long) Math.floor(seconds / 60);
-		long secs = (long) Math.floor(seconds % 60);
-		return minutes + ":" + (secs < 10 ? "0" + secs : Long.toString(secs));
+		return String.format(Locale.ROOT, ".%02d", centis);
+	}
+
+	/**
+	 * {@code formatDuration}: {@code MM:SS.cs} under an hour (mock's {@code 42:18.11}), switching
+	 * to {@code HH:MM:SS.cs} past it.
+	 */
+	public static String formatDuration(double seconds) {
+		long total = wholeSeconds(seconds);
+		long centis = centisOf(seconds);
+		if (total >= 3600) {
+			return String.format(Locale.ROOT, "%02d:%02d:%02d.%02d",
+					total / 3600, (total % 3600) / 60, total % 60, centis);
+		}
+		return String.format(Locale.ROOT, "%02d:%02d.%02d", total / 60, total % 60, centis);
+	}
+
+	private static long wholeSeconds(double seconds) {
+		if (!Double.isFinite(seconds) || seconds < 0) {
+			return 0;
+		}
+		return (long) Math.floor(seconds);
+	}
+
+	private static long centisOf(double seconds) {
+		if (!Double.isFinite(seconds) || seconds < 0) {
+			return 0;
+		}
+		double fraction = (seconds - Math.floor(seconds)) * 100.0;
+		return Math.min(99, Math.max(0, Math.round(fraction)));
 	}
 
 	/** Stops listening to the playback seam. */

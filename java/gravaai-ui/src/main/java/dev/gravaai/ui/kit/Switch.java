@@ -27,7 +27,7 @@ public final class Switch extends HBox {
 	private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
 
 	/** Switch size (switch.css size variants). */
-	public enum Size { SM, MD, LG }
+	public enum Size { XS, SM, MD, LG }
 
 	private final Size size;
 	private final StackPane control = new StackPane();
@@ -47,6 +47,19 @@ public final class Switch extends HBox {
 
 	public Switch(String labelText, boolean checked) {
 		this(labelText, Size.MD, checked);
+	}
+
+	/**
+	 * Extra-small switch (mock {@code .switch}: 26x15 track, 11px thumb) — the editor inspector's
+	 * row switches.
+	 */
+	public static Switch xs(String labelText) {
+		return new Switch(labelText, Size.XS, false);
+	}
+
+	/** The extra-small switch without a label. */
+	public static Switch xs() {
+		return xs("");
 	}
 
 	public Switch(String labelText, Size size, boolean checked) {
@@ -137,6 +150,7 @@ public final class Switch extends HBox {
 
 	private double trackWidth() {
 		return switch (size) {
+			case XS -> 26;
 			case SM -> 32;
 			case LG -> 48;
 			case MD -> 40;
@@ -145,6 +159,7 @@ public final class Switch extends HBox {
 
 	private double thumbWidth() {
 		return switch (size) {
+			case XS -> 11;
 			case SM -> 17;
 			case LG -> 27;
 			case MD -> 22;

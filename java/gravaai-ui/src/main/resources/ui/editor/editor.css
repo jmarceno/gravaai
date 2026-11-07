@@ -1,168 +1,327 @@
 /*
- * Editor shell styles (plan §5.12, P2.6).
+ * Editor shell styles — the Instrument layout (docs/mocks/editor-instrument.html).
  *
- * Colours come from the kit tokens (kit/gravaai.css, -g-*); geometry mirrors the React editor
- * (src/components/video-editor/layout/*, src/components/video-editor/SettingsPanel.tsx) and the
- * reference screenshots java/parity/ui/editor*.png.
+ * The editor scopes the kit tokens (-g-*) to the mock's palette: panel #0E1317 window base,
+ * #0B0F12 chrome surfaces, #171E24/#222B33 hairlines, #2FE6D0 cyan. Structure is hairlines, not
+ * shadows; radii stay 2–4px; every duration, value and timecode is tabular mono.
  */
 
 .editor-root {
+	/* Instrument palette (docs/mocks/editor-instrument.html :root), scoped to the editor. */
+	-g-bg: #0e1317;
+	-g-fg: #e9f1f4;
+	-g-surface: #0b0f12;
+	-g-surface-secondary: #141a1f;
+	-g-surface-tertiary: #1a2127;
+	-g-surface-hover: #141a1f;
+	-g-surface-secondary-hover: #1a2127;
+	-g-bg-secondary: #0b0f12;
+	-g-bg-tertiary: #10151a;
+	-g-bg-inverse: #e9f1f4;
+	-g-overlay: #141a1f;
+	-g-muted: #8794a0;
+	-g-default: #0a0e11;
+	-g-default-hover: #141a1f;
+	-g-default-soft: rgba(6, 10, 13, 0.55);
+	-g-segment: #141a1f;
+	-g-field: #0a0e11;
+	-g-field-hover: #0c1116;
+	-g-field-focus: #0a0e11;
+	-g-border: #222b33;
+	-g-separator: #171e24;
+	-g-border-secondary: #28323a;
+	-g-accent: #2fe6d0;
+	-g-accent-hover: #57f0dd;
+	-g-accent-foreground: #032522;
+	-g-accent-soft: rgba(47, 230, 208, 0.1);
+	-g-accent-soft-hover: rgba(47, 230, 208, 0.16);
+	-g-accent-soft-foreground: #2fe6d0;
+	-g-focus: #2fe6d0;
+	-g-scrollbar-thumb: #222b33;
+	-g-icon-color: #e9f1f4;
+
 	-fx-background-color: -g-bg;
 	-fx-font-family: "DM Sans";
+	-fx-font-size: 13px;
 }
 
-/* ---- Header (h-14 = 56, px-4 = 16, border-b) ------------------------------ */
+/* ---- Topbar (mock .topbar: 46px chrome strip) ----------------------------- */
 
 .editor-header {
-	-fx-min-height: 56px;
-	-fx-pref-height: 56px;
-	-fx-max-height: 56px;
-	-fx-padding: 0 16px;
-	-fx-spacing: 12px;
+	-fx-min-height: 46px;
+	-fx-pref-height: 46px;
+	-fx-max-height: 46px;
+	-fx-padding: 0 12px;
+	-fx-spacing: 10px;
 	-fx-alignment: center-left;
-	-fx-background-color: -g-bg;
-	-fx-border-color: transparent transparent -g-border transparent;
+	-fx-background-color: -g-surface;
+	-fx-border-color: transparent transparent -g-separator transparent;
 	-fx-border-width: 0 0 1 0;
 }
 
-.editor-header__breadcrumb {
-	-fx-spacing: 8px;
-	-fx-alignment: center-left;
+/* Brand mark: the app logo on a raised tile where the mock places its cyan mark. */
+.editor-header__mark {
+	-fx-min-width: 24px;
+	-fx-pref-width: 24px;
+	-fx-max-width: 24px;
+	-fx-min-height: 24px;
+	-fx-pref-height: 24px;
+	-fx-max-height: 24px;
+	-fx-alignment: center;
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 5px;
 }
 
 .editor-header__slash {
-	-fx-text-fill: -g-muted;
-	-fx-font-size: 18px;
-	-fx-font-weight: 300;
-	-fx-padding: 0 4px;
+	-fx-text-fill: #5b6872;
+	-fx-font-size: 12.5px;
+	-fx-padding: 0 1px;
 }
 
 .editor-header__project.button {
 	-fx-background-color: transparent;
-	-fx-padding: 0 6px;
+	-fx-padding: 0 4px;
+	-fx-background-radius: 4px;
 }
 .editor-header__project.button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-color: -g-surface-secondary;
 }
 .editor-header__project-name {
-	-fx-text-fill: rgba(255, 255, 255, 0.92);
-	-fx-font-size: 13px;
-	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 12.5px;
+	-fx-font-weight: 500;
 }
+
+/* Saved/Unsaved readout next to the title (mock .crumb .badge), driven by the dirty flag. */
+.editor-header__save-state {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 9px;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 4px 5px;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 3px;
+	-fx-border-width: 1px;
+	-fx-margin: 0 0 0 2px;
+}
+.editor-header__save-state.is-dirty {
+	-fx-text-fill: #f0b429;
+}
+
 /* The shell takes focus on open (React shows no ring until keyboard navigation). */
 .editor-header .button--ghost:focused {
 	-fx-background-color: transparent;
 }
-.editor-header__clips.button {
+
+/* Icon-only topbar buttons (undo/redo/browser): mock .iconbtn. */
+.editor-header__iconbtn.button,
+.editor-header .button--icon-only {
+	-fx-background-color: transparent;
+	-fx-background-radius: 4px;
+	-fx-min-width: 28px;
+	-fx-pref-width: 28px;
+	-fx-max-width: 28px;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
+	-fx-max-height: 28px;
+	-fx-padding: 0;
+	-fx-text-fill: -g-muted;
+}
+.editor-header .button--icon-only:hover,
+.editor-header .button--icon-only:armed {
 	-fx-background-color: -g-surface-secondary;
-	-fx-text-fill: rgba(255, 255, 255, 0.92);
-	-fx-min-height: 36px;
-	-fx-pref-height: 36px;
+	-fx-text-fill: -g-fg;
+}
+
+.editor-header__clips.button {
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-muted;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
+	-fx-padding: 0 10px;
+	-fx-background-radius: 4px;
+	-fx-border-color: transparent;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
+	-fx-font-size: 12px;
 }
 .editor-header__clips.button:hover {
-	-fx-background-color: -g-surface-tertiary;
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-fg;
 }
-.editor-header__export.button {
-	-fx-background-color: linear-gradient(to right, #2fe3b6, #23cfa7);
-	-fx-text-fill: #062019;
-	-fx-font-weight: 600;
-	-fx-min-height: 36px;
-	-fx-pref-height: 36px;
-	-fx-padding: 0 18px;
+.editor-header__clips.button.is-active {
+	-fx-border-color: -g-border;
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-fg;
 }
-.editor-header__export.button:hover {
-	-fx-background-color: linear-gradient(to right, #43efc4, #2fdcb4);
-}
-/* Save sits left of Export with the Clips surface look, so Export stays the only accent CTA. */
+
+/* Save: mock .btn (raised, hairline border). */
 .editor-header__save.button {
 	-fx-background-color: -g-surface-secondary;
-	-fx-text-fill: rgba(255, 255, 255, 0.92);
-	-fx-min-height: 36px;
-	-fx-pref-height: 36px;
-	-fx-padding: 0 14px;
+	-fx-text-fill: -g-fg;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
+	-fx-padding: 0 11px;
+	-fx-font-size: 12.5px;
+	-fx-font-weight: 500;
 }
-.editor-header__save.button:hover {
+.editor-header__save.button:hover,
+.editor-header__save.button:armed {
 	-fx-background-color: -g-surface-tertiary;
 }
-/* Changes not on disk: the kit accent-soft tint, the same language as an active rail icon. */
-.editor-header__save.button.is-dirty {
-	-fx-background-color: -g-accent-soft;
-	-fx-text-fill: -g-accent-soft-foreground;
+
+/* Export: mock .btn--primary, the one accent CTA. */
+.editor-header__export.button {
+	-fx-background-color: -g-accent;
+	-fx-text-fill: -g-accent-foreground;
+	-fx-font-weight: 500;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
+	-fx-padding: 0 11px;
+	-fx-font-size: 12.5px;
+	-fx-background-radius: 4px;
+	-fx-border-color: -g-accent;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
 }
-.editor-header__save.button.is-dirty:hover {
-	-fx-background-color: -g-accent-soft-hover;
-}
-.editor-header__save.button.is-dirty .g-icon {
-	-g-icon-color: -g-accent-soft-foreground;
+.editor-header__export.button:hover {
+	-fx-background-color: #57f0dd;
 }
 .editor-header__rename {
 	-fx-pref-width: 220px;
-	-fx-min-height: 32px;
-	-fx-pref-height: 32px;
+	-fx-min-height: 28px;
+	-fx-pref-height: 28px;
 }
 
-/* ---- Body: rail + inspector + preview ------------------------------------ */
+/* ---- Body: rail + docked inspector + stage column (mock .body, flush) ------ */
 
 .editor-body {
-	-fx-padding: 12px 12px 0 8px;
+	-fx-padding: 0;
 	-fx-spacing: 0;
 }
 
+/* Tools rail (mock .rail): 66px, icon over a tiny label, hairline right edge. */
 .editor-rail {
-	-fx-min-width: 56px;
-	-fx-pref-width: 56px;
-	-fx-max-width: 56px;
-	-fx-spacing: 6px;
-	-fx-padding: 4px 0 0 0;
+	-fx-min-width: 66px;
+	-fx-pref-width: 66px;
+	-fx-max-width: 66px;
+	-fx-spacing: 2px;
+	-fx-padding: 8px 0 8px 0;
 	-fx-alignment: top-center;
+	-fx-background-color: -g-surface;
+	-fx-border-color: transparent -g-separator transparent transparent;
+	-fx-border-width: 0 1 0 0;
 }
 .editor-rail .button {
 	-fx-background-color: transparent;
-	-fx-background-radius: 8px;
-	-fx-min-width: 36px;
-	-fx-pref-width: 36px;
-	-fx-max-width: 36px;
-	-fx-min-height: 36px;
-	-fx-pref-height: 36px;
-	-fx-max-height: 36px;
+	-fx-background-radius: 5px;
+	-fx-text-fill: #5b6872;
+	-fx-min-width: 52px;
+	-fx-pref-width: 52px;
+	-fx-max-width: 52px;
+	-fx-min-height: 38px;
+	-fx-pref-height: 38px;
+	-fx-max-height: 38px;
+	-fx-padding: 2px 0;
+	-fx-content-display: top;
+	-fx-graphic-text-gap: 3px;
+	-fx-font-size: 8.5px;
+	-fx-font-weight: 400;
 }
 .editor-rail .button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-fg;
 }
 .editor-rail .button.is-active {
-	-fx-background-color: rgba(47, 179, 163, 0.16);
+	-fx-background-color: -g-accent-soft;
+	-fx-text-fill: -g-accent-soft-foreground;
+}
+/* Icons ride currentColor in the mock; the kit resolves them through -g-icon-color. */
+.editor-rail .button .g-icon-fill,
+.editor-rail .button .g-icon-stroke {
+	-g-icon-color: #5b6872;
+}
+.editor-rail .button:hover .g-icon-fill,
+.editor-rail .button:hover .g-icon-stroke {
+	-g-icon-color: -g-fg;
+}
+.editor-rail .button.is-active .g-icon-fill,
+.editor-rail .button.is-active .g-icon-stroke {
+	-g-icon-color: -g-accent;
+}
+.editor-rail__gap {
+	-fx-min-height: 1px;
+	-fx-pref-height: 1px;
+	-fx-max-height: 1px;
+	-fx-min-width: 30px;
+	-fx-pref-width: 30px;
+	-fx-max-width: 30px;
+	-fx-background-color: -g-border;
+	-fx-margin: 7px 0;
 }
 
+/* Docked inspector (mock .inspector): flush panel, hairline left edge, no card chrome. */
 .editor-inspector {
-	-fx-min-width: 320px;
-	-fx-pref-width: 320px;
-	-fx-max-width: 320px;
-	-fx-background-color: -g-surface;
-	-fx-background-radius: 12px;
-	-fx-border-radius: 12px;
-	-fx-border-color: -g-border;
-	-fx-border-width: 1px;
-	-fx-margin: 0 8px 12px 4px;
+	-fx-min-width: 344px;
+	-fx-pref-width: 344px;
+	-fx-max-width: 344px;
+	-fx-background-color: -g-bg;
+	-fx-background-radius: 0;
+	-fx-border-color: transparent transparent transparent -g-border;
+	-fx-border-width: 0 0 0 1px;
+	-fx-border-radius: 0;
+	-fx-margin: 0;
 }
 .editor-inspector__header {
-	-fx-min-height: 56px;
-	-fx-pref-height: 56px;
-	-fx-padding: 0 20px;
+	-fx-min-height: 34px;
+	-fx-pref-height: 34px;
+	-fx-max-height: 34px;
+	-fx-padding: 0 10px;
 	-fx-alignment: center-left;
 	-fx-spacing: 8px;
 }
 .editor-inspector__title {
-	-fx-text-fill: -g-fg;
-	-fx-font-size: 14px;
-	-fx-font-weight: 600;
+	-fx-text-fill: #5b6872;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10px;
+	-fx-font-weight: 500;
 }
 .editor-inspector__advanced-label {
 	-fx-text-fill: -g-muted;
-	-fx-font-size: 12px;
+	-fx-font-size: 11px;
+}
+/* Section tabs under the header (mock .insp__tabs), filled by EditorInspectorPanel. */
+.editor-inspector__tabs {
+	-fx-padding: 6px 8px;
+	-fx-spacing: 2px;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
+}
+.editor-inspector__tab.button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 4px;
+	-fx-min-height: 25px;
+	-fx-pref-height: 25px;
+	-fx-max-height: 25px;
+	-fx-padding: 0;
+	-fx-text-fill: -g-muted;
+}
+.editor-inspector__tab.button:hover {
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-fg;
+}
+.editor-inspector__tab.button.is-selected {
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-fg;
+	-fx-border-color: -g-border;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
 }
 .editor-inspector__scroll {
 	-fx-background-color: transparent;
-	-fx-padding: 0 20px 20px 20px;
+	-fx-padding: 2px 0 8px 0;
 }
 .editor-inspector__scroll > .viewport {
 	-fx-background-color: transparent;
@@ -175,158 +334,321 @@
 	-fx-background-color: -g-scrollbar-thumb;
 	-fx-background-radius: 4px;
 }
+/* Collapsible section blocks (mock .sec). */
 .editor-section {
-	-fx-spacing: 16px;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
 }
-.editor-section__heading {
+.editor-section__head {
+	-fx-min-height: 30px;
+	-fx-pref-height: 30px;
+	-fx-padding: 0 10px;
+	-fx-spacing: 6px;
 	-fx-alignment: center-left;
+	-fx-background-color: transparent;
+}
+.editor-section__head:hover {
+	-fx-background-color: -g-surface-secondary;
+}
+.editor-section__head .editor-section__chevron {
+	-g-icon-color: #5b6872;
 }
 .editor-section__label {
 	-fx-text-fill: -g-fg;
-	-fx-font-size: 13px;
+	-fx-font-size: 12px;
 	-fx-font-weight: 500;
 }
 .editor-section__reset.button {
 	-fx-background-color: transparent;
 	-fx-text-fill: -g-muted;
-	-fx-font-size: 12px;
+	-fx-font-size: 10.5px;
 	-fx-padding: 2px 4px;
 }
 .editor-section__reset.button:hover {
 	-fx-text-fill: -g-fg;
+}
+.editor-section__body {
+	-fx-padding: 0 10px 10px 10px;
+	-fx-spacing: 8px;
+}
+.editor-inspector__foot {
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
+	-fx-max-height: 26px;
+	-fx-padding: 7px 10px;
+	-fx-spacing: 6px;
+	-fx-alignment: center-left;
+	-fx-background-color: transparent;
+	-fx-border-color: -g-separator transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
+}
+.editor-inspector__foot-label {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10px;
+	-fx-text-fill: #5b6872;
 }
 
 .editor-subsection {
 	-fx-spacing: 12px;
 }
 
-/* Wallpaper / gradient / colour grid (grid-cols-5, gap-2) */
+/* ---- Controls (mock .seg / .slider / .ctl__label / .swatches) -------------- */
+
+/* Segmented groups (mock .seg): bordered container, flat chips, raised selection. */
+.editor-root .tag-group__list {
+	-fx-background-color: #0a0e11;
+	-fx-background-radius: 4px;
+	-fx-border-color: #171e24;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
+	-fx-padding: 2px;
+	-fx-hgap: 2px;
+	-fx-vgap: 2px;
+}
+.editor-root .tag-group__list .tag {
+	-fx-background-color: transparent;
+	-fx-background-radius: 3px;
+	-fx-border-width: 0;
+	-fx-text-fill: #8794a0;
+	-fx-min-height: 22px;
+	-fx-padding: 2px 8px;
+	-fx-font-size: 11px;
+}
+.editor-root .tag-group__list .tag:hover {
+	-fx-background-color: transparent;
+	-fx-text-fill: -g-fg;
+}
+.editor-root .tag-group__list .tag:selected {
+	-fx-background-color: #1a2127;
+	-fx-text-fill: -g-fg;
+	-fx-border-color: #222b33;
+	-fx-border-radius: 3px;
+	-fx-border-width: 1px;
+}
+
+/* Sliders (mock .slider): 3px rail, cyan-deep fill, 9px light knob, mono value. */
+.editor-root .slider .slider__output {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10.5px;
+	-fx-font-weight: 500;
+	-fx-text-fill: -g-fg;
+}
+.editor-root .slider .slider__label {
+	-fx-font-size: 11px;
+	-fx-font-weight: 400;
+	-fx-text-fill: #8794a0;
+}
+.editor-root .slider .slider__track {
+	-fx-background-color: #1c252c;
+	-fx-background-radius: 2px;
+	-fx-min-height: 3px;
+	-fx-pref-height: 3px;
+	-fx-max-height: 3px;
+}
+.editor-root .slider .slider__fill {
+	-fx-background-color: #17b3a2;
+	-fx-background-radius: 2px;
+	-fx-min-height: 3px;
+	-fx-pref-height: 3px;
+	-fx-max-height: 3px;
+}
+.editor-root .slider .slider__thumb-pill {
+	-fx-background-color: #e9f1f4;
+	-fx-background-radius: 999px;
+	-fx-min-width: 9px;
+	-fx-pref-width: 9px;
+	-fx-max-width: 9px;
+	-fx-min-height: 9px;
+	-fx-pref-height: 9px;
+	-fx-max-height: 9px;
+}
+
+/* Inspector rows: label left, control right (mock .rowline). */
+.editor-root .row-label {
+	-fx-font-size: 11.5px;
+	-fx-text-fill: #8794a0;
+}
+
+/* Wallpaper / gradient / colour grid (mock .swatches: 2px radius tiles). */
 .editor-tiles {
-	-fx-hgap: 8px;
-	-fx-vgap: 8px;
+	-fx-hgap: 5px;
+	-fx-vgap: 5px;
 }
 .editor-tile.button {
 	-fx-background-color: transparent;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 2px;
 	-fx-padding: 0;
-	-fx-min-height: 38px;
-	-fx-pref-height: 38px;
-	-fx-max-height: 38px;
-	-fx-border-radius: 6px;
+	-fx-min-height: 30px;
+	-fx-pref-height: 30px;
+	-fx-max-height: 30px;
+	-fx-border-radius: 2px;
 }
 .editor-tile.button:hover {
 	-fx-background-color: rgba(255, 255, 255, 0.08);
 }
+.editor-tile.button.is-selected {
+	-fx-border-color: -g-accent;
+	-fx-border-width: 1.5px;
+	-fx-border-radius: 2px;
+}
 .editor-tile__add {
 	-fx-background-color: -g-surface-secondary;
-	-fx-background-radius: 6px;
-	-fx-border-color: rgba(255, 255, 255, 0.08);
-	-fx-border-radius: 6px;
+	-fx-background-radius: 2px;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 2px;
 }
 .editor-tile__check {
-	-fx-background-color: rgba(0, 0, 0, 0.65);
-	-fx-background-radius: 6px;
+	-fx-background-color: rgba(6, 10, 13, 0.65);
+	-fx-background-radius: 2px;
 	-fx-padding: 1px;
 }
 
-/* ---- Preview ------------------------------------------------------------- */
+/* ---- Stage column (mock .stagecol: stagehead + stage + transport) ---------- */
 
 .editor-preview {
 	-fx-spacing: 0;
+	-fx-background-color: #080b0e;
 }
+/* Stage header (mock .stagehead): 34px bar over the stage. */
 .editor-preview__toolbar {
-	-fx-min-height: 40px;
-	-fx-pref-height: 40px;
-	-fx-alignment: center;
-	-fx-spacing: 12px;
-	-fx-padding: 0 12px;
+	-fx-min-height: 34px;
+	-fx-pref-height: 34px;
+	-fx-max-height: 34px;
+	-fx-alignment: center-left;
+	-fx-spacing: 6px;
+	-fx-padding: 0 10px;
+	-fx-background-color: -g-surface;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
 }
 .editor-preview__toolbar .button {
 	-fx-background-color: transparent;
-	-fx-text-fill: rgba(255, 255, 255, 0.78);
-	-fx-font-size: 12px;
-	-fx-padding: 2px 6px;
+	-fx-text-fill: -g-muted;
+	-fx-font-size: 11.5px;
+	-fx-min-height: 24px;
+	-fx-pref-height: 24px;
+	-fx-padding: 0 7px;
+	-fx-background-radius: 4px;
+	-fx-border-color: transparent;
+	-fx-border-radius: 4px;
+	-fx-border-width: 1px;
 }
 .editor-preview__toolbar .button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-background-color: -g-surface-secondary;
 	-fx-text-fill: -g-fg;
+}
+.editor-preview__toolbar .button.is-pressed {
+	-fx-border-color: -g-border;
+	-fx-text-fill: -g-fg;
+	-fx-background-color: -g-surface-secondary;
 }
 .editor-preview__divider {
 	-fx-min-width: 1px;
 	-fx-pref-width: 1px;
 	-fx-max-width: 1px;
-	-fx-min-height: 16px;
-	-fx-pref-height: 16px;
-	-fx-background-color: rgba(255, 255, 255, 0.2);
+	-fx-min-height: 14px;
+	-fx-pref-height: 14px;
+	-fx-background-color: -g-border;
 }
 .editor-preview__stage {
-	-fx-padding: 12px 16px;
+	-fx-padding: 18px 20px;
+	-fx-background-color: radial-gradient(center 50% -10%, radius 120%, #0d1216 0%, #07090c 70%);
 }
 .editor-preview__wallpaper {
-	-fx-background-radius: 8px;
+	-fx-background-radius: 3px;
 }
 .editor-preview__plate {
-	-fx-background-color: #2b3a49;
-	-fx-background-radius: 10px;
-	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 18, 0.25, 0, 6);
+	-fx-background-color: #10161b;
+	-fx-background-radius: 3px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 30, 0.1, 0, 8);
+}
+/* Mock .frame: 3px radius, 1px #1d252d ring, soft drop shadow. */
+.editor-preview__frame {
+	-fx-border-color: #1d252d;
+	-fx-border-width: 1px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 24, 0.08, 0, 6);
+}
+/* Playhead timecode over the frame (mock .playheadframe). */
+.editor-preview__timecode {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10px;
+	-fx-text-fill: rgba(233, 241, 244, 0.55);
+	-fx-padding: 2px 4px;
 }
 
-/* ---- Playback bar -------------------------------------------------------- */
+/* ---- Transport (mock .transport, without the skipped scrub rail) ---------- */
 
 .editor-playback {
-	-fx-min-height: 56px;
-	-fx-pref-height: 56px;
-	-fx-max-height: 56px;
-	-fx-padding: 0 16px;
-	-fx-spacing: 12px;
+	-fx-min-height: 50px;
+	-fx-pref-height: 50px;
+	-fx-max-height: 50px;
+	-fx-padding: 8px 12px 9px 12px;
 	-fx-alignment: center-left;
+	-fx-background-color: -g-surface;
+	-fx-border-color: -g-separator transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
 }
 .editor-playback__tools {
-	-fx-spacing: 4px;
+	-fx-spacing: 2px;
 	-fx-alignment: center-left;
 }
 .editor-playback__tools .button,
 .editor-playback__center .button,
 .editor-playback__volume .button {
 	-fx-background-color: transparent;
-	-fx-text-fill: rgba(255, 255, 255, 0.72);
-	-fx-min-width: 32px;
-	-fx-pref-width: 32px;
-	-fx-min-height: 32px;
-	-fx-pref-height: 32px;
+	-fx-text-fill: -g-muted;
+	-fx-background-radius: 4px;
+	-fx-min-width: 28px;
+	-fx-pref-width: 28px;
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
 }
 .editor-playback__tools .button:hover,
 .editor-playback__center .button:hover,
 .editor-playback__volume .button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.08);
+	-fx-background-color: -g-surface-secondary;
 	-fx-text-fill: -g-fg;
 }
+/* Timecode (mock .tc): mono, bright clock, faint centiseconds. */
 .editor-playback__time {
-	-fx-text-fill: -g-muted;
-	-fx-font-size: 10px;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 11px;
+	-fx-font-weight: 500;
+}
+.editor-playback__time-fraction {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-text-fill: #5b6872;
+	-fx-font-size: 11px;
 	-fx-font-weight: 500;
 }
 .editor-playback__duration {
-	-fx-text-fill: rgba(139, 146, 154, 0.7);
-	-fx-font-size: 10px;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-text-fill: -g-fg;
+	-fx-font-size: 11px;
 	-fx-font-weight: 500;
 }
+/* Mock .tplay: cyan disc inside a 4px cyan ring — the layout's single glow. */
 .editor-playback__play.button {
-	-fx-background-color: #f2f5f7;
-	-fx-background-radius: 999px;
-	-fx-min-width: 34px;
-	-fx-pref-width: 34px;
-	-fx-min-height: 34px;
-	-fx-pref-height: 34px;
+	-fx-min-width: 40px;
+	-fx-pref-width: 40px;
+	-fx-max-width: 40px;
+	-fx-min-height: 40px;
+	-fx-pref-height: 40px;
+	-fx-max-height: 40px;
+	-fx-padding: 0;
+	-fx-background-color: rgba(47, 230, 208, 0.14), #2fe6d0;
+	-fx-background-insets: 0, 4;
+	-fx-background-radius: 999px, 999px;
 }
 .editor-playback__play.button:hover {
-	-fx-background-color: #ffffff;
+	-fx-background-color: rgba(47, 230, 208, 0.14), #57f0dd;
 }
 .editor-playback__play.editor-playback__play--playing.button {
-	-fx-background-color: #2a313b;
+	-fx-background-color: rgba(47, 230, 208, 0.14), -g-surface-secondary;
 }
 .editor-playback__play.editor-playback__play--playing.button:hover {
-	-fx-background-color: #38414d;
+	-fx-background-color: rgba(47, 230, 208, 0.14), -g-surface-tertiary;
 }
 .editor-playback__right {
 	-fx-spacing: 4px;
@@ -334,48 +656,56 @@
 }
 .editor-playback__rate.button {
 	-fx-background-color: transparent;
-	-fx-text-fill: rgba(255, 255, 255, 0.72);
-	-fx-background-radius: 8px;
-	-fx-min-height: 32px;
-	-fx-pref-height: 32px;
+	-fx-text-fill: -g-muted;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-background-radius: 4px;
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
 	-fx-padding: 0 8px;
-	-fx-font-size: 11px;
-	-fx-font-weight: 600;
+	-fx-font-size: 10.5px;
+	-fx-font-weight: 500;
 }
 .editor-playback__rate.button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.08);
+	-fx-background-color: -g-surface-secondary;
 	-fx-text-fill: -g-fg;
 }
 .editor-playback__rate.editor-playback__rate--accented.button,
 .editor-playback__rate.editor-playback__rate--accented.button:hover {
 	-fx-text-fill: -g-accent-soft-foreground;
 }
+.editor-playback__volume-percent {
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10.5px;
+	-fx-text-fill: -g-muted;
+	-fx-font-weight: 500;
+}
 .editor-playback__rate-title {
 	-fx-text-fill: -g-muted;
 	-fx-font-size: 10px;
-	-fx-font-weight: 600;
+	-fx-font-weight: 500;
 }
 .editor-playback__rate-chip.button {
-	-fx-background-color: rgba(255, 255, 255, 0.06);
-	-fx-text-fill: rgba(255, 255, 255, 0.72);
-	-fx-background-radius: 10px;
+	-fx-background-color: -g-surface-secondary;
+	-fx-text-fill: -g-muted;
+	-fx-background-radius: 3px;
 	-fx-min-width: 46px;
 	-fx-pref-width: 46px;
-	-fx-min-height: 30px;
-	-fx-pref-height: 30px;
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
 	-fx-padding: 0;
-	-fx-font-size: 11px;
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-font-size: 10.5px;
 	-fx-font-weight: 500;
 }
 .editor-playback__rate-chip.button:hover {
-	-fx-background-color: rgba(255, 255, 255, 0.12);
+	-fx-background-color: -g-surface-tertiary;
 	-fx-text-fill: -g-fg;
 }
 .editor-playback__rate-chip.editor-playback__rate-chip--active.button,
 .editor-playback__rate-chip.editor-playback__rate-chip--active.button:hover {
 	-fx-background-color: -g-accent;
 	-fx-text-fill: -g-accent-foreground;
-	-fx-font-weight: 600;
+	-fx-font-weight: 500;
 }
 .editor-playback__rate-hints {
 	-fx-padding: 2px 0 0 0;
@@ -385,16 +715,17 @@
 	-fx-font-size: 10px;
 }
 .editor-playback__rate-hint-key {
-	-fx-text-fill: rgba(255, 255, 255, 0.6);
+	-fx-font-family: "DejaVu Sans Mono";
+	-fx-text-fill: rgba(233, 241, 244, 0.6);
 	-fx-font-size: 10px;
-	-fx-font-weight: 600;
+	-fx-font-weight: 500;
 }
 
-/* ---- Timeline panel ------------------------------------------------------ */
+/* ---- Timeline panel (mock .timeline: flush strip) ------------------------- */
 
 .editor-timeline {
-	/* No top padding: the resize handle owns the top edge. */
-	-fx-padding: 0 16px 16px 16px;
+	/* Flush on every edge: the mock strip runs border to border. */
+	-fx-padding: 0;
 }
 /* Top-edge grab strip: dragging it trades height between the preview column and the strip. */
 .editor-timeline__resize-handle {
@@ -402,7 +733,7 @@
 	-fx-padding: 0 0 2px 0;
 }
 .editor-timeline__resize-grip {
-	-fx-background-color: rgba(255, 255, 255, 0.14);
+	-fx-background-color: #222b33;
 	-fx-background-radius: 999px;
 	-fx-min-width: 44px;
 	-fx-pref-width: 44px;
@@ -416,17 +747,17 @@
 	-fx-background-color: -g-accent;
 }
 .editor-timeline__playhead {
-	-fx-fill: #ef4444;
+	-fx-fill: #2fe6d0;
 }
 .editor-timeline__track {
-	-fx-background-color: #131a24;
-	-fx-background-radius: 6px;
-	-fx-border-color: rgba(130, 160, 200, 0.45);
-	-fx-border-radius: 6px;
+	-fx-background-color: #0b0f12;
+	-fx-background-radius: 3px;
+	-fx-border-color: #222b33;
+	-fx-border-radius: 3px;
 	-fx-border-width: 1px;
 }
 .editor-timeline__handle {
-	-fx-background-color: rgba(255, 255, 255, 0.92);
+	-fx-background-color: rgba(233, 241, 244, 0.92);
 	-fx-background-radius: 2px;
 }
 
@@ -467,17 +798,17 @@
 
 .export-menu__note {
 	-fx-font-size: 11px;
-	-fx-text-fill: rgba(139, 146, 154, 0.7);
+	-fx-text-fill: -g-muted;
 }
 
 .export-menu__warning {
 	-fx-font-size: 11px;
-	-fx-text-fill: rgba(232, 179, 57, 0.8);
+	-fx-text-fill: #f0b429;
 }
 
 .export-menu__file-name {
 	-fx-font-size: 11px;
-	-fx-text-fill: rgba(139, 146, 154, 0.7);
+	-fx-text-fill: -g-muted;
 }
 
 .export-menu__error-text {
@@ -555,54 +886,56 @@
 	-fx-opacity: 0.7;
 }
 
-/* ---- Clips panel (RecordingLibraryPanel.tsx) ----------------------------- */
+/* ---- Clips panel (RecordingLibraryPanel.tsx; docks in the inspector slot) -- */
 
 .clips-panel__header {
-	-fx-min-height: 56px;
-	-fx-pref-height: 56px;
-	-fx-padding: 12px 20px;
+	-fx-min-height: 46px;
+	-fx-pref-height: 46px;
+	-fx-padding: 8px 10px;
 	-fx-alignment: center-left;
+	-fx-border-color: transparent transparent -g-separator transparent;
+	-fx-border-width: 0 0 1 0;
 }
 
 .clips-panel__title {
 	-fx-text-fill: -g-fg;
-	-fx-font-size: 14px;
-	-fx-font-weight: 600;
+	-fx-font-size: 13px;
+	-fx-font-weight: 500;
 }
 
 .clips-panel__search-row {
-	-fx-padding: 0 20px 12px 20px;
+	-fx-padding: 8px 10px 8px 10px;
 }
 
-/* Dashboard search pattern: bg-default-soft, rounded-xl, icon gutter on the left. */
+/* Dashboard search pattern: field bg, 4px radius. */
 .clips-panel__search {
-	-fx-background-color: -g-default-soft;
-	-fx-background-radius: 12;
+	-fx-background-color: -g-field;
+	-fx-background-radius: 4;
 	-fx-border-width: 0;
 	-fx-padding: 0 12 0 40;
-	-fx-font-size: 14px;
-	-fx-pref-height: 40px;
+	-fx-font-size: 13px;
+	-fx-pref-height: 30px;
 }
 
 .clips-panel__search:focused {
-	-fx-background-color: -g-default-soft;
+	-fx-background-color: -g-field;
 	-fx-border-width: 0;
 }
 
 .clips-panel__select-row {
-	-fx-min-height: 40px;
-	-fx-padding: 0 20px 8px 20px;
+	-fx-min-height: 32px;
+	-fx-padding: 0 10px 6px 10px;
 	-fx-alignment: center-left;
 }
 
 .clips-panel__count {
 	-fx-text-fill: -g-muted;
-	-fx-font-size: 12px;
+	-fx-font-size: 11px;
 }
 
 .clips-panel__rows {
-	-fx-spacing: 4px;
-	-fx-padding: 0 12px 12px 12px;
+	-fx-spacing: 2px;
+	-fx-padding: 0 8px 8px 8px;
 }
 
 .clips-panel__scroll {
@@ -624,20 +957,20 @@
 }
 
 .clips-row {
-	-fx-padding: 12px 8px;
+	-fx-padding: 10px 6px;
 	-fx-spacing: 12px;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 3px;
 	-fx-alignment: center-left;
 }
 
 .clips-row:hover,
 .clips-row--selected {
-	-fx-background-color: -g-default;
+	-fx-background-color: -g-surface-secondary;
 }
 
 .clips-row__main {
 	-fx-background-color: transparent;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 3px;
 	-fx-alignment: center-left;
 	-fx-padding: 0;
 	-fx-min-height: 36px;
@@ -666,14 +999,14 @@
 	-fx-min-height: 36px;
 	-fx-pref-height: 36px;
 	-fx-max-height: 36px;
-	-fx-background-color: -g-default-soft;
-	-fx-background-radius: 4px;
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 3px;
 	-fx-alignment: center;
 }
 
 .clips-thumb__pulse {
-	-fx-background-color: -g-default-soft;
-	-fx-background-radius: 4px;
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 3px;
 }
 
 /* HeroUI checkbox control: 16x16 rounded-md, field bg, accent when selected. */
@@ -685,9 +1018,9 @@
 	-fx-pref-height: 16px;
 	-fx-max-height: 16px;
 	-fx-background-color: -g-field;
-	-fx-background-radius: 6px;
+	-fx-background-radius: 3px;
 	-fx-border-color: -g-border;
-	-fx-border-radius: 6px;
+	-fx-border-radius: 3px;
 	-fx-border-width: 1px;
 	-fx-alignment: center;
 }
@@ -722,8 +1055,10 @@
 }
 
 .clips-panel__footer {
-	-fx-padding: 12px 20px;
+	-fx-padding: 10px;
 	-fx-alignment: center-left;
+	-fx-border-color: -g-separator transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
 }
 
 .clips-panel__footer-hint {
@@ -738,7 +1073,7 @@
 
 .clips-panel__empty-title {
 	-fx-text-fill: -g-fg;
-	-fx-font-size: 14px;
+	-fx-font-size: 13px;
 }
 
 .clips-panel__empty-subtitle {
@@ -766,14 +1101,14 @@
 /* ---- Clip import overlay (the EditorShell importing blocker) -------------- */
 
 .clip-import-overlay {
-	-fx-background-color: rgba(18, 20, 24, 0.8);
+	-fx-background-color: rgba(6, 8, 10, 0.8);
 }
 
 .clip-import-overlay__card {
 	-fx-background-color: -g-bg;
-	-fx-background-radius: 12px;
+	-fx-background-radius: 8px;
 	-fx-border-color: -g-border;
-	-fx-border-radius: 12px;
+	-fx-border-radius: 8px;
 	-fx-border-width: 1px;
 	-fx-padding: 24px;
 	-fx-spacing: 8px;

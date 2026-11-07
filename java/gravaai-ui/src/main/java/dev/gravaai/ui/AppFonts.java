@@ -21,6 +21,9 @@ public final class AppFonts {
 	/** Family name used by {@code kit/gravaai.css}. */
 	public static final String FAMILY = "DM Sans";
 
+	/** Monospace family for timecodes and numeric values (the editor mock's {@code --mono}). */
+	public static final String MONO_FAMILY = "DejaVu Sans Mono";
+
 	private static final List<String> FILES = List.of(
 			"DMSans-Regular.ttf",
 			"DMSans-Italic.ttf",
@@ -29,7 +32,9 @@ public final class AppFonts {
 			"DMSans-SemiBold.ttf",
 			"DMSans-SemiBoldItalic.ttf",
 			"DMSans-Bold.ttf",
-			"DMSans-BoldItalic.ttf");
+			"DMSans-BoldItalic.ttf",
+			"DejaVuSansMono.ttf",
+			"DejaVuSansMono-Bold.ttf");
 
 	private static final System.Logger LOG = System.getLogger("gravaai.ui");
 
@@ -63,8 +68,8 @@ public final class AppFonts {
 			}
 		}
 		loaded = true;
-		LOG.log(System.Logger.Level.INFO, "loaded " + FILES.size() + " DM Sans faces, family="
-				+ findFamily());
+		LOG.log(System.Logger.Level.INFO, "loaded " + FILES.size() + " bundled font faces, family="
+				+ findFamily() + " mono=" + findMonoFamily());
 	}
 
 	/** {@code DM Sans} regular at {@code size} px. */
@@ -77,6 +82,16 @@ public final class AppFonts {
 		return Font.font(FAMILY, weight, size);
 	}
 
+	/** {@code DejaVu Sans Mono} regular at {@code size} px. */
+	public static Font monoFont(double size) {
+		return Font.font(MONO_FAMILY, size);
+	}
+
+	/** {@code DejaVu Sans Mono} at the given weight and {@code size} px. */
+	public static Font monoFont(FontWeight weight, double size) {
+		return Font.font(MONO_FAMILY, weight, size);
+	}
+
 	/** True when the family is registered under the expected name. */
 	public static boolean isLoaded() {
 		return loaded && findFamily().equals(FAMILY);
@@ -87,6 +102,16 @@ public final class AppFonts {
 		for (String name : Font.getFamilies()) {
 			if (name.equals(FAMILY)) {
 				return FAMILY;
+			}
+		}
+		return "";
+	}
+
+	/** The registered monospace family name; empty when the mono faces failed to load. */
+	public static String findMonoFamily() {
+		for (String name : Font.getFamilies()) {
+			if (name.equals(MONO_FAMILY)) {
+				return MONO_FAMILY;
 			}
 		}
 		return "";

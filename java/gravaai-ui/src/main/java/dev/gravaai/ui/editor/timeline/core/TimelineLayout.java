@@ -1,11 +1,20 @@
 package dev.gravaai.ui.editor.timeline.core;
 
-/** Vertical layout of the timeline (port of {@code timeline/timelineLayout.ts}). */
+/**
+ * Vertical layout of the timeline, restyled to the Instrument mock
+ * ({@code docs/mocks/editor-instrument.html}): a 22px ruler over uniform 44px lanes separated by
+ * 1px hairlines instead of gaps.
+ */
 public final class TimelineLayout {
 
-	public static final double TIMELINE_AXIS_HEIGHT_PX = 20;
-	public static final double TIMELINE_ROW_MIN_HEIGHT_PX = 32;
-	public static final double TIMELINE_CLIP_ROW_HEIGHT_PX = TIMELINE_ROW_MIN_HEIGHT_PX * 2;
+	/** Mock {@code .ruler} height; the track-header corner cell matches it. */
+	public static final double TIMELINE_AXIS_HEIGHT_PX = 22;
+
+	/** Mock {@code .lane} height — every lane, clip row included, is 44px tall. */
+	public static final double TIMELINE_ROW_MIN_HEIGHT_PX = 44;
+
+	/** Legacy alias: the clip row is one lane like every other row now. */
+	public static final double TIMELINE_CLIP_ROW_HEIGHT_PX = TIMELINE_ROW_MIN_HEIGHT_PX;
 
 	private TimelineLayout() {
 	}
@@ -17,14 +26,10 @@ public final class TimelineLayout {
 		return Math.max(0, (long) Math.floor(rowCount));
 	}
 
-	/** Port of {@code getTimelineRowsMinHeightPx}. */
+	/** Port of {@code getTimelineRowsMinHeightPx}: lanes stack with no gaps. */
 	public static double getTimelineRowsMinHeightPx(double rowCount) {
 		long count = normalizeRowCount(rowCount);
-		return count == 0
-				? 0
-				: TIMELINE_CLIP_ROW_HEIGHT_PX
-						+ (count == 2 ? 2 : count - 1) * TIMELINE_ROW_MIN_HEIGHT_PX
-						+ count * 2;
+		return count * TIMELINE_ROW_MIN_HEIGHT_PX;
 	}
 
 	/** Port of {@code getTimelineContentMinHeightPx}. */

@@ -68,11 +68,11 @@ public interface EditorPlaybackPort {
 		return Math.clamp(next, RATE_MIN, RATE_MAX);
 	}
 
-	/** {@code 1 -> "1×"}, {@code 1.5 -> "1.5×"}, {@code 1.25 -> "1.25×"} (Locale.ROOT). */
+	/** {@code 1 -> "1.0×"}, {@code 1.5 -> "1.5×"}, {@code 1.25 -> "1.25×"} (Locale.ROOT). */
 	static String formatRate(double rate) {
 		double value = Math.round(rate * 100.0) / 100.0;
 		if (value == Math.rint(value)) {
-			return (long) value + "×";
+			return String.format(Locale.ROOT, "%.1f", value) + "×";
 		}
 		String text = String.format(Locale.ROOT, "%.2f", value);
 		if (text.endsWith("0")) {

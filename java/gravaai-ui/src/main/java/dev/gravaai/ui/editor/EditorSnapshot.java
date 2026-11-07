@@ -47,7 +47,27 @@ public final class EditorSnapshot {
 			  "aspectRatio": "16:9",
 			  "borderRadius": 0,
 			  "padding": {"top": 20, "bottom": 20, "left": 20, "right": 20, "linked": true},
-			  "clipRegions": [{"id": "clip-1", "startMs": 0, "endMs": 6000, "speed": 1}]
+			  "clipRegions": [
+			    {"id": "clip-1", "startMs": 0, "endMs": 14000, "speed": 1},
+			    {"id": "clip-2", "startMs": 14000, "endMs": 30000, "speed": 1, "muted": true},
+			    {"id": "clip-3", "startMs": 30000, "endMs": 42000, "speed": 1}
+			  ],
+			  "zoomRegions": [
+			    {"id": "zoom-1", "startMs": 2000, "endMs": 7000, "depth": 3, "focus": "center", "mode": "smooth"},
+			    {"id": "zoom-2", "startMs": 16000, "endMs": 21000, "depth": 4, "focus": "center", "mode": "instant"}
+			  ],
+			  "gradeRegions": [
+			    {"id": "grade-1", "startMs": 8000, "endMs": 26000, "brightness": 12, "contrast": -8,
+			     "saturation": 15, "temperature": -10, "gamma": 1.1}
+			  ],
+			  "audioRegions": [
+			    {"id": "audio-1", "startMs": 0, "endMs": 42000, "audioPath": "mic", "volume": 0.8}
+			  ],
+			  "autoCaptions": [
+			    {"id": "cap-1", "startMs": 500, "endMs": 4500, "text": "So the inspector docks on the right"},
+			    {"id": "cap-2", "startMs": 6000, "endMs": 11000, "text": "and stays open through the edit"},
+			    {"id": "cap-3", "startMs": 15000, "endMs": 19000, "text": "That is the whole idea."}
+			  ]
 			}
 			""";
 
@@ -88,6 +108,17 @@ public final class EditorSnapshot {
 		EditorShellView view = new EditorShellView(store, new EditorViewActions() { },
 				new IdlePlayback(6));
 		view.header().setProjectName("Untitled Project");
+		// The real timeline over the snapshot store, so the gallery shows the lanes (Instrument).
+		dev.gravaai.ui.editor.timeline.StoreTimelineDataSource dataSource =
+				new dev.gravaai.ui.editor.timeline.StoreTimelineDataSource(store,
+						() -> 42_000L, () -> 14_000.0, null);
+		dev.gravaai.ui.editor.timeline.TimelineView timeline =
+				new dev.gravaai.ui.editor.timeline.TimelineView(dataSource,
+						new dev.gravaai.ui.editor.timeline.StoreTimelineCommands(store,
+								seconds -> { }));
+		dataSource.onChange(timeline::refreshData);
+		timeline.setCurrentTimeMs(14_000);
+		view.setTimelineContent(timeline);
 
 		Scene scene = new Scene(new KitRoot(view), 1440, 1000);
 		Theme.install(scene);

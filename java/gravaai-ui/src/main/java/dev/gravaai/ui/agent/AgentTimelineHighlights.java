@@ -27,7 +27,7 @@ public final class AgentTimelineHighlights extends Pane {
 		double widthForMs(double durationMs);
 	}
 
-	private static final double TRACK_TOP = 24;
+	private static final double TRACK_TOP = dev.gravaai.ui.editor.timeline.core.TimelineLayout.TIMELINE_AXIS_HEIGHT_PX;
 	private static final double CUT_LINE_WIDTH = 3;
 	private static final double BAND_MIN_WIDTH = 3;
 

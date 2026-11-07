@@ -62,8 +62,8 @@ final class ElementSettingsPanel extends VBox {
 		SceneElement element = selected.get();
 		Label name = new Label(element.component());
 		name.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-		Label span = muted(PlaybackControls.formatTime(element.startMs() / 1000.0) + " – "
-				+ PlaybackControls.formatTime(element.endMs() / 1000.0));
+		Label span = muted(PlaybackControls.formatDuration(element.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatDuration(element.endMs() / 1000.0));
 		getChildren().addAll(name, span);
 
 		Optional<ElementComponent> component = BuiltinComponents.resolve(element.component(),

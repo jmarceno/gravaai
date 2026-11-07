@@ -23,14 +23,17 @@ import javafx.scene.shape.Polygon;
  */
 public final class EditorTimelinePanel extends VBox {
 
-	/** Shortest the strip may get: the clip row, the ruler and the scroll bar stay visible. */
+	/** Shortest the strip may get: the toolbar, the ruler and one lane stay visible. */
 	public static final double MIN_HEIGHT = 180;
-	/** Share of the editor height used before the user overrides it with the handle. */
-	private static final double DEFAULT_HEIGHT_RATIO = 0.22;
-	/** Default-height ceiling (the pre-resize cap); dragging the handle lifts it. */
-	private static final double DEFAULT_MAX_HEIGHT = 280;
+	/** Share of the editor height used before the user overrides it with the handle (mock ~23%). */
+	private static final double DEFAULT_HEIGHT_RATIO = 0.23;
+	/**
+	 * Default-height ceiling (the pre-resize cap), raised so the toolbar, ruler and four 44px lanes
+	 * fit without scrolling (Instrument mock).
+	 */
+	private static final double DEFAULT_MAX_HEIGHT = 400;
 	/** Height the preview column keeps (image plus the playback bar) when the strip is dragged up. */
-	private static final double PREVIEW_RESERVE = 240;
+	private static final double PREVIEW_RESERVE = 260;
 	/** Grab strip along the top edge; generous enough to hit without pixel hunting. */
 	private static final double RESIZE_HANDLE_HEIGHT = 8;
 	/** Distance the pointer moves before a press counts as a drag instead of a click. */

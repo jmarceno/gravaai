@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 #
-# Generates the P2.1 golden-frame fixtures (plan §6.2, §7.2 P2.1).
+# Generates the P2.1 compositor fixtures (plan §6.2, §7.2 P2.1).
 #
 #   java/tools/parity/generate-fixtures.sh
 #
 # Writes java/parity/fixtures/projects/*.gravaai, the cursor/keystroke telemetry sidecars and the
-# image-annotation PNG next to the shared media, and java/parity/fixtures/capture-plan.json.
-# The generator uses the production project normaliser/serialiser (gravaai-core), so every fixture
-# loads in both the Electron reference app and the Java app.
+# image-annotation PNG next to the shared media. The generator uses the production project
+# normaliser/serialiser (gravaai-core), so every fixture loads like a saved user project.
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

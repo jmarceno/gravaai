@@ -22,19 +22,18 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Generates the P2.1 golden-frame fixture projects (plan §6.2, §7.2 P2.1).
+ * Generates the P2.1 compositor fixture projects (plan §6.2, §7.2 P2.1).
  *
  * <p>The fixtures are authored as JSON patches on top of the committed real project
  * {@code java/gravaai-core/src/test/resources/project/Untitled Project 1.gravaai}, then normalized by
  * the production {@link ProjectPersistence} normaliser and written through {@link ProjectDocument}, so
- * they load in the Electron reference app and in the Java app exactly like a saved project.
+ * they load exactly like a saved user project.
  *
  * <p>It also writes the cursor and keystroke telemetry sidecars next to the shared media (the sidecar
- * location is {@code <videoPath>.cursor.json} / {@code <videoPath>.keys.json}, the recording layout),
- * a small PNG used by the image annotation, and {@code fixtures/capture-plan.json}, which
- * {@code java/tools/parity/capture-fixtures.sh} uses to capture the reference frames.
+ * location is {@code <videoPath>.cursor.json} / {@code <videoPath>.keys.json}, the recording layout)
+ * and a small PNG used by the image annotation.
  *
- * <p>Media paths are absolute for local capture (lead decision for P2.1); a portable scheme can come
+ * <p>Media paths are absolute for local use (lead decision for P2.1); a portable scheme can come
  * later. Run through {@code java/tools/parity/generate-fixtures.sh}.
  */
 public final class GenerateFixtures {
@@ -42,7 +41,6 @@ public final class GenerateFixtures {
 	private static final String CAPTION_FONT =
 			"\"SF Pro Text\", \"SF Pro Display\", \"Helvetica Neue\", sans-serif";
 	private static final int DURATION_MS = 2000;
-	private static final int CAPTURE_WIDTH = 1280;
 
 	private record PlanEntry(String name, String project, String video, int[] timesSeconds,
 			List<String> features) {}
@@ -223,7 +221,6 @@ public final class GenerateFixtures {
 					cursor(editor, "tahoe", "none", "#2563EB", 1.0, 1.0, 600);
 				});
 
-		writeCapturePlan();
 		System.out.println("GenerateFixtures: " + PLAN.size() + " projects, "
 				+ repo.relativize(projects) + ", " + repo.relativize(media));
 	}
@@ -554,33 +551,6 @@ public final class GenerateFixtures {
 		byte[] bytes = png.toByteArray();
 		Files.write(media.resolve("annotation-image.png"), bytes);
 		return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes);
-	}
-
-	private static void writeCapturePlan() throws IOException {
-		ObjectNode plan = obj();
-		plan.put("width", CAPTURE_WIDTH);
-		plan.put("mediaDirectory", "java/parity/fixtures/media");
-		plan.put("ffmpeg", "java/native/build/ffmpeg/bin/ffmpeg");
-		ArrayNode entries = arr();
-		for (PlanEntry entry : PLAN) {
-			ObjectNode item = obj();
-			item.put("name", entry.name());
-			item.put("project", entry.project());
-			item.put("video", entry.video());
-			ArrayNode times = arr();
-			for (int time : entry.timesSeconds()) {
-				times.add(time / 1000.0);
-			}
-			item.set("timesSeconds", times);
-			ArrayNode features = arr();
-			entry.features().forEach(features::add);
-			item.set("features", features);
-			entries.add(item);
-		}
-		plan.set("projects", entries);
-		Path file = repo.resolve("java/parity/fixtures/capture-plan.json");
-		Json.writeFile(file, plan);
-		System.out.println("wrote " + repo.relativize(file));
 	}
 
 	private static Path requireMedia(String fileName) {

@@ -63,9 +63,8 @@ class AutoMaskServiceRealTest {
 		}
 	}
 
-	/** Runs the real pipeline to completion on a daemon-free executor. */
+	/** Runs the real pipeline to completion and returns its result. */
 	private static Result analyse(Options options) throws Exception {
-		var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 		AutoMaskService service = AutoMaskService.withRealDetectors(glinerModelDir);
 		AtomicReference<Status> last = new AtomicReference<>();
 		service.addListener(last::set);
@@ -92,7 +91,6 @@ class AutoMaskServiceRealTest {
 			throw new AssertionError("analysis did not finish in time: " + service.status());
 		} finally {
 			service.close();
-			executor.shutdownNow();
 		}
 	}
 

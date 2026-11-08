@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import dev.gravaai.media.compose.RgbaFrame;
+import dev.gravaai.media.onnx.OnnxLibs;
 import dev.gravaai.media.onnx.OnnxRuntimeApi;
 
 /**
@@ -73,7 +74,6 @@ public final class OcrEngine implements AutoCloseable {
 	private final MemorySegment recInputBuffer;
 	private final float[] detTensor;
 	private final float[] recTensor;
-	private final int[] recWidths;
 	private boolean closed;
 
 	/**
@@ -87,9 +87,6 @@ public final class OcrEngine implements AutoCloseable {
 	public record TextLine(String text, float confidence, int left, int top, int right, int bottom) {
 
 		public TextLine {
-			if (text == null) {
-				throw new IllegalArgumentException("recognised text must not be null");
-			}
 			if (right <= left || bottom <= top) {
 				throw new IllegalArgumentException("invalid text box: " + left + "," + top + ".."
 						+ right + "," + bottom);
@@ -121,29 +118,51 @@ public final class OcrEngine implements AutoCloseable {
 		}
 		this.api = OnnxRuntimeApi.bind();
 		MemorySegment env = api.createEnv();
-		this.detSession = api.createSession(env, detModel, threads);
-		this.recSession = api.createSession(env, recModel, threads);
-		this.memoryInfo = api.createCpuMemoryInfo();
-		MemorySegment allocator = api.defaultAllocator();
-		this.detInputName = api.sessionInputName(detSession, allocator, 0);
-		this.detOutputName = api.sessionOutputName(detSession, allocator, 0);
-		this.recInputName = api.sessionInputName(recSession, allocator, 0);
-		this.recOutputName = api.sessionOutputName(recSession, allocator, 0);
-		this.characters = readCharacters(recSession, allocator, recModel);
-		// The detector's input is dynamic; 960x960 in one buffer is the largest it runs at here.
-		this.detTensor = new float[3 * DET_LIMIT_SIDE * DET_LIMIT_SIDE];
-		this.detInputBuffer = detInputArena.allocate((long) detTensor.length * Float.BYTES,
-				Float.BYTES);
-		this.recTensor = new float[3 * REC_HEIGHT * REC_WIDTH];
-		this.recInputBuffer = recInputArena.allocate((long) recTensor.length * Float.BYTES,
-				Float.BYTES);
-		this.recWidths = new int[REC_WIDTH];
+		MemorySegment det = api.createSession(env, detModel, threads);
+		MemorySegment rec = api.createSession(env, recModel, threads);
+		MemorySegment info = api.createCpuMemoryInfo();
+		// Native sessions are not GC-reclaimable: a model rejected below (corrupt download, wrong
+		// file) has to release what it already opened, or every retry leaks for the process's life.
+		try {
+			MemorySegment allocator = api.defaultAllocator();
+			String detIn = api.sessionInputName(det, allocator, 0);
+			String detOut = api.sessionOutputName(det, allocator, 0);
+			String recIn = api.sessionInputName(rec, allocator, 0);
+			String recOut = api.sessionOutputName(rec, allocator, 0);
+			// The recognizer's own metadata carries the CTC alphabet; a model without it is not a
+			// PP-OCR recogniser, and finding that out here must not leak the sessions.
+			String[] alphabet = readCharacters(rec, allocator, recModel);
+			float[] detBuffer = new float[3 * DET_LIMIT_SIDE * DET_LIMIT_SIDE];
+			MemorySegment detSegment = detInputArena.allocate((long) detBuffer.length
+					* Float.BYTES, Float.BYTES);
+			float[] recBuffer = new float[3 * REC_HEIGHT * REC_WIDTH];
+			MemorySegment recSegment = recInputArena.allocate((long) recBuffer.length
+					* Float.BYTES, Float.BYTES);
+			this.detSession = det;
+			this.recSession = rec;
+			this.memoryInfo = info;
+			this.detInputName = detIn;
+			this.detOutputName = detOut;
+			this.recInputName = recIn;
+			this.recOutputName = recOut;
+			this.characters = alphabet;
+			this.detTensor = detBuffer;
+			this.detInputBuffer = detSegment;
+			this.recTensor = recBuffer;
+			this.recInputBuffer = recSegment;
+		} catch (RuntimeException invalidModel) {
+			api.releaseMemoryInfo(info);
+			api.releaseSession(rec);
+			api.releaseSession(det);
+			api.close();
+			throw invalidModel;
+		}
 	}
 
 	/** Opens the bundled PP-OCR models ({@link OnnxLibs#resolveOcrDetModelFile()} and friends). */
 	public static OcrEngine openBundled() {
-		return new OcrEngine(dev.gravaai.media.onnx.OnnxLibs.resolveOcrDetModelFile(),
-				dev.gravaai.media.onnx.OnnxLibs.resolveOcrRecModelFile(), 2);
+		return new OcrEngine(OnnxLibs.resolveOcrDetModelFile(),
+				OnnxLibs.resolveOcrRecModelFile(), 2);
 	}
 
 	/**

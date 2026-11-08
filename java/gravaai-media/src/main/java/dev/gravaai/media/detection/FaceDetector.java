@@ -79,37 +79,56 @@ public final class FaceDetector implements AutoCloseable {
 		}
 		this.api = OnnxRuntimeApi.bind();
 		MemorySegment env = api.createEnv();
-		this.session = api.createSession(env, modelFile, 0);
-		this.memoryInfo = api.createCpuMemoryInfo();
-		MemorySegment allocator = api.defaultAllocator();
-		if (api.sessionInputCount(session) != 1) {
-			throw new IllegalArgumentException("YuNet must have exactly one input: " + modelFile);
+		MemorySegment ortsession = api.createSession(env, modelFile, 0);
+		MemorySegment info = api.createCpuMemoryInfo();
+		// ORT sessions and envs are native: the GC cannot reclaim them, so a rejected model (the
+		// common failure with a corrupt or wrong download) must release what it already allocated
+		// before throwing, or every retry leaks a session for the life of the process.
+		try {
+			MemorySegment allocator = api.defaultAllocator();
+			if (api.sessionInputCount(ortsession) != 1) {
+				throw new IllegalArgumentException("YuNet must have exactly one input: "
+						+ modelFile);
+			}
+			if (api.sessionOutputCount(ortsession) != OUTPUT_NAMES.size()) {
+				throw new IllegalArgumentException("YuNet must expose " + OUTPUT_NAMES.size()
+						+ " outputs, found " + api.sessionOutputCount(ortsession) + ": "
+						+ modelFile);
+			}
+			String input = api.sessionInputName(ortsession, allocator, 0);
+			long[] shape = api.sessionInputShape(ortsession, 0);
+			if (shape.length != 4 || shape[1] != 3) {
+				throw new IllegalArgumentException("YuNet input must be NCHW RGB, found "
+						+ java.util.Arrays.toString(shape) + ": " + modelFile);
+			}
+			// The 2023-03 export publishes a fixed 640x640 input; a dynamic export would take the
+			// caller's size. Either way the decoder below works on whatever we run at.
+			int height = shape[2] > 0 && shape[2] <= Integer.MAX_VALUE
+					? (int) shape[2] : inputSize;
+			int width = shape[3] > 0 && shape[3] <= Integer.MAX_VALUE
+					? (int) shape[3] : inputSize;
+			if (width % 32 != 0 || height % 32 != 0) {
+				throw new IllegalArgumentException("YuNet input must be a multiple of 32, found "
+						+ width + "x" + height + ": " + modelFile);
+			}
+			float[] tensor = new float[3 * width * height];
+			MemorySegment segment = inputArena.allocate((long) tensor.length * Float.BYTES,
+					Float.BYTES);
+			this.session = ortsession;
+			this.memoryInfo = info;
+			this.inputName = input;
+			this.inputWidth = width;
+			this.inputHeight = height;
+			this.paddedWidth = width;
+			this.paddedHeight = height;
+			this.inputTensor = tensor;
+			this.inputSegment = segment;
+		} catch (RuntimeException invalidModel) {
+			api.releaseMemoryInfo(info);
+			api.releaseSession(ortsession);
+			api.close();
+			throw invalidModel;
 		}
-		if (api.sessionOutputCount(session) != OUTPUT_NAMES.size()) {
-			throw new IllegalArgumentException("YuNet must expose " + OUTPUT_NAMES.size()
-					+ " outputs, found " + api.sessionOutputCount(session) + ": " + modelFile);
-		}
-		this.inputName = api.sessionInputName(session, allocator, 0);
-		long[] shape = api.sessionInputShape(session, 0);
-		if (shape.length != 4 || shape[1] != 3) {
-			throw new IllegalArgumentException("YuNet input must be NCHW RGB, found "
-					+ java.util.Arrays.toString(shape) + ": " + modelFile);
-		}
-		// The 2023-03 export publishes a fixed 640x640 input; a dynamic export would take the
-		// caller's size. Either way the decoder below works on whatever we run at.
-		this.inputHeight = shape[2] > 0 && shape[2] <= Integer.MAX_VALUE
-				? (int) shape[2] : inputSize;
-		this.inputWidth = shape[3] > 0 && shape[3] <= Integer.MAX_VALUE
-				? (int) shape[3] : inputSize;
-		if (inputWidth % 32 != 0 || inputHeight % 32 != 0) {
-			throw new IllegalArgumentException("YuNet input must be a multiple of 32, found "
-					+ inputWidth + "x" + inputHeight + ": " + modelFile);
-		}
-		this.paddedWidth = inputWidth;
-		this.paddedHeight = inputHeight;
-		this.inputTensor = new float[3 * inputWidth * inputHeight];
-		this.inputSegment = inputArena.allocate((long) inputTensor.length * Float.BYTES,
-				Float.BYTES);
 	}
 
 	/** Opens the bundled YuNet model at {@link #DEFAULT_INPUT_SIZE}. */

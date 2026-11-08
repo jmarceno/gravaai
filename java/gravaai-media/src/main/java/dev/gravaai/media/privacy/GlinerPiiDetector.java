@@ -70,6 +70,12 @@ public final class GlinerPiiDetector implements AutoCloseable {
 	private static final int MAX_SPAN_WIDTH = 12;
 	/** The checkpoint's maximum window in tokens (its {@code max_len} config). */
 	private static final int MAX_WINDOW_TOKENS = 384;
+	/**
+	 * Words shared by consecutive windows. At least {@link #MAX_SPAN_WIDTH}, so any entity the model
+	 * can express still fits entirely inside one window even when it straddles a cut — a smaller
+	 * overlap would split the longest spans in half.
+	 */
+	private static final int WINDOW_OVERLAP_WORDS = MAX_SPAN_WIDTH;
 
 	private final OnnxRuntimeApi api;
 	private final MemorySegment session;
@@ -94,22 +100,34 @@ public final class GlinerPiiDetector implements AutoCloseable {
 		this.tokenizer = GlinerTokenizer.load(modelDir.resolve("tokenizer.json"));
 		this.api = OnnxRuntimeApi.bind();
 		MemorySegment env = api.createEnv();
-		this.session = api.createSession(env, modelFile, threads);
-		this.memoryInfo = api.createCpuMemoryInfo();
-		MemorySegment allocator = api.defaultAllocator();
-		int count = (int) api.sessionInputCount(session);
-		this.inputNames = new String[count];
-		for (int i = 0; i < count; i++) {
-			inputNames[i] = api.sessionInputName(session, allocator, i);
-		}
-		// The six-input, single-logits-output shape is how this export is driven; a different
-		// export needs a matching decoder, so fail loudly rather than guess.
-		if (count != 6) {
-			throw new IllegalArgumentException("expected the GLiNER 6-input export, found " + count
-					+ " inputs: " + modelFile);
-		}
-		if (api.sessionOutputCount(session) < 1) {
-			throw new IllegalArgumentException("GLiNER model has no outputs: " + modelFile);
+		MemorySegment ortsession = api.createSession(env, modelFile, threads);
+		MemorySegment info = api.createCpuMemoryInfo();
+		// A rejected export (wrong input count, no outputs) must release the native session and
+		// env before throwing: the GC cannot reclaim them, so a retry loop would leak each time.
+		try {
+			MemorySegment allocator = api.defaultAllocator();
+			int count = (int) api.sessionInputCount(ortsession);
+			String[] names = new String[count];
+			for (int i = 0; i < count; i++) {
+				names[i] = api.sessionInputName(ortsession, allocator, i);
+			}
+			// The six-input, single-logits-output shape is how this export is driven; a different
+			// export needs a matching decoder, so fail loudly rather than guess.
+			if (count != 6) {
+				throw new IllegalArgumentException("expected the GLiNER 6-input export, found "
+						+ count + " inputs: " + modelFile);
+			}
+			if (api.sessionOutputCount(ortsession) < 1) {
+				throw new IllegalArgumentException("GLiNER model has no outputs: " + modelFile);
+			}
+			this.session = ortsession;
+			this.memoryInfo = info;
+			this.inputNames = names;
+		} catch (RuntimeException invalidModel) {
+			api.releaseMemoryInfo(info);
+			api.releaseSession(ortsession);
+			api.close();
+			throw invalidModel;
 		}
 	}
 
@@ -146,23 +164,78 @@ public final class GlinerPiiDetector implements AutoCloseable {
 	}
 
 	/**
-	 * Detects PII in one text line. Empty text or an already-cancelled caller returns an empty
-	 * list; a text longer than the model window is cut to its first {@link #MAX_WINDOW_TOKENS}
-	 * tokens, which for screen text (a single line) never happens.
+	 * Detects PII in one text line. Empty text returns an empty list.
+	 *
+	 * <p>A line long enough to overflow the model window is split into overlapping word windows
+	 * rather than skipped: silently returning nothing would leave personal data unmasked, which is
+	 * the worst failure mode a privacy feature has. Screen text is normally one short line, so the
+	 * chunking path is the safety net, not the common case.</p>
 	 */
 	public List<Span> detect(String text) {
 		if (closed) {
 			throw new IllegalStateException("GLiNER detector is closed");
 		}
-		if (text == null || text.isBlank()) {
+		if (text.isBlank()) {
 			return List.of();
 		}
-		GlinerTokenizer.Encoding encoding = tokenizer.encode(text, PII_LABELS);
-		if (encoding.length() > MAX_WINDOW_TOKENS) {
-			return List.of();
+		List<String> words = GlinerTokenizer.splitWords(GlinerTokenizer.normalize(text));
+		int first = firstWindowWords(words);
+		if (first >= words.size()) {
+			return detectWindow(words);
 		}
-		int words = encoding.textWordCount();
-		if (words == 0) {
+		if (first == 0) {
+			// Not even one word fits: a single token that alone exceeds the window. Skipping is
+			// wrong (it could be the PII) and so is guessing a cut, so report it loudly — this
+			// means the model window and the configured token limit disagree.
+			throw new IllegalStateException("GLiNER window is too small for a single word of "
+					+ words.size() + " words; MAX_WINDOW_TOKENS=" + MAX_WINDOW_TOKENS);
+		}
+		// A window carries the model's own word budget, so split on word boundaries with a small
+		// overlap: an entity straddling a cut is still whole inside one of the windows.
+		List<Span> found = new ArrayList<>();
+		int stride = Math.max(1, first - WINDOW_OVERLAP_WORDS);
+		for (int start = 0; start < words.size(); start += stride) {
+			int end = Math.min(words.size(), start + first);
+			List<Span> window = detectWindow(words.subList(start, end));
+			for (Span span : window) {
+				found.add(new Span(span.label(), span.startWord() + start,
+						span.endWord() + start, span.score()));
+			}
+			if (end == words.size()) {
+				break;
+			}
+		}
+		return dedupe(found);
+	}
+
+	/**
+	 * How many leading words fit the model window, or {@code words.size()} when all of them do.
+	 * The prompt length is constant per label set, so this is measured once over growing prefixes.
+	 */
+	private int firstWindowWords(List<String> words) {
+		int low = 0;
+		int high = words.size();
+		// Binary search on the token count: encoding is monotonic in the word count.
+		while (low < high) {
+			int mid = (low + high + 1) >>> 1;
+			if (tokenCount(words.subList(0, mid)) <= MAX_WINDOW_TOKENS) {
+				low = mid;
+			} else {
+				high = mid - 1;
+			}
+		}
+		return low;
+	}
+
+	private int tokenCount(List<String> words) {
+		return tokenizer.encodeWords(words, PII_LABELS).length();
+	}
+
+	/** Runs one window that is known to fit, with span indices relative to the window. */
+	private List<Span> detectWindow(List<String> words) {
+		GlinerTokenizer.Encoding encoding = tokenizer.encodeWords(words, PII_LABELS);
+		int wordCount = encoding.textWordCount();
+		if (wordCount == 0) {
 			return List.of();
 		}
 		long[] ids = toLongs(encoding.ids());
@@ -171,15 +244,15 @@ public final class GlinerPiiDetector implements AutoCloseable {
 		java.util.Arrays.fill(attention, 1);
 
 		int len = ids.length;
-		int numSpans = words * MAX_SPAN_WIDTH;
+		int numSpans = wordCount * MAX_SPAN_WIDTH;
 		long[] spanIdx = new long[numSpans * 2];
 		byte[] spanMask = new byte[numSpans];
-		for (int start = 0; start < words; start++) {
+		for (int start = 0; start < wordCount; start++) {
 			for (int width = 0; width < MAX_SPAN_WIDTH; width++) {
 				int span = start * MAX_SPAN_WIDTH + width;
 				spanIdx[span * 2] = start;
 				spanIdx[span * 2 + 1] = start + width;
-				spanMask[span] = (byte) (start + width < words ? 1 : 0);
+				spanMask[span] = (byte) (start + width < wordCount ? 1 : 0);
 			}
 		}
 
@@ -193,7 +266,7 @@ public final class GlinerPiiDetector implements AutoCloseable {
 						new OnnxRuntimeApi.NamedLong(named(2, "words_mask"),
 								new long[] {1, len}, wordIds),
 						new OnnxRuntimeApi.NamedLong(named(3, "text_lengths"),
-								new long[] {1, 1}, new long[] {words}),
+								new long[] {1, 1}, new long[] {wordCount}),
 						new OnnxRuntimeApi.NamedLong(named(4, "span_idx"),
 								new long[] {1, numSpans, 2}, spanIdx)),
 				List.of(new OnnxRuntimeApi.NamedBool(named(5, "span_mask"),
@@ -202,7 +275,7 @@ public final class GlinerPiiDetector implements AutoCloseable {
 		try {
 			long[] shape = api.valueShape(outputs[0]);
 			// [1, words, max_width, labels]
-			if (shape.length != 4 || shape[1] != words || shape[2] != MAX_SPAN_WIDTH) {
+			if (shape.length != 4 || shape[1] != wordCount || shape[2] != MAX_SPAN_WIDTH) {
 				throw new IllegalStateException("unexpected GLiNER logits shape: "
 						+ java.util.Arrays.toString(shape));
 			}
@@ -213,7 +286,7 @@ public final class GlinerPiiDetector implements AutoCloseable {
 			}
 			float[] logits = api.getTensorFloats(outputs[0],
 					shape[0] * shape[1] * shape[2] * shape[3]);
-			return decode(logits, words, labelCount);
+			return decode(logits, wordCount, labelCount);
 		} finally {
 			for (MemorySegment output : outputs) {
 				api.releaseValue(output);
@@ -266,6 +339,15 @@ public final class GlinerPiiDetector implements AutoCloseable {
 				}
 			}
 		}
+		return dedupe(found);
+	}
+
+	/**
+	 * Drops a span contained in a higher-scoring span of the same label, then sorts by position.
+	 * Shared by a single window and by the chunked path, whose overlapping windows can otherwise
+	 * report the same entity twice.
+	 */
+	private static List<Span> dedupe(List<Span> found) {
 		found.sort(Comparator.comparingDouble(Span::score).reversed());
 		List<Span> kept = new ArrayList<>();
 		for (Span candidate : found) {

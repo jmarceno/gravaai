@@ -1,7 +1,5 @@
 package dev.gravaai.services.privacy;
 
-import org.jspecify.annotations.Nullable;
-
 import java.nio.file.Path;
 
 /**
@@ -81,25 +79,25 @@ public final class PrivacyAssets {
 	public static final String GLINER_CONFIG_SHA256 =
 			"69e141f7fe1864e0d81ab0e542c68387d588db62393bcd93b471d54dcf0f5c16";
 
-	/** Whether every file is present; the detector is only opened when this is true. */
+	/**
+	 * Whether every file is present at its pinned size. Size is checked, not just existence, so a
+	 * download truncated by a crash or a full disk reads as missing and triggers a re-fetch instead
+	 * of being handed to the detector. The full hash stays the installer's job: hashing 580 MB on
+	 * every run would cost more than the detection it guards.
+	 */
 	public boolean isInstalled() {
 		Path dir = glinerModelDir();
 		for (AssetFile file : files()) {
-			if (!java.nio.file.Files.isRegularFile(file.path(dir))) {
+			Path path = file.path(dir);
+			try {
+				if (!java.nio.file.Files.isRegularFile(path)
+						|| java.nio.file.Files.size(path) != file.sizeBytes()) {
+					return false;
+				}
+			} catch (java.io.IOException unreadable) {
 				return false;
 			}
 		}
 		return true;
-	}
-
-	/** The first file that is missing, or {@code null} when the asset is complete. */
-	public @Nullable AssetFile missingFile() {
-		Path dir = glinerModelDir();
-		for (AssetFile file : files()) {
-			if (!java.nio.file.Files.isRegularFile(file.path(dir))) {
-				return file;
-			}
-		}
-		return null;
 	}
 }

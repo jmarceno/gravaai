@@ -50,12 +50,21 @@ class AutoMaskControllerTest {
 		throw new AssertionError("no download expected");
 	};
 
-	/** An installer whose assets are already "installed" (empty files exist on disk). */
+	/**
+	 * An installer whose assets are already "installed": files exist at their pinned sizes (sparse,
+	 * so the 580 MB entry costs no disk and no time). {@code isInstalled()} checks size, which is
+	 * what makes a truncated download re-fetch instead of being handed to the detector.
+	 */
 	private static PrivacyAssetInstaller installedInstaller(PrivacyAssets assets) throws Exception {
 		Path dir = assets.glinerModelDir();
 		Files.createDirectories(dir);
 		for (PrivacyAssets.AssetFile file : assets.files()) {
-			Files.writeString(file.path(dir), "");
+			try (var channel = Files.newByteChannel(file.path(dir),
+					java.nio.file.StandardOpenOption.CREATE,
+					java.nio.file.StandardOpenOption.WRITE)) {
+				channel.position(file.sizeBytes() - 1);
+				channel.write(java.nio.ByteBuffer.wrap(new byte[] {0}));
+			}
 		}
 		return new PrivacyAssetInstaller(NO_DOWNLOAD, assets);
 	}
@@ -121,10 +130,11 @@ class AutoMaskControllerTest {
 				runDetect(controller);
 			}
 			List<AnnotationRegion> annotations = store.state().annotationRegions();
-			// The write needs the FX thread, which this test does not start; the assertion is
-			// conditional so the test still guards the controller contract when it does run.
-			Assumptions.assumeTrue(annotations.size() > before,
-					"the write path needs the JavaFX thread (Platform.runLater)");
+			// runOnFx falls back to running inline when there is no toolkit, so this write lands
+			// here too. Assert it unconditionally: skipping would let a regression that stops
+			// writing entirely pass the suite.
+			assertTrue(annotations.size() > before,
+					"the run must write annotations: " + annotations.size() + " <= " + before);
 			List<AnnotationRegion> generated = annotations.stream()
 					.filter(a -> a.type() == AnnotationType.BLUR).toList();
 			assertEquals(2, generated.size(), "both regions must be written as blurs");
@@ -148,11 +158,14 @@ class AutoMaskControllerTest {
 		Path project = copyFixture(directory);
 		try (EditorSession session = EditorSession.open(project)) {
 			EditorStore store = session.store();
+			int before = store.state().annotationRegions().size();
 			try (AutoMaskController controller = controller(session, directory, recording(),
 					List.of(region(DetectedRegion.Source.FACE, 9_900, 20_000, 100, 100)))) {
 				runDetect(controller);
 			}
-			for (AnnotationRegion annotation : store.state().annotationRegions()) {
+			List<AnnotationRegion> annotations = store.state().annotationRegions();
+			assertTrue(annotations.size() > before, "the out-of-range region must still be written");
+			for (AnnotationRegion annotation : annotations) {
 				assertTrue(annotation.endMs() >= annotation.startMs(), "span must be ordered: "
 						+ annotation);
 			}

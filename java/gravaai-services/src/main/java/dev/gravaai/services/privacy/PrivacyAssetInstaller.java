@@ -1,7 +1,5 @@
 package dev.gravaai.services.privacy;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -90,11 +88,23 @@ public final class PrivacyAssetInstaller {
 			Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING,
 					StandardCopyOption.ATOMIC_MOVE);
 		} catch (IOException error) {
+			// A dropped connection mid-download must not leave a partial behind: the next attempt
+			// would have to re-fetch it anyway, and the class contract says nothing is left over.
+			deleteQuietly(partial);
 			throw new UncheckedIOException("could not download " + file.fileName(), error);
 		} catch (InterruptedException interrupted) {
+			deleteQuietly(partial);
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException("download of " + file.fileName() + " was interrupted",
 					interrupted);
+		}
+	}
+
+	private static void deleteQuietly(Path path) {
+		try {
+			Files.deleteIfExists(path);
+		} catch (IOException ignored) {
+			// The download failed already; a stuck temp file is not worth masking that failure.
 		}
 	}
 
@@ -126,7 +136,7 @@ public final class PrivacyAssetInstaller {
 	}
 
 	/** Diagnostic: the model directory, for error messages and the download row. */
-	public @Nullable Path modelDir() {
+	public Path modelDir() {
 		return assets.glinerModelDir();
 	}
 }

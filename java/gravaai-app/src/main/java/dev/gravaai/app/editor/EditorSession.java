@@ -666,7 +666,7 @@ public final class EditorSession implements AutoCloseable {
 	timelineSeek.set(seek);
 }
 
-	/** The project media path (null for a project without a video). */
+	/** The project media path. Never null; the file itself may be missing from disk. */
 	public String videoPath() {
 	return document.videoPath();
 }

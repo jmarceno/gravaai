@@ -41,6 +41,8 @@ import dev.gravaai.services.meeting.CancelSignal;
  */
 public final class AutoMaskService implements AutoCloseable {
 
+	private static final System.Logger LOG = System.getLogger(AutoMaskService.class.getName());
+
 	/** Samples per second taken from the recording. */
 	public static final int SAMPLES_PER_SECOND = 1;
 
@@ -54,17 +56,21 @@ public final class AutoMaskService implements AutoCloseable {
 		CANCELLED
 	}
 
-	/** One immutable status snapshot pushed to listeners. */
+	/**
+	 * One immutable status snapshot pushed to listeners. {@code regions} is never null (empty when
+	 * there is nothing to report yet); {@code result} and {@code error} are the terminal payloads
+	 * of {@code DONE} and {@code ERROR} respectively.
+	 */
 	public record Status(
 			State state,
 			int progress,
 			String message,
-			@Nullable List<RegionTracker.TimedRegion> regions,
+			List<RegionTracker.TimedRegion> regions,
 			@Nullable Result result,
 			@Nullable String error) {
 
 		public Status {
-			regions = regions == null ? List.of() : List.copyOf(regions);
+			regions = List.copyOf(regions);
 		}
 
 		public boolean running() {
@@ -156,6 +162,21 @@ public final class AutoMaskService implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Reports first-use model download progress (0-100) so the inspector can show it. The download
+	 * runs before the analysis pass, so this deliberately does not flip the state out of IDLE: it
+	 * only replaces the message and percentage of the current snapshot.
+	 */
+	public void reportDownloadProgress(int percent) {
+		Status current = status;
+		if (current.running()) {
+			return;
+		}
+		publish(new Status(State.IDLE, Math.clamp(percent, 0, 100),
+				percent >= 100 ? "Model installed." : "Downloading the detection model…",
+				List.of(), null, null));
+	}
+
 	private void runAnalysis(Options options, CancelSignal.Flag flag) {
 		publish(new Status(State.EXTRACTING, 0, "Sampling frames…", List.of(), null, null));
 		try {
@@ -175,11 +196,22 @@ public final class AutoMaskService implements AutoCloseable {
 		} catch (CancelSignal.CancelledException cancelled) {
 			publish(new Status(State.CANCELLED, 0, "Cancelled.", List.of(), null, null));
 		} catch (RuntimeException error) {
-			String message = error.getMessage() == null || error.getMessage().isBlank()
-					? "Failed to detect masks automatically"
-					: error.getMessage();
-			publish(new Status(State.ERROR, 0, message, List.of(), null, message));
+			publish(failure(error));
+		} catch (Error fatal) {
+			// An Error (OOM while copying a tensor, for instance) would otherwise kill the worker
+			// with the status still saying EXTRACTING, leaving the inspector's bar spinning on a
+			// run that no longer exists. Report it, then let it propagate as Errors must.
+			publish(failure(fatal));
+			throw fatal;
 		}
+	}
+
+	/** The ERROR status for a failed run, with its message or a generic fallback. */
+	private static Status failure(Throwable error) {
+		String message = error.getMessage() == null || error.getMessage().isBlank()
+				? "Failed to detect masks automatically"
+				: error.getMessage();
+		return new Status(State.ERROR, 0, message, List.of(), null, message);
 	}
 
 	private static String messageFor(State state) {
@@ -211,10 +243,20 @@ public final class AutoMaskService implements AutoCloseable {
 		return "Masked " + String.join(" and ", parts) + ".";
 	}
 
+	/**
+	 * Publishes a snapshot to every listener. A listener that throws must not take the run down or
+	 * be mistaken for an analysis failure: the UI rebuilds JavaFX nodes from here, and a bad rebuild
+	 * is a UI bug, not a reason to abort masking and report a bogus error to the user.
+	 */
 	private void publish(Status next) {
 		status = next;
 		for (Consumer<Status> listener : listeners) {
-			listener.accept(next);
+			try {
+				listener.accept(next);
+			} catch (RuntimeException brokenListener) {
+				LOG.log(System.Logger.Level.WARNING,
+						"auto mask listener failed: " + brokenListener);
+			}
 		}
 	}
 

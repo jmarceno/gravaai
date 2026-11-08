@@ -16,10 +16,10 @@ import dev.gravaai.media.privacy.GlinerTokenizer;
  * which is what the OCR-to-box mapping needs.</p>
  *
  * <p>Character offsets are recovered from the tokenizer's own word split: the detector reports
- * {@code [startWord, endWord)} and {@link GlinerTokenizer#splitWords} of the normalised text gives
- * each word's place. Because normalisation can change character counts, the offsets are into the
- * normalised text — the caller masks the whole OCR box anyway, so a handful of characters of
- * drift cannot leak anything.</p>
+ * {@code [startWord, endWord)} and {@link GlinerTokenizer#splitWordsWithOffsets} of the normalised
+ * text gives each word's real character range, separators included. Because normalisation can
+ * change character counts, the offsets are into the normalised text — the caller masks the whole
+ * OCR box anyway, so a handful of characters of drift cannot leak anything.</p>
  */
 public final class GlinerPiiAdapter implements PiiDetector {
 
@@ -50,23 +50,17 @@ public final class GlinerPiiAdapter implements PiiDetector {
 			return List.of();
 		}
 		String normalised = GlinerTokenizer.normalize(text);
-		List<String> words = GlinerTokenizer.splitWords(normalised);
-		// Word start offsets in the normalised text, computed once per line.
-		int[] starts = new int[words.size() + 1];
-		int cursor = 0;
-		for (int i = 0; i < words.size(); i++) {
-			starts[i] = cursor;
-			cursor += words.get(i).length();
-		}
-		starts[words.size()] = cursor;
+		List<GlinerTokenizer.WordSpan> words = GlinerTokenizer.splitWordsWithOffsets(normalised);
 		List<PiiSpan> out = new ArrayList<>(spans.size());
 		for (GlinerPiiDetector.Span span : spans) {
 			int endWord = Math.min(span.endWord(), words.size());
 			if (span.startWord() >= endWord) {
 				continue;
 			}
-			int start = starts[span.startWord()];
-			int end = starts[endWord];
+			// Offsets come from the matcher, not from accumulated word lengths: the separators
+			// between words are part of the text and would otherwise shift every later span.
+			int start = words.get(span.startWord()).start();
+			int end = words.get(endWord - 1).end();
 			if (end > start) {
 				out.add(new PiiSpan(span.label(), start, end, span.score()));
 			}

@@ -177,6 +177,15 @@ public final class GlinerTokenizer {
 	 * text (the first text word is 0); prompt words are {@code -1}.
 	 */
 	public Encoding encode(String text, List<String> entityTypes) {
+		return encodeWords(splitWords(normalize(text)), entityTypes);
+	}
+
+	/**
+	 * The same encoding over an explicit word list, so a caller chunking a long text into windows
+	 * can encode each window without re-splitting it. The word indices are relative to
+	 * {@code words}, so the caller adds the window's base offset back.
+	 */
+	public Encoding encodeWords(List<String> words, List<String> entityTypes) {
 		// The reference feeds the prompt as a pretokenized word sequence, so a multi-word label
 		// ("phone number") arrives as separate words. Normalize and split a label like text.
 		List<String> prompt = new ArrayList<>(entityTypes.size() * 2 + 1);
@@ -186,7 +195,6 @@ public final class GlinerTokenizer {
 		}
 		prompt.add(SEP_TOKEN);
 
-		List<String> words = splitWords(normalize(text));
 		List<Integer> ids = new ArrayList<>(prompt.size() + words.size() * 2 + 2);
 		List<Integer> wordIndices = new ArrayList<>();
 		ids.add(CLS_ID);
@@ -232,6 +240,33 @@ public final class GlinerTokenizer {
 		Matcher matcher = WORD.matcher(text);
 		while (matcher.find()) {
 			words.add(matcher.group());
+		}
+		return words;
+	}
+
+	/** One word with its half-open character range in the text it was split from. */
+	public record WordSpan(String word, int start, int end) {
+		public WordSpan {
+			if (start < 0 || end <= start) {
+				throw new IllegalArgumentException("invalid word range: " + start + ".." + end);
+			}
+		}
+
+		public int length() {
+			return end - start;
+		}
+	}
+
+	/**
+	 * The same segmentation as {@link #splitWords}, but carrying each word's character offsets in
+	 * {@code text}. Callers that map a detected span back onto the source need these: the words
+	 * alone lose the separators between them, so an offset accumulated from word lengths drifts.
+	 */
+	public static List<WordSpan> splitWordsWithOffsets(String text) {
+		List<WordSpan> words = new ArrayList<>();
+		Matcher matcher = WORD.matcher(text);
+		while (matcher.find()) {
+			words.add(new WordSpan(matcher.group(), matcher.start(), matcher.end()));
 		}
 		return words;
 	}

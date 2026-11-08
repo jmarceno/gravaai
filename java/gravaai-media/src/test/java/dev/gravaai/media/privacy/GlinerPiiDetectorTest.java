@@ -67,7 +67,27 @@ class GlinerPiiDetectorTest {
 
 	@Test
 	@Timeout(300)
-	@DisplayName("detects a name, an email and a phone number in one line of screen text")
+	@DisplayName("a text far longer than the model window is chunked, not silently skipped")
+	void longTextIsChunked() {
+		// The old behaviour returned an empty list for any text over 384 tokens, which would leave
+		// personal data unmasked without a word of warning. A long paragraph with the PII at the end
+		// only passes if the tail is actually analysed.
+		String filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(30);
+		String line = filler + "Contact John Smith at john.smith@example.com";
+		assertTrue(GlinerTokenizer.splitWords(line).size() > 200,
+				"the fixture must be long enough to exercise the chunking path");
+		try (GlinerPiiDetector detector = GlinerPiiDetector.open(modelDir)) {
+			List<GlinerPiiDetector.Span> spans = detector.detect(line);
+			assertFalse(spans.isEmpty(), "a long line must still be analysed, not skipped");
+			assertTrue(spans.stream().anyMatch(span -> span.label().equals("email")
+							|| span.label().equals("person") || span.label().equals("name")),
+					"the PII at the end of a long line must be found: " + spans);
+		}
+	}
+
+	@Test
+	@Timeout(300)
+	@DisplayName("a name, an email and a phone number in one line of screen text")
 	void detectsClassicPii() {
 		String line = "Contact John Smith at john.smith@example.com or +1 555 123 4567.";
 		try (GlinerPiiDetector detector = GlinerPiiDetector.open(modelDir)) {

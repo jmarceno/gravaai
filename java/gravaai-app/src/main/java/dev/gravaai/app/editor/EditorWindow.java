@@ -433,10 +433,10 @@ public final class EditorWindow {
 				timelineSubscription.close();
 			}
 			if (autoMask != null) {
-			autoMask.close();
-			autoMask = null;
-		}
-		if (captions != null) {
+				autoMask.close();
+				autoMask = null;
+			}
+			if (captions != null) {
 				captions.close();
 			}
 			if (webcamSegmenter != null) {

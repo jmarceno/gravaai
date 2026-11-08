@@ -28,7 +28,11 @@ public final class RegionTracker {
 
 	/** IoU at which a detection continues an existing track rather than starting a new one. */
 	public static final double MATCH_IOU = 0.4;
-	/** Samples a track may go unseen and still continue (1 fps sampling, so ~2 s). */
+	/**
+	 * Samples a track may go unseen and still continue (1 fps sampling, so ~2 s). The index delta
+	 * between the last sighting and the current sample is one more than the number of missed
+	 * samples, which is why the comparison below adds one.
+	 */
 	public static final int MAX_GAP_SAMPLES = 2;
 	/** Hard cap on regions per recording, so a busy screen cannot flood the timeline. */
 	public static final int MAX_REGIONS = 60;
@@ -131,7 +135,7 @@ public final class RegionTracker {
 				double bestIou = MATCH_IOU;
 				for (Track track : tracks) {
 					if (track.source != region.source()
-							|| sampleIndex - track.lastSampleIndex > MAX_GAP_SAMPLES) {
+							|| sampleIndex - track.lastSampleIndex > MAX_GAP_SAMPLES + 1) {
 						continue;
 					}
 					double iou = track.bounds.iou(region);

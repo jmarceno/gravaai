@@ -78,6 +78,35 @@ class RegionTrackerTest {
 	}
 
 	@Test
+	@DisplayName("a two-sample dropout is bridged, matching the documented gap")
+	void twoSampleGapIsBridged() {
+		// MAX_GAP_SAMPLES counts missed samples, not the index delta, so two blanks (delta 3) must
+		// still continue the track. This is the boundary the docs describe and the code must meet.
+		List<RegionTracker.Sample> samples = List.of(
+				new RegionTracker.Sample(0, List.of(face(800, 300, 120, 140))),
+				new RegionTracker.Sample(1000, List.of()),
+				new RegionTracker.Sample(2000, List.of()),
+				new RegionTracker.Sample(3000, List.of(face(802, 302, 120, 140))));
+		List<RegionTracker.TimedRegion> regions = tracker().track(samples, 4_000);
+		assertEquals(1, regions.size(), "two missed samples are within the documented gap");
+		assertEquals(0, regions.getFirst().startMs());
+		assertEquals(3_600, regions.getFirst().endMs());
+	}
+
+	@Test
+	@DisplayName("a three-sample dropout starts a new region")
+	void threeSampleGapSplits() {
+		List<RegionTracker.Sample> samples = List.of(
+				new RegionTracker.Sample(0, List.of(face(800, 300, 120, 140))),
+				new RegionTracker.Sample(1000, List.of()),
+				new RegionTracker.Sample(2000, List.of()),
+				new RegionTracker.Sample(3000, List.of()),
+				new RegionTracker.Sample(4000, List.of(face(800, 300, 120, 140))));
+		assertEquals(2, tracker().track(samples, 5_000).size(),
+				"three missed samples exceed the documented gap");
+	}
+
+	@Test
 	@DisplayName("a long absence starts a new region")
 	void longGapSplits() {
 		List<RegionTracker.Sample> samples = List.of(

@@ -6,9 +6,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.privacy.DetectedRegion;
 import dev.gravaai.core.privacy.RegionTracker;
@@ -17,6 +19,7 @@ import dev.gravaai.core.project.AnnotationRegion;
 import dev.gravaai.core.project.AnnotationSize;
 import dev.gravaai.core.project.AnnotationTextStyle;
 import dev.gravaai.core.project.AnnotationType;
+import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.services.privacy.AutoMaskService;
 import dev.gravaai.services.privacy.PrivacyAssetInstaller;
 import dev.gravaai.services.privacy.PrivacyAssets;
@@ -25,6 +28,7 @@ import dev.gravaai.ui.editor.EditorMutations;
 import dev.gravaai.ui.kit.Toast;
 import javafx.application.Platform;
 import javafx.scene.Node;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -58,6 +62,8 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 	private volatile State state;
 	private volatile AutoMaskService.@Nullable Status appliedStatus;
 	private volatile boolean detecting;
+	/** Set while a first-use download is in flight, so Cancel can stop it before the run exists. */
+	private volatile @Nullable AtomicBoolean cancelDownload;
 	/** Source-frame size of the sampled recording, from the last completed run. */
 	private volatile int frameWidthPx = 1920;
 	private volatile int frameHeightPx = 1080;
@@ -94,8 +100,7 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 		if (current.state() != AutoMaskService.State.DONE) {
 			return 0;
 		}
-		List<RegionTracker.TimedRegion> regions = current.regions();
-		return regions == null ? 0 : regions.size();
+		return current.regions().size();
 	}
 
 	@Override
@@ -127,7 +132,7 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 	@Override
 	public void detect(boolean includeFaces, boolean includeText) {
 		String video = videoPath.get();
-		if (video == null || video.isBlank()) {
+		if (video.isBlank()) {
 			toast("Open a recording before detecting masks", Toast.Variant.DANGER);
 			return;
 		}
@@ -138,14 +143,29 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 		}
 		detecting = true;
 		publishState();
+		// Cancelling while the model is still downloading has to take effect before the run even
+		// exists, so the flag is raised here and checked between download progress ticks and again
+		// before start(). Without it Cancel would be a no-op for the whole multi-minute fetch.
+		AtomicBoolean cancelled = new AtomicBoolean();
+		cancelDownload = cancelled;
 		// The download is slow (hundreds of MB) and the detector needs the files, so it runs off
 		// the FX thread; start() itself only queues work on the service's daemon.
-		Thread.ofVirtual().name("gravaai-automask-download").start(() -> {
+		Threads.startVirtual("gravaai-automask-download", () -> {
 			try {
+				// isInstalled() checks each file's pinned size, so a truncated download heals by
+				// re-fetching instead of failing every run against a half-written model.
 				if (includeText && !installer.isInstalled()) {
 					installer.ensure(percent -> {
-						// The inspector's bar reads the service's status; nothing to toast here.
+						if (cancelled.get()) {
+							throw new IllegalStateException("Auto-mask model download cancelled");
+						}
+						publishDownloadProgress(percent);
 					});
+				}
+				if (cancelled.get()) {
+					detecting = false;
+					publishState();
+					return;
 				}
 				AutoMaskService.Options options = new AutoMaskService.Options(Path.of(video),
 						durationMs, includeFaces, includeText);
@@ -157,27 +177,34 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 				publishState();
 			} catch (RuntimeException error) {
 				detecting = false;
-				toast(error.getMessage() == null ? "Could not download the auto-mask model"
-						: error.getMessage(), Toast.Variant.DANGER);
+				// A cancel is not a failure: the user asked for it, so no error toast.
+				if (!cancelled.get()) {
+					toast(error.getMessage() == null ? "Could not download the auto-mask model"
+							: error.getMessage(), Toast.Variant.DANGER);
+				}
 				publishState();
 			}
 		});
 	}
 
-	/** Cancels the in-flight run, if any. */
+	/** Cancels the in-flight run, or the model download that precedes it. */
 	@Override
 	public void cancel() {
+		AtomicBoolean download = cancelDownload;
+		if (download != null) {
+			download.set(true);
+		}
+		detecting = false;
 		service.cancel();
+		publishState();
 	}
 
 	/** Downloads the model without starting a detection run (the inspector's Download button). */
 	@Override
 	public void downloadModel() {
-		Thread.ofVirtual().name("gravaai-automask-download").start(() -> {
+		Threads.startVirtual("gravaai-automask-download", () -> {
 			try {
-				installer.ensure(percent -> {
-					// Progress is reflected by the controller's state on the next rebuild.
-				});
+				installer.ensure(this::publishDownloadProgress);
 				Platform.runLater(() -> {
 					toast("Auto-mask model installed", Toast.Variant.SUCCESS);
 					publishState();
@@ -187,6 +214,14 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 						: error.getMessage(), Toast.Variant.DANGER);
 			}
 		});
+	}
+
+	/**
+	 * Surfaces download progress through the same status the inspector renders, so a 580 MB fetch
+	 * is visible instead of showing a 0 % bar for minutes.
+	 */
+	private void publishDownloadProgress(int percent) {
+		service.reportDownloadProgress(percent);
 	}
 
 	/** Removes every region a previous run generated, leaving hand-made blur annotations. */
@@ -270,7 +305,7 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 				AnnotationRegion annotation = toAnnotation(timed, next, zIndex++, frameDuration);
 				next.add(annotation);
 			}
-			ArrayNode written = dev.gravaai.core.project.ProjectDocument.writeAnnotationRegions(next);
+			ArrayNode written = ProjectDocument.writeAnnotationRegions(next);
 			// Re-write the provenance flag: the record carries no field for it, so it rides on
 			// the JSON node the writer produced.
 			for (int i = 0; i < written.size(); i++) {
@@ -284,7 +319,7 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 	}
 
 	/** Whether the stored annotation with {@code id} was produced by a previous auto-mask run. */
-	private static boolean isAutoMask(tools.jackson.databind.JsonNode json, String id) {
+	private static boolean isAutoMask(JsonNode json, String id) {
 		if (!(json.get("annotationRegions") instanceof ArrayNode array)) {
 			return false;
 		}
@@ -357,14 +392,20 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 		runOnFx(notify);
 	}
 
-	/** Runs {@code action} on the FX thread, or inline when there is no toolkit (tests, tools). */
+	/**
+	 * Runs {@code action} on the FX thread, or inline when there is no toolkit (tests, tools).
+	 *
+	 * <p>Only the {@code runLater} call is inside the {@code catch}: if the action itself throws an
+	 * {@link IllegalStateException}, that is a real failure, and catching it here would run the
+	 * action a second time on the caller's thread.</p>
+	 */
 	private static void runOnFx(Runnable action) {
+		if (Platform.isFxApplicationThread()) {
+			action.run();
+			return;
+		}
 		try {
-			if (Platform.isFxApplicationThread()) {
-				action.run();
-			} else {
-				Platform.runLater(action);
-			}
+			Platform.runLater(action);
 		} catch (IllegalStateException noToolkit) {
 			action.run();
 		}

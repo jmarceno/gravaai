@@ -48,6 +48,11 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	/** ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL (one byte per element). */
 	public static final int ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL = 9;
 
+	/** Cap on a metadata value's scanned length (the OCR alphabet is a few kilobytes). */
+	private static final int MAX_METADATA_BYTES = 1 << 20;
+	/** Cap on a model I/O name; ORT names are short identifiers. */
+	private static final int MAX_IO_NAME_BYTES = 4096;
+
 	private final MemorySegment api;
 	/** The OrtEnv backing every session; released in {@link #close()}. */
 	private @Nullable MemorySegment env;
@@ -333,7 +338,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	public record Input(String name, int elementType, long[] shape, MemorySegment data) {
 
 		public Input {
-			if (name == null || name.isBlank()) {
+			if (name.isBlank()) {
 				throw new IllegalArgumentException("tensor name must not be blank");
 			}
 			shape = shape.clone();
@@ -406,14 +411,25 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 				}
 			}
 			MemorySegment[] result = new MemorySegment[outputNames.size()];
-			for (int i = 0; i < result.length; i++) {
-				MemorySegment value = outputs.getAtIndex(ValueLayout.ADDRESS, i);
-				if (value.address() == 0) {
-					throw new IllegalStateException(
-							"ONNX Runtime Run produced a null output value for "
-									+ outputNames.get(i));
+			try {
+				for (int i = 0; i < result.length; i++) {
+					MemorySegment value = outputs.getAtIndex(ValueLayout.ADDRESS, i);
+					if (value.address() == 0) {
+						throw new IllegalStateException(
+								"ONNX Runtime Run produced a null output value for "
+										+ outputNames.get(i));
+					}
+					result[i] = value;
 				}
-				result[i] = value;
+			} catch (RuntimeException invalidOutput) {
+				// The values already collected are owned by the caller and would otherwise leak:
+				// release them before failing, since the caller never sees the array.
+				for (MemorySegment value : result) {
+					if (value != null) {
+						OrtApi.ReleaseValue.invoke(OrtApi.ReleaseValue(api), value);
+					}
+				}
+				throw invalidOutput;
 			}
 			return result;
 		} catch (Throwable error) {
@@ -622,8 +638,10 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 					return null;
 				}
 				try {
-					// The alphabet is a few kilobytes; bound the segment generously for the scan.
-					return value.reinterpret(1 << 20).getString(0);
+					// Bound the segment to the actual NUL-terminated length before reading it:
+					// reinterpreting a fixed generous size would read past the allocation if a
+					// model ever shipped a longer value.
+					return readCString(value, MAX_METADATA_BYTES);
 				} finally {
 					MemorySegment freeFunction = OrtAllocator.Free(allocator);
 					OrtAllocator.Free.invoke(freeFunction, allocator, value);
@@ -700,9 +718,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 				throw new IllegalStateException("ONNX Runtime returned a null model I/O name");
 			}
 			try {
-				// The allocator hands out an unbounded address; model I/O names are short, so a
-				// small bounded reinterpret covers the NUL scan.
-				return name.reinterpret(256).getString(0);
+				return readCString(name, MAX_IO_NAME_BYTES);
 			} finally {
 				// OrtAllocator::Free(self, p): the generated invoker takes the function pointer
 				// plus both arguments.
@@ -737,5 +753,21 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 		MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.length);
 		segment.set(ValueLayout.JAVA_BYTE, bytes.length, (byte) 0);
 		return segment;
+	}
+
+	/**
+	 * Reads a NUL-terminated UTF-8 string from native memory without trusting its length: at most
+	 * {@code limit} bytes are scanned, so a malformed or unexpectedly long value cannot read
+	 * arbitrarily far past the allocation.
+	 */
+	private static String readCString(MemorySegment value, int limit) {
+		MemorySegment bounded = value.reinterpret(limit);
+		int length = 0;
+		while (length < limit && bounded.get(ValueLayout.JAVA_BYTE, length) != 0) {
+			length++;
+		}
+		byte[] bytes = new byte[length];
+		MemorySegment.copy(bounded, ValueLayout.JAVA_BYTE, 0, bytes, 0, length);
+		return new String(bytes, StandardCharsets.UTF_8);
 	}
 }

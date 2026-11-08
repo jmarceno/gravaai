@@ -1923,9 +1923,9 @@ public final class EditorInspectorPanel extends VBox {
 		Button detect = new Button(action, running ? Button.Variant.OUTLINE
 				: Button.Variant.DEFAULT, Button.Size.MD);
 		detect.setMaxWidth(Double.MAX_VALUE);
-		// Text detection needs the downloaded model; faces alone are bundled.
-		detect.setDisable(!running && !installed && autoMaskText
-				&& !(service != null && service.state().modelInstalled()));
+		// Text detection needs the downloaded model; faces alone are bundled. `installed` already
+		// came from service.state(), so re-reading it here would be the same value twice.
+		detect.setDisable(!running && !installed && autoMaskText);
 		detect.setOnAction(event -> {
 			if (service == null) {
 				return;

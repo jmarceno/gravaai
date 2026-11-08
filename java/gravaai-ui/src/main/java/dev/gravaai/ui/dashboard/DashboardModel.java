@@ -63,8 +63,9 @@ public final class DashboardModel {
 			new SimpleObjectProperty<>(DashboardSection.PROJECTS);
 	/**
 	 * The active library ({@code library} in React): {@code "projects"}, {@code "raw"} or
-	 * {@code "meetings"}. A folder is a section inside the current library, so selecting a folder
-	 * keeps filtering the library the user was in, exactly like {@code setSection} in React.
+	 * {@code "meetings"}. A folder only ever holds project paths, so selecting one switches this
+	 * back to {@link DashboardSection.Projects}: React kept the previous library and a folder clicked
+	 * while Raw or Meetings was open then filtered that list by project paths and showed nothing.
 	 */
 	private DashboardSection library = DashboardSection.PROJECTS;
 	private final StringProperty query = new SimpleStringProperty("");
@@ -683,10 +684,15 @@ public final class DashboardModel {
 
 	private void registerListeners() {
 		section.addListener((observable, oldValue, newValue) -> {
-			if (newValue instanceof DashboardSection.Projects
+			if (newValue instanceof DashboardSection.Folder) {
+				// A folder holds project paths only, so it always lists the Projects library. React
+				// kept the library the user came from, which made a folder opened from Raw or
+				// Meetings filter those entries by project paths and show an empty grid.
+				library = DashboardSection.PROJECTS;
+			} else if (newValue instanceof DashboardSection.Projects
 					|| newValue instanceof DashboardSection.Raw
 					|| newValue instanceof DashboardSection.Meetings) {
-				// React's setSection only changes the library for these ids; a folder id keeps it.
+				// React's setSection only changes the library for these ids.
 				library = newValue;
 			}
 			if (oldValue != null && !oldValue.wire().equals(newValue.wire())) {

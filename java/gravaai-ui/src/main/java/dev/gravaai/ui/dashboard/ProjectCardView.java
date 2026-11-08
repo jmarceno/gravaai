@@ -88,8 +88,11 @@ final class ProjectCardView extends VBox {
 		Label date = new Label(DashboardDates.shortDate(entry.updatedAt()));
 		date.getStyleClass().add("project-card__date");
 		meta.getChildren().add(date);
-		meta.getChildren().add(buildFolderChips());
-		meta.getChildren().add(buildAddFolderButton());
+		if (isProjectEntry()) {
+			// Folders hold project paths only, so raw files and meetings must not be filed into
+			// them: the path would sit in the folder invisible to every folder view.
+			meta.getChildren().addAll(buildFolderChips(), buildAddFolderButton());
+		}
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		meta.getChildren().add(spacer);
@@ -99,7 +102,14 @@ final class ProjectCardView extends VBox {
 		getChildren().add(caption);
 
 		attachHoverPreview();
-		attachDragSource();
+		if (isProjectEntry()) {
+			attachDragSource();
+		}
+	}
+
+	/** A project card can live in the sidebar folders; raw files and meetings cannot. */
+	private boolean isProjectEntry() {
+		return !rawSource() && meetingSource() == null;
 	}
 
 	private StackPane buildThumbnail() {

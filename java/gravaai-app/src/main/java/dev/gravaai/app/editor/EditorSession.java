@@ -677,6 +677,9 @@ public final class EditorSession implements AutoCloseable {
 		if (target == null) {
 			throw new IllegalStateException("The project has not been saved yet; use Save As.");
 		}
+		// An autosave that was in flight took its snapshot before this save: its result must not
+		// overwrite the document this save installs (see applyAutosaveResult).
+		changeSequence.incrementAndGet();
 		ProjectDocument next = document
 				.withEditor(ProjectPersistence.normalizeProjectEditor(store.editorJson()));
 		writeProjectAtomically(target, next);
@@ -687,6 +690,7 @@ public final class EditorSession implements AutoCloseable {
 
 	/** Save As: writes the same project data to a new file and continues there. */
 	public void saveAs(Path target) throws IOException {
+		changeSequence.incrementAndGet();
 		ProjectDocument next = document
 				.withEditor(ProjectPersistence.normalizeProjectEditor(store.editorJson()));
 		writeProjectAtomically(target, next);
@@ -702,12 +706,17 @@ public final class EditorSession implements AutoCloseable {
 	 * {@code <project>.bak}, so a crash mid-save cannot leave a truncated project behind.
 	 */
 	private static void writeProjectAtomically(Path target, ProjectDocument next) throws IOException {
+		writeProjectJson(target, Json.stringify(next.toJson()));
+	}
+
+	/** The same write with the JSON already serialized (the autosave thread never touches the store). */
+	private static void writeProjectJson(Path target, String json) throws IOException {
 		Path parent = target.toAbsolutePath().getParent();
 		if (parent != null) {
 			Files.createDirectories(parent);
 		}
 		try {
-			AtomicProjectSave.writeProjectFileAtomically(target, Json.stringify(next.toJson())).join();
+			AtomicProjectSave.writeProjectFileAtomically(target, json).join();
 		} catch (CompletionException | UncheckedIOException error) {
 			// The atomic saver completes the future exceptionally with an UncheckedIOException;
 			// callers of an explicit save keep seeing the plain IOException they already handle.
@@ -913,7 +922,7 @@ public final class EditorSession implements AutoCloseable {
 	/** Performs one snapshot write; {@code null} means success. Never throws. */
 	private @Nullable String writeFailure(AutosaveSnapshot snapshot) {
 		try {
-			writeProjectAtomically(snapshot.target(), snapshot.document());
+			writeProjectJson(snapshot.target(), snapshot.json());
 			return null;
 		} catch (IOException | RuntimeException error) {
 			String reason = describeWriteFailure(error);
@@ -936,15 +945,20 @@ public final class EditorSession implements AutoCloseable {
 			hooks.saveFailed().accept(failure);
 			return;
 		}
-		document = snapshot.document();
-		projectPath = snapshot.target();
+		boolean unchanged = changeSequence.get() == snapshot.sequence();
 		autosaveFailure = null;
-		if (changeSequence.get() == snapshot.sequence()) {
+		if (unchanged) {
+			document = snapshot.document();
 			dirty.set(false);
 		}
+		if (projectPath == null) {
+			// The write created the project's first file: later edits continue in the same file.
+			projectPath = snapshot.target();
+		}
 		hooks.autosaved().accept(new Autosaved(snapshot.target(), snapshot.targetIsNew()));
-		if (changeSequence.get() != snapshot.sequence()) {
-			// Edited while the file was being written: that edit is not on disk yet.
+		if (!unchanged && dirty.get()) {
+			// Edited (or explicitly saved) while the file was being written: that state is not on
+			// disk yet.
 			scheduleAutosave();
 		}
 	}

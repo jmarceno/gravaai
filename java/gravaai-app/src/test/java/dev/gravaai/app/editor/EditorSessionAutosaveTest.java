@@ -3,6 +3,7 @@ package dev.gravaai.app.editor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -219,6 +220,16 @@ class EditorSessionAutosaveTest {
 				assertNotNull(session.autosaveFailure());
 				assertTrue(saved.isEmpty(), "a failed write never reports success");
 				assertEquals(0, projectFileCount(projects));
+
+				// The folder becomes writable again: the next save recovers, and only then reports
+				// success and clears the reason.
+				Files.setPosixFilePermissions(projects, PosixFilePermissions.fromString("rwx------"));
+				session.flushAutosave();
+				assertFalse(session.dirty());
+				assertNull(session.autosaveFailure());
+				assertFalse(session.isUnsaved(), "the project file finally exists");
+				assertEquals(1, saved.size(), "the recovered write reports success once");
+				assertEquals(1, projectFileCount(projects));
 			}
 		} finally {
 			Files.setPosixFilePermissions(projects, PosixFilePermissions.fromString("rwx------"));

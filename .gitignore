@@ -12,6 +12,7 @@ logs
 .history/
 extension-sources/
 .zcode/
+.v2c/
 
 # Java build output
 target/

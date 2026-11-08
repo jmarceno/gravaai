@@ -2,7 +2,8 @@
 #
 # Wrap the jpackage app image into an AppImage (plan §5.19.5): AppDir with an AppRun entry point
 # (which also stamps GRAVAAI_LAUNCHED_AT before the JVM boots), .desktop file and icons.
-# appimagetool is downloaded once into java/build/tools (gitignored) and pinned by SHA-256.
+# appimagetool and the AppImage runtime are downloaded once into java/build/tools (gitignored) and
+# both pinned by SHA-256.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -52,6 +53,30 @@ if [ ! -x "$TOOL" ] || [ "$(sha256sum "$TOOL" | cut -d' ' -f1)" != "$expected" ]
 	fi
 	mv "$TOOL.part" "$TOOL"
 	chmod +x "$TOOL"
+fi
+
+# appimagetool otherwise downloads the type-2 runtime from the rebuildable "continuous" tag at
+# build time, which makes the AppImage unreproducible and fails outright when that CDN 504s.
+# Fetch the same pinned versioned release it would have used and pass it with --runtime-file.
+RUNTIME="${GRAVAAI_APPIMAGE_RUNTIME:-$SCRIPT_DIR/../build/tools/runtime-x86_64}"
+RUNTIME_URL="https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64"
+RUNTIME_PIN_FILE="$SCRIPT_DIR/appimage-runtime.sha256"
+runtime_expected="$(tr -d '[:space:]' < "$RUNTIME_PIN_FILE")"
+if [ ! -f "$RUNTIME" ] || [ "$(sha256sum "$RUNTIME" | cut -d' ' -f1)" != "$runtime_expected" ]; then
+	echo "build-appimage.sh: downloading AppImage runtime to $RUNTIME"
+	mkdir -p "$(dirname "$RUNTIME")"
+	curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 \
+		--speed-limit 10240 --speed-time 60 --max-time 600 -o "$RUNTIME.part" "$RUNTIME_URL"
+	runtime_actual="$(sha256sum "$RUNTIME.part" | cut -d' ' -f1)"
+	if [ "$runtime_expected" != "$runtime_actual" ]; then
+		echo "build-appimage.sh: AppImage runtime checksum mismatch" >&2
+		echo "  expected $runtime_expected" >&2
+		echo "  actual   $runtime_actual" >&2
+		rm -f "$RUNTIME.part"
+		exit 1
+	fi
+	mv "$RUNTIME.part" "$RUNTIME"
+	chmod +x "$RUNTIME"
 fi
 
 WORK="$(dirname "$OUTPUT")/.appimage-work"
@@ -185,6 +210,7 @@ APPRUN
 chmod +x "$APPDIR/AppRun"
 
 echo "build-appimage.sh: appimagetool $APPDIR"
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream "$APPDIR" "$OUTPUT"
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream --runtime-file "$RUNTIME" \
+	"$APPDIR" "$OUTPUT"
 chmod +x "$OUTPUT"
 echo "build-appimage.sh: $OUTPUT ($(stat -c %s "$OUTPUT") bytes)"

@@ -640,6 +640,23 @@ public final class AppContext {
 		}
 	}
 
+	/** Auto masking for one editor window: PII takes PII model download and the detection pass. */
+	private void attachAutoMask(EditorWindow window) {
+		try {
+			EditorSession session = window.session();
+			var assets = new dev.gravaai.services.privacy.PrivacyAssets(userData.dir());
+			var installer = new dev.gravaai.services.privacy.PrivacyAssetInstaller(
+					new dev.gravaai.services.meeting.HttpFileDownloader(), assets);
+			var service = dev.gravaai.services.privacy.AutoMaskService.withRealDetectors(
+					assets.glinerModelDir());
+			window.setAutoMaskController(new dev.gravaai.app.editor.AutoMaskController(
+					session.store(), session::videoPath, session::durationSeconds,
+					() -> window.scene().getRoot(), assets, installer, service));
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "auto masking unavailable: " + error);
+		}
+	}
+
 	private void attachAgent(EditorWindow window) {
 		AgentWiring wiring = agentWiring;
 		if (wiring == null) {
@@ -1386,6 +1403,7 @@ public final class AppContext {
 				dev.gravaai.media.segmentation.DualPathWebcamSegmenter.preview()));
 		attachAgent(window);
 		attachCaptions(window);
+		attachAutoMask(window);
 		if (path != null) {
 			rememberProject(path);
 		}

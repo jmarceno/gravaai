@@ -55,6 +55,7 @@ public final class EditorShellView extends VBox {
 	private final EditorSidebarRail rail;
 	private @Nullable EditorInspectorPanel inspector;
 	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
+	private dev.gravaai.ui.editor.@Nullable AutoMaskUiService autoMask;
 	private Region inspectorPlaceholder;
 	private HBox body;
 	private final VBox dropHost;
@@ -260,6 +261,14 @@ public final class EditorShellView extends VBox {
 		}
 	}
 
+	/** Connects the AUTO-MASK section to the auto-mask controller. */
+	public void setAutoMaskService(AutoMaskUiService service) {
+		autoMask = service;
+		if (inspector != null) {
+			inspector.setAutoMaskService(service);
+		}
+	}
+
 	/** The highlights controller for the timeline overlay (null until setAgentUiService). */
 	public @Nullable AgentHighlightsController agentHighlights() {
 		return agentHighlights;
@@ -286,6 +295,9 @@ public final class EditorShellView extends VBox {
 		inspector.onSectionTab(rail::select);
 		if (timelineContent instanceof dev.gravaai.ui.editor.timeline.TimelineView timelineView) {
 			inspector.setTrackCount(timelineView::rowCount);
+		}
+		if (autoMask != null) {
+			inspector.setAutoMaskService(autoMask);
 		}
 		if (captionModels != null) {
 			inspector.setCaptionModelService(captionModels);

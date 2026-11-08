@@ -1,12 +1,10 @@
 package dev.gravaai.media.onnx;
 
 import java.lang.foreign.Arena;
-
-
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
@@ -16,17 +14,21 @@ import dev.gravaai.media.onnx.gen.OrtAllocator;
 import dev.gravaai.media.onnx.gen.onnxruntime_h;
 
 /**
- * Typed binding over the ONNX Runtime C API for the selfie segmenter (webcam background blur).
+ * Typed binding over the ONNX Runtime C API (selfie/MODNet segmentation, the auto-mask detectors).
  *
  * <p>The C API is a struct of function pointers ({@code OrtApi}): jextract generates a getter
  * per field plus nested invoker classes; this wrapper resolves
  * {@code OrtGetApiBase()->GetApi(ORT_API_VERSION)} once and exposes the handful of entry points
- * the segmenter uses with typed signatures and status checking. One instance per process;
+ * the models use with typed signatures and status checking. One instance per process;
  * sessions outlive it via {@link #close()} (only when the owner is done with every session —
  * the env must outlive them, so {@code close()} is the owner's last call).</p>
  *
  * <p>The ORT_* enum constants are ABI-stable values from onnxruntime_c_api.h; jextract only
  * emits {@code #define}s and simple enum constants, and these enums have no explicit values.</p>
+ *
+ * <p>{@link #runSingle} is the original single-input/single-output float path the segmenters use;
+ * {@link #run} is the general multi-input/multi-output form the face/OCR/PII detectors need
+ * (YuNet has twelve outputs and GLiNER takes token-id tensors).</p>
  */
 public final class OnnxRuntimeApi implements AutoCloseable {
 
@@ -38,6 +40,13 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	private static final int ORT_DEVICE_ALLOCATOR = 0;
 	/** OrtMemType: the default memory type for CPU input tensors. */
 	private static final int ORT_MEM_TYPE_DEFAULT = 0;
+	/**
+	 * ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64. Not emitted by jextract
+	 * (only FLOAT came through), but the value is ABI-frozen in onnxruntime_c_api.h.
+	 */
+	public static final int ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 = 7;
+	/** ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL (one byte per element). */
+	public static final int ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL = 9;
 
 	private final MemorySegment api;
 	/** The OrtEnv backing every session; released in {@link #close()}. */
@@ -221,15 +230,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 			// jextract skipped SessionGetInputShape's accessor outright (one of the opaque
 			// forward-declared types it cannot lay out), while the type-info path is generated.
 			MemorySegment typeOut = arena.allocate(ValueLayout.ADDRESS);
-			if (input) {
-				checkStatus(OrtApi.SessionGetInputTypeInfo.invoke(
-						OrtApi.SessionGetInputTypeInfo(api), session, index, typeOut),
-						"SessionGetInputTypeInfo");
-			} else {
-				checkStatus(OrtApi.SessionGetOutputTypeInfo.invoke(
-						OrtApi.SessionGetOutputTypeInfo(api), session, index, typeOut),
-						"SessionGetOutputTypeInfo");
-			}
+			sessionTypeInfo(session, index, input, typeOut);
 			MemorySegment typeInfo = typeOut.get(ValueLayout.ADDRESS, 0);
 			if (typeInfo.address() == 0) {
 				throw new IllegalStateException(
@@ -253,6 +254,35 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 			throw (error instanceof RuntimeException runtime) ? runtime
 					: new IllegalStateException(error);
 		}
+	}
+
+	/** Writes the {@code OrtTypeInfo*} for one model input/output into {@code out}. */
+	private void sessionTypeInfo(MemorySegment session, long index, boolean input,
+			MemorySegment out) {
+		if (input) {
+			checkStatus(OrtApi.SessionGetInputTypeInfo.invoke(
+					OrtApi.SessionGetInputTypeInfo(api), session, index, out),
+					"SessionGetInputTypeInfo");
+		} else {
+			checkStatus(OrtApi.SessionGetOutputTypeInfo.invoke(
+					OrtApi.SessionGetOutputTypeInfo(api), session, index, out),
+					"SessionGetOutputTypeInfo");
+		}
+	}
+
+	/** Bytes per element for a tensor element type we feed (float32 or int64). */
+	private static long elementBytes(Input input) {
+		return input.elementType() == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64
+				? Long.BYTES : Float.BYTES;
+	}
+
+	/** The element count of a shape (the product of its dimensions). */
+	private static long elementCount(long[] shape) {
+		long count = 1;
+		for (long dim : shape) {
+			count = Math.multiplyExact(count, dim);
+		}
+		return count;
 	}
 
 	/**
@@ -293,6 +323,245 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * One input of a general {@link #run} call: a tensor name, element type, shape and its data.
+	 *
+	 * <p>{@code data} is a native float array (float32 tensors) or a native long array (int64
+	 * tensors); the primitive-array overloads on {@link OnnxRuntimeApi#run} copy into the arena
+	 * the run owns. Element type is one of the {@code ONNX_TENSOR_ELEMENT_DATA_TYPE_*} values.</p>
+	 */
+	public record Input(String name, int elementType, long[] shape, MemorySegment data) {
+
+		public Input {
+			if (name == null || name.isBlank()) {
+				throw new IllegalArgumentException("tensor name must not be blank");
+			}
+			shape = shape.clone();
+			long elements = 1;
+			for (long dim : shape) {
+				if (dim <= 0) {
+					throw new IllegalArgumentException("tensor " + name + " has a non-positive"
+							+ " dimension: " + java.util.Arrays.toString(shape));
+				}
+				elements = Math.multiplyExact(elements, dim);
+			}
+			long bytes = elements * switch (elementType) {
+				case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 -> Long.BYTES;
+				case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL -> 1;
+				default -> Float.BYTES;
+			};
+			if (data.byteSize() < bytes) {
+				throw new IllegalArgumentException("tensor " + name + " holds " + data.byteSize()
+						+ " bytes, need " + bytes + " for " + java.util.Arrays.toString(shape));
+			}
+		}
+	}
+
+	/**
+	 * Runs a session with any number of inputs and outputs. Output values are caller-owned: release
+	 * each with {@link #releaseValue} (preferably in a finally block around the whole call).
+	 *
+	 * <p>The input data segments are borrowed by ORT for the duration of the call, so they must be
+	 * alive in the caller's arena. Output order matches {@code outputNames}.</p>
+	 */
+	public MemorySegment[] run(MemorySegment session, List<Input> inputs, List<String> outputNames,
+			MemorySegment memoryInfo) {
+		if (inputs.isEmpty() || outputNames.isEmpty()) {
+			throw new IllegalArgumentException("run needs at least one input and one output");
+		}
+		MemorySegment[] inputValues = new MemorySegment[inputs.size()];
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment inNames = arena.allocate(ValueLayout.ADDRESS, inputs.size());
+			MemorySegment inputArray = arena.allocate(ValueLayout.ADDRESS, inputs.size());
+			for (int i = 0; i < inputs.size(); i++) {
+				Input input = inputs.get(i);
+				inNames.setAtIndex(ValueLayout.ADDRESS, i, cString(arena, input.name()));
+				MemorySegment shapeSegment = arena.allocate(ValueLayout.JAVA_LONG,
+						input.shape().length);
+				for (int d = 0; d < input.shape().length; d++) {
+					shapeSegment.setAtIndex(ValueLayout.JAVA_LONG, d, input.shape()[d]);
+				}
+				MemorySegment valueOut = arena.allocate(ValueLayout.ADDRESS);
+				checkStatus(OrtApi.CreateTensorWithDataAsOrtValue.invoke(
+						OrtApi.CreateTensorWithDataAsOrtValue(api), memoryInfo, input.data(),
+						elementBytes(input) * elementCount(input.shape()), shapeSegment,
+						input.shape().length, input.elementType(), valueOut),
+						"CreateTensorWithDataAsOrtValue(" + input.name() + ")");
+				inputValues[i] = valueOut.get(ValueLayout.ADDRESS, 0);
+				inputArray.setAtIndex(ValueLayout.ADDRESS, i, inputValues[i]);
+			}
+			MemorySegment outNames = arena.allocate(ValueLayout.ADDRESS, outputNames.size());
+			for (int i = 0; i < outputNames.size(); i++) {
+				outNames.setAtIndex(ValueLayout.ADDRESS, i, cString(arena, outputNames.get(i)));
+			}
+			MemorySegment outputs = arena.allocate(ValueLayout.ADDRESS, outputNames.size());
+			try {
+				checkStatus(OrtApi.Run.invoke(OrtApi.Run(api), session, MemorySegment.NULL, inNames,
+						inputArray, inputs.size(), outNames, outputNames.size(), outputs), "Run");
+			} finally {
+				for (MemorySegment value : inputValues) {
+					if (value != null) {
+						OrtApi.ReleaseValue.invoke(OrtApi.ReleaseValue(api), value);
+					}
+				}
+			}
+			MemorySegment[] result = new MemorySegment[outputNames.size()];
+			for (int i = 0; i < result.length; i++) {
+				MemorySegment value = outputs.getAtIndex(ValueLayout.ADDRESS, i);
+				if (value.address() == 0) {
+					throw new IllegalStateException(
+							"ONNX Runtime Run produced a null output value for "
+									+ outputNames.get(i));
+				}
+				result[i] = value;
+			}
+			return result;
+		} catch (Throwable error) {
+			throw (error instanceof RuntimeException runtime) ? runtime
+					: new IllegalStateException(error);
+		}
+	}
+
+	/** Convenience: run with float inputs (copies each array into the run's arena). */
+	public MemorySegment[] runFloat(MemorySegment session, MemorySegment memoryInfo,
+			List<NamedFloat> inputs, List<String> outputNames) {
+		try (Arena arena = Arena.ofConfined()) {
+			List<Input> prepared = inputs.stream()
+					.map(input -> new Input(input.name(), onnxruntime_h
+							.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT(), input.shape(),
+							arena.allocateFrom(ValueLayout.JAVA_FLOAT, input.values())))
+					.toList();
+			// run() opens its own arena; the data above must outlive it, hence the outer scope.
+			return run(session, prepared, outputNames, memoryInfo);
+		}
+	}
+
+	/** Convenience: run with int64 inputs (token ids), copying each array into the run's arena. */
+	public MemorySegment[] runLong(MemorySegment session, MemorySegment memoryInfo,
+			List<NamedLong> inputs, List<String> outputNames) {
+		try (Arena arena = Arena.ofConfined()) {
+			List<Input> prepared = inputs.stream()
+					.map(input -> new Input(input.name(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+							input.shape(), arena.allocateFrom(ValueLayout.JAVA_LONG,
+									input.values())))
+					.toList();
+			// run() opens its own arena; the data above must outlive it, hence the outer scope.
+			return run(session, prepared, outputNames, memoryInfo);
+		}
+	}
+
+	/**
+	 * Convenience: run with int64 inputs and one {@code bool} input (GLiNER's {@code span_mask}),
+	 * copying every array into the run's arena.
+	 */
+	public MemorySegment[] runMixed(MemorySegment session, MemorySegment memoryInfo,
+			List<NamedLong> longs, List<NamedBool> bools, List<String> outputNames) {
+		try (Arena arena = Arena.ofConfined()) {
+			List<Input> prepared = new java.util.ArrayList<>(longs.size() + bools.size());
+			for (NamedLong input : longs) {
+				prepared.add(new Input(input.name(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+						input.shape(), arena.allocateFrom(ValueLayout.JAVA_LONG,
+								input.values())));
+			}
+			for (NamedBool input : bools) {
+				prepared.add(new Input(input.name(), ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
+						input.shape(), arena.allocateFrom(ValueLayout.JAVA_BYTE,
+								input.values())));
+			}
+			// run() opens its own arena; the data above must outlive it, hence the outer scope.
+			return run(session, prepared, outputNames, memoryInfo);
+		}
+	}
+
+	/** A bool tensor by name, shape and values (one byte per element, 0 or 1). */
+	public record NamedBool(String name, long[] shape, byte[] values) {}
+
+	/** A float tensor by name, shape and values. */
+	public record NamedFloat(String name, long[] shape, float[] values) {}
+
+	/** An int64 tensor by name, shape and values. */
+	public record NamedLong(String name, long[] shape, long[] values) {}
+
+	/**
+	 * The element type of a model input or output: one of the
+	 * {@code ONNX_TENSOR_ELEMENT_DATA_TYPE_*} values.
+	 */
+	public int tensorElementType(MemorySegment session, long index, boolean input) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment typeOut = arena.allocate(ValueLayout.ADDRESS);
+			sessionTypeInfo(session, index, input, typeOut);
+			MemorySegment typeInfo = typeOut.get(ValueLayout.ADDRESS, 0);
+			try {
+				MemorySegment tensorOut = arena.allocate(ValueLayout.ADDRESS);
+				checkStatus(OrtApi.CastTypeInfoToTensorInfo.invoke(
+						OrtApi.CastTypeInfoToTensorInfo(api), typeInfo, tensorOut),
+						"CastTypeInfoToTensorInfo");
+				MemorySegment info = tensorOut.get(ValueLayout.ADDRESS, 0);
+				if (info.address() == 0) {
+					throw new IllegalStateException("model "
+							+ (input ? "input" : "output") + " is not a tensor");
+				}
+				try {
+					MemorySegment elementOut = arena.allocate(ValueLayout.JAVA_INT);
+					checkStatus(OrtApi.GetTensorElementType.invoke(
+							OrtApi.GetTensorElementType(api), info, elementOut),
+							"GetTensorElementType");
+					return elementOut.get(ValueLayout.JAVA_INT, 0);
+				} finally {
+					releaseTensorTypeAndShapeInfo(info);
+				}
+			} finally {
+				releaseTypeInfo(typeInfo);
+			}
+		} catch (Throwable error) {
+			throw (error instanceof RuntimeException runtime) ? runtime
+					: new IllegalStateException(error);
+		}
+	}
+
+	/**
+	 * The shape of an {@code OrtValue} produced by {@link #run} (dynamic dimensions resolved to the
+	 * values actually used). Useful for outputs whose extent depends on the input.
+	 */
+	public long[] valueShape(MemorySegment value) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment infoOut = arena.allocate(ValueLayout.ADDRESS);
+			checkStatus(OrtApi.GetTensorTypeAndShape.invoke(OrtApi.GetTensorTypeAndShape(api),
+					value, infoOut), "GetTensorTypeAndShape");
+			MemorySegment info = infoOut.get(ValueLayout.ADDRESS, 0);
+			try {
+				return tensorInfoDimensions(info);
+			} finally {
+				releaseTensorTypeAndShapeInfo(info);
+			}
+		} catch (Throwable error) {
+			throw (error instanceof RuntimeException runtime) ? runtime
+					: new IllegalStateException(error);
+		}
+	}
+
+	/** The int64 data of an output tensor, copied into a Java array. */
+	public long[] getTensorLongs(MemorySegment value, long elementCount) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
+			checkStatus(OrtApi.GetTensorMutableData.invoke(OrtApi.GetTensorMutableData(api),
+					value, out), "GetTensorMutableData");
+			MemorySegment data = out.get(ValueLayout.ADDRESS, 0);
+			if (data.address() == 0) {
+				throw new IllegalStateException(
+						"ONNX Runtime GetTensorMutableData produced a null pointer");
+			}
+			MemorySegment bounded = data.reinterpret(Math.multiplyExact(elementCount,
+					Long.BYTES));
+			long[] values = new long[Math.toIntExact(elementCount)];
+			MemorySegment.copy(bounded, ValueLayout.JAVA_LONG, 0, values, 0, values.length);
+			return values;
+		} catch (Throwable error) {
+			throw (error instanceof RuntimeException runtime) ? runtime
+					: new IllegalStateException(error);
+		}
+	}
+
 	/** The float data of an output tensor, copied into a Java array. */
 	public float[] getTensorFloats(MemorySegment value, long elementCount) {
 		try (Arena arena = Arena.ofConfined()) {
@@ -324,6 +593,48 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	/** Releases a session (before {@link #close()} releases the env). */
 	public void releaseSession(MemorySegment session) {
 		OrtApi.ReleaseSession.invoke(OrtApi.ReleaseSession(api), session);
+	}
+
+	/**
+	 * Reads one custom metadata value from a session's model, or {@code null} when the key is
+	 * absent. PP-OCR's recognizers embed their character list this way, which is why no dictionary
+	 * file has to be shipped with them.
+	 */
+	public @Nullable String modelMetadata(MemorySegment session, MemorySegment allocator,
+			String key) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment metadataOut = arena.allocate(ValueLayout.ADDRESS);
+			checkStatus(OrtApi.SessionGetModelMetadata.invoke(
+					OrtApi.SessionGetModelMetadata(api), session, metadataOut),
+					"SessionGetModelMetadata");
+			MemorySegment metadata = metadataOut.get(ValueLayout.ADDRESS, 0);
+			if (metadata.address() == 0) {
+				return null;
+			}
+			try {
+				MemorySegment valueOut = arena.allocate(ValueLayout.ADDRESS);
+				checkStatus(OrtApi.ModelMetadataLookupCustomMetadataMap.invoke(
+						OrtApi.ModelMetadataLookupCustomMetadataMap(api), metadata, allocator,
+						cString(arena, key), valueOut),
+						"ModelMetadataLookupCustomMetadataMap(" + key + ")");
+				MemorySegment value = valueOut.get(ValueLayout.ADDRESS, 0);
+				if (value.address() == 0) {
+					return null;
+				}
+				try {
+					// The alphabet is a few kilobytes; bound the segment generously for the scan.
+					return value.reinterpret(1 << 20).getString(0);
+				} finally {
+					MemorySegment freeFunction = OrtAllocator.Free(allocator);
+					OrtAllocator.Free.invoke(freeFunction, allocator, value);
+				}
+			} finally {
+				OrtApi.ReleaseModelMetadata.invoke(OrtApi.ReleaseModelMetadata(api), metadata);
+			}
+		} catch (Throwable error) {
+			throw (error instanceof RuntimeException runtime) ? runtime
+					: new IllegalStateException(error);
+		}
 	}
 
 	/** Releases a memory info object. */

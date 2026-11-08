@@ -17,6 +17,9 @@ step() { local t=$SECONDS; "$@"; echo "[build-release] $(basename "$1") took $((
 step native/build-native-helpers.sh
 step ../.gitea/scripts/fetch-ffmpeg.sh native/build   # prebuilt GPU-enabled FFmpeg, not compiled
 step native/build-whisper.sh
+# ONNX Runtime and the bundled segmentation/detection models. Without this step the release payload
+# only carries them when the cache volume happens to already contain a previous staging.
+step native/build-onnxruntime.sh
 rm -rf "$GRAVAAI_NATIVE_CACHE/out" && cp -a native/build "$GRAVAAI_NATIVE_CACHE/out"
 # Stamp the release version into every pom (the packaged app reports it) and McpMain's fallback.
 old="$(sed -nE '0,/<version>([^<]+)<\/version>/s//\1/p' pom.xml | head -n1 | tr -d '[:space:]')"

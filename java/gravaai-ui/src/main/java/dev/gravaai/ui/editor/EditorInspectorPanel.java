@@ -110,6 +110,11 @@ public final class EditorInspectorPanel extends VBox {
 	private final Label footLabel = new Label("");
 	private java.util.function.Consumer<EditorSidebarRail.Section> onSectionTab = section -> { };
 	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
+	private dev.gravaai.ui.editor.@Nullable AutoMaskUiService autoMask;
+	private @Nullable AutoCloseable autoMaskSubscription;
+	/** Detector toggles; both on by default, matching the ship defaults. */
+	private boolean autoMaskFaces = true;
+	private boolean autoMaskText = true;
 	private @Nullable AutoCloseable captionModelSubscription;
 	private dev.gravaai.ui.editor.transcript.@Nullable TranscriptPanel transcriptPanel;
 	private Runnable onAddCustomFont = () -> { };
@@ -358,7 +363,7 @@ public final class EditorInspectorPanel extends VBox {
 		return switch (section) {
 			// Only sections with controls rendered behind the Advanced switch. Cursor and
 			// Settings currently have no advanced-only rows, so showing the toggle there is inert.
-			case SCENE, WEBCAM, CAPTIONS, KEYSTROKES -> true;
+			case SCENE, WEBCAM, CAPTIONS, KEYSTROKES, AUTO_MASK -> true;
 			case COLOR, CURSOR, TRANSCRIPT, MEETING, SETTINGS -> false;
 		};
 	}
@@ -380,6 +385,25 @@ public final class EditorInspectorPanel extends VBox {
 			captionModelSubscription = service.addListener(state -> javafx.application.Platform
 					.runLater(() -> {
 						if (!annotationMode && section == EditorSidebarRail.Section.CAPTIONS) {
+							rebuild();
+						}
+					}));
+		}
+		rebuild();
+	}
+
+	/**
+	 * Connects the AUTO-MASK section to the app's controller. Rebuilds when a run starts or
+	 * finishes so the button flips between Detect and Cancel.
+	 */
+	public void setAutoMaskService(AutoMaskUiService service) {
+		closeQuietly(autoMaskSubscription);
+		autoMaskSubscription = null;
+		autoMask = service;
+		if (service != null) {
+			autoMaskSubscription = service.addListener(state -> javafx.application.Platform
+					.runLater(() -> {
+						if (!annotationMode && section == EditorSidebarRail.Section.AUTO_MASK) {
 							rebuild();
 						}
 					}));
@@ -590,6 +614,7 @@ public final class EditorInspectorPanel extends VBox {
 			case KEYSTROKES -> keystrokesSection();
 			case WEBCAM -> webcamSection();
 			case CAPTIONS -> captionsSection();
+			case AUTO_MASK -> autoMaskSection();
 			case TRANSCRIPT -> transcriptSection();
 			case MEETING -> meetingSection();
 			case SETTINGS -> settingsSection();
@@ -1845,6 +1870,104 @@ public final class EditorInspectorPanel extends VBox {
 			{"auto", "Auto Detect"}, {"en", "English"}, {"es", "Spanish"}, {"fr", "French"},
 			{"de", "German"}, {"it", "Italian"}, {"pt", "Portuguese"},
 			{"zh", "Chinese (Simplified)"}, {"ja", "Japanese"}, {"ko", "Korean"}};
+
+	/**
+	 * Auto masking: the two detector toggles, Detect/Cancel, the model download row and a result
+	 * summary. The heavy lifting lives in the app's AutoMaskController; this section only presents
+	 * it, the same split the Captions section uses for its controller.
+	 */
+	private VBox autoMaskSection() {
+		VBox root = new VBox(16);
+		AutoMaskUiService service = autoMask;
+		AutoMaskUiService.State state = service == null
+				? new AutoMaskUiService.State(false) : service.state();
+		AutoMaskUiService.Progress progress = service == null
+				? new AutoMaskUiService.Progress(false, 0, "", false) : service.progress();
+		boolean running = service != null && service.detecting();
+		boolean installed = state.modelInstalled();
+
+		VBox detectors = group("Detectors", this::resetAutoMaskDetectors);
+		Switch faces = Switch.xs();
+		faces.setChecked(autoMaskFaces);
+		faces.onCheckedChange(value -> autoMaskFaces = value);
+		detectors.getChildren().add(row("Faces", faces));
+		Switch text = Switch.xs();
+		text.setChecked(autoMaskText);
+		text.onCheckedChange(value -> autoMaskText = value);
+		detectors.getChildren().add(row("Screen text (PII)", text));
+		detectors.getChildren().add(new Label(
+				"Finds faces and personal data in the recording, then blurs them as timeline"
+						+ " regions. Everything runs on this machine."));
+
+		VBox model = group("Detection model", null);
+		if (installed) {
+			Label ready = new Label("Installed.");
+			ready.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			model.getChildren().add(ready);
+		} else {
+			Button download = new Button("Download model (~580 MB)",
+					Button.Variant.OUTLINE, Button.Size.MD);
+			download.setMaxWidth(Double.MAX_VALUE);
+			download.setDisable(running);
+			download.setOnAction(event -> {
+				if (service != null) {
+					service.downloadModel();
+				}
+			});
+			model.getChildren().add(download);
+		}
+		root.getChildren().add(model);
+
+		VBox run = group("Masking", null);
+		String action = running ? "Cancel" : "Detect Masks";
+		Button detect = new Button(action, running ? Button.Variant.OUTLINE
+				: Button.Variant.DEFAULT, Button.Size.MD);
+		detect.setMaxWidth(Double.MAX_VALUE);
+		// Text detection needs the downloaded model; faces alone are bundled.
+		detect.setDisable(!running && !installed && autoMaskText
+				&& !(service != null && service.state().modelInstalled()));
+		detect.setOnAction(event -> {
+			if (service == null) {
+				return;
+			}
+			if (running) {
+				service.cancel();
+			} else {
+				service.detect(faces.isChecked(), text.isChecked());
+			}
+		});
+		run.getChildren().add(detect);
+		if (running) {
+			javafx.scene.control.ProgressBar bar = new javafx.scene.control.ProgressBar(
+					progress.percent() / 100.0);
+			bar.setMaxWidth(Double.MAX_VALUE);
+			Label status = new Label(progress.message());
+			status.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			run.getChildren().add(new VBox(4, status, bar));
+		} else if (progress.failed()) {
+			Label failure = new Label(progress.message());
+			failure.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-danger;");
+			run.getChildren().add(failure);
+		} else if (service != null && service.lastRegionCount() > 0) {
+			Label summary = new Label(service.lastRegionCount()
+					+ (service.lastRegionCount() == 1 ? " region on the timeline."
+							: " regions on the timeline."));
+			summary.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			run.getChildren().add(summary);
+			Button remove = new Button("Remove auto masks", Button.Variant.GHOST,
+					Button.Size.SM);
+			remove.setOnAction(event -> service.removeAutoRegions());
+			run.getChildren().add(remove);
+		}
+		root.getChildren().add(run);
+		return root;
+	}
+
+	/** Reset for the DETECTORS group: both detectors on, the ship default. */
+	private void resetAutoMaskDetectors() {
+		autoMaskFaces = true;
+		autoMaskText = true;
+	}
 
 	/** Port of {@code captionsSectionContent} in SettingsPanel.tsx. */
 	private VBox captionsSection() {

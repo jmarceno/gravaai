@@ -122,17 +122,43 @@ public final class OnnxLibs {
 		return resolveSegmentationModel("modnet.onnx");
 	}
 
+	/**
+	 * Resolves the bundled YuNet face-detection model (auto masking). Lives in
+	 * {@code models/detection/} in the native payload.
+	 */
+	public static Path resolveFaceModelFile() {
+		return resolveBundledModel("detection", "face_detection_yunet_2023mar.onnx");
+	}
+
+	/** Resolves the bundled PP-OCR detection model (auto-mask screen text). */
+	public static Path resolveOcrDetModelFile() {
+		return resolveBundledModel("detection", "ch_PP-OCRv4_det_infer.onnx");
+	}
+
+	/** Resolves the bundled PP-OCR recognition model (auto-mask screen text). */
+	public static Path resolveOcrRecModelFile() {
+		return resolveBundledModel("detection", "ch_PP-OCRv4_rec_infer.onnx");
+	}
+
 	private static Path resolveSegmentationModel(String fileName) {
-		Path bundled = NativeHelpers.nativeDir().resolve("models").resolve("segmentation")
+		return resolveBundledModel("segmentation", fileName);
+	}
+
+	/**
+	 * Resolves a model under {@code models/<kind>/} in the native payload, falling back to the
+	 * development {@code native/build/models/<kind>/} layout of the Maven/IDE runs.
+	 */
+	private static Path resolveBundledModel(String kind, String fileName) {
+		Path bundled = NativeHelpers.nativeDir().resolve("models").resolve(kind)
 				.resolve(fileName);
 		if (Files.isRegularFile(bundled)) {
 			return bundled;
 		}
 		List<Path> candidates = List.of(
-				Path.of("native", "build", "models", "segmentation", fileName),
-				Path.of("..", "native", "build", "models", "segmentation", fileName),
-				Path.of("..", "..", "native", "build", "models", "segmentation", fileName),
-				Path.of("..", "..", "..", "native", "build", "models", "segmentation", fileName));
+				Path.of("native", "build", "models", kind, fileName),
+				Path.of("..", "native", "build", "models", kind, fileName),
+				Path.of("..", "..", "native", "build", "models", kind, fileName),
+				Path.of("..", "..", "..", "native", "build", "models", kind, fileName));
 		for (Path candidate : candidates) {
 			if (Files.isRegularFile(candidate)) {
 				return candidate.toAbsolutePath().normalize();
@@ -140,7 +166,7 @@ public final class OnnxLibs {
 		}
 		throw new IllegalStateException(
 				fileName + " not found. Run java/native/build-onnxruntime.sh, then pass"
-						+ " -Dgravaai.nativeDir=<dir> (the models live in models/segmentation)."
+						+ " -Dgravaai.nativeDir=<dir> (the models live in models/" + kind + ")."
 						+ " Tried: " + bundled + " and " + candidates);
 	}
 }

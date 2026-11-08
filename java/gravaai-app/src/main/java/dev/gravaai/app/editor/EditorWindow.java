@@ -166,6 +166,7 @@ public final class EditorWindow {
 	private boolean closeApproved;
 	private boolean previewFrameLogged;
 	private @Nullable AutoCaptionController captions;
+	private @Nullable AutoMaskController autoMask;
 	/** Webcam background-blur segmenter handed to the preview; closed with the window. */
 	private @Nullable WebcamSegmenter webcamSegmenter;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
@@ -431,7 +432,11 @@ public final class EditorWindow {
 			if (timelineSubscription != null) {
 				timelineSubscription.close();
 			}
-			if (captions != null) {
+			if (autoMask != null) {
+			autoMask.close();
+			autoMask = null;
+		}
+		if (captions != null) {
 				captions.close();
 			}
 			if (webcamSegmenter != null) {
@@ -532,6 +537,15 @@ public final class EditorWindow {
 		}
 		captions = controller;
 		shell.setCaptionModelService(controller);
+	}
+
+	/** Connects the AUTO-MASK section to the auto-mask controller. */
+	public void setAutoMaskController(AutoMaskController controller) {
+		if (autoMask != null) {
+			autoMask.close();
+		}
+		autoMask = controller;
+		shell.setAutoMaskService(controller);
 	}
 
 	/** Mounts the AI control chip/highlights and routes them to the timeline overlay. */

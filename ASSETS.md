@@ -103,6 +103,26 @@ reproduced in
 | `key-tap.ogg` | Tap (key press) | Kenney | CC0 1.0 | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) (`tick_004.ogg`) |
 | `key-soft.ogg` | Soft (key press) | Kenney Vleugels | CC0 1.0 | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) (`click3.ogg`) |
 
+## Inference models
+
+Auto masking and the webcam background effects run on ONNX models. The small ones are bundled
+under `java/native/models/` (staged by `java/native/build-onnxruntime.sh` with pinned SHA-256);
+the large PII model downloads on first use into the user profile, pinned by URL and SHA-256.
+
+| File | Size | License | Source |
+| --- | --- | --- | --- |
+| `models/detection/face_detection_yunet_2023mar.onnx` | 232,589 B | MIT | [opencv_zoo YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) |
+| `models/detection/ch_PP-OCRv4_det_infer.onnx` | 4,745,517 B | Apache-2.0 | [RapidOCR model zoo](https://huggingface.co/SWHL/RapidOCR) (PaddleOCR PP-OCRv4) |
+| `models/detection/ch_PP-OCRv4_rec_infer.onnx` | 10,857,958 B | Apache-2.0 | [RapidOCR model zoo](https://huggingface.co/SWHL/RapidOCR) (PaddleOCR PP-OCRv4) |
+| `models/segmentation/selfie-segmenter.onnx` | 462,352 B | Apache-2.0 | MediaPipe selfie segmenter (ONNX conversion) |
+| `models/segmentation/modnet.onnx` | 25,888,640 B | Apache-2.0 | [Xenova/modnet](https://huggingface.co/Xenova/modnet) |
+| `privacy/models/gliner-multi-pii-v1/model.onnx` (downloaded) | 579,717,643 B | Apache-2.0 | [onnx-community/gliner_multi_pii-v1](https://huggingface.co/onnx-community/gliner_multi_pii-v1) `onnx/model_fp16.onnx` |
+| `privacy/models/gliner-multi-pii-v1/tokenizer.json` (downloaded) | 16,331,948 B | Apache-2.0 | same checkpoint |
+
+Licence texts for the bundled detection models ship beside them under
+`java/native/models/detection/notices/`. The GLiNER asset's licence is the checkpoint's own
+(Apache-2.0), and the download row in *Editor → Auto mask* records the pinned hash.
+
 ## Logo
 
 `branding/gravaai.png` and `app-icons/gravaai-*.png` are the Gravaai logo and application

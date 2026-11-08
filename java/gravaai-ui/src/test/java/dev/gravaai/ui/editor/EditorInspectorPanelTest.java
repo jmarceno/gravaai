@@ -9,12 +9,13 @@ import org.junit.jupiter.api.Test;
 /** Inspector header toggle visibility follows the sections with advanced-only controls. */
 class EditorInspectorPanelTest {
 
-@DisplayName("only Scene, Webcam and Captions expose an Advanced toggle")
+@DisplayName("only sections with advanced-only rows expose an Advanced toggle")
 @Test
 void hasAdvancedMatchesSectionsWithAdvancedRows() {
 assertTrue(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.SCENE));
 assertTrue(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.WEBCAM));
 assertTrue(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.CAPTIONS));
+assertTrue(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.AUTO_MASK));
 
 assertFalse(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.CURSOR));
 assertFalse(EditorInspectorPanel.hasAdvanced(EditorSidebarRail.Section.SETTINGS));

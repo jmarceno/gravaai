@@ -703,6 +703,11 @@ public final class EditorSession implements AutoCloseable {
 		}
 	}
 
+	/** Timeline duration in seconds (the auto-mask pass needs it as a double). */
+	public double durationSeconds() {
+		return timelineDurationMs() / 1000.0;
+	}
+
 	/** Timeline duration from the clip regions, falling back to the media duration. */
 	private long timelineDurationMs() {
 		long end = 0L;

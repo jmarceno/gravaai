@@ -66,7 +66,7 @@ opens a separate dashboard window this is marked "in flight" rather than mapped.
 | 28 | `wallpaper.spec.ts` (2) | 🟡 mapped+manual | 2 | `PreviewBackgroundsTest#bundledImage`, `ProjectFrameInputFactoryTest#videoWallpaperLoops` | Gallery add/remove/persist manual (gap B3) |
 | 29 | `webcam-defaults.spec.ts` (1) | 🟡 mapped+manual | 1 | `PreviewFrameMapperTest#webcamSpecFromFixture`, `WebcamOverlayTest#cornerRadius`, `ProjectPersistenceNormalizerTest#migratesLegacyWebcamRadius` | Saved-69 preference path untested |
 
-Totals: the 104 declared test cases (106 runtime titles) group into **84 behaviour bullets** — **31 ✅ mapped,
+Totals: the 104 declared test cases (106 runtime titles) group into **84 behaviour bullets** — **32 ✅ mapped,
 36 🟡 mapped+manual, 11 🔵 manual, 4 ⛔ N/A** (the eight `startup-loading` titles collapse into one
 N/A group), **1 ⚠ gap** (A1; A2 closed), plus 9 implemented-but-untested behaviours in [Gaps B](#b-implemented-but-untested-coverage-gaps--add-tests-no-code-change-expected).
 

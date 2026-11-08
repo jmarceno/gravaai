@@ -1,5 +1,7 @@
 package dev.gravaai.core.project;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
@@ -40,7 +42,7 @@ public final class ProjectFileNaming {
 	 * collapses, trailing dots and spaces go, and an empty result falls back to
 	 * {@link #UNTITLED_BASE_NAME}.
 	 */
-	public static String safeBaseName(String displayName) {
+	public static String safeBaseName(@Nullable String displayName) {
 		if (displayName == null) {
 			return UNTITLED_BASE_NAME;
 		}
@@ -63,7 +65,7 @@ public final class ProjectFileNaming {
 	 * <p>Pure path arithmetic — nothing is created, so the caller writes the file it picked (the
 	 * session writes it through {@link AtomicProjectSave} and keeps the path for every later save).
 	 */
-	public static Path uniqueProjectPath(Path directory, String baseName) {
+	public static Path uniqueProjectPath(Path directory, @Nullable String baseName) {
 		String base = safeBaseName(baseName);
 		String extension = "." + StorageFiles.PROJECT_FILE_EXTENSION;
 		Path candidate = directory.resolve(base + extension);

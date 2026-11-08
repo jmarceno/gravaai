@@ -607,7 +607,13 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 	}
 
 	private void guardUnsaved(@Nullable EditorSession session, boolean force) {
-		if (session == null || !session.dirty()) {
+		if (session == null) {
+			return;
+		}
+		// Debounced autosave may be holding the last edits for a moment: write them before deciding
+		// whether the project really has changes the agent must refuse to discard.
+		session.flushAutosave();
+		if (!session.dirty()) {
 			return;
 		}
 		if (!force) {

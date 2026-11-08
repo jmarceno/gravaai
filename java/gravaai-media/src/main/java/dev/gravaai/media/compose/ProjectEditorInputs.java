@@ -482,8 +482,9 @@ public final class ProjectEditorInputs {
 				style.size().orElse(base.size()), style.width().orElse(base.width()),
 				style.height().orElse(base.height()), base.mirror(),
 				style.roundness().orElse(base.roundness()), style.shadow().orElse(base.shadow()),
-				base.margin(), base.reactToZoom(), base.cropRegion(), base.visibleRanges(),
-				base.timeOffsetMs(), Optional.empty(), base.backgroundEffect());
+				style.margin().orElse(base.margin()), base.reactToZoom(), base.cropRegion(),
+				base.visibleRanges(), base.timeOffsetMs(), Optional.empty(),
+				base.backgroundEffect());
 	}
 
 	/** Maps the project's fade-through-black clip transitions (stage 11). */

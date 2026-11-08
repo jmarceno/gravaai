@@ -263,6 +263,13 @@ public final class TimelineView extends Region {
 	private @Nullable Span dragLiveSpan;
 	private boolean dragged;
 	private boolean pressedEmpty;
+	/**
+	 * Drag over empty Camera-lane space: the press point, the live span of the block being drawn
+	 * (null until the pointer crosses the drag threshold), and whether the press started there.
+	 */
+	private boolean pressedCameraLane;
+	private double cameraLanePressMs;
+	private @Nullable Span cameraLaneDrawSpan;
 	/** Seek-drag in progress (empty lane press or playhead grab, React isSeeking / cap drag). */
 	private boolean scrubbing;
 	/** Pointer over the playhead cap/line: the cap expands and shows the time (React isHovered). */
@@ -657,22 +664,10 @@ public final class TimelineView extends Region {
 
 	private List<RowLayout> buildRowLayouts() {
 		List<RowLayout> rows = new ArrayList<>();
-		long annotationTracks = items.stream()
-				.filter(item -> TimelineRows.isAnnotationTrackRowId(item.rowId()))
-				.map(TimelineRenderItem::rowId).distinct().count();
-		long audioTracks = items.stream()
-				.filter(item -> TimelineRows.isAudioTrackRowId(item.rowId()))
-				.map(TimelineRenderItem::rowId).distinct().count();
-		long keystrokeLanes = items.stream()
-				.filter(item -> TimelineRows.isKeystrokeLaneRowId(item.rowId()))
-				.map(TimelineRenderItem::rowId).distinct().count();
-		boolean cameraLayoutRow = !cameraLayouts.isEmpty();
 		// Animated elements get their own lanes (overlaps stack), right under the clip rows.
 		List<String> elementLanes = items.stream()
 				.filter(item -> item.variant() == TimelineRenderItem.Variant.ELEMENT)
 				.map(TimelineRenderItem::rowId).distinct().sorted().toList();
-		long extras = annotationTracks + audioTracks + keystrokeLanes + sourceAudioTracks.size()
-				+ (cameraLayoutRow ? 1 : 0) + elementLanes.size();
 
 		double top = AXIS_HEIGHT;
 		rows.add(new RowLayout(TimelineConstants.CLIP_ROW_ID, top, CLIP_ROW_HEIGHT));
@@ -682,12 +677,11 @@ public final class TimelineView extends Region {
 			rows.add(new RowLayout(TimelineConstants.CAPTION_ROW_ID, top, COMPACT_ROW_HEIGHT));
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		}
-		// The Camera layout track sits right under the clips it re-frames; it appears once the
-		// first layout switch exists (Camera layout in the toolbar).
-		if (cameraLayoutRow) {
-			rows.add(new RowLayout(TimelineConstants.CAMERA_LAYOUT_ROW_ID, top, COMPACT_ROW_HEIGHT));
-			top += COMPACT_ROW_HEIGHT + ROW_GAP;
-		}
+		// The Camera layout track sits right under the clips it re-frames. It is always present:
+		// its empty stretches are the project layout (dashed lane), and clicking one returns the
+		// Webcam panel to the project scope.
+		rows.add(new RowLayout(TimelineConstants.CAMERA_LAYOUT_ROW_ID, top, COMPACT_ROW_HEIGHT));
+		top += COMPACT_ROW_HEIGHT + ROW_GAP;
 		for (String lane : elementLanes) {
 			rows.add(new RowLayout(lane, top, COMPACT_ROW_HEIGHT));
 			top += COMPACT_ROW_HEIGHT + ROW_GAP;
@@ -880,6 +874,18 @@ public final class TimelineView extends Region {
 				dragStartX = x;
 				return;
 			}
+			if (inCameraLayoutRow(y)) {
+				// Empty Camera-lane space is the project layout: a click returns the Webcam panel
+				// to that scope, a drag draws a new block over the range instead.
+				selectedIds.clear();
+				setSelection(null);
+				commands.clearSelection();
+				pressedCameraLane = true;
+				dragStartX = x;
+				cameraLanePressMs = Math.max(0, Math.min(timeAtX(x), fullRange.end()));
+				redraw();
+				return;
+			}
 			// handleTimelineMouseDown: clear the block selection, seek at once, then keep seeking
 			// while the pointer drags (the preview follows in real time).
 			selectedIds.clear();
@@ -968,6 +974,16 @@ public final class TimelineView extends Region {
 			if (time != currentTimeMs) {
 				setCurrentTimeMs(time);
 				commands.scrub(time);
+			}
+			return;
+		}
+		if (pressedCameraLane) {
+			double time = Math.max(0, Math.min(timeAtX(x), fullRange.end()));
+			if (Math.abs(x - dragStartX) > DRAG_THRESHOLD_PX) {
+				double start = Math.max(0, Math.min(cameraLanePressMs, time));
+				cameraLaneDrawSpan = new Span(start,
+						Math.min(fullRange.end(), Math.max(cameraLanePressMs, time)));
+				redraw();
 			}
 			return;
 		}
@@ -1090,6 +1106,23 @@ public final class TimelineView extends Region {
 			redraw();
 			return;
 		}
+		if (pressedCameraLane) {
+			Span drawn = cameraLaneDrawSpan;
+			resetDrag();
+			if (drawn != null) {
+				// A drag across empty camera-lane space draws a block over that range.
+				commands.addCameraLayout(drawn.start(), drawn.end());
+			} else {
+				// A plain click is the project-scope gesture: the Webcam panel shows the project
+				// settings again and the playhead moves there.
+				double time = scrubTimeAtX(x);
+				commands.clearSelection();
+				setCurrentTimeMs(time);
+				commands.seek(time);
+			}
+			redraw();
+			return;
+		}
 		boolean wasEmpty = pressedEmpty;
 		resetDrag();
 		if (wasEmpty) {
@@ -1107,6 +1140,8 @@ public final class TimelineView extends Region {
 		dragGroupSpans = null;
 		dragged = false;
 		pressedEmpty = false;
+		pressedCameraLane = false;
+		cameraLaneDrawSpan = null;
 		scrubbing = false;
 	}
 
@@ -1125,6 +1160,12 @@ public final class TimelineView extends Region {
 	private boolean inGradeRow(double y) {
 		RowLayout gradeRow = rowById(TimelineConstants.GRADE_ROW_ID);
 		return gradeRow != null && y >= gradeRow.top() && y <= gradeRow.top() + gradeRow.height();
+	}
+
+	private boolean inCameraLayoutRow(double y) {
+		RowLayout cameraRow = rowById(TimelineConstants.CAMERA_LAYOUT_ROW_ID);
+		return cameraRow != null && y >= cameraRow.top()
+				&& y <= cameraRow.top() + cameraRow.height();
 	}
 
 	/**
@@ -1242,6 +1283,10 @@ public final class TimelineView extends Region {
 				hoverGhost = ClipPresentation.getRegionDisplaySpan(new Span(start, end),
 						clipPresentation);
 				hoverGhostKind = "grade";
+			} else if (inCameraLayoutRow(y)) {
+				// Empty camera-lane space: the drag here draws a block; the click returns to the
+				// project layout, so the lane reads as "the project layout applies".
+				cursor = Cursor.CROSSHAIR;
 			}
 		}
 		canvas.setCursor(cursor);
@@ -1817,6 +1862,11 @@ public final class TimelineView extends Region {
 	}
 
 	private void drawInteractionOverlays(GraphicsContext graphics) {
+		if (pressedCameraLane && cameraLaneDrawSpan != null) {
+			// The block being drawn on the empty Camera lane.
+			drawDragGhost(graphics, cameraLaneDrawSpan,
+					rowById(TimelineConstants.CAMERA_LAYOUT_ROW_ID));
+		}
 		if (dragMode != DragMode.NONE && dragLiveSpan != null) {
 			RowLayout row = rowById(dragRowId);
 			if (dragMode == DragMode.MOVE && dragGroupSpans != null && dragGroupSpans.size() > 1) {

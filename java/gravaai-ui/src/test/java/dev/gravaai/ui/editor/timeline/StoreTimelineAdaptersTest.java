@@ -156,6 +156,37 @@ class StoreTimelineAdaptersTest {
 	}
 
 	@Test
+	@DisplayName("the Camera track scopes the Webcam panel and empty-lane space returns it to project")
+	void cameraScopeFollowsTheTrack() {
+		EditorStore store = store();
+		StoreTimelineCommands commands = new StoreTimelineCommands(store, seconds -> { });
+
+		// Drawing a block on the empty lane selects it, which is what scopes the panel.
+		commands.addCameraLayout(1_000, 3_000);
+		assertEquals(1, store.state().cameraLayoutSegments().size());
+		String blockId = store.state().cameraLayoutSegments().get(0).id();
+		assertEquals(blockId, store.selectedCameraLayoutId());
+
+		// Resizing the block through the adapter keeps its span.
+		commands.resizeEnd(blockId, new Span(1_000, 4_000));
+		assertEquals(4_000, store.state().cameraLayoutSegments().get(0).endMs());
+
+		// Clicking empty camera-lane space clears the block selection back to the project scope,
+		// and the clear is published so the inspector actually re-renders.
+		AtomicInteger changes = new AtomicInteger();
+		Subscription subscription = store.onChange(changed -> changes.incrementAndGet());
+		commands.clearSelection();
+		assertNull(store.selectedCameraLayoutId());
+		assertEquals(1, changes.get());
+		subscription.close();
+
+		commands.select(new TimelineSelection(TimelineSelection.CAMERA_LAYOUT, blockId));
+		assertEquals(blockId, store.selectedCameraLayoutId());
+		commands.deleteSelection();
+		assertEquals(0, store.state().cameraLayoutSegments().size());
+	}
+
+	@Test
 	@DisplayName("publishes store changes to the data source listener")
 	void publishesChanges() {
 		EditorStore store = store();

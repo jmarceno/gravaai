@@ -110,6 +110,66 @@ class CameraLayoutCommandsTest {
 	}
 
 	@Test
+	@DisplayName("drawing on the empty lane adds a block on the project layout")
+	void addsOnTheProjectLayout() {
+		EditorStore store = new EditorStore(state("""
+				{"clipRegions":[{"id":"a","startMs":0,"endMs":20000,"speed":1}],
+				 "webcam":{"positionPreset":"top-left"}}
+				"""));
+
+		assertTrue(store.apply(new CameraLayoutCommands.Add(4_000, 9_000)));
+
+		CameraLayoutSegment added = store.state().cameraLayoutSegments().get(0);
+		assertEquals(4_000, added.startMs());
+		assertEquals(9_000, added.endMs());
+		// A fresh block changes nothing on screen: same preset as the project, smooth switch in.
+		assertEquals(new CameraLayout.Position(WebcamPositionPreset.TOP_LEFT), added.layout());
+		assertEquals(CameraLayoutSegment.Transition.SMOOTH, added.transition());
+		assertTrue(added.style().isInherit());
+		assertEquals(added.id(), store.selectedCameraLayoutId());
+	}
+
+	@Test
+	@DisplayName("a drawn block is trimmed against the blocks beside it")
+	void drawnBlockStopsAtNeighbours() {
+		EditorStore store = store();
+		store.apply(new CameraLayoutCommands.SwitchAt(10_000, 20_000, SPLIT));
+
+		assertTrue(store.apply(new CameraLayoutCommands.Add(4_000, 14_000)));
+
+		assertEquals(List.of("4000-10000:bottom-right", "10000-20000:split-right"), layouts(store));
+	}
+
+	@Test
+	@DisplayName("a drawn block too short to keep is rejected")
+	void drawnBlockNeedsRoom() {
+		EditorStore store = store();
+		store.apply(new CameraLayoutCommands.SwitchAt(10_000, 20_000, SPLIT));
+
+		assertFalse(store.apply(new CameraLayoutCommands.Add(9_950, 14_000)));
+		assertEquals(1, store.state().cameraLayoutSegments().size());
+	}
+
+	@Test
+	@DisplayName("clearing a block's style restores inheritance in one undoable step")
+	void clearStyleRestoresInheritance() {
+		EditorStore store = store();
+		store.apply(new CameraLayoutCommands.SwitchAt(0, 20_000, CORNER));
+		String id = store.state().cameraLayoutSegments().get(0).id();
+		store.apply(new CameraLayoutCommands.SetStyle(id, "margin", OptionalDouble.of(12)));
+		store.apply(new CameraLayoutCommands.SetStyle(id, "size", OptionalDouble.of(30)));
+
+		assertTrue(store.apply(new CameraLayoutCommands.ClearStyle(id)));
+		assertTrue(store.state().cameraLayoutSegments().get(0).style().isInherit());
+		// Nothing left to clear the second time.
+		assertFalse(store.apply(new CameraLayoutCommands.ClearStyle(id)));
+
+		assertTrue(store.undo());
+		assertEquals(OptionalDouble.of(12),
+				store.state().cameraLayoutSegments().get(0).style().margin());
+	}
+
+	@Test
 	@DisplayName("selecting another element clears the camera layout selection")
 	void otherSelectionClears() {
 		EditorStore store = store();

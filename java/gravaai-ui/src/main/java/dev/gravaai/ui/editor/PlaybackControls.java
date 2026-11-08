@@ -103,7 +103,8 @@ public final class PlaybackControls extends GridPane {
 		cameraLayoutGraphic.getChildren().addAll(Icon.of(Icons.VideoCamera, 14),
 				Icon.of(Icons.CaretDown, 10));
 		cameraLayout.setGraphic(cameraLayoutGraphic);
-		dev.gravaai.ui.kit.Tooltip.install(cameraLayout, "Camera layout from the playhead");
+		dev.gravaai.ui.kit.Tooltip.install(cameraLayout,
+				"Camera layout from the playhead (or drag on the empty Camera track)");
 		cameraMenu = new DropdownMenu(cameraLayout);
 		cameraMenu.label("Camera layout from here");
 		boolean afterSplits = false;

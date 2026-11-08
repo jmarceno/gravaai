@@ -112,7 +112,9 @@ public final class StoreTimelineCommands implements TimelineCommands {
 
 	@Override
 	public void clearSelection() {
-		store.clearSelectionsExcept(null, null, null, null, null);
+		// Through the command, so the change is published and the inspector re-scopes (an empty
+		// Camera-lane click returns the Webcam panel to the project settings this way).
+		store.apply(new SelectionCommands.ClearAll());
 	}
 
 	@Override
@@ -332,6 +334,11 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	@Override
 	public void addGrade(double startMs, double endMs) {
 		store.apply(new GradeCommands.Add(startMs, endMs));
+	}
+
+	@Override
+	public void addCameraLayout(double startMs, double endMs) {
+		store.apply(new CameraLayoutCommands.Add(startMs, endMs));
 	}
 
 	private void retimeCaption(String id, Span span) {

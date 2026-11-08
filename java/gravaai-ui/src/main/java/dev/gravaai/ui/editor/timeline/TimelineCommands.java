@@ -151,4 +151,11 @@ public interface TimelineCommands {
 	/** Add a color/luminosity grade over the empty-lane click / playhead span on the Color track. */
 	default void addGrade(double startMs, double endMs) {
 	}
+
+	/**
+	 * Add a Camera layout block over a range drawn on the empty Camera track. The block starts on
+	 * the project layout (a no-op until its options change) and is trimmed to the gaps beside it.
+	 */
+	default void addCameraLayout(double startMs, double endMs) {
+	}
 }

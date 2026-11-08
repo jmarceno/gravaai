@@ -115,9 +115,53 @@ public final class CameraLayoutCommands {
 		}
 	}
 
+	/**
+	 * Adds a segment over {@code [startMs, endMs)} — the timeline's drag-on-the-empty-lane gesture.
+	 * The span is trimmed against the segments already there (the new block never overlaps), and
+	 * the new segment starts on the project layout's preset with a smooth switch in, so drawing a
+	 * block reads as "re-frame the camera here" before any option is touched.
+	 */
+	public static final class Add implements EditorCommand {
+		private final double startMs;
+		private final double endMs;
+
+		public Add(double startMs, double endMs) {
+			this.startMs = startMs;
+			this.endMs = endMs;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			long at = Math.max(0, Math.round(startMs));
+			long until = Math.round(endMs);
+			List<CameraLayoutSegment> segments = store.state().cameraLayoutSegments();
+			for (CameraLayoutSegment segment : segments) {
+				if (segment.endMs() > at) {
+					until = Math.min(until, segment.startMs());
+					break;
+				}
+			}
+			if (until - at < MIN_SEGMENT_MS) {
+				return false;
+			}
+			CameraLayout layout = projectLayout(store);
+			String id = store.nextId("camera", ids(segments));
+			List<CameraLayoutSegment> next = new ArrayList<>(segments);
+			next.add(new CameraLayoutSegment(id, at, until, layout, CameraLayoutStyle.INHERIT,
+					CameraLayoutSegment.Transition.SMOOTH));
+			store.setCameraLayoutSegments(next);
+			select(store, id);
+			return true;
+		}
+
+		/** The layout the project webcam settings already draw: the block starts as a no-op. */
+		private static CameraLayout projectLayout(EditorStore store) {
+			return new CameraLayout.Position(store.state().webcam().positionPreset());
+		}
+	}
+
 	/** Changes the layout of one segment. */
-	public static final class ChangeLayout implements EditorCommand {
-		private final String id;
+	public static final class ChangeLayout implements EditorCommand {		private final String id;
 		private final CameraLayout layout;
 
 		public ChangeLayout(String id, CameraLayout layout) {
@@ -165,6 +209,28 @@ public final class CameraLayoutCommands {
 			}
 			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
 					.map(segment -> segment.id().equals(id) ? segment.withStyle(next) : segment)
+					.toList());
+			return true;
+		}
+	}
+
+	/** Clears every style override of one segment, so it inherits the project look again. */
+	public static final class ClearStyle implements EditorCommand {
+		private final String id;
+
+		public ClearStyle(String id) {
+			this.id = id;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			Optional<CameraLayoutSegment> current = find(store, id);
+			if (current.isEmpty() || current.get().style().isInherit()) {
+				return false;
+			}
+			store.setCameraLayoutSegments(store.state().cameraLayoutSegments().stream()
+					.map(segment -> segment.id().equals(id)
+							? segment.withStyle(CameraLayoutStyle.INHERIT) : segment)
 					.toList());
 			return true;
 		}

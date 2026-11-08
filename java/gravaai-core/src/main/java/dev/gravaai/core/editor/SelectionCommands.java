@@ -63,13 +63,25 @@ public final class SelectionCommands {
 	}
 
 	/**
-	 * Clears every timeline selection, including the multi-selection (the Escape path).
+	 * Clears every timeline selection, including the multi-selection (the Escape path). It reports
+	 * a change only when something was selected, so a click on empty timeline space publishes and
+	 * records nothing.
 	 */
 	public static final class ClearAll implements EditorCommand {
 		@Override
 		public boolean apply(EditorStore store) {
+			boolean hadSelection = store.selectedClipId() != null
+					|| store.selectedZoomId() != null
+					|| store.selectedAnnotationId() != null
+					|| store.selectedAudioId() != null
+					|| store.selectedCaptionId() != null
+					|| store.selectedKeystrokeId() != null
+					|| store.selectedGradeId() != null
+					|| store.selectedCameraLayoutId() != null
+					|| store.selectedElementId().isPresent()
+					|| !store.multiSelection().isEmpty();
 			store.clearSelectionsExcept(null, null, null, null, null);
-			return true;
+			return hadSelection;
 		}
 	}
 

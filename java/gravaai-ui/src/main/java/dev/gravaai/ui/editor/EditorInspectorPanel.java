@@ -24,7 +24,6 @@ import dev.gravaai.core.project.AutoCaptionAnimation;
 import dev.gravaai.core.project.AutoCaptionSettings;
 import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
-import dev.gravaai.core.project.CameraLayoutStyle;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.CropRegion;
@@ -257,7 +256,10 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
-	/** Shows the editor for the selected camera layout segment. */
+	/**
+	 * The Camera layout scope: the Webcam panel edits the selected block instead of the project.
+	 * The panel is the same one either way — only its scope (and title) change.
+	 */
 	public void showCameraLayoutSettings() {
 		this.annotationMode = false;
 		this.selectionEditor = SelectionEditor.CAMERA_LAYOUT;
@@ -328,7 +330,10 @@ public final class EditorInspectorPanel extends VBox {
 		} else if (store.selectedGradeId() != null) {
 			showGradeSettings();
 		} else if (isSelectionMode()) {
-			show(section);
+			// Leaving the Camera block scope returns to the project scope of the same Webcam
+			// panel: an empty-lane click must not drop the user on an unrelated section.
+			show(selectionEditor == SelectionEditor.CAMERA_LAYOUT
+					? EditorSidebarRail.Section.WEBCAM : section);
 		}
 	}
 
@@ -558,7 +563,7 @@ public final class EditorInspectorPanel extends VBox {
 			case AUDIO -> "Audio";
 			case CAPTION -> "Caption";
 			case KEYSTROKE -> "Keystroke";
-			case CAMERA_LAYOUT -> "Camera layout";
+			case CAMERA_LAYOUT -> "Webcam · block";
 			case ELEMENT -> "Element";
 			case GRADE -> "Color grade";
 			case MULTI -> "Multiple";
@@ -591,7 +596,8 @@ public final class EditorInspectorPanel extends VBox {
 		return keystrokeSelectionSection();
 	}
 	if (selectionEditor == SelectionEditor.CAMERA_LAYOUT) {
-		return cameraLayoutSelectionSection();
+		// The Camera track re-scopes the ordinary Webcam panel rather than opening a second one.
+		return webcamSection();
 	}
 	if (selectionEditor == SelectionEditor.ELEMENT) {
 		if (elementPanel == null) {
@@ -1015,109 +1021,6 @@ public final class EditorInspectorPanel extends VBox {
 			return "0";
 		}
 		return String.format(java.util.Locale.ROOT, "%+.0f", value);
-	}
-
-	/** The Camera layout segment editor: its time span, the layout to switch to, remove. */
-	private Node cameraLayoutSelectionSection() {
-		java.util.Optional<CameraLayoutSegment> selected = store.state().cameraLayoutSegments()
-				.stream().filter(segment -> segment.id().equals(store.selectedCameraLayoutId()))
-				.findFirst();
-		if (selected.isEmpty()) {
-			return emptySelection("Select a camera layout block to change or remove it.");
-		}
-		CameraLayoutSegment segment = selected.get();
-		VBox root = new VBox(14);
-		Label span = new Label(PlaybackControls.formatDuration(segment.startMs() / 1000.0) + " – "
-				+ PlaybackControls.formatDuration(segment.endMs() / 1000.0));
-		span.setStyle("-fx-font-family: \"DejaVu Sans Mono\"; -fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		root.getChildren().add(span);
-
-		Select layout = new Select();
-		for (CameraLayout choice : CameraLayout.all()) {
-			layout.item(choice.wire(), choice.label());
-		}
-		layout.value(segment.layout().wire());
-		layout.onValueChange(value -> CameraLayout.fromWire(value).ifPresent(choice ->
-				store.apply(new CameraLayoutCommands.ChangeLayout(segment.id(), choice))));
-
-		ChoiceGroup transition = choice("cut", "Cut", "smooth", "Smooth");
-		transition.setValue(segment.transition().wire());
-		transition.setAccessibleText("Switch");
-		transition.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransition(
-				segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
-
-		// The layout group: what block this is and how the camera enters it.
-		root.getChildren().add(group("Layout", null, row("Layout", layout),
-				row("Switch", transition)));
-
-		// The switch out only matters where the project layout follows: a touching block's
-		// switch-in governs that boundary instead.
-		if (segment.followedByGap(store.state().cameraLayoutSegments())) {
-			ChoiceGroup switchOut = choice("cut", "Cut", "smooth", "Smooth");
-			switchOut.setValue(segment.transitionOut().wire());
-			switchOut.setAccessibleText("Switch out");
-			switchOut.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransitionOut(
-					segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
-			root.getChildren().add(row("Switch out", switchOut));
-		}
-
-		// This block's look; each slider starts at the project webcam value it overrides.
-		WebcamOverlaySettings webcam = store.state().webcam();
-		CameraLayoutStyle style = segment.style();
-		VBox styleGroup = groupRebuilding("Style", () -> {
-			for (String field : CameraLayoutStyle.FIELDS) {
-				store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
-						java.util.OptionalDouble.empty()));
-			}
-		});
-		if (segment.layout() instanceof CameraLayout.Position(var preset)) {
-			if (preset.isSplit()) {
-				boolean stacked = preset == WebcamPositionPreset.SPLIT_TOP
-						|| preset == WebcamPositionPreset.SPLIT_BOTTOM;
-				String field = stacked ? "height" : "width";
-				styleGroup.getChildren().add(styleSlider(segment, "Camera share", field,
-						style.get(field).orElse(stacked ? webcam.height() : webcam.width()),
-						10, 90, 1, EditorInspectorPanel::formatPercent));
-			} else {
-				styleGroup.getChildren().add(styleSlider(segment, "Size", "size",
-						style.size().orElse(webcam.size()), 10, 100, 1,
-						EditorInspectorPanel::formatPercent));
-				styleGroup.getChildren().add(styleSlider(segment, "Width", "width",
-						style.width().orElse(webcam.width()), 10, 100, 1,
-						EditorInspectorPanel::formatPercent));
-				styleGroup.getChildren().add(styleSlider(segment, "Height", "height",
-						style.height().orElse(webcam.height()), 10, 100, 1,
-						EditorInspectorPanel::formatPercent));
-			}
-			styleGroup.getChildren().add(styleSlider(segment, "Roundness", "roundness",
-					style.roundness().orElse(webcam.roundness()), 0, 100, 1,
-					EditorInspectorPanel::formatPercent));
-			styleGroup.getChildren().add(styleSlider(segment, "Shadow", "shadow",
-					style.shadow().orElse(webcam.shadow()) * 100, 0, 100, 1,
-					EditorInspectorPanel::formatPercent));
-		}
-		root.getChildren().add(styleGroup);
-
-		Label hint = new Label("Drag the block's edges on the Camera track to move the switch. "
-				+ "The diamond at its start toggles Cut / Smooth"
-				+ (segment.followedByGap(store.state().cameraLayoutSegments())
-						? ", the one at its end sets how the camera leaves." : "."));
-		hint.setWrapText(true);
-		hint.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		root.getChildren().add(hint);
-
-		root.getChildren().add(deleteSelectionButton("Remove (use project layout)",
-				() -> store.apply(new CameraLayoutCommands.Delete(segment.id()))));
-		return root;
-	}
-
-	/** A slider that overrides one webcam style field for one Camera layout block. */
-	private Slider styleSlider(CameraLayoutSegment segment, String label, String field,
-			double value, double min, double max, double step, DoubleFunction<String> formatter) {
-		double scale = "shadow".equals(field) ? 100 : 1;
-		return slider(label, value, min, max, step, formatter,
-				next -> store.apply(new CameraLayoutCommands.SetStyle(segment.id(), field,
-						java.util.OptionalDouble.of(next / scale))));
 	}
 
 	private Label emptySelection(String message) {
@@ -1670,70 +1573,107 @@ public final class EditorInspectorPanel extends VBox {
 
 	private VBox webcamSection() {
 		var webcam = store.state().webcam();
+		// The panel is one set of camera options whose scope follows the Camera track: a selected
+		// block edits that block's overrides, no selection (or empty-lane space) edits the project.
+		CameraLayoutSegment scope = cameraLayoutScope();
 		VBox root = new VBox(14);
+		if (scope != null) {
+			root.getChildren().add(cameraScopeBanner(scope));
+		}
 		// One Camera group carries the switch, background, layout and geometry affordances;
 		// Crop and the background-effect mask stay separate groups under Advanced.
-		VBox camera = group("Camera", this::resetWebcam);
+		VBox camera = group(scope == null ? "Camera" : "This block",
+				scope == null ? this::resetWebcam : () -> resetCameraBlock(scope));
 
-		Switch enabled = Switch.xs("Enabled");
-		enabled.setChecked(webcam.enabled());
-		enabled.onCheckedChange(value -> applyWebcam(json -> json.put("enabled", value)));
-		Switch mirror = Switch.xs("Mirror");
-		mirror.setChecked(webcam.mirror());
-		mirror.onCheckedChange(value -> {
-			applyWebcam(json -> json.put("mirror", value));
-			// The crop control edits a flipped rectangle when mirrored.
-			rebuild();
-		});
-		Switch react = Switch.xs("React to zoom");
-		react.setChecked(webcam.reactToZoom());
-		react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
-		boolean split = webcam.positionPreset().isSplit();
-		// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
-		camera.getChildren().addAll(split ? List.of(enabled, mirror)
-				: List.of(enabled, mirror, react));
+		// The camera device itself is one per recording: enabled/mirror/react and the background
+		// effect stay project-wide, so a block never edits them behind the user's back.
+		if (scope == null) {
+			Switch enabled = Switch.xs("Enabled");
+			enabled.setChecked(webcam.enabled());
+			enabled.onCheckedChange(value -> applyWebcam(json -> json.put("enabled", value)));
+			Switch mirror = Switch.xs("Mirror");
+			mirror.setChecked(webcam.mirror());
+			mirror.onCheckedChange(value -> {
+				applyWebcam(json -> json.put("mirror", value));
+				// The crop control edits a flipped rectangle when mirrored.
+				rebuild();
+			});
+			Switch react = Switch.xs("React to zoom");
+			react.setChecked(webcam.reactToZoom());
+			react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
+			boolean projectSplit = webcam.positionPreset().isSplit();
+			// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
+			camera.getChildren().addAll(projectSplit ? List.of(enabled, mirror)
+					: List.of(enabled, mirror, react));
 
-		// What the card does with the room: nothing, blur it, or let the wallpaper show through.
-		// One selector rather than two switches, so blur and remove cannot both be on.
-		ChoiceGroup backgroundEffect = choice(WebcamBackgroundEffect.NONE.wire(), "None",
-				WebcamBackgroundEffect.BLUR.wire(), "Blur",
-				WebcamBackgroundEffect.REMOVE.wire(), "Remove");
-		backgroundEffect.setValue(webcam.backgroundEffect().wire());
-		backgroundEffect.setAccessibleText("Webcam background");
-		backgroundEffect.onValueChange(value -> {
-			WebcamBackgroundEffect effect = WebcamBackgroundEffect.fromWireOrNull(value);
-			if (effect == null || effect == webcam.backgroundEffect()) {
-				return;
+			// What the card does with the room: nothing, blur it, or let the wallpaper show through.
+			// One selector rather than two switches, so blur and remove cannot both be on.
+			ChoiceGroup backgroundEffect = choice(WebcamBackgroundEffect.NONE.wire(), "None",
+					WebcamBackgroundEffect.BLUR.wire(), "Blur",
+					WebcamBackgroundEffect.REMOVE.wire(), "Remove");
+			backgroundEffect.setValue(webcam.backgroundEffect().wire());
+			backgroundEffect.setAccessibleText("Webcam background");
+			backgroundEffect.onValueChange(value -> {
+				WebcamBackgroundEffect effect = WebcamBackgroundEffect.fromWireOrNull(value);
+				if (effect == null || effect == webcam.backgroundEffect()) {
+					return;
+				}
+				applyWebcam(json -> json.put("backgroundEffect", effect.wire()));
+			});
+			Label effectCaption = new Label("Background");
+			effectCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			camera.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
+		} else {
+			// A block can also take the camera full frame or hide it; the Webcam panel is the only
+			// editor for blocks, so the full layout list lives here.
+			Select blockLayout = new Select();
+			for (CameraLayout choice : CameraLayout.all()) {
+				blockLayout.item(choice.wire(), choice.label());
 			}
-			applyWebcam(json -> json.put("backgroundEffect", effect.wire()));
-		});
-		Label effectCaption = new Label("Background");
-		effectCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
-		camera.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
+			blockLayout.value(scope.layout().wire());
+			blockLayout.onValueChange(value -> CameraLayout.fromWire(value).ifPresent(choice -> {
+				store.apply(new CameraLayoutCommands.ChangeLayout(scope.id(), choice));
+				rebuild();
+			}));
+			camera.getChildren().add(row("Layout", blockLayout));
+		}
+
+		WebcamPositionPreset preset = framingPreset(scope, webcam);
+		boolean split = preset.isSplit();
+		// Framing only applies to a positioned camera; camera-only and no-camera have no box.
+		if (scope != null && !(scope.layout() instanceof CameraLayout.Position)) {
+			root.getChildren().addAll(camera, cameraSwitchGroup(scope),
+					deleteSelectionButton("Remove block (use project layout)",
+							() -> store.apply(new CameraLayoutCommands.Delete(scope.id()))));
+			return root;
+		}
 
 		// Layout first: the floating bubble or split screen, each with its own position control.
-		ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");
-		layout.setValue(split ? "split" : "overlay");
-		layout.setAccessibleText("Webcam layout");
-		layout.onValueChange(value -> {
-			if (value.equals("split") == split) {
-				return;
-			}
-			applyWebcam(json -> json.put("positionPreset", value.equals("split")
-					? defaultSplitPreset(store.state().aspectRatio())
-					: webcam.corner().wire()));
-			rebuild();
-		});
-		camera.getChildren().add(layout);
+		// A block picks from the full list above instead (it can also be camera-only or hidden).
+		if (scope == null) {
+			ChoiceGroup layout = choice("overlay", "Overlay", "split", "Split screen");
+			layout.setValue(split ? "split" : "overlay");
+			layout.setAccessibleText("Webcam layout");
+			layout.onValueChange(value -> {
+				if (value.equals("split") == split) {
+					return;
+				}
+				applyPreset(null, value.equals("split")
+						? defaultSplitPreset(store.state().aspectRatio())
+						: webcam.corner().wire());
+				rebuild();
+			});
+			camera.getChildren().add(layout);
+		}
 
 		if (split) {
 			ChoiceGroup side = choice("split-right", "Right", "split-left", "Left",
 					"split-top", "Top", "split-bottom", "Bottom");
-			side.setValue(webcam.positionPreset().wire());
+			side.setValue(preset.wire());
 			side.setAccessibleText("Camera side");
 			side.onValueChange(value -> {
-				if (!value.equals(webcam.positionPreset().wire())) {
-					applyWebcam(json -> json.put("positionPreset", value));
+				if (!value.equals(preset.wire())) {
+					applyPreset(scope, value);
 					rebuild();
 				}
 			});
@@ -1743,50 +1683,45 @@ public final class EditorInspectorPanel extends VBox {
 			camera.getChildren().add(new VBox(8, sideCaption, side));
 			// The camera share of the split axis: the width percent beside the content, the
 			// height percent above/below it (the compositor reads the same fields).
-			boolean stacked = webcam.positionPreset() == WebcamPositionPreset.SPLIT_TOP
-					|| webcam.positionPreset() == WebcamPositionPreset.SPLIT_BOTTOM;
+			boolean stacked = preset == WebcamPositionPreset.SPLIT_TOP
+					|| preset == WebcamPositionPreset.SPLIT_BOTTOM;
 			String shareField = stacked ? "height" : "width";
-			camera.getChildren().add(slider("Camera share",
-					stacked ? webcam.height() : webcam.width(),
-					10, 90, 1, value -> formatPercent(value),
-					value -> applyWebcam(json -> json.put(shareField, value))));
+			camera.getChildren().add(framingSlider(scope, "Camera share", shareField,
+					stacked ? webcam.height() : webcam.width(), 10, 90,
+					value -> formatPercent(value)));
 		} else {
 			Select position = new Select();
-			for (WebcamPositionPreset preset : WebcamPositionPreset.values()) {
-				if (!preset.isSplit()) {
-					position.item(preset.wire(), labelFor(preset.wire()));
+			for (WebcamPositionPreset candidate : WebcamPositionPreset.values()) {
+				if (!candidate.isSplit()) {
+					position.item(candidate.wire(), labelFor(candidate.wire()));
 				}
 			}
-			position.value(webcam.positionPreset().wire());
-			position.onValueChange(value -> applyWebcam(json -> {
-				json.put("positionPreset", value);
-				WebcamPositionPreset preset = WebcamPositionPreset.fromWireOrNull(value);
-				if (preset != null && preset.isCorner()) {
-					json.put("corner", value);
-				}
-			}));
+			position.value(preset.wire());
+			position.onValueChange(value -> applyPreset(scope, value));
 			camera.getChildren().add(row("Position", position));
 
-			camera.getChildren().add(slider("Size", webcam.size(), 10, 100, 1,
-					value -> formatPercent(value),
-					value -> applyWebcam(json -> json.put("size", value))));
-			camera.getChildren().add(slider("Width", webcam.width(), 10, 100, 1,
-					value -> formatPercent(value),
-					value -> applyWebcam(json -> json.put("width", value))));
-			camera.getChildren().add(slider("Height", webcam.height(), 10, 100, 1,
-					value -> formatPercent(value),
-					value -> applyWebcam(json -> json.put("height", value))));
+			camera.getChildren().add(framingSlider(scope, "Size", "size", webcam.size(),
+					10, 100, value -> formatPercent(value)));
+			camera.getChildren().add(framingSlider(scope, "Width", "width", webcam.width(),
+					10, 100, value -> formatPercent(value)));
+			camera.getChildren().add(framingSlider(scope, "Height", "height", webcam.height(),
+					10, 100, value -> formatPercent(value)));
 		}
-		camera.getChildren().add(slider("Roundness", webcam.roundness(), 0, 100, 1,
-				value -> formatPercent(value),
-				value -> applyWebcam(json -> json.put("roundness", value))));
-		camera.getChildren().add(slider("Shadow", webcam.shadow(), 0, 1, 0.01,
-				value -> Math.round(value * 100) + "%",
-				value -> applyWebcam(json -> json.put("shadow", value))));
-		camera.getChildren().add(slider(split ? "Gap" : "Margin", webcam.margin(), 0, 96, 1,
-				value -> Math.round(value) + "px",
-				value -> applyWebcam(json -> json.put("margin", value))));
+		camera.getChildren().add(framingSlider(scope, "Roundness", "roundness", webcam.roundness(),
+				0, 100, value -> formatPercent(value)));
+		camera.getChildren().add(framingSlider(scope, "Shadow", "shadow", webcam.shadow(),
+				0, 1, value -> Math.round(value * 100) + "%"));
+		camera.getChildren().add(framingSlider(scope, split ? "Gap" : "Margin", "margin",
+				webcam.margin(), 0, 96, value -> Math.round(value) + "px"));
 		root.getChildren().add(camera);
+
+		if (scope != null) {
+			// How the camera arrives at and leaves this block: the switch diamonds on the track.
+			root.getChildren().add(cameraSwitchGroup(scope));
+			root.getChildren().add(deleteSelectionButton("Remove block (use project layout)",
+					() -> store.apply(new CameraLayoutCommands.Delete(scope.id()))));
+			return root;
+		}
 
 		if (advanced) {
 			// React: the crop control sits under Webcam > Advanced with a reset action.
@@ -1840,6 +1775,112 @@ public final class EditorInspectorPanel extends VBox {
 					value -> applyWebcam(json -> json.put("maskOffset", value))));
 		}
 		return root;
+	}
+
+	/**
+	 * The Camera track block the Webcam panel edits, or {@code null} for the project scope. The
+	 * panel follows the timeline selection, so selecting a block re-scopes it and clicking the
+	 * empty lane (or the track gutter) returns it to the project settings.
+	 */
+	private @Nullable CameraLayoutSegment cameraLayoutScope() {
+		String id = store.selectedCameraLayoutId();
+		if (id == null) {
+			return null;
+		}
+		return store.state().cameraLayoutSegments().stream()
+				.filter(segment -> segment.id().equals(id)).findFirst().orElse(null);
+	}
+
+	/** A one-line banner naming the block the panel is scoped to, with its time range. */
+	private Node cameraScopeBanner(CameraLayoutSegment segment) {
+		Label banner = new Label("Editing this block · "
+				+ PlaybackControls.formatDuration(segment.startMs() / 1000.0) + " – "
+				+ PlaybackControls.formatDuration(segment.endMs() / 1000.0)
+				+ ". Other times use the project layout.");
+		banner.setWrapText(true);
+		banner.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		return banner;
+	}
+
+	/** The preset the framing controls start from: the block's layout, else the project's. */
+	private static WebcamPositionPreset framingPreset(@Nullable CameraLayoutSegment scope,
+			WebcamOverlaySettings webcam) {
+		if (scope != null && scope.layout() instanceof CameraLayout.Position(var preset)) {
+			return preset;
+		}
+		return webcam.positionPreset();
+	}
+
+	/** Writes a position preset to the current scope: the block's layout, or the project's webcam. */
+	private void applyPreset(@Nullable CameraLayoutSegment scope, @Nullable String wire) {
+		WebcamPositionPreset preset = wire == null ? null : WebcamPositionPreset.fromWireOrNull(wire);
+		if (preset == null) {
+			return;
+		}
+		if (scope != null) {
+			store.apply(new CameraLayoutCommands.ChangeLayout(scope.id(),
+					new CameraLayout.Position(preset)));
+			return;
+		}
+		applyWebcam(json -> {
+			json.put("positionPreset", preset.wire());
+			if (preset.isCorner()) {
+				json.put("corner", preset.wire());
+			}
+		});
+	}
+
+	/**
+	 * One framing slider, routed to the current scope. In the block scope a slider shows (and
+	 * writes) the block's override, falling back to the project value until the user moves it; the
+	 * Reset action clears the overrides instead of copying values.
+	 */
+	private Slider framingSlider(@Nullable CameraLayoutSegment scope, String label, String field,
+			double projectValue, double min, double max, DoubleFunction<String> formatter) {
+		if (scope == null) {
+			return slider(label, projectValue, min, max, sliderStep(field), formatter,
+					value -> applyWebcam(json -> json.put(field, value)));
+		}
+		double value = scope.style().get(field).orElse(projectValue);
+		return slider(label, value, min, max, sliderStep(field), formatter,
+				next -> store.apply(new CameraLayoutCommands.SetStyle(scope.id(), field,
+						java.util.OptionalDouble.of(next))));
+	}
+
+	/** Shadow is a 0..1 fraction; the other framing fields are whole percents or pixels. */
+	private static double sliderStep(String field) {
+		return "shadow".equals(field) ? 0.01 : 1;
+	}
+
+	/** Clears every style override of one block, so it inherits the project look again. */
+	private void resetCameraBlock(CameraLayoutSegment segment) {
+		store.apply(new CameraLayoutCommands.ClearStyle(segment.id()));
+		rebuild();
+	}
+
+	/** How the camera enters and leaves the block: the two switch diamonds, as chips. */
+	private Node cameraSwitchGroup(CameraLayoutSegment segment) {
+		ChoiceGroup transition = choice("cut", "Cut", "smooth", "Smooth");
+		transition.setValue(segment.transition().wire());
+		transition.setAccessibleText("Switch");
+		transition.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransition(
+				segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
+
+		List<Node> rows = new ArrayList<>();
+		rows.add(row("Switch in", transition));
+		// The switch out only matters where the project layout follows: a touching block's
+		// switch-in governs that boundary instead.
+		if (segment.followedByGap(store.state().cameraLayoutSegments())) {
+			ChoiceGroup switchOut = choice("cut", "Cut", "smooth", "Smooth");
+			switchOut.setValue(segment.transitionOut().wire());
+			switchOut.setAccessibleText("Switch out");
+			switchOut.onValueChange(value -> store.apply(new CameraLayoutCommands.SetTransitionOut(
+					segment.id(), CameraLayoutSegment.Transition.fromWire(value))));
+			rows.add(row("Switch out", switchOut));
+		}
+		VBox box = new VBox(12);
+		box.getChildren().addAll(rows);
+		return box;
 	}
 
 	/**
@@ -2328,14 +2369,6 @@ public final class EditorInspectorPanel extends VBox {
 		box.getChildren().add(heading(title, reset));
 		box.getChildren().addAll(children);
 		return box;
-	}
-
-	/** One collapsible group whose Reset also rebuilds, so controls re-read the stored state. */
-	private VBox groupRebuilding(String title, Runnable reset, Node... children) {
-		return group(title, () -> {
-			reset.run();
-			rebuild();
-		}, children);
 	}
 
 	private HBox row(String label, Node control) {

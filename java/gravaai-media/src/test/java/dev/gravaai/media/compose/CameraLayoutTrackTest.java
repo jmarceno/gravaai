@@ -37,6 +37,24 @@ class CameraLayoutTrackTest {
 	}
 
 	@Test
+	@DisplayName("a block's margin override moves only that block's card")
+	void blockMarginOverride() {
+		ProjectEditorState editor = ProjectPersistence.normalizeProjectEditor(
+				Json.parseJsonWithByteOrderMark("""
+						{"clipRegions":[{"id":"a","startMs":0,"endMs":30000,"speed":1}],
+						 "webcam":{"enabled":true,"positionPreset":"bottom-right","margin":24},
+						 "cameraLayoutSegments":[
+							{"id":"camera-1","startMs":0,"endMs":10000,"layout":"bottom-right",
+							 "style":{"margin":8}}]}
+						"""));
+		WebcamSpec base = ProjectEditorInputs.webcamSpec(editor);
+
+		assertEquals(8, ProjectEditorInputs.webcamSpecAt(base, editor, 5_000).margin(), 1e-9);
+		// The gap after the block is back on the project margin.
+		assertEquals(24, ProjectEditorInputs.webcamSpecAt(base, editor, 12_000).margin(), 1e-9);
+	}
+
+	@Test
 	@DisplayName("a smooth switch glides from the previous layout; style overrides apply")
 	void smoothSwitchAndStyle() {
 		ProjectEditorState editor = ProjectPersistence.normalizeProjectEditor(

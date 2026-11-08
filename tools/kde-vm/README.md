@@ -51,18 +51,18 @@ Both machines need the files copied over; the two VMs are reached differently.
 
 ```bash
 # Proxmox host (192.168.0.11) - pointer.py
-scp tools/kde-vm/pointer.py root@192.168.0.11:/root/gravaai-pointer.py
+scp -i ~/.ssh/proxmox tools/kde-vm/pointer.py root@192.168.0.11:/root/gravaai-pointer.py
 
-# KDE VM (192.168.0.145) - the rest
+# KDE VM (192.168.0.165, VM 2004) - the rest
 scp tools/kde-vm/{cursor-recv.py,kwin-probe.js,harness.sh,launch-dev.sh,pprobe.sh,cprobe.sh} \
-    root@192.168.0.145:/opt/gravaai-test/
-ssh root@192.168.0.145 'chmod +x /opt/gravaai-test/*.sh'
+    root@192.168.0.165:/opt/gravaai-test/
+ssh root@192.168.0.165 'chmod +x /opt/gravaai-test/*.sh'
 ```
 
 Start the cursor readback once per VM boot:
 
 ```bash
-ssh root@192.168.0.145 /opt/gravaai-test/harness.sh start
+ssh root@192.168.0.165 /opt/gravaai-test/harness.sh start
 ```
 
 ## Clicking
@@ -82,8 +82,8 @@ input: `vm.sh click 828 988`, `vm.sh combo ctrl alt r`, `vm.sh shot hud 600 900 
 Read back where the pointer landed, and grab a screenshot:
 
 ```bash
-ssh root@192.168.0.145 /opt/gravaai-test/harness.sh pos    # e.g. 828,988	move
-ssh root@192.168.0.145 /opt/gravaai-test/harness.sh shot   # -> /run/gravaai-test/shot.png
+ssh root@192.168.0.165 /opt/gravaai-test/harness.sh pos    # e.g. 828,988	move
+ssh root@192.168.0.165 /opt/gravaai-test/harness.sh shot   # -> /run/gravaai-test/shot.png
 ```
 
 ## Gotchas

@@ -9,14 +9,15 @@
 #   vm.sh pos                       pointer position as KWin reports it
 #   vm.sh sh CMD...                 run a command on the VM as root
 set -u
-VM=${VM:-root@192.168.0.145}
+VM=${VM:-root@192.168.0.165}
 PVE=${PVE:-root@192.168.0.11}
-VMID=${VMID:-2002}
+PVE_KEY=${PVE_KEY:-$HOME/.ssh/proxmox}
+VMID=${VMID:-2004}
 OUT=${VM_SHOT_DIR:-$PWD}
 cmd=${1:-help}; shift || true
 case $cmd in
   click|move|rclick|tap|combo)
-    ssh -o BatchMode=yes "$PVE" python3 /root/gravaai-pointer.py "$cmd" "$@"
+    ssh -i "$PVE_KEY" -o BatchMode=yes "$PVE" python3 /root/gravaai-pointer.py "$cmd" "$@"
     sleep 0.3
     ssh "$VM" /opt/gravaai-test/harness.sh pos ;;
   pos) ssh "$VM" /opt/gravaai-test/harness.sh pos ;;
@@ -24,8 +25,8 @@ case $cmd in
     name=${1:-shot}; shift || true
     crop=""
     [ $# -eq 4 ] && crop="pamcut $1 $2 $3 $4 /tmp/vm.ppm |"
-    ssh "$PVE" "qm monitor $VMID <<< 'screendump /tmp/vm.ppm' >/dev/null 2>&1; ${crop:-cat /tmp/vm.ppm |} pnmtopng > /tmp/vm.png"
-    scp -q "$PVE:/tmp/vm.png" "$OUT/$name.png" && echo "$OUT/$name.png" ;;
+    ssh -i "$PVE_KEY" -o BatchMode=yes "$PVE" "qm monitor $VMID <<< 'screendump /tmp/vm.ppm' >/dev/null 2>&1; ${crop:-cat /tmp/vm.ppm |} pnmtopng > /tmp/vm.png"
+    scp -i "$PVE_KEY" -q "$PVE:/tmp/vm.png" "$OUT/$name.png" && echo "$OUT/$name.png" ;;
   sh) ssh "$VM" "$@" ;;
   *) sed -n '2,12p' "$0"; exit 2 ;;
 esac

@@ -11,7 +11,7 @@ import socket
 import sys
 import time
 
-SOCK = "/var/run/qemu-server/2002.qmp"
+SOCK = "/var/run/qemu-server/2004.qmp"
 SCREEN_W, SCREEN_H = 1920, 1080
 # The HID tablet reports 0..0x7fff across the whole framebuffer.
 AXIS_MAX = 0x7FFF

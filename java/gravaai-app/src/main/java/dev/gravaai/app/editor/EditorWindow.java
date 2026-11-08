@@ -164,6 +164,8 @@ public final class EditorWindow {
 	private final boolean hosted;
 	private boolean disposed;
 	private boolean closeApproved;
+	/** True once an autosave has told the dashboard about the project file it created. */
+	private boolean autosaveAnnounced;
 	private boolean previewFrameLogged;
 	private @Nullable AutoCaptionController captions;
 	private @Nullable AutoMaskController autoMask;
@@ -362,6 +364,16 @@ public final class EditorWindow {
 			}
 		});
 		shell.header().setDirty(unsavedChanges());
+		// Debounced autosave (plan §5.11, sweep gap A2): edits reach the project file on their own,
+		// an unsaved recording acquires exactly one file in the Projects folder, and nothing is
+		// written while the editor is idle. The header badge is the only signal — autosave never
+		// toasts, which is what the reference behaviour does.
+		session.enableAutosave(new EditorSession.AutosaveHooks(
+				this::projectsDirOrNull,
+				this::isExportRunning,
+				command -> Platform.runLater(command),
+				this::onAutosaved,
+				this::onAutosaveFailed));
 		// Single-window mode: the app owns the primary stage (and its close request). The editor
 		// disposes itself when the main window navigates back to the dashboard.
 		this.closeNow = () -> {
@@ -412,6 +424,36 @@ public final class EditorWindow {
 	/** True when this editor is hosted by the app's main window (single-window mode). */
 	public boolean isHosted() {
 		return hosted;
+	}
+
+	/**
+	 * Writes pending autosave work now (app quit): the debounce window would otherwise lose the
+	 * last edits. Safe from the FX thread (the normal caller) and waits for it when called from
+	 * another thread, because the store belongs to the FX thread.
+	 */
+	public void flushAutosave() {
+		if (disposed) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			session.flushAutosave();
+			return;
+		}
+		java.util.concurrent.CountDownLatch written = new java.util.concurrent.CountDownLatch(1);
+		Platform.runLater(() -> {
+			try {
+				session.flushAutosave();
+			} finally {
+				written.countDown();
+			}
+		});
+		try {
+			if (!written.await(2, java.util.concurrent.TimeUnit.SECONDS)) {
+				LOG.log(System.Logger.Level.WARNING, "autosave flush timed out while quitting");
+			}
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 	/** Releases the editor resources (subscriptions, shell, engine, session); idempotent. */
@@ -468,6 +510,10 @@ public final class EditorWindow {
 			confirmHostCloseDuringExport(next, abort);
 			return;
 		}
+		// Autosave first: work that reaches the disk needs no prompt. What is left dirty afterwards
+		// is the work the autosave could not persist (no folder, disk full), which the prompt guards.
+		session.flushAutosave();
+		refreshTitle();
 		if (closeApproved || !session.dirty()) {
 			dispose();
 			next.run();
@@ -654,6 +700,10 @@ public final class EditorWindow {
 			confirmCloseDuringExport(null, event);
 			return;
 		}
+		// Same rule as the hosted window: flush first, so the prompt only covers work that is
+		// genuinely not on disk.
+		session.flushAutosave();
+		refreshTitle();
 		if (closeApproved || !session.dirty()) {
 			return;
 		}
@@ -849,6 +899,32 @@ public final class EditorWindow {
 				Toast.Variant.SUCCESS);
 	}
 
+	/**
+	 * An autosave reached the disk (on the FX thread). Silent by design: the header badge is the
+	 * signal, and a "Project saved" toast per edit burst is exactly what the reference behaviour
+	 * does not do. The project the autosave created is announced to the dashboard once, so its card
+	 * shows up while the user keeps editing.
+	 */
+	private void onAutosaved(EditorSession.Autosaved saved) {
+		shell.header().setSaveWarning(null);
+		shell.header().setProjectName(session.displayName());
+		refreshTitle();
+		if (saved.createdFile() && !autosaveAnnounced && services.projectUpdated() != null) {
+			autosaveAnnounced = true;
+			services.projectUpdated().accept(saved.projectPath());
+		}
+	}
+
+	/**
+	 * An autosave could not write (disk full, read-only folder, unplugged volume): the session stays
+	 * dirty, the header keeps the warning until a save succeeds and the close prompt stays armed. The
+	 * work is never reported as saved, and never dropped.
+	 */
+	private void onAutosaveFailed(String reason) {
+		shell.header().setSaveWarning(reason);
+		refreshTitle();
+	}
+
 	private boolean save() {
 		if (session.isUnsaved()) {
 			// save-project without a path: the save dialog in the Projects folder.
@@ -856,6 +932,7 @@ public final class EditorWindow {
 		}
 		try {
 			session.save();
+			shell.header().setSaveWarning(null);
 			refreshTitle();
 			Path saved = session.projectPath();
 			if (saved != null && services.projectUpdated() != null) {
@@ -878,6 +955,7 @@ public final class EditorWindow {
 		Path target = withProjectExtension(chosen.get());
 		try {
 			session.saveAs(target);
+			shell.header().setSaveWarning(null);
 			shell.header().setProjectName(session.displayName());
 			refreshTitle();
 			if (services.projectUpdated() != null) {
@@ -1176,11 +1254,14 @@ public final class EditorWindow {
 					saveAsChosen();
 					return;
 				}
-				String clean = name.trim().replaceAll("[\\\\/:*?\"<>|]", "-");
-				Path target = folder.resolve(clean + ".gravaai");
+				// The same naming rules as autosave: the name is filesystem-safe and cannot
+				// overwrite a project that is already in the folder.
+				Path target = dev.gravaai.core.project.ProjectFileNaming
+						.uniqueProjectPath(folder, name);
 				try {
 					java.nio.file.Files.createDirectories(folder);
 					session.saveAs(target);
+					shell.header().setSaveWarning(null);
 					shell.header().setProjectName(session.displayName());
 					refreshTitle();
 					if (services.projectUpdated() != null) {

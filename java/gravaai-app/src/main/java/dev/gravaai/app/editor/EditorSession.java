@@ -3,20 +3,32 @@ package dev.gravaai.app.editor;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
+import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
 import dev.gravaai.core.editor.CaptionCommands;
 import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.ZoomCommands;
+import dev.gravaai.core.json.Json;
+import dev.gravaai.core.project.AtomicProjectSave;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClickSoundSettings;
 import dev.gravaai.core.project.KeySoundSettings;
@@ -25,6 +37,7 @@ import dev.gravaai.core.project.KeystrokeGrouping;
 import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.ProjectFileNaming;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.media.audio.ClickSoundHits;
@@ -69,6 +82,14 @@ public final class EditorSession implements AutoCloseable {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.editor");
 
+	/**
+	 * The debounce window between an edit and the autosave write (plan §5.11, sweep gap A2). Two
+	 * seconds is far below what the user notices and keeps a project file — which can carry a whole
+	 * transcript — from being rewritten on every drag. Nothing is written while the editor is idle,
+	 * and leaving the editor flushes, so a crash only loses the last two seconds of edits.
+	 */
+	public static final long AUTOSAVE_DEBOUNCE_MS = 2_000L;
+
 	/** The project file; {@code null} for an unsaved recording until it is saved. */
 	private @Nullable Path projectPath;
 	private ProjectDocument document;
@@ -81,6 +102,19 @@ public final class EditorSession implements AutoCloseable {
 	private final PlaybackEngine engine;
 	private final PlaybackControllerPort playback;
 	private final AtomicBoolean dirty = new AtomicBoolean();
+	/** Edits counted since the session opened, so a write only clears dirtiness it actually wrote. */
+	private final AtomicLong changeSequence = new AtomicLong();
+	/** Installed by the window to turn debounced autosave on; {@code null} keeps it off. */
+	private volatile @Nullable AutosaveHooks autosaveHooks;
+	/** Debounce window; the app uses {@link #AUTOSAVE_DEBOUNCE_MS}, tests shorten it. */
+	private volatile long autosaveDelayMs = AUTOSAVE_DEBOUNCE_MS;
+	/** The single daemon thread the debounce timer and the project writes run on. */
+	private volatile @Nullable ScheduledExecutorService autosaveScheduler;
+	private volatile @Nullable ScheduledFuture<?> autosavePending;
+	/** One write in flight; the state update lands on the UI thread once it finishes. */
+	private final AtomicBoolean autosaveWriting = new AtomicBoolean();
+	/** Why the last autosave failed, kept until a write succeeds; drives a persistent warning. */
+	private volatile @Nullable String autosaveFailure;
 	private final AtomicLong playheadMs = new AtomicLong();
 	/** Playhead listeners for the timeline indicator (engine thread; the window marshals to FX). */
 	private final java.util.List<java.util.function.Consumer<Double>> playheadListeners =
@@ -129,6 +163,8 @@ public final class EditorSession implements AutoCloseable {
 		});
 		this.changeSubscription = store.onChange(changed -> {
 			dirty.set(true);
+			changeSequence.incrementAndGet();
+			scheduleAutosave();
 			syncPlaybackClips();
 			syncClickSound();
 			syncKeySound();
@@ -637,24 +673,290 @@ public final class EditorSession implements AutoCloseable {
 
 	/** Saves the working editor state into the project file (raw unknown keys are preserved). */
 	public void save() throws IOException {
-		if (projectPath == null) {
+		Path target = projectPath;
+		if (target == null) {
 			throw new IllegalStateException("The project has not been saved yet; use Save As.");
 		}
 		ProjectDocument next = document
 				.withEditor(ProjectPersistence.normalizeProjectEditor(store.editorJson()));
-		next.write(projectPath);
+		writeProjectAtomically(target, next);
 		document = next;
 		dirty.set(false);
+		autosaveFailure = null;
 	}
 
 	/** Save As: writes the same project data to a new file and continues there. */
 	public void saveAs(Path target) throws IOException {
 		ProjectDocument next = document
 				.withEditor(ProjectPersistence.normalizeProjectEditor(store.editorJson()));
-		next.write(target);
+		writeProjectAtomically(target, next);
 		document = next;
 		projectPath = target;
 		dirty.set(false);
+		autosaveFailure = null;
+	}
+
+	/**
+	 * The one project-file write behind every save path: {@link AtomicProjectSave} writes a synced
+	 * temporary file and renames it over the target, keeping the previous generation as
+	 * {@code <project>.bak}, so a crash mid-save cannot leave a truncated project behind.
+	 */
+	private static void writeProjectAtomically(Path target, ProjectDocument next) throws IOException {
+		Path parent = target.toAbsolutePath().getParent();
+		if (parent != null) {
+			Files.createDirectories(parent);
+		}
+		try {
+			AtomicProjectSave.writeProjectFileAtomically(target, Json.stringify(next.toJson())).join();
+		} catch (CompletionException | UncheckedIOException error) {
+			// The atomic saver completes the future exceptionally with an UncheckedIOException;
+			// callers of an explicit save keep seeing the plain IOException they already handle.
+			IOException io = firstIoCause(error);
+			if (io != null) {
+				throw io;
+			}
+			throw error;
+		}
+	}
+
+	/** The {@code IOException} behind a wrapped write failure, if there is one. */
+	private static @Nullable IOException firstIoCause(Throwable error) {
+		for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+			if (cause instanceof IOException io) {
+				return io;
+			}
+			if (cause.getCause() == cause) {
+				break;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Turns debounced autosave on. The window installs it (the session has no JavaFX, no project
+	 * folder and no idea whether an export is running); a session without hooks — every headless
+	 * caller — keeps the explicit-save behaviour.
+	 *
+	 * @param hooks the wiring, installed once the window can answer for the UI thread
+	 */
+	public void enableAutosave(AutosaveHooks hooks) {
+		autosaveHooks = hooks;
+		if (autosaveScheduler == null && !closed) {
+			autosaveScheduler = Threads.daemonScheduler("gravaai-autosave");
+		}
+	}
+
+	/** Replaces the debounce window (tests shorten it; the app runs on the default). */
+	public void setAutosaveDelayMs(long delayMs) {
+		autosaveDelayMs = Math.max(0L, delayMs);
+	}
+
+	/** Why the last autosave failed, or {@code null} once a write has succeeded. */
+	public @Nullable String autosaveFailure() {
+		return autosaveFailure;
+	}
+
+	/**
+	 * Writes pending changes now, on the calling thread — the window calls it on the FX thread when
+	 * the user asks to leave, before its close prompt decides whether there is unsaved work. A
+	 * failure keeps the session dirty so the prompt still protects it. Deliberately <em>not</em>
+	 * called from {@link #close()}: the "Discard" path closes the session and must not write. No-op
+	 * for a session with no autosave installed.
+	 */
+	public void flushAutosave() {
+		ScheduledExecutorService scheduler = autosaveScheduler;
+		if (scheduler != null) {
+			cancelPendingAutosave();
+		}
+		AutosaveHooks hooks = autosaveHooks;
+		if (closed || hooks == null || !dirty.get() || hooks.saveBlocked().getAsBoolean()) {
+			return;
+		}
+		if (!autosaveWriting.compareAndSet(false, true)) {
+			// A debounced write is in flight; it applies its own result and keeps the session dirty
+			// when it fails, which is exactly what the close prompt then asks about.
+			return;
+		}
+		try {
+			AutosaveSnapshot snapshot = buildAutosaveSnapshot();
+			if (snapshot == null) {
+				return;
+			}
+			applyAutosaveResult(snapshot, writeFailure(snapshot));
+		} finally {
+			autosaveWriting.set(false);
+		}
+	}
+
+	/**
+	 * The autosave wiring installed by {@link #enableAutosave(AutosaveHooks)}.
+	 *
+	 * @param untitledDirectory where an unsaved project's first file goes (the Projects folder), or
+	 *     {@code null} when the app cannot name one — an untitled project is then simply not autosaved
+	 * @param saveBlocked true while a write must not run (an export rendering the same state)
+	 * @param uiExecutor the thread the store belongs to (the FX thread, inline in tests): every
+	 *     store read and every state update happens there, never on the write thread
+	 * @param autosaved called on the UI executor after a write reached the disk
+	 * @param saveFailed called on the UI executor with the reason a write did not reach the disk
+	 */
+	public record AutosaveHooks(
+			Supplier<@Nullable Path> untitledDirectory,
+			BooleanSupplier saveBlocked,
+			Executor uiExecutor,
+			Consumer<Autosaved> autosaved,
+			Consumer<String> saveFailed) {}
+
+	/** One autosave that reached the disk; {@code createdFile} marks the project's first file. */
+	public record Autosaved(Path projectPath, boolean createdFile) {}
+
+	/** A serialized project ready to hit the disk, with the state it was taken from. */
+	private record AutosaveSnapshot(
+			Path target, ProjectDocument document, String json, long sequence, boolean targetIsNew) {}
+
+	/** Re-arms the debounce timer; the write itself happens when it fires. */
+	private void scheduleAutosave() {
+		ScheduledExecutorService scheduler = autosaveScheduler;
+		if (scheduler == null || autosaveHooks == null || closed) {
+			return;
+		}
+		cancelPendingAutosave();
+		try {
+			autosavePending = scheduler.schedule(
+					this::runDebouncedAutosave, autosaveDelayMs, TimeUnit.MILLISECONDS);
+		} catch (java.util.concurrent.RejectedExecutionException stopped) {
+			autosavePending = null;
+		}
+	}
+
+	private void cancelPendingAutosave() {
+		ScheduledFuture<?> pending = autosavePending;
+		autosavePending = null;
+		if (pending != null) {
+			pending.cancel(false);
+		}
+	}
+
+	/** The timer: hand the snapshot to the UI thread, then the write back to this one. */
+	private void runDebouncedAutosave() {
+		autosavePending = null;
+		AutosaveHooks hooks = autosaveHooks;
+		ScheduledExecutorService scheduler = autosaveScheduler;
+		if (hooks == null || scheduler == null || closed || autosaveWriting.get()) {
+			return;
+		}
+		if (hooks.saveBlocked().getAsBoolean()) {
+			// An export is rendering: keep the changes dirty and try again after the next window.
+			scheduleAutosave();
+			return;
+		}
+		hooks.uiExecutor().execute(() -> {
+			if (closed || autosaveWriting.get()) {
+				return;
+			}
+			AutosaveSnapshot snapshot = buildAutosaveSnapshot();
+			if (snapshot == null || !autosaveWriting.compareAndSet(false, true)) {
+				return;
+			}
+			try {
+				scheduler.execute(() -> {
+					try {
+						writeAutosaveSnapshot(snapshot);
+					} finally {
+						autosaveWriting.set(false);
+					}
+				});
+			} catch (java.util.concurrent.RejectedExecutionException stopped) {
+				autosaveWriting.set(false);
+			}
+		});
+	}
+
+	/**
+	 * Reads the store and serializes the project. Runs on the UI thread because the store belongs to
+	 * it; the write that follows is the only part that leaves it.
+	 */
+	private @Nullable AutosaveSnapshot buildAutosaveSnapshot() {
+		if (closed) {
+			return null;
+		}
+		Path target = projectPath;
+		boolean isNew = false;
+		if (target == null) {
+			AutosaveHooks hooks = autosaveHooks;
+			Path directory = hooks == null ? null : hooks.untitledDirectory().get();
+			if (directory == null) {
+				// No Projects folder to create the file in: the work stays dirty, as before autosave.
+				return null;
+			}
+			target = ProjectFileNaming.uniqueProjectPath(directory, displayName());
+			isNew = true;
+		}
+		ProjectDocument next = document
+				.withEditor(ProjectPersistence.normalizeProjectEditor(store.editorJson()));
+		return new AutosaveSnapshot(target, next, Json.stringify(next.toJson()),
+				changeSequence.get(), isNew);
+	}
+
+	/** The write, on the autosave thread; the result is applied back on the UI thread. */
+	private void writeAutosaveSnapshot(AutosaveSnapshot snapshot) {
+		if (closed) {
+			return;
+		}
+		String failure = writeFailure(snapshot);
+		AutosaveHooks hooks = autosaveHooks;
+		if (hooks == null || closed) {
+			return;
+		}
+		hooks.uiExecutor().execute(() -> applyAutosaveResult(snapshot, failure));
+	}
+
+	/** Performs one snapshot write; {@code null} means success. Never throws. */
+	private @Nullable String writeFailure(AutosaveSnapshot snapshot) {
+		try {
+			writeProjectAtomically(snapshot.target(), snapshot.document());
+			return null;
+		} catch (IOException | RuntimeException error) {
+			String reason = describeWriteFailure(error);
+			LOG.log(System.Logger.Level.WARNING,
+					"autosave failed for " + snapshot.target() + ": " + reason, error);
+			return reason;
+		}
+	}
+
+	/** Applies one write result on the UI thread: the file, the project path and the dirty flag. */
+	private void applyAutosaveResult(AutosaveSnapshot snapshot, @Nullable String failure) {
+		AutosaveHooks hooks = autosaveHooks;
+		if (closed || hooks == null) {
+			return;
+		}
+		if (failure != null) {
+			// Disk full, read-only folder, removed volume: the work stays dirty and the editor says
+			// so persistently — never a "saved" toast that did not happen.
+			autosaveFailure = failure;
+			hooks.saveFailed().accept(failure);
+			return;
+		}
+		document = snapshot.document();
+		projectPath = snapshot.target();
+		autosaveFailure = null;
+		if (changeSequence.get() == snapshot.sequence()) {
+			dirty.set(false);
+		}
+		hooks.autosaved().accept(new Autosaved(snapshot.target(), snapshot.targetIsNew()));
+		if (changeSequence.get() != snapshot.sequence()) {
+			// Edited while the file was being written: that edit is not on disk yet.
+			scheduleAutosave();
+		}
+	}
+
+	/** The reason a write failed, for the persistent warning: "No space left on device", … */
+	private static String describeWriteFailure(Throwable error) {
+		Throwable cause = error;
+		while (cause.getCause() != null && cause.getCause() != cause) {
+			cause = cause.getCause();
+		}
+		String message = cause.getMessage();
+		return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
 	}
 
 	/** Late-bound timeline scrub for playhead drags (non-blocking, latest wins). */
@@ -682,6 +984,7 @@ public final class EditorSession implements AutoCloseable {
 			return;
 		}
 		closed = true;
+		cancelPendingAutosave();
 		clipSync.shutdownNow();
 		closeQuietly(timeSubscription);
 		closeQuietly(changeSubscription);
@@ -689,6 +992,10 @@ public final class EditorSession implements AutoCloseable {
 		engine.close();
 		for (AutoCloseable resource : ownedResources) {
 			closeQuietly(resource);
+		}
+		ScheduledExecutorService autosave = autosaveScheduler;
+		if (autosave != null) {
+			autosave.shutdownNow();
 		}
 	}
 

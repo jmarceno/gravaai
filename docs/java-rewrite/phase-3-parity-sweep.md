@@ -55,7 +55,7 @@ opens a separate dashboard window this is marked "in flight" rather than mapped.
 | 17 | `linux-capture.spec.ts` (4) | 🟡 mapped+manual | 4 | `CapturePickerSourcesTest#keepsLinuxWindowSelectionOnItsSourceList`, `SourceServiceTest#waylandStartsUnselectedAndPreparesThePortalOnRequest` | Source-list window UI and COSMIC consent manual |
 | 18 | `paused-motion.spec.ts` (3) | 🟡 mapped+manual | 3 | `PlaybackEngineTest#pausedSeekRendersOneFrame`, `CompositorMotionBlurTest#zoomStepProducesRadialBlur` | Paused-seek→resume and scrub+paused-blur combinations manual |
 | 19 | `playback-shortcut.spec.ts` (1) | ⚠ gap | 1 |none | Space handler missing in Java (gap A1) |
-| 20 | `project-dashboard.spec.ts` (12) | 🟡 mapped+manual | 10 | `DashboardLibraryFiltersTest#filtersBySearchAndSort`, `DashboardModelTest#persistsFolders`, `ProjectCardHoverPreviewTest#hoverMountsAndExitUnmounts` | Autosave is a gap (A2); pixel layout manual |
+| 20 | `project-dashboard.spec.ts` (12) | 🟡 mapped+manual | 10 | `DashboardLibraryFiltersTest#filtersBySearchAndSort`, `DashboardModelTest#persistsFolders`, `ProjectCardHoverPreviewTest#hoverMountsAndExitUnmounts` | Autosave mapped (A2 closed, see §A); pixel layout manual |
 | 21 | `recording-startup-cancellation.spec.ts` (1) | 🟡 mapped+manual | 2 | `SourceServiceTest#doesNotChangeSourcesIfRecordingStartsDuringValidation`, `CountdownServiceTest#cancelsActiveCountdownImmediately` | Native warm-up discard untested |
 | 22 | `startup-loading.spec.ts` (8) | ⛔ N/A | 1 | `EditorSkeletonWindow` (code, not a test) | Electron/JS boot wireframes do not exist in Java |
 | 23 | `timeline-gap-snapping.spec.ts` (3) | ✅ mapped | 3 | `TimelineViewTest#resizesZoomEndSnappingToCut`, `#zoomDragSnapsEndKeepingDuration`, `ClipPresentationTest#softSnapsWithinEightPixels` | |
@@ -68,7 +68,7 @@ opens a separate dashboard window this is marked "in flight" rather than mapped.
 
 Totals: the 104 declared test cases (106 runtime titles) group into **84 behaviour bullets** — **31 ✅ mapped,
 36 🟡 mapped+manual, 11 🔵 manual, 4 ⛔ N/A** (the eight `startup-loading` titles collapse into one
-N/A group), **2 ⚠ gaps**, plus 9 implemented-but-untested behaviours in [Gaps B](#b-implemented-but-untested-coverage-gaps--add-tests-no-code-change-expected).
+N/A group), **1 ⚠ gap** (A1; A2 closed), plus 9 implemented-but-untested behaviours in [Gaps B](#b-implemented-but-untested-coverage-gaps--add-tests-no-code-change-expected).
 
 ---
 
@@ -352,9 +352,16 @@ steps are written to be runnable on the packaged AppImage (phase-1 gate conventi
   `DashboardModelTest#listsProjectsAndFilters`,
   `DashboardLibraryFiltersTest#usesElectronTimeWindows`; empty-state copy/UI manual.
 * Autosave creates one untitled project, stays idle without periodic saves, refreshes the preview on
-  exit and shows no saved toast → ⚠ **gap A2**: Java has explicit save (`EditorSession#save`,
-  `#saveAs`) plus an unsaved-close prompt (`EditorWindow`), and no debounced autosave/untitled-project
-  creation. Poster generation exists (`ProjectManagerTest#generatesMissingPosterOnce`).
+  exit and shows no saved toast → ✅ **gap A2 closed**: `EditorSession` debounces edits on a
+  `Threads.daemonScheduler` thread (`AUTOSAVE_DEBOUNCE_MS`, 2 s), names the first file through
+  `ProjectFileNaming.uniqueProjectPath` (`<recording>.gravaai`, then ` 1`, ` 2`, …), writes it through
+  `AtomicProjectSave`, and keeps the header badge as the only signal (no toast).
+  `EditorSessionAutosaveTest#editsReachDiskOnTheirOwn`, `#freshRecordingAcquiresOneFile`,
+  `#collisionGetsTheNumberedName`, `#idleWritesNothing`, `#editBurstLandsAsOneWrite`,
+  `#flushWritesThePendingEdits`, `#failedWriteKeepsTheWorkDirty`,
+  `ProjectFileNamingTest#picksTheFirstFreeName`. Leaving the editor flushes before the close prompt;
+  the dashboard's copy now says "Projects save automatically as you edit." Poster generation exists
+  (`ProjectManagerTest#generatesMissingPosterOnce`).
 * Creation sort, independent folders/shared settings, precise caption spacing (48 px avatar/caption),
   circular initials, settings rows → 🟡 `DashboardLibraryFiltersTest#sortsByCreationTime`,
   `DashboardModelTest#persistsFolders`; exact pixel layout manual.
@@ -486,7 +493,7 @@ steps are written to be runnable on the packaged AppImage (phase-1 gate conventi
 | # | Spec | Behaviour missing in Java | Java file | Action |
 |---|---|---|---|---|
 | A1 | `playback-shortcut.spec.ts` | Space toggles play/pause exactly once per press (held-key repeats ignored), from the play button and from the timeline. `Shortcuts.Action.PLAY_PAUSE` is defined/defaulted and editable but nothing consumes it. | `gravaai-ui/.../editor/timeline/TimelineView.java` (`keyAction`), `gravaai-app/.../editor/EditorWindow.java`, `gravaai-ui/.../editor/PlaybackControls.java` | Add a scene-level Space binding (consume repeat, no debounce) + TestFX test mirroring the Playwright cases. |
-| A2 | `project-dashboard.spec.ts` | Debounced autosave that creates one untitled project, does not save while idle, and refreshes the preview on exit without a "saved" toast. Java only has explicit save + unsaved-close prompt. | `gravaai-app/.../editor/EditorSession.java` (`save`/`saveAs`), `gravaai-app/.../editor/EditorWindow.java` (close dialog) | Decide port vs accepted deviation; if deviation, record it in the Phase 3 report deviations table (plan §5.11 says "autosave/recovery (whatever exists today)"). |
+| A2 | `project-dashboard.spec.ts` | ~~Debounced autosave that creates one untitled project, does not save while idle, and refreshes the preview on exit without a "saved" toast.~~ **Closed 2026-11-08**: `EditorSession#enableAutosave` debounces `store.onChange` on `Threads.daemonScheduler`, creates one `<recording>.gravaai` through `ProjectFileNaming` + `AtomicProjectSave`, stays silent (badge only) and flushes on leave. | `gravaai-app/.../editor/EditorSession.java`, `gravaai-app/.../editor/EditorWindow.java`, `gravaai-core/.../project/ProjectFileNaming.java`, `gravaai-ui/.../editor/EditorHeaderView.java` (`setSaveWarning`) | Ported, not a deviation. Evidence: `EditorSessionAutosaveTest` (9 cases), `ProjectFileNamingTest` (4). Failed writes stay dirty with a persistent badge warning |
 | A3 | `hud-layout.spec.ts` | Floating webcam preview resizes from all four corners, remembers its size, and falls back gracefully when storage is blocked. | `gravaai-ui/.../launch/HudWebcamPreview.java` | Java has one bottom-right handle and a hard-coded 320×240 default with no persistence. Port four-corner resize + preference persistence, or record as deviation. |
 
 ### B. Implemented but untested (coverage gaps — add tests, no code change expected)

@@ -26,6 +26,8 @@ public final class EditorHeaderView extends HBox {
 	private final StackPane titleHost = new StackPane();
 	private final Label projectName = new Label("Untitled Project");
 	private final Label saveState = new Label("Saved");
+	/** The reason of the current save warning, shown on hover over the badge. */
+	private final javafx.scene.control.Label saveWarningTip = new javafx.scene.control.Label();
 	private final Button undo;
 	private final Button redo;
 	private final Button clips;
@@ -55,8 +57,15 @@ public final class EditorHeaderView extends HBox {
 		titleHost.getChildren().add(projectButton());
 
 		// Saved/Unsaved readout (mock .crumb .badge): the dirty flag surfaces here instead of
-		// tinting the Save button, which the mock keeps plain.
+		// tinting the Save button, which the mock keeps plain. A failed autosave keeps the badge in
+		// its warning state (with the reason on hover) until a save succeeds — persistent, not a
+		// toast that disappears with the failure still on the disk.
 		saveState.getStyleClass().add("editor-header__save-state");
+		saveWarningTip.setWrapText(true);
+		saveWarningTip.setMaxWidth(320);
+		dev.gravaai.ui.kit.Tooltip.install(saveState, saveWarningTip,
+				dev.gravaai.ui.kit.Motion.TOOLTIP_DELAY,
+				dev.gravaai.ui.kit.Motion.TOOLTIP_CLOSE_DELAY);
 
 		Separator divider = Separator.vertical();
 		divider.setMinHeight(20);
@@ -132,6 +141,7 @@ public final class EditorHeaderView extends HBox {
 		getChildren().addAll(mark, home, slash, titleHost, saveState, browser, divider, clips,
 				spacer, undo, redo, save, export);
 		refresh();
+		refreshSaveState();
 	}
 
 	/** The app logo at topbar-mark size; the shell's first element in the mock. */
@@ -148,6 +158,8 @@ public final class EditorHeaderView extends HBox {
 
 	private boolean clipsOpen;
 	private boolean dirty;
+	/** Why a save could not write, kept in the badge until a save succeeds; {@code null} when clean. */
+	private @Nullable String saveWarning;
 	private @Nullable Runnable openExportMenu;
 	private @Nullable Runnable onSave;
 	private @Nullable Runnable projectBrowserOpener;
@@ -242,14 +254,46 @@ public final class EditorHeaderView extends HBox {
 	 */
 	public void setDirty(boolean dirty) {
 		this.dirty = dirty;
-		saveState.setText(dirty ? "Unsaved" : "Saved");
-		saveState.getStyleClass().remove("is-dirty");
-		if (dirty) {
-			saveState.getStyleClass().add("is-dirty");
+		refreshSaveState();
+	}
+
+	/**
+	 * Reports that a save could not write, and keeps reporting it: the badge turns to "Not saved"
+	 * (red) with the reason on hover, and stays there until a save succeeds. Autosave never shows a
+	 * success toast, so this is the only channel that tells the user their work is not on disk.
+	 *
+	 * @param reason the failure to show, or {@code null} to clear the warning
+	 */
+	public void setSaveWarning(@Nullable String reason) {
+		saveWarning = reason == null || reason.isBlank() ? null : reason.trim();
+		refreshSaveState();
+	}
+
+	/** True while a save failure is being reported. */
+	public boolean saveWarning() {
+		return saveWarning != null;
+	}
+
+	private void refreshSaveState() {
+		saveState.getStyleClass().removeAll("is-dirty", "is-error");
+		if (saveWarning != null) {
+			saveState.setText("Not saved");
+			saveState.getStyleClass().add("is-error");
+			saveWarningTip.setText("The project could not be written: " + saveWarning
+					+ "\nYour changes are not on disk.");
+		} else {
+			saveState.setText(dirty ? "Unsaved" : "Saved");
+			if (dirty) {
+				saveState.getStyleClass().add("is-dirty");
+			}
+			// The badge always has something useful on hover, so the tooltip is never an empty box.
+			saveWarningTip.setText(dirty
+					? "Saving every edit; the last seconds are not on disk yet."
+					: "Every change is on disk.");
 		}
-		save.setAccessibleText(dirty
-				? "Save project, unsaved changes"
-				: "Save project");
+		save.setAccessibleText(saveWarning != null
+				? "Save project, saving failed: " + saveWarning
+				: dirty ? "Save project, unsaved changes" : "Save project");
 	}
 
 	/** True while the project has changes that are not on disk. */

@@ -75,6 +75,12 @@
 	-fx-text-fill: #f0b429;
 }
 
+/* A save that did not reach the disk (disk full, read-only folder): persistent, red, in the badge. */
+.editor-header__save-state.is-error {
+	-fx-text-fill: #e5484d;
+	-fx-border-color: #e5484d;
+}
+
 /* The shell takes focus on open (React shows no ring until keyboard navigation). */
 .editor-header .button--ghost:focused {
 	-fx-background-color: transparent;

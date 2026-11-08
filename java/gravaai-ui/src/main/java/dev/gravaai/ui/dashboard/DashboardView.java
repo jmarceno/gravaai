@@ -544,7 +544,7 @@ public final class DashboardView {
 		openFile.setOnAction(event -> dependencies.actions().importFile());
 		rows.add(new SettingsRow("Open video or project", "", openFile));
 		javafx.scene.control.Label hint = new javafx.scene.control.Label(
-				"Named projects save automatically. Previews refresh when you return to Projects.");
+				"Projects save automatically as you edit. Previews refresh when you return to Projects.");
 		hint.getStyleClass().add("dashboard-settings__hint");
 		hint.setWrapText(true);
 		rows.add(hint);

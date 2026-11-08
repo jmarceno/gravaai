@@ -37,7 +37,7 @@ Each deviation names the decision rule used. Items carried from P1/P2 are refere
 | **jqwik pinned to 1.9.3** | `java/pom.xml` pins `jqwik.version=1.9.3` instead of the newest 1.10.x. | 1.10.x ships an upstream AI-directed notice ("jqwik Anti-AI Affair"); 1.9.3 is the last clean line (comment in `java/pom.xml:42-45`). Rule: no prompt-injection-style dependency content |
 | **`java/` stays a subdirectory** | Repo keeps the Maven reactor under `java/` instead of moving modules to the repo root. | Plan §7.3 P3.6 leaves this to the reviewer; keeping the path while Electron removal is pending avoids rewriting every doc/tool/CI path. Decision recorded in the removal plan; the repo must still build the AppImage with `cd java && ./mvnw -T1 -Pdist package` |
 | **Preview audio via bundled ffmpeg CLI, 16-bit PCM** | Preview decodes with `ffmpeg -f s16le` converted to float; export keeps the float graph. Plan §5.7 prefers the in-process AVFilterGraph. | The bundled `--disable-everything` FFmpeg enables `pcm_s16le` but **not** `f32le`; requesting `f32le` produced silent preview in the packaged app (user report). CLI keeps preview audio available; the in-process filter graph remains the §5.7 remainder. Evidence: `FfmpegCliPcmSource` + `FfmpegCliPcmSourceTest#decodesAudioFixture` (peak > 0.01), `PlaybackAudioProducerTest#appliesClipTransitionFadeGain` |
-| **Autosave not ported** | Java saves on explicit Save/Save As and prompts on unsaved close; Electron's debounced autosave/untitled-project creation was not ported. | Behaviour parity gap (sweep gap A2), **not yet an approved deviation**: plan §5.11 says "autosave/recovery (whatever exists today)". Reviewer must either accept this as a deviation or schedule the port |
+| ~~**Autosave not ported**~~ | **Closed 2026-11-08** — Electron's debounced autosave is ported: `EditorSession` debounces edits (2 s) onto a daemon scheduler, an unsaved recording acquires exactly one `<recording>.gravaai` in the Projects folder (`ProjectFileNaming` + `AtomicProjectSave`), no toast is shown, and leaving the editor flushes first. | Sweep gap A2 is now **closed rather than deviated** (plan §5.11 "autosave/recovery (whatever exists today)"). Evidence: `EditorSessionAutosaveTest` (9 cases), `ProjectFileNamingTest` (4). A failed write keeps the session dirty and shows a persistent badge warning |
 | **Webcam crop control without live frame** | Inspector crop editor works from stored crop math/gestures; no live webcam frame in the inspector; crop-matched height auto-match deferred. | Inspector has no webcam frame source in JavaFX; a live frame would need another decoder path. `WebcamCropMathTest` / `WebcamCropControlTest` cover the maths and gestures; visual crop-in-context is manual |
 | **Raw-card hover preview uses the compositor** | Dashboard raw recordings preview through the composited frame rather than playing the source video directly. | Consistent wallpaper/cursor/edit state with the editor preview, one decoder path; `ProjectCardHoverPreviewTest#rawCardHoverPreview` |
 | **Smoke export as settings overrides, not a dev IPC channel** | `Mp4ExportSettings` reads smoke URL/format overrides from settings; the Electron dev smoke-export IPC route is gone. | Single process has no IPC; the dev smoke path only needs deterministic settings. `Mp4ExportSettingsTest#smokeOverridesMenu`, `#partialSmokeFallsBack` |
@@ -149,7 +149,7 @@ Open human gates carried by the plan; all are to run on the packaged AppImage on
 | P3 | **Real COSMIC recording end-to-end** (HUD → portal/source pick → capture → stop → editor) | **in progress** | being diagnosed (see §8); user report 2026-10-28 |
 | P3 | **MCP skill loop** (read → plan → edit → look → export against the Java app) | **done — PASS** | `phase-3-skill-loop-evidence.md` (real packaged app + `--mcp`, `:99`; export validated with `ffprobe`; residual tool gaps in its §7) |
 | P3 | Example extension in preview + export | done by tests | `ExtensionRenderHookPipelineTest` (both composites) |
-| P3 | Parity-sweep manual spots | open | `phase-3-parity-sweep.md` Gaps A1–A3, B1–B9: Space shortcut, autosave decision, webcam-preview resize, header rename, Clips panel, wallpaper gallery, popover dismissal, HUD view internals, source-list view, focus guard, paused-motion combinations |
+| P3 | Parity-sweep manual spots | open | `phase-3-parity-sweep.md` Gaps A1, A3, B1–B9: Space shortcut, webcam-preview resize, header rename, Clips panel, wallpaper gallery, popover dismissal, HUD view internals, source-list view, focus guard, paused-motion combinations (A2 autosave **closed** 2026-11-08) |
 
 ### 2026-10-28 user-reported fixes (verified in tree + latest green run)
 
@@ -219,8 +219,8 @@ change.
 2. **Parity gaps from P3.5** (details + manual steps in `phase-3-parity-sweep.md`):
    * A1 — **Space play/pause is not wired** in Java: `Shortcuts.Action.PLAY_PAUSE` (default `" "`)
      exists and is editable/persisted, but no key handler consumes it.
-   * A2 — **No autosave**: explicit save + unsaved-close prompt only; decide port vs recorded
-     deviation (plan §5.11).
+   * A2 — **Autosave ported 2026-11-08** (was: explicit save only). `EditorSession` debounces
+     edits and creates the untitled project file itself; no decision left for the reviewer.
    * A3 — **HUD webcam preview parity**: Java resizes from one bottom-right handle with a fixed
      320×240 default and no persistence; React used four corners, 288×288, localStorage + storage
      fallback.
@@ -251,7 +251,7 @@ change.
    captures before P3.6 approval.
 8. **Open questions**: (a) keep or drop the meeting dev env flags after single-window hosting;
    (b) whether the hosted editor should still expose a separate "editor window" mode for the
-   legacy gate/test `EditorWindowTest`; (c) autosave deviation (A2); (d) Space shortcut (A1)
+   legacy gate/test `EditorWindowTest`; (c) Space shortcut (A1)
    and HUD webcam preview (A3) scope for P3.
 9. **Test-environment policy**: UI tests default to `:99` via the Maven property; do not run them
    on `:0`. The latest suite numbers in §4 are from `:99` runs.
@@ -266,8 +266,8 @@ change.
 3. Regenerate the Phase-3 UI gallery (and `phase-2-ui.html`-style side-by-side) after the
    single-window change.
 4. Approve P3.6 (Electron deletion) or send back; the removal plan is ready.
-5. Decide login items: autosave deviation (A2), Space play/pause port (A1), HUD webcam preview
-   resize (A3), meeting dev env flags.
+5. Decide login items: Space play/pause port (A1), HUD webcam preview resize (A3), meeting dev
+   env flags. (Autosave A2 is ported — no decision needed.)
 6. Review `phase-3-skill-loop-evidence.md` (loop PASS) and decide its five residual agent gaps
    (`project close`, transcribe job, auto_zoom telemetry, contact sheet, extension hooks).
 7. Run the recording end-to-end diagnosis on COSMIC and record the result in §6.

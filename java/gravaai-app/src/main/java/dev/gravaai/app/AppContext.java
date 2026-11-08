@@ -838,6 +838,8 @@ public final class AppContext {
 		}
 		for (EditorWindow window : List.copyOf(editorWindows)) {
 			try {
+				// Quitting must not drop the debounced autosave: write what is pending first.
+				window.flushAutosave();
 				if (window.isHosted()) {
 					window.dispose();
 				} else {

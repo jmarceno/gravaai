@@ -1,8 +1,11 @@
 **ALWAYS USE MODERN JAVA**
 **NULL IS FORBIDDEN WITHOUT A WELL JUSTIFIED REASON**
 **THIS IS A LINUX ONLY APPLICATION**
+**TESTING ON KDE/GNOME/OTHERS SHOULD ONLY BE DONE WHEN REQUESTED BY THE USER EXPLICITLY***
 
-## Testing on KDE
+When done, always commit the changes, compile a new version and bundle a new app image, except if you were explicitly said not to do so.
+
+## Testing on KDE 
 
 KDE compatibility is tested by clicking the real app in the `KubuntuDev-KDE` VM, never by
 reasoning about what should happen. The harness lives in `tools/kde-vm/`; read its README

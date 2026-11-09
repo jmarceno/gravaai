@@ -13,6 +13,7 @@ import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
 import dev.gravaai.services.projects.ProjectThumbnailReady;
 import dev.gravaai.ui.UiThreads;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.ContentClamp;
 import dev.gravaai.ui.kit.Icon;
@@ -59,7 +60,21 @@ public final class DashboardView {
 	/** The dashboard stylesheet; the hosting window adds it with {@link #installStyles(Scene)}. */
 	public static final String STYLESHEET = "/ui/dashboard/dashboard.css";
 
-	private static final Map<String, String> SETTINGS_CATEGORIES = settingsCategories();
+	/** The settings rail categories in display order; labels resolve through {@link #categoryLabel}. */
+	private static final List<String> SETTINGS_CATEGORY_IDS = List.of("general", "permissions",
+			"motion", "recording", "shortcuts", "meetings", "automations", "ai", "files");
+
+	/** Label keys per category, literal so the key check sees them. */
+	private static final Map<String, String> SETTINGS_CATEGORY_LABEL_KEYS = Map.of(
+			"general", "dashboard:settings.category.general",
+			"permissions", "dashboard:settings.category.permissions",
+			"motion", "dashboard:settings.category.motion",
+			"recording", "dashboard:settings.category.recording",
+			"shortcuts", "dashboard:settings.category.shortcuts",
+			"meetings", "dashboard:settings.category.meetings",
+			"automations", "dashboard:settings.category.automations",
+			"ai", "dashboard:settings.category.ai",
+			"files", "dashboard:settings.category.files");
 
 	private final DashboardDependencies dependencies;
 	private final DashboardModel model;
@@ -207,6 +222,18 @@ public final class DashboardView {
 		rebuildSettingsSections();
 	}
 
+	/** The currently selected settings category (the app restores it when rebuilding the scene). */
+	public String activeSettingsCategory() {
+		return activeSettingsCategory;
+	}
+
+	/** Flushes the settings pages' debounced saves before the view is discarded. */
+	public void flushPendingEdits() {
+		if (automationsView != null) {
+			automationsView.flushPendingSave();
+		}
+	}
+
 	/** Adds the content of one settings category (General, Recording, Shortcuts, ...). */
 	public void addSettingsSection(String category, Node node) {
 		String key = category == null ? "general" : category;
@@ -261,7 +288,8 @@ public final class DashboardView {
 				});
 			} catch (Exception error) {
 				Platform.runLater(() -> {
-					model.errorProperty().set("Could not load the library: " + message(error));
+					model.errorProperty().set(UiI18n.t("dashboard:library.couldNotLoad",
+							Map.of("error", message(error))));
 					model.loadingProperty().set(false);
 					rebuildGrid();
 				});
@@ -377,21 +405,28 @@ public final class DashboardView {
 		}
 		javafx.scene.control.Label message = new javafx.scene.control.Label(emptyMessage(projectsLibrary, filtered));
 		message.getStyleClass().add("dashboard-empty__text");
+		// Longer translations (de, pt-BR) must wrap instead of stretching the centred empty state.
+		message.setWrapText(true);
+		message.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+		message.setMaxWidth(420);
 		emptyState.getChildren().addAll(artwork, message);
 		if (projectsLibrary && !filtered) {
-			Button record = new Button("Record your first video", Button.Variant.DEFAULT, Button.Size.SM);
+			Button record = new Button(UiI18n.t("dashboard:empty.recordFirst"),
+					Button.Variant.DEFAULT, Button.Size.SM);
 			record.setGraphic(Icon.of(Icons.Plus, 16));
 			record.setGraphicTextGap(8);
 			record.setOnAction(event -> dependencies.actions().showRecordingHud());
 			emptyState.getChildren().add(record);
 		}
 		if (!model.query().isBlank()) {
-			Button clear = new Button("Clear search", Button.Variant.GHOST, Button.Size.SM);
+			Button clear = new Button(UiI18n.t("dashboard:empty.clearSearch"),
+					Button.Variant.GHOST, Button.Size.SM);
 			clear.setOnAction(event -> model.setQuery(""));
 			emptyState.getChildren().add(clear);
 		}
 		if (model.isRaw() && model.errorProperty().get() != null && !model.errorProperty().get().isBlank()) {
-			Button retry = new Button("Retry", Button.Variant.SECONDARY, Button.Size.SM);
+			Button retry = new Button(UiI18n.t("dashboard:empty.retry"),
+					Button.Variant.SECONDARY, Button.Size.SM);
 			retry.setOnAction(event -> refresh(true));
 			emptyState.getChildren().add(retry);
 		}
@@ -404,13 +439,15 @@ public final class DashboardView {
 				return model.meetingsError();
 			}
 			return filtered
-					? "No matching meetings"
-					: "No meetings yet. Turn on meeting mode in the recorder, or import a recording.";
+					? UiI18n.t("dashboard:empty.noMatchingMeetings")
+					: UiI18n.t("dashboard:empty.noMeetings");
 		}
 		if (model.isRaw()) {
-			return filtered ? "No matching raw files" : "No raw recordings yet";
+			return filtered ? UiI18n.t("dashboard:empty.noMatchingRaw")
+					: UiI18n.t("dashboard:empty.noRaw");
 		}
-		return filtered ? "No matching projects" : "It's looking empty in here...";
+		return filtered ? UiI18n.t("dashboard:empty.noMatchingProjects")
+				: UiI18n.t("dashboard:empty.emptyProjects");
 	}
 
 	private void updateError() {
@@ -458,21 +495,21 @@ public final class DashboardView {
 	private void buildSettingsContent() {
 		settingsContent.getStyleClass().add("dashboard-settings");
 
-		Label title = new Label("SETTINGS");
+		Label title = new Label(UiI18n.t("dashboard:settings.title"));
 		title.getStyleClass().add("dashboard-settings__title");
 
-		Label categoryLabel = new Label("CATEGORIES");
+		Label categoryLabel = new Label(UiI18n.t("dashboard:settings.categories"));
 		categoryLabel.getStyleClass().add("dashboard-settings__rail-label");
 
 		VBox rail = settingsRail;
 		rail.getStyleClass().add("dashboard-settings__rail");
-		for (Map.Entry<String, String> category : SETTINGS_CATEGORIES.entrySet()) {
-			Button item = new Button(category.getValue(), Button.Variant.GHOST, Button.Size.SM);
+		for (String category : SETTINGS_CATEGORY_IDS) {
+			Button item = new Button(categoryLabel(category), Button.Variant.GHOST, Button.Size.SM);
 			item.getStyleClass().add("dashboard-settings__rail-item");
 			item.setMaxWidth(Double.MAX_VALUE);
 			item.setAlignment(Pos.CENTER_LEFT);
 			item.setOnAction(event -> {
-				activeSettingsCategory = category.getKey();
+				activeSettingsCategory = category;
 				rebuildSettingsSections();
 			});
 			rail.getChildren().add(item);
@@ -506,7 +543,7 @@ public final class DashboardView {
 			if (item instanceof Button button) {
 				button.getStyleClass().remove("is-selected");
 				if (button.getText() != null
-						&& button.getText().equals(SETTINGS_CATEGORIES.get(activeSettingsCategory))) {
+						&& button.getText().equals(categoryLabel(activeSettingsCategory))) {
 					button.getStyleClass().add("is-selected");
 				}
 			}
@@ -521,7 +558,7 @@ public final class DashboardView {
 				return;
 			}
 			javafx.scene.control.Label unavailable = new javafx.scene.control.Label(
-					"Meeting settings are loading. Open this tab again in a moment.");
+					UiI18n.t("dashboard:settings.meetingSettingsLoading"));
 			unavailable.getStyleClass().add("dashboard-settings__hint");
 			settingsSectionsHost.getChildren().add(unavailable);
 		}
@@ -533,18 +570,21 @@ public final class DashboardView {
 	private List<Node> buildFilesSettings() {
 		List<Node> rows = new ArrayList<>();
 		String projectsDir = model.projectsDir() == null ? "" : model.projectsDir().toString();
-		Button showFolder = new Button("Show folder", Button.Variant.SECONDARY, Button.Size.SM);
+		Button showFolder = new Button(UiI18n.t("dashboard:settings.files.showFolder"),
+				Button.Variant.SECONDARY, Button.Size.SM);
 		showFolder.setOnAction(event -> {
 			if (model.projectsDir() != null) {
 				dependencies.actions().revealInFolder(model.projectsDir().toString());
 			}
 		});
-		rows.add(new SettingsRow("Projects folder", projectsDir, showFolder));
-		Button openFile = new Button("Open file", Button.Variant.SECONDARY, Button.Size.SM);
+		rows.add(new SettingsRow(UiI18n.t("dashboard:settings.files.projectsFolder"), projectsDir,
+				showFolder));
+		Button openFile = new Button(UiI18n.t("dashboard:settings.files.openFile"),
+				Button.Variant.SECONDARY, Button.Size.SM);
 		openFile.setOnAction(event -> dependencies.actions().importFile());
-		rows.add(new SettingsRow("Open video or project", "", openFile));
+		rows.add(new SettingsRow(UiI18n.t("dashboard:settings.files.openVideoOrProject"), "", openFile));
 		javafx.scene.control.Label hint = new javafx.scene.control.Label(
-				"Projects save automatically as you edit. Previews refresh when you return to Projects.");
+				UiI18n.t("dashboard:settings.files.hint"));
 		hint.getStyleClass().add("dashboard-settings__hint");
 		hint.setWrapText(true);
 		rows.add(hint);
@@ -569,18 +609,12 @@ public final class DashboardView {
 		return host;
 	}
 
-	private static Map<String, String> settingsCategories() {
-		Map<String, String> categories = new LinkedHashMap<>();
-		categories.put("general", "General");
-		categories.put("permissions", "Permissions");
-		categories.put("motion", "Motion");
-		categories.put("recording", "Recording");
-		categories.put("shortcuts", "Shortcuts");
-		categories.put("meetings", "Meetings");
-		categories.put("automations", "Automations");
-		categories.put("ai", "AI control");
-		categories.put("files", "Files");
-		return java.util.Collections.unmodifiableMap(categories);
+	private static String categoryLabel(String category) {
+		String key = SETTINGS_CATEGORY_LABEL_KEYS.get(category);
+		if (key == null) {
+			throw new IllegalArgumentException("unknown settings category: " + category);
+		}
+		return UiI18n.t(key);
 	}
 
 	private static String message(Throwable error) {

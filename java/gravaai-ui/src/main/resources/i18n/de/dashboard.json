@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Neu aufnehmen",
+		"home": "Start",
+		"raw": "Rohdateien",
+		"meetings": "Besprechungen",
+		"folders": "Ordner",
+		"newFolder": "Neuer Ordner",
+		"settings": "Einstellungen",
+		"changeColorFor": "Farbe von {{name}} ändern",
+		"optionsFor": "Optionen für {{name}}",
+		"rename": "Umbenennen",
+		"removeFolder": "Ordner entfernen"
+	},
+	"toolbar": {
+		"import": "Importieren",
+		"searchRaw": "Rohdateien durchsuchen…",
+		"searchRawAccessible": "Rohdateien durchsuchen",
+		"searchMeetings": "Besprechungen durchsuchen…",
+		"searchMeetingsAccessible": "Besprechungen durchsuchen",
+		"searchProjects": "Projekte durchsuchen…",
+		"searchProjectsAccessible": "Projekte durchsuchen"
+	},
+	"filters": {
+		"timeFilters": "Zeitfilter",
+		"all": "Alle",
+		"last7Days": "Letzte 7 Tage",
+		"last30Days": "Letzte 30 Tage",
+		"sortProjects": "Projekte sortieren",
+		"lastEdited": "Zuletzt bearbeitet",
+		"lastCreated": "Zuletzt erstellt",
+		"name": "Name",
+		"selectAll": "Alle auswählen",
+		"selectRawToRemove": "Rohdateien zum Entfernen auswählen",
+		"selectProjectsToDelete": "Projekte zum Löschen auswählen",
+		"remove": "Entfernen",
+		"selectedCount": "{{count}} ausgewählt"
+	},
+	"empty": {
+		"recordFirst": "Nimm dein erstes Video auf",
+		"clearSearch": "Suche löschen",
+		"retry": "Erneut versuchen",
+		"noMatchingMeetings": "Keine passenden Besprechungen",
+		"noMeetings": "Noch keine Besprechungen. Aktiviere den Besprechungsmodus im Rekorder oder importiere eine Aufnahme.",
+		"noMatchingRaw": "Keine passenden Rohdateien",
+		"noRaw": "Noch keine Rohaufnahmen",
+		"noMatchingProjects": "Keine passenden Projekte",
+		"emptyProjects": "Hier sieht es ziemlich leer aus..."
+	},
+	"library": {
+		"couldNotLoad": "Die Bibliothek konnte nicht geladen werden: {{error}}",
+		"couldNotDelete": "Löschen fehlgeschlagen: {{error}}",
+		"couldNotRename": "Umbenennen fehlgeschlagen: {{error}}",
+		"couldNotSavePreferences": "Bibliothekseinstellungen konnten nicht gespeichert werden: {{error}}",
+		"meetingsNotDeleted": "Besprechungen, die noch verarbeitet werden, wurden nicht gelöscht.",
+		"meetingsServiceUnavailable": "Der Besprechungsdienst ist nicht verfügbar.",
+		"untitledFolder": "Unbenannter Ordner",
+		"meeting": "Besprechung"
+	},
+	"cards": {
+		"select": "{{name}} auswählen",
+		"optionsFor": "Optionen für {{name}}",
+		"addFolder": "Ordner hinzufügen",
+		"createFolderHint": "Lege in der Seitenleiste einen Ordner an",
+		"removeFromFolders": "Aus allen Ordnern entfernen",
+		"openMeeting": "Besprechung öffnen",
+		"previewFile": "Datei ansehen",
+		"openProject": "Projekt öffnen",
+		"rename": "Umbenennen",
+		"showInFolder": "Im Ordner anzeigen",
+		"moveToTrash": "In den Papierkorb verschieben",
+		"removeFromLibrary": "Aus der Bibliothek entfernen",
+		"deleteProject": "Projekt löschen"
+	},
+	"deleteDialog": {
+		"titleOne": "„{{name}}“ löschen?",
+		"titleMany": "{{count}} Projekte löschen?",
+		"descriptionOne": "Das Projekt wird in den Systempapierkorb verschoben und lässt sich von dort wiederherstellen.",
+		"descriptionMany": "Die Projekte werden in den Systempapierkorb verschoben und lassen sich von dort wiederherstellen.",
+		"alsoDeleteVideoOne": "Das aufgenommene Video auch von der Festplatte löschen",
+		"alsoDeleteVideoMany": "Die aufgenommenen Videos auch von der Festplatte löschen"
+	},
+	"banner": {
+		"meetingInterrupted": "Eine Besprechungsaufnahme wurde unterbrochen",
+		"screenInterrupted": "Eine Bildschirmaufnahme wurde unterbrochen",
+		"recoverHint": "Stelle sie wieder her, um weiterzubearbeiten.",
+		"discard": "Verwerfen",
+		"recover": "Wiederherstellen"
+	},
+	"announcements": {
+		"previous": "Vorherige Ankündigung",
+		"next": "Nächste Ankündigung",
+		"dot": "Ankündigung {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Notizen bereit",
+		"transcriptReady": "Transkript bereit",
+		"notTranscribed": "Nicht transkribiert"
+	},
+	"meetingStatus": {
+		"waiting": "Warten",
+		"processing": "Verarbeitung…",
+		"failed": "Fehlgeschlagen",
+		"interrupted": "Unterbrochen",
+		"waitingToStart": "Wartet auf den Start",
+		"transcribing": "Transkribieren",
+		"writingNotes": "Notizen schreiben",
+		"namingMeeting": "Besprechung benennen"
+	},
+	"settings": {
+		"title": "EINSTELLUNGEN",
+		"categories": "KATEGORIEN",
+		"category": {
+			"general": "Allgemein",
+			"permissions": "Berechtigungen",
+			"motion": "Bewegung",
+			"recording": "Aufnahme",
+			"shortcuts": "Tastenkürzel",
+			"meetings": "Besprechungen",
+			"automations": "Automatisierungen",
+			"ai": "KI-Steuerung",
+			"files": "Dateien"
+		},
+		"meetingSettingsLoading": "Die Besprechungseinstellungen werden geladen. Öffne diesen Tab gleich noch einmal.",
+		"files": {
+			"showFolder": "Ordner anzeigen",
+			"projectsFolder": "Projektordner",
+			"openFile": "Datei öffnen",
+			"openVideoOrProject": "Video oder Projekt öffnen",
+			"hint": "Projekte werden beim Bearbeiten automatisch gespeichert. Vorschauen aktualisieren sich, wenn du zu Projekte zurückkehrst."
+		},
+		"general": {
+			"languageSystem": "Systemsprache",
+			"languageDescription": "Sprache der gesamten Oberfläche. „Systemsprache“ folgt der Einstellung deines Desktops.",
+			"autoZoomsTitle": "Neue Aufnahmen automatisch zoomen",
+			"autoZoomsDescription": "Fügt Zooms bei Klicks und Tippen hinzu, wenn eine frische Aufnahme im Editor geöffnet wird.",
+			"showCursorTitle": "Cursor anzeigen",
+			"showCursorDescription": "Neue Projekte zeichnen den aufgezeichneten Cursor über das Video."
+		},
+		"motion": {
+			"connectZoomsTitle": "Nahe Zooms verbinden",
+			"connectZoomsDescription": "Nahe beieinander liegende Zooms gleiten ineinander über, statt dazwischen herauszuzoomen.",
+			"zoomInDurationTitle": "Dauer des Zooms hinein",
+			"zoomInDurationDescription": "Wie lange der Zoom hinein dauert.",
+			"zoomOutDurationTitle": "Dauer des Zooms heraus",
+			"zoomOutDurationDescription": "Wie lange der Zoom zurück dauert.",
+			"zoomMotionBlurTitle": "Zoom-Bewegungsunschärfe",
+			"zoomMotionBlurDescription": "Unschärfe während des Zoomens.",
+			"cursorSmoothingTitle": "Cursor-Glättung",
+			"cursorSmoothingDescription": "Glättet zitterige Cursorbewegungen.",
+			"cursorMotionBlurTitle": "Cursor-Bewegungsunschärfe",
+			"cursorMotionBlurDescription": "Unschärfe bei schnellen Cursorbewegungen.",
+			"cursorSwayTitle": "Cursor-Schwanken",
+			"cursorSwayDescription": "Wie stark sich der Cursor bei Bewegung neigt."
+		},
+		"recording": {
+			"micTitle": "Mikrofon-Rauschunterdrückung",
+			"micDescription": "Bereinigt Hintergrundrauschen des Mikrofons in neuen Aufnahmen. Systemaudio bleibt unverändert. Die Stufe Stark kann Stimmen leicht bearbeitet klingen lassen.",
+			"keysTitle": "Tastenanschläge aufzeichnen",
+			"keysDescription": "„Nur Kürzel“ überspringt normales Tippen. Tastenanschläge werden nur neben der Aufnahme gespeichert. Buchstaben folgen dem US-Tastaturlayout.",
+			"off": "Aus",
+			"light": "Leicht",
+			"balanced": "Ausgewogen",
+			"strong": "Stark",
+			"shortcutsOnly": "Nur Kürzel",
+			"allKeys": "Alle Tasten",
+			"micSaveFailed": "Rauschunterdrückung des Mikrofons konnte nicht aktualisiert werden",
+			"keysSaveFailed": "Tastenanschlag-Aufzeichnung konnte nicht aktualisiert werden"
+		},
+		"permissions": {
+			"captureHint": "Lege fest, was beim Start einer Aufnahme erfasst wird.",
+			"mediaTitle": "Mikrofon und Kamera",
+			"mediaDescription": "Der Zugriff wird angefragt, sobald du ein Mikrofon oder eine Kamera für Aufnahmen aktivierst.",
+			"mediaStatus": "Bei Bedarf angefragt"
+		},
+		"shortcuts": {
+			"title": "Globale Tastenkürzel",
+			"cosmicDescription": "Gelten in jeder App. Gravaai legt sie für dich in COSMICs Tastenkürzeln an.",
+			"portalDescription": "Gelten in jeder App. Dein Desktop bittet dich einmal um Bestätigung; die Tasten änderst du in dessen Tastatureinstellungen.",
+			"cliDescription": "Dein Desktop erlaubt Apps keine eigenen Kürzel. Lege diese Befehle in dessen Tastatureinstellungen fest:",
+			"captureNote": "Während du ein Kürzel wählst, löst auch eine Kombination, die bereits ein Gravaai-Kürzel nutzt, dieses aus.",
+			"resetToDefaults": "Auf Standardwerte zurücksetzen",
+			"notSet": "Nicht festgelegt",
+			"pressAShortcut": "Tastenkürzel drücken…",
+			"copy": "Kopieren",
+			"commandCopied": "Befehl kopiert",
+			"invalidBinding": "Verwende Super, Strg oder Alt zusammen mit einer Taste",
+			"clearShortcut": "Kürzel für {{action}} entfernen",
+			"actionToggleRecording": "Aufnahme starten / stoppen",
+			"actionTogglePause": "Pause / fortsetzen",
+			"actionCancelRecording": "Aufnahme abbrechen",
+			"actionToggleMeeting": "Besprechung starten / stoppen"
+		}
+	}
+}

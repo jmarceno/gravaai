@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Grabar nuevo",
+		"home": "Inicio",
+		"raw": "Originales",
+		"meetings": "Reuniones",
+		"folders": "Carpetas",
+		"newFolder": "Nueva carpeta",
+		"settings": "Ajustes",
+		"changeColorFor": "Cambiar el color de {{name}}",
+		"optionsFor": "Opciones de {{name}}",
+		"rename": "Cambiar nombre",
+		"removeFolder": "Eliminar carpeta"
+	},
+	"toolbar": {
+		"import": "Importar",
+		"searchRaw": "Buscar archivos originales…",
+		"searchRawAccessible": "Buscar archivos originales",
+		"searchMeetings": "Buscar reuniones…",
+		"searchMeetingsAccessible": "Buscar reuniones",
+		"searchProjects": "Buscar proyectos…",
+		"searchProjectsAccessible": "Buscar proyectos"
+	},
+	"filters": {
+		"timeFilters": "Filtros de tiempo",
+		"all": "Todo",
+		"last7Days": "Últimos 7 días",
+		"last30Days": "Últimos 30 días",
+		"sortProjects": "Ordenar proyectos",
+		"lastEdited": "Última edición",
+		"lastCreated": "Última creación",
+		"name": "Nombre",
+		"selectAll": "Seleccionar todo",
+		"selectRawToRemove": "Selecciona archivos originales para quitar",
+		"selectProjectsToDelete": "Selecciona proyectos para eliminar",
+		"remove": "Quitar",
+		"selectedCount": "{{count}} seleccionados"
+	},
+	"empty": {
+		"recordFirst": "Graba tu primer vídeo",
+		"clearSearch": "Borrar búsqueda",
+		"retry": "Reintentar",
+		"noMatchingMeetings": "No hay reuniones que coincidan",
+		"noMeetings": "Aún no hay reuniones. Activa el modo reunión en la grabadora o importa una grabación.",
+		"noMatchingRaw": "No hay archivos originales que coincidan",
+		"noRaw": "Aún no hay grabaciones originales",
+		"noMatchingProjects": "No hay proyectos que coincidan",
+		"emptyProjects": "Está bastante vacío por aquí..."
+	},
+	"library": {
+		"couldNotLoad": "No se pudo cargar la biblioteca: {{error}}",
+		"couldNotDelete": "No se pudo eliminar: {{error}}",
+		"couldNotRename": "No se pudo cambiar el nombre: {{error}}",
+		"couldNotSavePreferences": "No se pudo guardar las preferencias de la biblioteca: {{error}}",
+		"meetingsNotDeleted": "Las reuniones que se siguen procesando no se eliminaron.",
+		"meetingsServiceUnavailable": "El servicio de reuniones no está disponible.",
+		"untitledFolder": "Carpeta sin título",
+		"meeting": "Reunión"
+	},
+	"cards": {
+		"select": "Seleccionar {{name}}",
+		"optionsFor": "Opciones de {{name}}",
+		"addFolder": "Añadir carpeta",
+		"createFolderHint": "Crea una carpeta en la barra lateral",
+		"removeFromFolders": "Quitar de todas las carpetas",
+		"openMeeting": "Abrir reunión",
+		"previewFile": "Previsualizar archivo",
+		"openProject": "Abrir proyecto",
+		"rename": "Cambiar nombre",
+		"showInFolder": "Mostrar en la carpeta",
+		"moveToTrash": "Mover a la papelera",
+		"removeFromLibrary": "Quitar de la biblioteca",
+		"deleteProject": "Eliminar proyecto"
+	},
+	"deleteDialog": {
+		"titleOne": "¿Eliminar «{{name}}»?",
+		"titleMany": "¿Eliminar {{count}} proyectos?",
+		"descriptionOne": "El proyecto se mueve a la papelera del sistema y aún puede restaurarse desde ahí.",
+		"descriptionMany": "Los proyectos se mueven a la papelera del sistema y aún pueden restaurarse desde ahí.",
+		"alsoDeleteVideoOne": "Eliminar también el vídeo grabado del disco",
+		"alsoDeleteVideoMany": "Eliminar también los vídeos grabados del disco"
+	},
+	"banner": {
+		"meetingInterrupted": "Una grabación de reunión se interrumpió",
+		"screenInterrupted": "Una grabación de pantalla se interrumpió",
+		"recoverHint": "Recupérala para seguir editando.",
+		"discard": "Descartar",
+		"recover": "Recuperar"
+	},
+	"announcements": {
+		"previous": "Anuncio anterior",
+		"next": "Anuncio siguiente",
+		"dot": "Anuncio {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Notas listas",
+		"transcriptReady": "Transcripción lista",
+		"notTranscribed": "Sin transcribir"
+	},
+	"meetingStatus": {
+		"waiting": "En espera",
+		"processing": "Procesando…",
+		"failed": "Error",
+		"interrupted": "Interrumpida",
+		"waitingToStart": "Esperando para empezar",
+		"transcribing": "Transcribiendo",
+		"writingNotes": "Escribiendo notas",
+		"namingMeeting": "Poniendo nombre a la reunión"
+	},
+	"settings": {
+		"title": "AJUSTES",
+		"categories": "CATEGORÍAS",
+		"category": {
+			"general": "General",
+			"permissions": "Permisos",
+			"motion": "Movimiento",
+			"recording": "Grabación",
+			"shortcuts": "Atajos",
+			"meetings": "Reuniones",
+			"automations": "Automatizaciones",
+			"ai": "Control por IA",
+			"files": "Archivos"
+		},
+		"meetingSettingsLoading": "Los ajustes de reunión se están cargando. Abre esta pestaña de nuevo en un momento.",
+		"files": {
+			"showFolder": "Mostrar carpeta",
+			"projectsFolder": "Carpeta de proyectos",
+			"openFile": "Abrir archivo",
+			"openVideoOrProject": "Abrir vídeo o proyecto",
+			"hint": "Los proyectos se guardan automáticamente mientras editas. Las vistas previas se actualizan al volver a Proyectos."
+		},
+		"general": {
+			"languageSystem": "Idioma del sistema",
+			"languageDescription": "Idioma de la interfaz de toda la aplicación. «Idioma del sistema» sigue la configuración de tu escritorio.",
+			"autoZoomsTitle": "Aplicar zooms automáticamente a las grabaciones nuevas",
+			"autoZoomsDescription": "Añade zooms en clics y al escribir cuando una grabación nueva se abre en el editor.",
+			"showCursorTitle": "Mostrar el cursor",
+			"showCursorDescription": "Los proyectos nuevos dibujan el cursor grabado sobre el vídeo."
+		},
+		"motion": {
+			"connectZoomsTitle": "Conectar zooms cercanos",
+			"connectZoomsDescription": "Los zooms cercanos pasan de uno a otro sin alejarse entre ellos.",
+			"zoomInDurationTitle": "Duración del acercamiento",
+			"zoomInDurationDescription": "Cuánto tarda el zoom en entrar.",
+			"zoomOutDurationTitle": "Duración del alejamiento",
+			"zoomOutDurationDescription": "Cuánto tarda el zoom en volver a salir.",
+			"zoomMotionBlurTitle": "Desenfoque de movimiento del zoom",
+			"zoomMotionBlurDescription": "Desenfoque mientras la cámara hace zoom.",
+			"cursorSmoothingTitle": "Suavizado del cursor",
+			"cursorSmoothingDescription": "Suaviza el movimiento tembloroso del cursor.",
+			"cursorMotionBlurTitle": "Desenfoque de movimiento del cursor",
+			"cursorMotionBlurDescription": "Desenfoque en movimientos rápidos del cursor.",
+			"cursorSwayTitle": "Balanceo del cursor",
+			"cursorSwayDescription": "Cuánto se inclina el cursor al moverse."
+		},
+		"recording": {
+			"micTitle": "Reducción de ruido del micrófono",
+			"micDescription": "Limpia el ruido de fondo del micrófono en las grabaciones nuevas. El audio del sistema no se modifica. El nivel fuerte puede hacer que las voces suenen ligeramente procesadas.",
+			"keysTitle": "Grabar pulsaciones de teclas",
+			"keysDescription": "Solo atajos omite la escritura normal. Las pulsaciones se guardan solo junto a la grabación. Las letras siguen la distribución de teclado de EE. UU.",
+			"off": "Desactivado",
+			"light": "Ligera",
+			"balanced": "Equilibrada",
+			"strong": "Fuerte",
+			"shortcutsOnly": "Solo atajos",
+			"allKeys": "Todas las teclas",
+			"micSaveFailed": "No se pudo actualizar la reducción de ruido del micrófono",
+			"keysSaveFailed": "No se pudo actualizar la captura de pulsaciones"
+		},
+		"permissions": {
+			"captureHint": "Elige qué capturar cuando inicias una grabación.",
+			"mediaTitle": "Micrófono y cámara",
+			"mediaDescription": "El acceso se solicita al habilitar un micrófono o una cámara para grabar.",
+			"mediaStatus": "Se solicita cuando hace falta"
+		},
+		"shortcuts": {
+			"title": "Atajos globales",
+			"cosmicDescription": "Funcionan en todas las aplicaciones. Gravaai los añade a los atajos de teclado de COSMIC por ti.",
+			"portalDescription": "Funcionan en todas las aplicaciones. Tu escritorio te pide confirmarlos una vez; cambia las teclas en sus ajustes de teclado.",
+			"cliDescription": "Tu escritorio no permite que las aplicaciones añadan atajos. Asigna estos comandos en sus ajustes de teclado:",
+			"captureNote": "Mientras eliges un atajo, una combinación que ya usa un atajo de Gravaai también se activa.",
+			"resetToDefaults": "Restablecer valores predeterminados",
+			"notSet": "Sin asignar",
+			"pressAShortcut": "Pulsa un atajo…",
+			"copy": "Copiar",
+			"commandCopied": "Comando copiado",
+			"invalidBinding": "Usa Súper, Ctrl o Alt con una tecla",
+			"clearShortcut": "Quitar el atajo de {{action}}",
+			"actionToggleRecording": "Iniciar / detener grabación",
+			"actionTogglePause": "Pausar / reanudar",
+			"actionCancelRecording": "Cancelar grabación",
+			"actionToggleMeeting": "Iniciar / detener reunión"
+		}
+	}
+}

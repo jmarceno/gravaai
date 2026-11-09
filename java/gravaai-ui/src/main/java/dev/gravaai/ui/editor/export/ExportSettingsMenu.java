@@ -10,6 +10,7 @@ import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.core.editor.ExportPreferences.ExportQuality;
 import dev.gravaai.core.editor.ExportPreferences.GifSizePreset;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Card;
 import dev.gravaai.ui.kit.Icons;
@@ -60,21 +61,24 @@ public final class ExportSettingsMenu extends VBox {
 	private List<Node> buildContent() {
 		ExportFormat format = settings.exportFormat();
 		java.util.List<Node> children = new java.util.ArrayList<>();
-		children.add(choices("Format", format == ExportFormat.GIF ? "gif" : "mp4", List.of(
-				choice("mp4", "MP4", Icons.FilmSlate, null),
-				choice("gif", "GIF", Icons.Image, null)),
+		children.add(choices(UiI18n.t("dialogs:export.format"),
+				format == ExportFormat.GIF ? "gif" : "mp4", List.of(
+				choice("mp4", UiI18n.t("settings:export.mp4"), Icons.FilmSlate, null),
+				choice("gif", UiI18n.t("settings:export.gif"), Icons.Image, null)),
 				value -> settings.setExportFormat("gif".equals(value) ? ExportFormat.GIF
 						: ExportFormat.MP4)));
 		if (format == ExportFormat.MP4) {
 			children.add(qualityChoices());
 			children.add(encodingChoices());
-			children.add(fpsChoices("FPS", String.valueOf(settings.mp4FrameRate()),
+			children.add(fpsChoices(UiI18n.t("settings:export.fpsTitle"),
+					String.valueOf(settings.mp4FrameRate()),
 					ExportPreferences.MP4_FRAME_RATES, settings::setMp4FrameRate));
 			if (hasCaptionsForSidecar.getAsBoolean()) {
 				children.add(captionSidecarOption());
 			}
 		} else {
-			children.add(fpsChoices("FPS", String.valueOf(settings.gifFrameRate()),
+			children.add(fpsChoices(UiI18n.t("settings:export.fpsTitle"),
+					String.valueOf(settings.gifFrameRate()),
 					ExportPreferences.GIF_FRAME_RATES, settings::setGifFrameRate));
 			children.add(gifSizeChoices());
 			if (dimensions != null && dimensions.gif() != null) {
@@ -83,7 +87,7 @@ public final class ExportSettingsMenu extends VBox {
 				gifSize.getStyleClass().add("export-settings__hint");
 				children.add(gifSize);
 			}
-			Switch loop = new Switch("Loop", settings.gifLoop());
+			Switch loop = new Switch(UiI18n.t("settings:export.loop"), settings.gifLoop());
 			loop.onCheckedChange(settings::setGifLoop);
 			children.add(loop);
 		}
@@ -93,7 +97,9 @@ public final class ExportSettingsMenu extends VBox {
 
 	private Node qualityChoices() {
 		// React maps ["medium","good","high","source"] to the labels low/medium/high/original.
-		List<String> labels = List.of("Low", "Medium", "High", "Original");
+		List<String> labels = List.of(UiI18n.t("settings:export.quality.low"),
+				UiI18n.t("settings:export.quality.medium"), UiI18n.t("settings:export.quality.high"),
+				UiI18n.t("settings:export.quality.original"));
 		List<ExportQuality> values = List.of(ExportQuality.MEDIUM, ExportQuality.GOOD,
 				ExportQuality.HIGH, ExportQuality.SOURCE);
 		java.util.List<Choice> options = new java.util.ArrayList<>();
@@ -105,18 +111,20 @@ public final class ExportSettingsMenu extends VBox {
 			options.add(new Choice(quality.wire(), labels.get(index), null, description));
 		}
 		String selected = settings.exportQuality() == null ? null : settings.exportQuality().wire();
-		return choices("Quality", selected, options,
+		return choices(UiI18n.t("dialogs:export.qualityLabel"), selected, options,
 				value -> settings.setExportQuality(ExportQuality.fromWire(value)));
 	}
 
 	private Node encodingChoices() {
 		List<Choice> options = List.of(
-				new Choice(ExportEncodingMode.FAST.wire(), "Fast", null, null),
-				new Choice(ExportEncodingMode.BALANCED.wire(), "Balanced", null, null),
-				new Choice(ExportEncodingMode.QUALITY.wire(), "Quality", null, null));
+				new Choice(ExportEncodingMode.FAST.wire(), UiI18n.t("dialogs:export.encodingFast"), null, null),
+				new Choice(ExportEncodingMode.BALANCED.wire(),
+						UiI18n.t("dialogs:export.encodingBalanced"), null, null),
+				new Choice(ExportEncodingMode.QUALITY.wire(),
+						UiI18n.t("dialogs:export.encodingQuality"), null, null));
 		String selected = settings.exportEncodingMode() == null ? null
 				: settings.exportEncodingMode().wire();
-		return choices("Encoding", selected, options,
+		return choices(UiI18n.t("dialogs:export.encoding"), selected, options,
 				value -> settings.setExportEncodingMode(ExportEncodingMode.fromWire(value)));
 	}
 
@@ -131,20 +139,20 @@ public final class ExportSettingsMenu extends VBox {
 
 	private Node gifSizeChoices() {
 		List<Choice> options = List.of(
-				new Choice(GifSizePreset.MEDIUM.wire(), "Medium (720p)", null, null),
-				new Choice(GifSizePreset.LARGE.wire(), "Large (1080p)", null, null),
-				new Choice(GifSizePreset.ORIGINAL.wire(), "Original", null, null));
+				new Choice(GifSizePreset.MEDIUM.wire(), UiI18n.t("dialogs:export.sizeMedium"), null, null),
+				new Choice(GifSizePreset.LARGE.wire(), UiI18n.t("dialogs:export.sizeLarge"), null, null),
+				new Choice(GifSizePreset.ORIGINAL.wire(),
+						UiI18n.t("settings:export.quality.original"), null, null));
 		String selected = settings.gifSizePreset() == null ? null : settings.gifSizePreset().wire();
-		return choices("Size", selected, options,
+		return choices(UiI18n.t("dialogs:export.size"), selected, options,
 				value -> settings.setGifSizePreset(GifSizePreset.fromWire(value)));
 	}
 
 	private Node captionSidecarOption() {
 		VBox box = new VBox(4);
-		Switch toggle = new Switch("Export captions file", settings.includeCaptionSidecar());
+		Switch toggle = new Switch(UiI18n.t("dialogs:export.captionsFile"), settings.includeCaptionSidecar());
 		toggle.onCheckedChange(settings::setIncludeCaptionSidecar);
-		Card.Description hint = new Card.Description(
-				"Save .srt and .vtt files next to your exported video.");
+		Card.Description hint = new Card.Description(UiI18n.t("dialogs:export.captionsFileHint"));
 		hint.getStyleClass().add("export-settings__hint");
 		hint.getStyleClass().add("export-settings__hint--indent");
 		box.getChildren().addAll(toggle, hint);
@@ -153,7 +161,11 @@ public final class ExportSettingsMenu extends VBox {
 
 	private Node exportButton() {
 		Button export = new Button(
-				settings.exportFormat() == ExportFormat.GIF ? "Export GIF" : "Export Video",
+				settings.exportFormat() == ExportFormat.GIF
+						? UiI18n.t("settings:export.exportVideo",
+								java.util.Map.of("format", UiI18n.t("settings:export.gif")))
+						: UiI18n.t("settings:export.exportVideo",
+								java.util.Map.of("format", UiI18n.t("settings:export.mp4"))),
 				Button.Variant.DEFAULT, Button.Size.LG);
 		export.icon(Icons.DownloadSimple);
 		export.setGraphicTextGap(8);

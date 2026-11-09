@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Новая запись",
+		"home": "Главная",
+		"raw": "Исходные",
+		"meetings": "Встречи",
+		"folders": "Папки",
+		"newFolder": "Новая папка",
+		"settings": "Настройки",
+		"changeColorFor": "Изменить цвет «{{name}}»",
+		"optionsFor": "Действия с «{{name}}»",
+		"rename": "Переименовать",
+		"removeFolder": "Удалить папку"
+	},
+	"toolbar": {
+		"import": "Импорт",
+		"searchRaw": "Поиск исходных файлов…",
+		"searchRawAccessible": "Поиск исходных файлов",
+		"searchMeetings": "Поиск встреч…",
+		"searchMeetingsAccessible": "Поиск встреч",
+		"searchProjects": "Поиск проектов…",
+		"searchProjectsAccessible": "Поиск проектов"
+	},
+	"filters": {
+		"timeFilters": "Фильтры по времени",
+		"all": "Все",
+		"last7Days": "За 7 дней",
+		"last30Days": "За 30 дней",
+		"sortProjects": "Сортировка проектов",
+		"lastEdited": "По изменению",
+		"lastCreated": "По созданию",
+		"name": "По имени",
+		"selectAll": "Выбрать все",
+		"selectRawToRemove": "Выберите исходные файлы для удаления",
+		"selectProjectsToDelete": "Выберите проекты для удаления",
+		"remove": "Удалить",
+		"selectedCount": "Выбрано: {{count}}"
+	},
+	"empty": {
+		"recordFirst": "Запишите своё первое видео",
+		"clearSearch": "Очистить поиск",
+		"retry": "Повторить",
+		"noMatchingMeetings": "Нет подходящих встреч",
+		"noMeetings": "Встреч пока нет. Включите режим встречи в рекордере или импортируйте запись.",
+		"noMatchingRaw": "Нет подходящих исходных файлов",
+		"noRaw": "Исходных записей пока нет",
+		"noMatchingProjects": "Нет подходящих проектов",
+		"emptyProjects": "Здесь пока совсем пусто..."
+	},
+	"library": {
+		"couldNotLoad": "Не удалось загрузить библиотеку: {{error}}",
+		"couldNotDelete": "Не удалось удалить: {{error}}",
+		"couldNotRename": "Не удалось переименовать: {{error}}",
+		"couldNotSavePreferences": "Не удалось сохранить настройки библиотеки: {{error}}",
+		"meetingsNotDeleted": "Встречи, которые ещё обрабатываются, не были удалены.",
+		"meetingsServiceUnavailable": "Сервис встреч недоступен.",
+		"untitledFolder": "Папка без названия",
+		"meeting": "Встреча"
+	},
+	"cards": {
+		"select": "Выбрать {{name}}",
+		"optionsFor": "Действия с {{name}}",
+		"addFolder": "Добавить папку",
+		"createFolderHint": "Создайте папку в боковой панели",
+		"removeFromFolders": "Убрать из всех папок",
+		"openMeeting": "Открыть встречу",
+		"previewFile": "Просмотреть файл",
+		"openProject": "Открыть проект",
+		"rename": "Переименовать",
+		"showInFolder": "Показать в папке",
+		"moveToTrash": "В корзину",
+		"removeFromLibrary": "Убрать из библиотеки",
+		"deleteProject": "Удалить проект"
+	},
+	"deleteDialog": {
+		"titleOne": "Удалить «{{name}}»?",
+		"titleMany": "Удалить проекты ({{count}})?",
+		"descriptionOne": "Проект попадёт в системную корзину, откуда его ещё можно восстановить.",
+		"descriptionMany": "Проекты попадут в системную корзину, откуда их ещё можно восстановить.",
+		"alsoDeleteVideoOne": "Также удалить записанное видео с диска",
+		"alsoDeleteVideoMany": "Также удалить записанные видео с диска"
+	},
+	"banner": {
+		"meetingInterrupted": "Запись встречи была прервана",
+		"screenInterrupted": "Запись экрана была прервана",
+		"recoverHint": "Восстановите её, чтобы продолжить монтаж.",
+		"discard": "Отменить",
+		"recover": "Восстановить"
+	},
+	"announcements": {
+		"previous": "Предыдущее объявление",
+		"next": "Следующее объявление",
+		"dot": "Объявление {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Заметки готовы",
+		"transcriptReady": "Транскрипт готов",
+		"notTranscribed": "Без транскрипции"
+	},
+	"meetingStatus": {
+		"waiting": "Ожидание",
+		"processing": "Обработка…",
+		"failed": "Ошибка",
+		"interrupted": "Прервано",
+		"waitingToStart": "Ожидание запуска",
+		"transcribing": "Транскрипция",
+		"writingNotes": "Составление заметок",
+		"namingMeeting": "Придумывание названия"
+	},
+	"settings": {
+		"title": "НАСТРОЙКИ",
+		"categories": "КАТЕГОРИИ",
+		"category": {
+			"general": "Общие",
+			"permissions": "Разрешения",
+			"motion": "Движение",
+			"recording": "Запись",
+			"shortcuts": "Горячие клавиши",
+			"meetings": "Встречи",
+			"automations": "Автоматизации",
+			"ai": "Управление ИИ",
+			"files": "Файлы"
+		},
+		"meetingSettingsLoading": "Настройки встреч загружаются. Откройте эту вкладку ещё раз через минуту.",
+		"files": {
+			"showFolder": "Показать папку",
+			"projectsFolder": "Папка проектов",
+			"openFile": "Открыть файл",
+			"openVideoOrProject": "Открыть видео или проект",
+			"hint": "Проекты сохраняются автоматически во время монтажа. Превью обновляются, когда вы возвращаетесь в Проекты."
+		},
+		"general": {
+			"languageSystem": "Системный язык",
+			"languageDescription": "Язык интерфейса всего приложения. «Системный язык» следует настройке вашего рабочего стола.",
+			"autoZoomsTitle": "Автоматически применять зумы к новым записям",
+			"autoZoomsDescription": "Добавляет зумы на клики и набор текста, когда свежая запись открывается в редакторе.",
+			"showCursorTitle": "Показывать курсор",
+			"showCursorDescription": "Новые проекты рисуют записанный курсор поверх видео."
+		},
+		"motion": {
+			"connectZoomsTitle": "Соединять близкие зумы",
+			"connectZoomsDescription": "Близкие зумы плавно перетекают друг в друга вместо отдаления между ними.",
+			"zoomInDurationTitle": "Длительность приближения",
+			"zoomInDurationDescription": "Сколько длится вход в зум.",
+			"zoomOutDurationTitle": "Длительность отдаления",
+			"zoomOutDurationDescription": "Сколько длится выход из зума.",
+			"zoomMotionBlurTitle": "Размытие движения при зуме",
+			"zoomMotionBlurDescription": "Размытие, пока камера зумирует.",
+			"cursorSmoothingTitle": "Сглаживание курсора",
+			"cursorSmoothingDescription": "Сглаживает дрожащие движения курсора.",
+			"cursorMotionBlurTitle": "Размытие движения курсора",
+			"cursorMotionBlurDescription": "Размытие при быстрых движениях курсора.",
+			"cursorSwayTitle": "Покачивание курсора",
+			"cursorSwayDescription": "Насколько курсор наклоняется при движении."
+		},
+		"recording": {
+			"micTitle": "Шумоподавление микрофона",
+			"micDescription": "Убирает фоновый шум микрофона в новых записях. Системный звук не меняется. Сильный уровень может придать голосам слегка обработанное звучание.",
+			"keysTitle": "Записывать нажатия клавиш",
+			"keysDescription": "Режим «Только горячие клавиши» пропускает обычный набор текста. Нажатия сохраняются только рядом с записью. Буквы следуют американской раскладке.",
+			"off": "Выкл",
+			"light": "Слабое",
+			"balanced": "Среднее",
+			"strong": "Сильное",
+			"shortcutsOnly": "Только горячие клавиши",
+			"allKeys": "Все клавиши",
+			"micSaveFailed": "Не удалось обновить шумоподавление микрофона",
+			"keysSaveFailed": "Не удалось обновить запись нажатий клавиш"
+		},
+		"permissions": {
+			"captureHint": "Выберите, что захватывать при запуске записи.",
+			"mediaTitle": "Микрофон и камера",
+			"mediaDescription": "Доступ запрашивается, когда вы включаете микрофон или камеру для записи.",
+			"mediaStatus": "Запрашивается при необходимости"
+		},
+		"shortcuts": {
+			"title": "Глобальные горячие клавиши",
+			"cosmicDescription": "Работают в любом приложении. Gravaai сам добавит их в горячие клавиши COSMIC.",
+			"portalDescription": "Работают в любом приложении. Рабочий стол попросит подтвердить их один раз; клавиши меняются в его настройках клавиатуры.",
+			"cliDescription": "Ваш рабочий стол не позволяет приложениям добавлять горячие клавиши. Назначьте эти команды в его настройках клавиатуры:",
+			"captureNote": "Пока вы выбираете сочетание, комбинация, уже занятая горячей клавишей Gravaai, тоже срабатывает.",
+			"resetToDefaults": "Сбросить к значениям по умолчанию",
+			"notSet": "Не задано",
+			"pressAShortcut": "Нажмите сочетание…",
+			"copy": "Копировать",
+			"commandCopied": "Команда скопирована",
+			"invalidBinding": "Используйте Super, Ctrl или Alt вместе с клавишей",
+			"clearShortcut": "Убрать сочетание для «{{action}}»",
+			"actionToggleRecording": "Начать / остановить запись",
+			"actionTogglePause": "Пауза / продолжить",
+			"actionCancelRecording": "Отменить запись",
+			"actionToggleMeeting": "Начать / остановить встречу"
+		}
+	}
+}

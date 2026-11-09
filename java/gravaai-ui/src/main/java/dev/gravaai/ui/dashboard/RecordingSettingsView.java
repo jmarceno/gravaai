@@ -10,6 +10,7 @@ import dev.gravaai.services.recording.KeystrokeCapture;
 import dev.gravaai.services.recording.KeystrokeCaptureMode;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.MicNoiseReductionFilters;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.ChoiceGroup;
 import dev.gravaai.ui.kit.Toast;
 import javafx.scene.layout.VBox;
@@ -28,13 +29,6 @@ import tools.jackson.databind.JsonNode;
  */
 public final class RecordingSettingsView extends VBox {
 
-	public static final String KEYS_TITLE = "Record key presses";
-	public static final String KEYS_DESCRIPTION = "Shortcuts only skips normal typing. Key presses are"
-			+ " saved only next to the recording. Letters follow the US keyboard layout.";
-	public static final String MIC_TITLE = "Microphone noise reduction";
-	public static final String MIC_DESCRIPTION = "Cleans background noise from your microphone in new"
-			+ " recordings. System audio is not changed. Strong can make voices sound slightly processed.";
-
 	private final AppSettingsStore settings;
 	private final ChoiceGroup keyMode = new ChoiceGroup();
 	private final ChoiceGroup micNoise = new ChoiceGroup();
@@ -45,26 +39,31 @@ public final class RecordingSettingsView extends VBox {
 		this.settings = settings;
 		getStyleClass().add("recording-settings");
 
-		micNoise.setAccessibleText(MIC_TITLE);
-		micNoise.item(MicNoiseReduction.OFF.wire(), "Off");
-		micNoise.item(MicNoiseReduction.LIGHT.wire(), "Light");
-		micNoise.item(MicNoiseReduction.BALANCED.wire(), "Balanced");
-		micNoise.item(MicNoiseReduction.STRONG.wire(), "Strong");
+		String micTitle = UiI18n.t("dashboard:settings.recording.micTitle");
+		String keysTitle = UiI18n.t("dashboard:settings.recording.keysTitle");
+		micNoise.setAccessibleText(micTitle);
+		micNoise.item(MicNoiseReduction.OFF.wire(), UiI18n.t("dashboard:settings.recording.off"));
+		micNoise.item(MicNoiseReduction.LIGHT.wire(), UiI18n.t("dashboard:settings.recording.light"));
+		micNoise.item(MicNoiseReduction.BALANCED.wire(), UiI18n.t("dashboard:settings.recording.balanced"));
+		micNoise.item(MicNoiseReduction.STRONG.wire(), UiI18n.t("dashboard:settings.recording.strong"));
 
-		keyMode.setAccessibleText(KEYS_TITLE);
-		keyMode.item(KeystrokeCaptureMode.OFF.wire(), "Off");
-		keyMode.item(KeystrokeCaptureMode.SHORTCUTS.wire(), "Shortcuts only");
-		keyMode.item(KeystrokeCaptureMode.ALL.wire(), "All keys");
+		keyMode.setAccessibleText(keysTitle);
+		keyMode.item(KeystrokeCaptureMode.OFF.wire(), UiI18n.t("dashboard:settings.recording.off"));
+		keyMode.item(KeystrokeCaptureMode.SHORTCUTS.wire(),
+				UiI18n.t("dashboard:settings.recording.shortcutsOnly"));
+		keyMode.item(KeystrokeCaptureMode.ALL.wire(), UiI18n.t("dashboard:settings.recording.allKeys"));
 
 		load();
 		micNoise.onValueChange(level -> save(MicNoiseReductionFilters.MIC_NOISE_REDUCTION_SETTING, level,
-				"Could not update microphone noise reduction"));
+				UiI18n.t("dashboard:settings.recording.micSaveFailed")));
 		keyMode.onValueChange(mode -> save(KeystrokeCapture.KEYSTROKE_CAPTURE_MODE_SETTING, mode,
-				"Could not update key press capture"));
+				UiI18n.t("dashboard:settings.recording.keysSaveFailed")));
 
 		getChildren().addAll(
-				new SettingsRow(MIC_TITLE, MIC_DESCRIPTION, micNoise, true),
-				new SettingsRow(KEYS_TITLE, KEYS_DESCRIPTION, keyMode, true));
+				new SettingsRow(micTitle, UiI18n.t("dashboard:settings.recording.micDescription"),
+						micNoise, true),
+				new SettingsRow(keysTitle, UiI18n.t("dashboard:settings.recording.keysDescription"),
+						keyMode, true));
 	}
 
 	/** The selected key-press capture mode ({@code off}, {@code shortcuts}, {@code all}). */

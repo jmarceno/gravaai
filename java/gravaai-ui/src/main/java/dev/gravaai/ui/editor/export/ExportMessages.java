@@ -5,6 +5,8 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.gravaai.ui.i18n.UiI18n;
+
 /**
  * Export-dialog tips and announcement stream (port of
  * {@code src/components/video-editor/export/useExportMessages.ts}, plan §5.12). The bundled
@@ -67,9 +69,9 @@ public final class ExportMessages {
 	/** The two built-in tips of the export dialog (i18n keys kept in the ids). */
 	public static List<Message> defaultTips() {
 		return List.of(
-				new Message("tip:auto-zooms", "Tip: Turn off auto-applied zooms in settings",
+				new Message("tip:auto-zooms", UiI18n.t("editor:exportTips.autoZooms"),
 						DEFAULT_MESSAGE_DURATION_SECONDS),
-				new Message("tip:cursor-appearance", "Tip: You can customise your cursor appearance",
+				new Message("tip:cursor-appearance", UiI18n.t("editor:exportTips.cursorAppearance"),
 						DEFAULT_MESSAGE_DURATION_SECONDS));
 	}
 }

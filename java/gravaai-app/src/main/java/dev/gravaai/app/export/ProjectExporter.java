@@ -151,7 +151,8 @@ public final class ProjectExporter {
 			boolean started = coordinator.start(prepared.request(), provider, run);
 			if (!started) {
 				run.closeFactory();
-				throw new IllegalStateException("An export is already running.");
+				throw new IllegalStateException(dev.gravaai.ui.i18n.UiI18n.t(
+						"dialogs:export.alreadyRunning"));
 			}
 			return true;
 		} catch (IOException | RuntimeException error) {
@@ -206,10 +207,12 @@ public final class ProjectExporter {
 
 	/** The success toast of {@code useExportSuccessToast}. */
 	private void showExportSuccessToast(Window owner, Path saved) {
-		Toast toast = showToast(owner, "Exported successfully to " + saved);
+		Toast toast = showToast(owner, dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.exportedTo",
+				java.util.Map.of("path", saved.toString())));
 		if (toast != null) {
 			toast.variant(Toast.Variant.SUCCESS)
-					.action("Show in Folder", () -> reveal(saved));
+					.action(dev.gravaai.ui.i18n.UiI18n.t("editor:actions.showInFolder"),
+							() -> reveal(saved));
 		}
 	}
 
@@ -234,17 +237,23 @@ public final class ProjectExporter {
 		Path stagingDir = stagedFile == null ? null : stagedFile.getParent();
 		FileChooser chooser = new FileChooser();
 		boolean gif = stagedFile != null && stagedFile.getFileName().toString().endsWith(".gif");
-		chooser.setTitle(gif ? "Export GIF" : "Export video");
+		chooser.setTitle(gif
+				? dev.gravaai.ui.i18n.UiI18n.t("settings:export.exportVideo",
+						java.util.Map.of("format", dev.gravaai.ui.i18n.UiI18n.t("settings:export.gif")))
+				: dev.gravaai.ui.i18n.UiI18n.t("settings:export.exportVideo",
+						java.util.Map.of("format", dev.gravaai.ui.i18n.UiI18n.t("settings:export.mp4"))));
 		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
-				gif ? "GIF" : "MP4 video", gif ? "*.gif" : "*.mp4"));
-		chooser.setInitialFileName(pending.fileName() == null ? "Untitled.mp4"
+				gif ? dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.filterGif")
+						: dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.filterVideo"),
+				gif ? "*.gif" : "*.mp4"));
+		chooser.setInitialFileName(pending.fileName() == null
+				? dev.gravaai.ui.i18n.UiI18n.t("editor:project.untitled") + ".mp4"
 				: pending.fileName());
 		java.io.File file = chooser.showSaveDialog(owner);
 		if (file == null) {
-			model.setError(
-					"Save dialog canceled. Click Save Again to save without re-rendering.");
+			model.setError(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.saveDialogCanceled"));
 			Toast canceled = showToast(owner,
-					"Save canceled. You can save again without re-exporting.");
+					dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.saveCanceledToast"));
 			if (canceled != null) {
 				canceled.variant(Toast.Variant.DEFAULT);
 			}

@@ -990,8 +990,10 @@ public final class EditorWindow {
 
 	private void errorDialog(String title, @Nullable String detail) {
 		Dialog dialog = new Dialog(title);
-		dialog.description(detail == null || detail.isBlank() ? "Unknown error" : detail);
-		Button close = new Button("Close", Button.Variant.DEFAULT, Button.Size.SM);
+		dialog.description(detail == null || detail.isBlank()
+				? dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.exportFailed") : detail);
+		Button close = new Button(dev.gravaai.ui.i18n.UiI18n.t("common:actions.close"),
+				Button.Variant.DEFAULT, Button.Size.SM);
 		close.setOnAction(action -> dialog.close());
 		dialog.footer(close);
 		dialog.show(shell);
@@ -1318,7 +1320,8 @@ public final class EditorWindow {
 		public void startExport(ExportPreferences preferences) {
 			ProjectExporter exporter = services.exporter();
 			if (exporter == null) {
-				errorDialog("Export", "The export pipeline is not available.");
+				errorDialog(dev.gravaai.ui.i18n.UiI18n.t("settings:export.title"),
+						dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.pipelineUnavailable"));
 				return;
 			}
 			LOG.log(System.Logger.Level.INFO, "export requested for " + session.projectPath());

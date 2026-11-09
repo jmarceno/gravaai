@@ -12,6 +12,7 @@ import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
 import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.projects.RecordingEntry;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -133,7 +134,9 @@ final class ProjectCardView extends VBox {
 			}
 			openEntry();
 		});
-		String tooltip = model.selectingProperty().get() ? "Select " + entry.name() : entry.name();
+		String tooltip = model.selectingProperty().get()
+				? UiI18n.t("dashboard:cards.select", Map.of("name", entry.name()))
+				: entry.name();
 		host.setAccessibleText(tooltip);
 
 		Node artwork = buildArtwork();
@@ -402,20 +405,21 @@ final class ProjectCardView extends VBox {
 	}
 
 	private Node buildAddFolderButton() {
-		Button add = new Button("Add folder", Button.Variant.GHOST, Button.Size.SM);
+		Button add = new Button(UiI18n.t("dashboard:cards.addFolder"), Button.Variant.GHOST, Button.Size.SM);
 		add.getStyleClass().add("add-folder-button");
 		add.setGraphic(Icon.of(Icons.Plus, 12));
 		add.setGraphicTextGap(6);
 		DropdownMenu menu = new DropdownMenu(add);
 		if (model.folders().isEmpty()) {
-			menu.label("Create a folder in the sidebar");
+			menu.label(UiI18n.t("dashboard:cards.createFolderHint"));
 		}
 		for (ProjectFolder folder : model.folders()) {
 			menu.item(folder.name(), () -> model.assignFolder(entry.path(), folder.id()));
 		}
 		if (!model.folders().isEmpty()) {
 			menu.separator();
-			menu.item("Remove from all folders", () -> model.assignFolder(entry.path(), "none"));
+			menu.item(UiI18n.t("dashboard:cards.removeFromFolders"),
+					() -> model.assignFolder(entry.path(), "none"));
 		}
 		return add;
 	}
@@ -424,15 +428,18 @@ final class ProjectCardView extends VBox {
 		Button options = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		options.getStyleClass().add("project-card__options");
 		options.setGraphic(Icon.of(Icons.DotsThree, 20, "bold"));
-		options.setAccessibleText("Options for " + entry.name());
+		options.setAccessibleText(UiI18n.t("dashboard:cards.optionsFor", Map.of("name", entry.name())));
 		DropdownMenu menu = new DropdownMenu(options);
-		menu.item(meetingSource() != null ? "Open meeting"
-				: rawSource() ? "Preview file" : "Open project", this::openEntry);
-		menu.item("Rename", this::startRename);
-		menu.item("Show in folder", () -> dependencies.actions().revealInFolder(entry.path()));
+		menu.item(meetingSource() != null ? UiI18n.t("dashboard:cards.openMeeting")
+				: rawSource() ? UiI18n.t("dashboard:cards.previewFile")
+						: UiI18n.t("dashboard:cards.openProject"), this::openEntry);
+		menu.item(UiI18n.t("dashboard:cards.rename"), this::startRename);
+		menu.item(UiI18n.t("dashboard:cards.showInFolder"),
+				() -> dependencies.actions().revealInFolder(entry.path()));
 		menu.separator();
-		menu.dangerItem(meetingSource() != null ? "Move to trash"
-				: rawSource() ? "Remove from library" : "Delete project", this::deleteEntry);
+		menu.dangerItem(meetingSource() != null ? UiI18n.t("dashboard:cards.moveToTrash")
+				: rawSource() ? UiI18n.t("dashboard:cards.removeFromLibrary")
+						: UiI18n.t("dashboard:cards.deleteProject"), this::deleteEntry);
 		return options;
 	}
 
@@ -470,7 +477,8 @@ final class ProjectCardView extends VBox {
 					model.trashProjects(paths, deleteRecordings);
 				} catch (java.io.IOException error) {
 					javafx.application.Platform.runLater(() ->
-							model.errorProperty().set("Could not delete: " + error.getMessage()));
+							model.errorProperty().set(UiI18n.t("dashboard:library.couldNotDelete",
+									Map.of("error", String.valueOf(error.getMessage())))));
 				} finally {
 					javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 				}
@@ -489,7 +497,8 @@ final class ProjectCardView extends VBox {
 				model.deleteLibraryEntries(paths);
 			} catch (java.io.IOException error) {
 				javafx.application.Platform.runLater(() ->
-						model.errorProperty().set("Could not delete: " + error.getMessage()));
+						model.errorProperty().set(UiI18n.t("dashboard:library.couldNotDelete",
+								Map.of("error", String.valueOf(error.getMessage())))));
 			} finally {
 				javafx.application.Platform.runLater(() -> model.busyProperty().set(false));
 			}
@@ -539,7 +548,8 @@ final class ProjectCardView extends VBox {
 			} catch (java.io.IOException error) {
 				javafx.application.Platform.runLater(() -> {
 					nameHost.getChildren().setAll(nameLabel);
-					model.errorProperty().set("Could not rename: " + error.getMessage());
+					model.errorProperty().set(UiI18n.t("dashboard:library.couldNotRename",
+							Map.of("error", String.valueOf(error.getMessage()))));
 					model.busyProperty().set(false);
 				});
 			}

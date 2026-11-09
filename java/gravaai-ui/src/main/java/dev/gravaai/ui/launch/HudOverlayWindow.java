@@ -328,6 +328,17 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	}
 
 	/**
+	 * Re-renders the bar (and its tooltips) after a language switch. Menus are rebuilt every time
+	 * they open, so they pick the new language up on their own.
+	 */
+	public void retranslate() {
+		HudBar current = bar;
+		if (current != null) {
+			current.retranslate();
+		}
+	}
+
+	/**
 	 * HUD hint bubble (the React {@code toast.info("Click anywhere on the screen you want to
 	 * record.")} the port never surfaced): shown while the capture pick is pending and after a
 	 * pick that ended without a source, so "Pick screen" is never a silent no-op.
@@ -335,10 +346,10 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private void updateHint(HudRecordingPort.@Nullable State previous, HudRecordingPort.State state) {
 		boolean wasPicking = previous != null && previous.picking();
 		if (state.picking() && !wasPicking) {
-			showHint("Click anywhere on the screen you want to record.", false);
+			showHint(dev.gravaai.ui.i18n.UiI18n.t("launch:recording.screenPickHint"), false);
 		} else if (!state.picking() && wasPicking) {
 			if (!state.hasSource() && !state.recording() && !state.countdownActive()) {
-				showHint("No screen was selected. Pick screen to try again.", true);
+				showHint(dev.gravaai.ui.i18n.UiI18n.t("launch:permissions.pickFailed"), true);
 			} else {
 				hideHint();
 			}

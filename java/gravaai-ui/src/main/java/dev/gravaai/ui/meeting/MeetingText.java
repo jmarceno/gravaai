@@ -13,6 +13,7 @@ import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJob.Stage;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.meeting.MeetingMeta;
+import dev.gravaai.ui.i18n.UiI18n;
 
 /**
  * Labels and formatters from the React meetings components ({@code MeetingView.tsx},
@@ -43,12 +44,13 @@ public final class MeetingText {
 			created = fallbackMs;
 		}
 		if (created == null) {
-			return "Meeting";
+			return UiI18n.t("dashboard:library.meeting");
 		}
 		LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(created),
 				ZoneId.systemDefault());
-		return "Meeting " + DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-				.withLocale(Locale.getDefault()).format(date) + " " + TIME.format(date);
+		return UiI18n.t("dashboard:library.meeting") + " "
+				+ DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
+						.withLocale(Locale.getDefault()).format(date) + " " + TIME.format(date);
 	}
 
 	/** Port of {@code formatMeetingDuration}: "1 h 5 min", "5 min 3 s", "3 s" or null. */
@@ -80,22 +82,22 @@ public final class MeetingText {
 		}
 		return switch (status) {
 			case IDLE -> null;
-			case QUEUED -> "Waiting";
-			case RUNNING -> "Processing…";
-			case FAILED -> "Failed";
-			case INTERRUPTED -> "Interrupted";
+			case QUEUED -> UiI18n.t("dashboard:meetingStatus.waiting");
+			case RUNNING -> UiI18n.t("dashboard:meetingStatus.processing");
+			case FAILED -> UiI18n.t("dashboard:meetingStatus.failed");
+			case INTERRUPTED -> UiI18n.t("dashboard:meetingStatus.interrupted");
 		};
 	}
 
 	/** Port of {@code STAGE_LABEL} in {@code MeetingNotes.tsx}. */
 	public static String stageLabel(@Nullable Stage stage) {
 		if (stage == null) {
-			return "Waiting to start";
+			return UiI18n.t("dashboard:meetingStatus.waitingToStart");
 		}
 		return switch (stage) {
-			case TRANSCRIBE -> "Transcribing";
-			case SUMMARIZE -> "Writing notes";
-			case TITLE -> "Naming the meeting";
+			case TRANSCRIBE -> UiI18n.t("dashboard:meetingStatus.transcribing");
+			case SUMMARIZE -> UiI18n.t("dashboard:meetingStatus.writingNotes");
+			case TITLE -> UiI18n.t("dashboard:meetingStatus.namingMeeting");
 		};
 	}
 

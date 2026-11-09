@@ -1,5 +1,6 @@
 package dev.gravaai.ui.dashboard;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -41,7 +42,8 @@ public final class DashboardToolbar extends HBox {
 		StackPane.setMargin(magnifier, new Insets(0, 0, 0, 14));
 		HBox.setHgrow(searchHost, Priority.ALWAYS);
 
-		Button importButton = new Button("Import", Button.Variant.SECONDARY, Button.Size.SM);
+		Button importButton = new Button(UiI18n.t("dashboard:toolbar.import"),
+				Button.Variant.SECONDARY, Button.Size.SM);
 		importButton.setGraphic(Icon.of(Icons.UploadSimple, 16));
 		importButton.setContentDisplay(ContentDisplay.LEFT);
 		importButton.setGraphicTextGap(8);
@@ -64,14 +66,14 @@ public final class DashboardToolbar extends HBox {
 
 	private void updatePrompt(DashboardModel model) {
 		if (model.isRaw()) {
-			search.setPromptText("Search raw files…");
-			search.setAccessibleText("Search raw files");
+			search.setPromptText(UiI18n.t("dashboard:toolbar.searchRaw"));
+			search.setAccessibleText(UiI18n.t("dashboard:toolbar.searchRawAccessible"));
 		} else if (model.isMeetings()) {
-			search.setPromptText("Search meetings…");
-			search.setAccessibleText("Search meetings");
+			search.setPromptText(UiI18n.t("dashboard:toolbar.searchMeetings"));
+			search.setAccessibleText(UiI18n.t("dashboard:toolbar.searchMeetingsAccessible"));
 		} else {
-			search.setPromptText("Search projects…");
-			search.setAccessibleText("Search projects");
+			search.setPromptText(UiI18n.t("dashboard:toolbar.searchProjects"));
+			search.setAccessibleText(UiI18n.t("dashboard:toolbar.searchProjectsAccessible"));
 		}
 	}
 }

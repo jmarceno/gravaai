@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 import tools.jackson.databind.JsonNode;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -65,7 +66,8 @@ public final class DashboardSidebar extends VBox {
 		logoText.getStyleClass().add("dashboard-logo__text");
 		logo.getChildren().addAll(markHost, logoText);
 
-		Button record = new Button("Record new", Button.Variant.DEFAULT, Button.Size.SM);
+		Button record = new Button(UiI18n.t("dashboard:sidebar.recordNew"),
+				Button.Variant.DEFAULT, Button.Size.SM);
 		record.getStyleClass().add("dashboard-record");
 		record.setGraphic(Icon.of(Icons.Plus, 16));
 		record.setContentDisplay(ContentDisplay.LEFT);
@@ -79,21 +81,22 @@ public final class DashboardSidebar extends VBox {
 		VBox nav = new VBox(4);
 		nav.getStyleClass().add("dashboard-nav");
 		nav.getChildren().addAll(
-				navButton("Home", Icons.House, DashboardSection.PROJECTS),
-				navButton("Raw", Icons.File, DashboardSection.RAW),
-				navButton("Meetings", Icons.UsersGroup, DashboardSection.MEETINGS));
+				navButton(UiI18n.t("dashboard:sidebar.home"), Icons.House, DashboardSection.PROJECTS),
+				navButton(UiI18n.t("dashboard:sidebar.raw"), Icons.File, DashboardSection.RAW),
+				navButton(UiI18n.t("dashboard:sidebar.meetings"), Icons.UsersGroup,
+						DashboardSection.MEETINGS));
 
 		HBox foldersHeader = new HBox();
 		foldersHeader.getStyleClass().add("dashboard-folders-header");
 		foldersHeader.setAlignment(Pos.CENTER_LEFT);
-		Label foldersTitle = new Label("Folders");
+		Label foldersTitle = new Label(UiI18n.t("dashboard:sidebar.folders"));
 		foldersTitle.getStyleClass().add("dashboard-folders-title");
 		Region folderSpacer = new Region();
 		HBox.setHgrow(folderSpacer, Priority.ALWAYS);
 		Button addFolder = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		addFolder.getStyleClass().add("dashboard-add-folder");
 		addFolder.setGraphic(Icon.of(Icons.Plus, 14));
-		addFolder.setAccessibleText("New folder");
+		addFolder.setAccessibleText(UiI18n.t("dashboard:sidebar.newFolder"));
 		addFolder.setOnAction(event -> model.createFolder());
 		foldersHeader.getChildren().addAll(foldersTitle, folderSpacer, addFolder);
 
@@ -107,7 +110,8 @@ public final class DashboardSidebar extends VBox {
 
 		VBox bottom = new VBox(4);
 		bottom.getStyleClass().add("dashboard-sidebar-bottom");
-		bottom.getChildren().add(navButton("Settings", Icons.GearSix, DashboardSection.SETTINGS));
+		bottom.getChildren().add(navButton(UiI18n.t("dashboard:sidebar.settings"), Icons.GearSix,
+				DashboardSection.SETTINGS));
 
 		getChildren().addAll(logo, record, nav, foldersHeader, foldersScroll, bottom);
 
@@ -198,7 +202,8 @@ public final class DashboardSidebar extends VBox {
 			colorPicker.setGraphic(folderIcon);
 			colorPicker.setMinWidth(28);
 			colorPicker.setPrefWidth(28);
-			colorPicker.setAccessibleText("Change color for " + folder.name());
+			colorPicker.setAccessibleText(UiI18n.t("dashboard:sidebar.changeColorFor",
+					java.util.Map.of("name", folder.name())));
 			List<String> palette = new ArrayList<>(ProjectFolder.COLORS);
 			for (String custom : model.preferences().colors()) {
 				if (!palette.contains(custom)) {
@@ -228,14 +233,16 @@ public final class DashboardSidebar extends VBox {
 			Button options = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 			options.getStyleClass().add("folder-row__options");
 			options.setGraphic(Icon.of(Icons.DotsThree, 16));
-			options.setAccessibleText("Options for " + folder.name());
+			options.setAccessibleText(UiI18n.t("dashboard:sidebar.optionsFor",
+					java.util.Map.of("name", folder.name())));
 			Popover optionsPopover = new Popover(options);
 			optionsPopover.side(dev.gravaai.ui.kit.Anchors.Side.BOTTOM);
 			VBox menu = new VBox(2);
 			menu.getStyleClass().add("dashboard-menu");
 			menu.getChildren().addAll(
-					menuItem("Rename", () -> startRename(name)),
-					menuItem("Remove folder", () -> model.removeFolder(folder.id())));
+					menuItem(UiI18n.t("dashboard:sidebar.rename"), () -> startRename(name)),
+					menuItem(UiI18n.t("dashboard:sidebar.removeFolder"),
+							() -> model.removeFolder(folder.id())));
 			optionsPopover.content(menu);
 
 			getChildren().addAll(colorPicker, name, options);

@@ -2,6 +2,7 @@ package dev.gravaai.ui.launch;
 
 import org.jspecify.annotations.Nullable;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -207,21 +208,23 @@ public final class HudMenuWindow {
 	// ── menus ─────────────────────────────────────────────────────────────
 
 	private void buildMicMenu(HudRecordingPort.State state) {
-		startPanel("Microphone");
+		startPanel(t("launch:recording.microphone"));
 		VBox contentPane = contentBox();
-		contentPane.getChildren().add(menuItem("System audio",
+		contentPane.getChildren().add(menuItem(t("launch:recording.systemAudio"),
 				state.systemAudioEnabled() ? Icons.SpeakerHighIcon : Icons.SpeakerXIcon,
 				state.systemAudioEnabled(),
-				state.systemAudioEnabled() ? "Disable system audio" : "Enable system audio",
+				state.systemAudioEnabled() ? t("launch:recording.disableSystemAudio")
+						: t("launch:recording.enableSystemAudio"),
 				() -> port.setSystemAudioEnabled(!state.systemAudioEnabled())));
 		if (state.microphoneEnabled()) {
-			contentPane.getChildren().add(menuItem("Turn Off Microphone", Icons.MicrophoneSlashIcon, false,
-					"Turn off the microphone", () -> {
+			contentPane.getChildren().add(menuItem(t("launch:recording.turnOffMicrophone"),
+					Icons.MicrophoneSlashIcon, false,
+					t("launch:recording.turnOffMicTooltip"), () -> {
 						port.setMicrophoneEnabled(false);
 						close();
 					}));
 		} else {
-			contentPane.getChildren().add(note("Select a microphone to enable"));
+			contentPane.getChildren().add(note(t("launch:recording.selectMicToEnable")));
 		}
 		List<HudRecordingPort.MicDevice> devices = port.microphoneDevices();
 		for (HudRecordingPort.MicDevice device : devices) {
@@ -246,24 +249,26 @@ public final class HudMenuWindow {
 			monitors.add(MicLevelMonitor.start(device.id(), meter::setLevel));
 		}
 		if (devices.isEmpty()) {
-			contentPane.getChildren().add(emptyNote("No microphones found"));
+			contentPane.getChildren().add(emptyNote(t("launch:recording.noMicrophonesFound")));
 		}
 	}
 
 	private void buildWebcamMenu(HudRecordingPort.State state) {
-		startPanel("Webcam");
+		startPanel(t("launch:recording.webcam"));
 		VBox contentPane = contentBox();
 		if (state.webcamEnabled()) {
-			contentPane.getChildren().add(menuItem("Turn Off Webcam", Icons.VideoCameraSlashIcon, false,
-					"Turn off the webcam overlay", () -> {
+			contentPane.getChildren().add(menuItem(t("launch:recording.turnOffWebcam"),
+					Icons.VideoCameraSlashIcon, false,
+					t("launch:recording.turnOffWebcamTooltip"), () -> {
 						port.setWebcamEnabled(false);
 						close();
 					}));
 			contentPane.getChildren().add(menuItem(
-					state.floatingWebcamPreview() ? "Hide Floating Preview" : "Show Floating Preview",
+					state.floatingWebcamPreview() ? t("launch:recording.hideFloatingWebcamPreview")
+							: t("launch:recording.showFloatingWebcamPreview"),
 					state.floatingWebcamPreview() ? Icons.EyeSlashIcon : Icons.EyeIcon,
 					state.floatingWebcamPreview(),
-					"Floating webcam preview during recording",
+					t("launch:recording.floatingPreviewTooltip"),
 					() -> port.setFloatingWebcamPreview(!state.floatingWebcamPreview())));
 			menuPreview = new WebcamPreviewView();
 			menuPreview.setMinSize(0, 0);
@@ -284,7 +289,7 @@ public final class HudMenuWindow {
 				menuPreview.start(selectCamera(state, cameras).path());
 			}
 		} else {
-			contentPane.getChildren().add(note("Select a webcam to enable"));
+			contentPane.getChildren().add(note(t("launch:recording.selectWebcamToEnable")));
 		}
 		List<HudRecordingPort.CameraDevice> cameras = port.cameraDevices();
 		for (HudRecordingPort.CameraDevice camera : cameras) {
@@ -298,7 +303,7 @@ public final class HudMenuWindow {
 					}));
 		}
 		if (cameras.isEmpty()) {
-			contentPane.getChildren().add(emptyNote("No webcams found"));
+			contentPane.getChildren().add(emptyNote(t("launch:recording.noWebcamsFound")));
 		}
 	}
 
@@ -307,11 +312,11 @@ public final class HudMenuWindow {
 	 * to record hid it behind them; choosing from a list keeps the HUD in front.
 	 */
 	private void buildScreenMenu(HudRecordingPort.State state) {
-		startPanel("Screen to record");
+		startPanel(t("launch:recording.screenMenuTitle"));
 		VBox contentPane = contentBox();
 		List<HudRecordingPort.ScreenDevice> screens = port.screenDevices();
 		if (screens.isEmpty()) {
-			Label empty = new Label("No screens found.");
+			Label empty = new Label(t("launch:recording.noScreensFound"));
 			empty.getStyleClass().add("hud-menu-item-empty");
 			contentPane.getChildren().add(empty);
 			return;
@@ -327,10 +332,10 @@ public final class HudMenuWindow {
 	}
 
 	private void buildCountdownMenu(HudRecordingPort.State state) {
-		startPanel("Countdown delay");
+		startPanel(t("launch:recording.countdownDelay"));
 		VBox contentPane = contentBox();
 		for (int delay : COUNTDOWN_OPTIONS) {
-			String label = delay == 0 ? "No delay" : delay + "s";
+			String label = delay == 0 ? t("launch:recording.noDelay") : delay + "s";
 			contentPane.getChildren().add(menuItem(label, Icons.TimerIcon, state.countdownDelay() == delay, label,
 					() -> {
 						port.setCountdownDelay(delay);
@@ -364,7 +369,7 @@ public final class HudMenuWindow {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		Button close = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		close.icon(Icon.of(Icons.XIcon, 20));
-		close.setAccessibleText("Close");
+		close.setAccessibleText(UiI18n.t("common:actions.close"));
 		close.setOnAction(event -> close());
 		HBox header = new HBox(12, titleLabel, spacer, close);
 		header.getStyleClass().add("hud-menu-header");
@@ -427,6 +432,10 @@ public final class HudMenuWindow {
 			menuPreview.stop();
 			menuPreview = null;
 		}
+	}
+
+	private static String t(String key) {
+		return UiI18n.t(key);
 	}
 
 	/** The stage, for the app's window registry and tests. */

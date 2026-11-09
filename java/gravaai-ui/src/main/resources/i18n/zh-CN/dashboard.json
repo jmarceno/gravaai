@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "新建录制",
+		"home": "首页",
+		"raw": "原始文件",
+		"meetings": "会议",
+		"folders": "文件夹",
+		"newFolder": "新建文件夹",
+		"settings": "设置",
+		"changeColorFor": "更改“{{name}}”的颜色",
+		"optionsFor": "“{{name}}”的选项",
+		"rename": "重命名",
+		"removeFolder": "删除文件夹"
+	},
+	"toolbar": {
+		"import": "导入",
+		"searchRaw": "搜索原始文件…",
+		"searchRawAccessible": "搜索原始文件",
+		"searchMeetings": "搜索会议…",
+		"searchMeetingsAccessible": "搜索会议",
+		"searchProjects": "搜索项目…",
+		"searchProjectsAccessible": "搜索项目"
+	},
+	"filters": {
+		"timeFilters": "时间筛选",
+		"all": "全部",
+		"last7Days": "最近 7 天",
+		"last30Days": "最近 30 天",
+		"sortProjects": "项目排序",
+		"lastEdited": "按修改时间",
+		"lastCreated": "按创建时间",
+		"name": "按名称",
+		"selectAll": "全选",
+		"selectRawToRemove": "选择要移除的原始文件",
+		"selectProjectsToDelete": "选择要删除的项目",
+		"remove": "移除",
+		"selectedCount": "已选 {{count}} 项"
+	},
+	"empty": {
+		"recordFirst": "录制你的第一个视频",
+		"clearSearch": "清除搜索",
+		"retry": "重试",
+		"noMatchingMeetings": "没有匹配的会议",
+		"noMeetings": "还没有会议。在录制器中开启会议模式，或导入一段录制。",
+		"noMatchingRaw": "没有匹配的原始文件",
+		"noRaw": "还没有原始录制",
+		"noMatchingProjects": "没有匹配的项目",
+		"emptyProjects": "这里还空空如也..."
+	},
+	"library": {
+		"couldNotLoad": "无法加载媒体库：{{error}}",
+		"couldNotDelete": "无法删除：{{error}}",
+		"couldNotRename": "无法重命名：{{error}}",
+		"couldNotSavePreferences": "无法保存媒体库偏好设置：{{error}}",
+		"meetingsNotDeleted": "仍在处理中的会议未被删除。",
+		"meetingsServiceUnavailable": "会议服务不可用。",
+		"untitledFolder": "未命名文件夹",
+		"meeting": "会议"
+	},
+	"cards": {
+		"select": "选择 {{name}}",
+		"optionsFor": "{{name}} 的选项",
+		"addFolder": "添加文件夹",
+		"createFolderHint": "在侧边栏中创建一个文件夹",
+		"removeFromFolders": "从所有文件夹中移除",
+		"openMeeting": "打开会议",
+		"previewFile": "预览文件",
+		"openProject": "打开项目",
+		"rename": "重命名",
+		"showInFolder": "在文件夹中显示",
+		"moveToTrash": "移到废纸篓",
+		"removeFromLibrary": "从媒体库中移除",
+		"deleteProject": "删除项目"
+	},
+	"deleteDialog": {
+		"titleOne": "删除“{{name}}”？",
+		"titleMany": "删除 {{count}} 个项目？",
+		"descriptionOne": "项目会移入系统废纸篓，之后仍可从那里恢复。",
+		"descriptionMany": "项目会移入系统废纸篓，之后仍可从那里恢复。",
+		"alsoDeleteVideoOne": "同时从磁盘删除录制的视频",
+		"alsoDeleteVideoMany": "同时从磁盘删除录制的视频"
+	},
+	"banner": {
+		"meetingInterrupted": "一段会议录制被中断了",
+		"screenInterrupted": "一段屏幕录制被中断了",
+		"recoverHint": "恢复它即可继续剪辑。",
+		"discard": "丢弃",
+		"recover": "恢复"
+	},
+	"announcements": {
+		"previous": "上一个公告",
+		"next": "下一个公告",
+		"dot": "公告 {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "笔记已就绪",
+		"transcriptReady": "转写已就绪",
+		"notTranscribed": "未转写"
+	},
+	"meetingStatus": {
+		"waiting": "等待中",
+		"processing": "处理中…",
+		"failed": "失败",
+		"interrupted": "已中断",
+		"waitingToStart": "等待开始",
+		"transcribing": "转写中",
+		"writingNotes": "撰写笔记中",
+		"namingMeeting": "正在命名会议"
+	},
+	"settings": {
+		"title": "设置",
+		"categories": "分类",
+		"category": {
+			"general": "通用",
+			"permissions": "权限",
+			"motion": "运动",
+			"recording": "录制",
+			"shortcuts": "快捷键",
+			"meetings": "会议",
+			"automations": "自动化",
+			"ai": "AI 控制",
+			"files": "文件"
+		},
+		"meetingSettingsLoading": "会议设置正在加载。请稍后重新打开此标签页。",
+		"files": {
+			"showFolder": "显示文件夹",
+			"projectsFolder": "项目文件夹",
+			"openFile": "打开文件",
+			"openVideoOrProject": "打开视频或项目",
+			"hint": "项目会在编辑时自动保存。返回“项目”时预览会自动刷新。"
+		},
+		"general": {
+			"languageSystem": "跟随系统语言",
+			"languageDescription": "整个应用的界面语言。“跟随系统语言”会使用桌面的语言设置。",
+			"autoZoomsTitle": "为新录制自动应用变焦",
+			"autoZoomsDescription": "新录制在编辑器中打开时，为点击和输入自动添加变焦。",
+			"showCursorTitle": "显示光标",
+			"showCursorDescription": "新项目会在视频上绘制录制的光标。"
+		},
+		"motion": {
+			"connectZoomsTitle": "连接相邻变焦",
+			"connectZoomsDescription": "相邻的变焦平滑衔接，而不是在中间拉远。",
+			"zoomInDurationTitle": "推近时长",
+			"zoomInDurationDescription": "变焦推近所需的时长。",
+			"zoomOutDurationTitle": "拉远时长",
+			"zoomOutDurationDescription": "变焦拉回所需的时长。",
+			"zoomMotionBlurTitle": "变焦运动模糊",
+			"zoomMotionBlurDescription": "镜头变焦时的模糊效果。",
+			"cursorSmoothingTitle": "光标平滑",
+			"cursorSmoothingDescription": "平滑光标的抖动。",
+			"cursorMotionBlurTitle": "光标运动模糊",
+			"cursorMotionBlurDescription": "光标快速移动时的模糊效果。",
+			"cursorSwayTitle": "光标摆动",
+			"cursorSwayDescription": "光标移动时的倾斜程度。"
+		},
+		"recording": {
+			"micTitle": "麦克风降噪",
+			"micDescription": "在新录制中清理麦克风的背景噪声。系统声音不受影响。较强档位可能让声音听起来略有处理痕迹。",
+			"keysTitle": "录制按键",
+			"keysDescription": "“仅快捷键”会忽略普通输入。按键只保存在录制文件旁边。字母按键遵循美式键盘布局。",
+			"off": "关闭",
+			"light": "较弱",
+			"balanced": "适中",
+			"strong": "较强",
+			"shortcutsOnly": "仅快捷键",
+			"allKeys": "所有按键",
+			"micSaveFailed": "无法更新麦克风降噪设置",
+			"keysSaveFailed": "无法更新按键录制设置"
+		},
+		"permissions": {
+			"captureHint": "选择开始录制时要捕捉的内容。",
+			"mediaTitle": "麦克风与摄像头",
+			"mediaDescription": "启用麦克风或摄像头进行录制时会请求访问权限。",
+			"mediaStatus": "按需请求"
+		},
+		"shortcuts": {
+			"title": "全局快捷键",
+			"cosmicDescription": "在所有应用中生效。Gravaai 会自动将它们添加到 COSMIC 的键盘快捷键中。",
+			"portalDescription": "在所有应用中生效。桌面会要求你确认一次；之后可在其键盘设置中修改按键。",
+			"cliDescription": "你的桌面不允许应用添加快捷键。请在它的键盘设置中绑定这些命令：",
+			"captureNote": "选择快捷键时，已被 Gravaai 快捷键使用的组合也会同时触发。",
+			"resetToDefaults": "恢复默认",
+			"notSet": "未设置",
+			"pressAShortcut": "请按下快捷键…",
+			"copy": "复制",
+			"commandCopied": "命令已复制",
+			"invalidBinding": "请将 Super、Ctrl 或 Alt 与某个按键搭配使用",
+			"clearShortcut": "清除 {{action}} 的快捷键",
+			"actionToggleRecording": "开始 / 停止录制",
+			"actionTogglePause": "暂停 / 继续",
+			"actionCancelRecording": "取消录制",
+			"actionToggleMeeting": "开始 / 停止会议"
+		}
+	}
+}

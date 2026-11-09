@@ -3,6 +3,7 @@ package dev.gravaai.ui.dashboard;
 import java.util.List;
 
 import dev.gravaai.services.projects.RecoverableRecording;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Card;
 import dev.gravaai.ui.kit.Icon;
@@ -61,17 +62,18 @@ public final class RecoverableRecordingsBannerView extends VBox {
 		VBox texts = new VBox(2);
 		HBox.setHgrow(texts, Priority.ALWAYS);
 		Label title = new Label(item.meeting()
-				? "A meeting recording was interrupted"
-				: "A screen recording was interrupted");
+				? UiI18n.t("dashboard:banner.meetingInterrupted")
+				: UiI18n.t("dashboard:banner.screenInterrupted"));
 		title.getStyleClass().add("recoverable-banner__title");
 		Label detail = new Label(DashboardDates.mediumDateTime(item.createdAt()) + " · "
-				+ formatRecoverableSize(item.bytes()) + " · Recover it to keep editing.");
+				+ formatRecoverableSize(item.bytes()) + " · "
+				+ UiI18n.t("dashboard:banner.recoverHint"));
 		detail.getStyleClass().add("recoverable-banner__detail");
 		texts.getChildren().addAll(title, detail);
 
-		Button discard = new Button("Discard", Button.Variant.GHOST, Button.Size.SM);
+		Button discard = new Button(UiI18n.t("dashboard:banner.discard"), Button.Variant.GHOST, Button.Size.SM);
 		discard.setOnAction(event -> dependencies.actions().discardRecording(item));
-		Button recover = new Button("Recover", Button.Variant.DEFAULT, Button.Size.SM);
+		Button recover = new Button(UiI18n.t("dashboard:banner.recover"), Button.Variant.DEFAULT, Button.Size.SM);
 		recover.setOnAction(event -> dependencies.actions().recoverRecording(item));
 		HBox actions = new HBox(8, discard, recover);
 		actions.setAlignment(Pos.CENTER_RIGHT);

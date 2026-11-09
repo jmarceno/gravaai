@@ -2,13 +2,14 @@ package dev.gravaai.ui.launch;
 
 import org.jspecify.annotations.Nullable;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.MarqueeText;
 import dev.gravaai.ui.kit.Motion;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -51,7 +52,7 @@ public final class HudBar extends HBox {
 	private final StackPane stateViewport = new StackPane();
 	private final RecordingTimer recordingTimer = new RecordingTimer();
 	private final Label timerLabel = new Label("00:00");
-	private final Label pausedLabel = new Label("PAUSED");
+	private final Label pausedLabel = new Label();
 	private @Nullable Timeline timerTick;
 	private @Nullable FadeTransition blink;
 	private @Nullable RotateTransition spinner;
@@ -91,6 +92,14 @@ public final class HudBar extends HBox {
 		}
 		recordingTimer.setPaused(next.paused());
 		render(next);
+	}
+
+	/**
+	 * Re-renders the current state row after a language switch: every label and tooltip is a pure
+	 * function of the state, so a fresh render retranslates the visible controls.
+	 */
+	public void retranslate() {
+		render(state);
 	}
 
 	public HudRecordingPort.State state() {
@@ -140,15 +149,15 @@ public final class HudBar extends HBox {
 		boolean disabledDuringRecording = next.recording() || next.finalizing();
 
 		Button meeting = iconButton(Icons.UsersGroup, next.meetingMode() ? "fill" : "regular", 20,
-				next.meetingMode() ? "Meeting mode on: transcribe and write notes after you stop"
-						: "Meeting mode: transcribe and write notes after you stop",
+				next.meetingMode() ? t("launch:recording.meetingModeOnTooltip")
+						: t("launch:recording.meetingModeTooltip"),
 				next.meetingMode() ? "hud-accent" : null, port::toggleMeetingMode);
 		meeting.setDisable(disabledDuringRecording);
 		row.getChildren().add(meeting);
 		if (next.meetingMode()) {
 			Button recordScreen = iconButton(Icons.MonitorIcon, next.recordScreen() ? "fill" : "regular", 20,
-					next.recordScreen() ? "Recording the screen too (click for audio only)"
-							: "Audio only, screen not recorded (click to record the screen too)",
+					next.recordScreen() ? t("launch:recording.recordScreenOnTooltip")
+							: t("launch:recording.recordScreenOffTooltip"),
 					next.recordScreen() ? "hud-accent" : null,
 					() -> port.setRecordScreen(!state.recordScreen()));
 			recordScreen.setDisable(disabledDuringRecording);
@@ -160,7 +169,8 @@ public final class HudBar extends HBox {
 			HBox note = new HBox(8);
 			note.getStyleClass().add("hud-audio-only-note");
 			note.setAlignment(Pos.CENTER_LEFT);
-			note.getChildren().addAll(Icon.of(Icons.UsersGroup, 20), new Label("Audio only"));
+			note.getChildren().addAll(Icon.of(Icons.UsersGroup, 20),
+					new Label(t("launch:recording.audioOnly")));
 			row.getChildren().add(note);
 		} else {
 			row.getChildren().add(sourceButton(next));
@@ -168,20 +178,22 @@ public final class HudBar extends HBox {
 		row.getChildren().add(separator());
 
 		Button mic = iconButton(Icons.MicrophoneIcon, next.microphoneEnabled() ? "fill" : "regular", 20,
-				next.microphoneEnabled() ? "Disable microphone" : "Enable microphone",
+				next.microphoneEnabled() ? t("launch:recording.disableMicrophone")
+						: t("launch:recording.enableMicrophone"),
 				next.microphoneEnabled() ? "hud-accent" : null,
 				() -> window.openMenu(HudMenuWindow.Menu.MIC));
 		mic.setDisable(next.recording() || next.finalizing());
 		row.getChildren().add(mic);
 		if (!next.audioOnly()) {
 			Button webcam = iconButton(Icons.VideoCameraIcon, next.webcamEnabled() ? "fill" : "regular", 20,
-					next.webcamEnabled() ? "Disable webcam overlay" : "Enable webcam overlay",
+					next.webcamEnabled() ? t("launch:recording.disableWebcam")
+							: t("launch:recording.enableWebcam"),
 					next.webcamEnabled() ? "hud-accent" : null,
 					() -> window.openMenu(HudMenuWindow.Menu.WEBCAM));
 			webcam.setDisable(next.recording() || next.finalizing());
 			row.getChildren().add(webcam);
 		}
-		Button countdown = iconButton(Icons.TimerIcon, "regular", 20, "Countdown delay",
+		Button countdown = iconButton(Icons.TimerIcon, "regular", 20, t("launch:recording.countdownDelay"),
 				next.countdownDelay() > 0 ? "hud-accent" : null,
 				() -> window.openMenu(HudMenuWindow.Menu.COUNTDOWN));
 		countdown.setDisable(next.picking());
@@ -197,8 +209,8 @@ public final class HudBar extends HBox {
 			}
 		});
 		record.setDisable(next.countdownActive() || next.picking());
-		tooltip(record, next.audioOnly() || next.hasSource() ? "Record"
-				: "Pick a screen, then record");
+		tooltip(record, next.audioOnly() || next.hasSource() ? t("launch:recording.record")
+				: t("launch:recording.pickScreenThenRecord"));
 		row.getChildren().add(record);
 		row.getChildren().add(separator());
 		row.getChildren().addAll(homeButton(), hideButton(), closeButton());
@@ -211,8 +223,9 @@ public final class HudBar extends HBox {
 		HBox graphic = new HBox(8);
 		graphic.setAlignment(Pos.CENTER_LEFT);
 		String sourceName = next.sourceName();
-		String label = next.picking() ? "Click a screen…"
-				: (sourceName != null && !sourceName.isBlank() ? sourceName : "Pick screen");
+		String label = next.picking() ? t("launch:recording.clickAScreen")
+				: (sourceName != null && !sourceName.isBlank() ? sourceName
+						: t("launch:recording.pickScreen"));
 		MarqueeText marquee = new MarqueeText(label);
 		marquee.setPrefWidth(120);
 		marquee.setMaxWidth(120);
@@ -221,10 +234,10 @@ public final class HudBar extends HBox {
 		source.setOnAction(event -> window.pickScreen(false));
 		source.setDisable(next.finalizing() || next.picking());
 		tooltip(source, next.picking()
-				? "Click anywhere on the screen you want to record"
+				? t("launch:recording.screenPickHint")
 				: next.hasSource()
-						? "Recording source: " + next.sourceName() + " (click to change)"
-						: "Pick the screen to record");
+						? t("launch:recording.recordingSourceTooltip", Map.of("name", sourceName == null ? "" : sourceName))
+						: t("launch:recording.pickScreenToRecord"));
 		return source;
 	}
 
@@ -233,7 +246,8 @@ public final class HudBar extends HBox {
 	private Node recordingControls(HudRecordingPort.State next) {
 		HBox row = new HBox(8);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.getChildren().add(iconButton(Icons.House, "fill", 16, "Home", null, port::openDashboard));
+		row.getChildren().add(iconButton(Icons.House, "fill", 16, t("launch:recording.home"), null,
+				port::openDashboard));
 
 		HBox status = new HBox(12);
 		status.setAlignment(Pos.CENTER_LEFT);
@@ -251,6 +265,7 @@ public final class HudBar extends HBox {
 		}
 		timerLabel.getStyleClass().add("hud-timer");
 		pausedLabel.getStyleClass().add("hud-paused-label");
+		pausedLabel.setText(t("launch:recording.paused"));
 		pausedLabel.setVisible(next.paused());
 		pausedLabel.setManaged(next.paused());
 		timerTick = new Timeline(new javafx.animation.KeyFrame(Duration.seconds(1),
@@ -263,14 +278,14 @@ public final class HudBar extends HBox {
 
 		Button micState = iconButton(next.microphoneEnabled() ? Icons.MicrophoneIcon : Icons.MicrophoneSlashIcon,
 				next.microphoneEnabled() ? "fill" : "regular", 16,
-				"Microphone cannot be toggled during recording", null, () -> {
+				t("launch:recording.micToggleDisabledTip"), null, () -> {
 				});
 		micState.setDisable(true);
 		row.getChildren().add(micState);
 		row.getChildren().add(separator());
 
 		Button pauseResume = iconButton(next.paused() ? Icons.PlayIcon : Icons.PauseIcon, "fill", 16,
-				next.paused() ? "Resume" : "Pause", null,
+				next.paused() ? t("launch:recording.resume") : t("launch:recording.pause"), null,
 				() -> {
 					if (state.paused()) {
 						port.resumeRecording();
@@ -283,11 +298,13 @@ public final class HudBar extends HBox {
 		Button stop = new Button("", Button.Variant.DESTRUCTIVE, Button.Size.ICON);
 		stop.setGraphic(region(STOP_SQUARE));
 		stop.setOnAction(event -> port.toggleRecording());
-		tooltip(stop, "Stop");
+		tooltip(stop, t("launch:recording.stop"));
 		row.getChildren().add(stop);
 
-		row.getChildren().add(iconButton(Icons.MinusIcon, "regular", 16, "Hide HUD", null, port::hideHud));
-		row.getChildren().add(iconButton(Icons.XIcon, "regular", 16, "Cancel", null, port::cancelRecording));
+		row.getChildren().add(iconButton(Icons.MinusIcon, "regular", 16, t("launch:recording.hideHud"),
+				null, port::hideHud));
+		row.getChildren().add(iconButton(Icons.XIcon, "regular", 16, t("launch:recording.cancel"),
+				null, port::cancelRecording));
 		return row;
 	}
 
@@ -302,9 +319,9 @@ public final class HudBar extends HBox {
 		spinner.setInterpolator(javafx.animation.Interpolator.ofLinear(
 				new javafx.geometry.Point2D(0, 0), new javafx.geometry.Point2D(1, 1)));
 		spinner.play();
-		Label title = new Label("Preparing recording");
+		Label title = new Label(t("launch:recording.preparing"));
 		title.getStyleClass().add("hud-finalizing-title");
-		Label subtitle = new Label("Opening the editor in a moment");
+		Label subtitle = new Label(t("launch:recording.openingEditor"));
 		subtitle.getStyleClass().add("hud-finalizing-subtitle");
 		VBox copy = new VBox(2, title, subtitle);
 		copy.getStyleClass().add("hud-finalizing-copy");
@@ -332,15 +349,23 @@ public final class HudBar extends HBox {
 	}
 
 	private Button homeButton() {
-		return iconButton(Icons.House, "fill", 20, "Home", null, port::openDashboard);
+		return iconButton(Icons.House, "fill", 20, t("launch:recording.home"), null, port::openDashboard);
 	}
 
 	private Button hideButton() {
-		return iconButton(Icons.MinusIcon, "regular", 20, "Hide HUD", null, port::hideHud);
+		return iconButton(Icons.MinusIcon, "regular", 20, t("launch:recording.hideHud"), null, port::hideHud);
 	}
 
 	private Button closeButton() {
-		return iconButton(Icons.XIcon, "regular", 20, "Minimize to tray", null, port::hideHud);
+		return iconButton(Icons.XIcon, "regular", 20, t("launch:recording.minimizeToTray"), null, port::hideHud);
+	}
+
+	private static String t(String key) {
+		return UiI18n.t(key);
+	}
+
+	private static String t(String key, Map<String, ?> vars) {
+		return UiI18n.t(key, vars);
 	}
 
 	/**

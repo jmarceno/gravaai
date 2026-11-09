@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Card;
 import dev.gravaai.ui.kit.Icon;
@@ -81,10 +82,10 @@ public final class DashboardAnnouncementsView extends StackPane {
 			body.getChildren().add(image);
 		}
 		if (config.banners().size() > 1) {
-			Button previous = arrowButton(Icons.ArrowLeft, "Previous announcement",
-					() -> select(config, index - 1));
-			Button next = arrowButton(Icons.ArrowRight, "Next announcement",
-					() -> select(config, index + 1));
+			Button previous = arrowButton(Icons.ArrowLeft,
+					UiI18n.t("dashboard:announcements.previous"), () -> select(config, index - 1));
+			Button next = arrowButton(Icons.ArrowRight,
+					UiI18n.t("dashboard:announcements.next"), () -> select(config, index + 1));
 			HBox controls = new HBox();
 			controls.getStyleClass().add("dashboard-announcements__controls");
 			controls.setAlignment(Pos.CENTER);
@@ -113,7 +114,8 @@ public final class DashboardAnnouncementsView extends StackPane {
 			Button dot = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 			dot.getStyleClass().add("dashboard-announcements__dot");
 			dot.setText(slide == index % config.banners().size() ? "●" : "○");
-			dot.setAccessibleText("Announcement " + (slide + 1));
+			dot.setAccessibleText(UiI18n.t("dashboard:announcements.dot",
+					java.util.Map.of("count", slide + 1)));
 			dot.setOnAction(event -> select(config, target));
 			dots.getChildren().add(dot);
 		}

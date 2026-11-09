@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Record new",
+		"home": "Home",
+		"raw": "Raw",
+		"meetings": "Meetings",
+		"folders": "Folders",
+		"newFolder": "New folder",
+		"settings": "Settings",
+		"changeColorFor": "Change color for {{name}}",
+		"optionsFor": "Options for {{name}}",
+		"rename": "Rename",
+		"removeFolder": "Remove folder"
+	},
+	"toolbar": {
+		"import": "Import",
+		"searchRaw": "Search raw files…",
+		"searchRawAccessible": "Search raw files",
+		"searchMeetings": "Search meetings…",
+		"searchMeetingsAccessible": "Search meetings",
+		"searchProjects": "Search projects…",
+		"searchProjectsAccessible": "Search projects"
+	},
+	"filters": {
+		"timeFilters": "Time filters",
+		"all": "All",
+		"last7Days": "Last 7 days",
+		"last30Days": "Last 30 days",
+		"sortProjects": "Sort projects",
+		"lastEdited": "Last edited",
+		"lastCreated": "Last created",
+		"name": "Name",
+		"selectAll": "Select all",
+		"selectRawToRemove": "Select raw files to remove",
+		"selectProjectsToDelete": "Select projects to delete",
+		"remove": "Remove",
+		"selectedCount": "{{count}} selected"
+	},
+	"empty": {
+		"recordFirst": "Record your first video",
+		"clearSearch": "Clear search",
+		"retry": "Retry",
+		"noMatchingMeetings": "No matching meetings",
+		"noMeetings": "No meetings yet. Turn on meeting mode in the recorder, or import a recording.",
+		"noMatchingRaw": "No matching raw files",
+		"noRaw": "No raw recordings yet",
+		"noMatchingProjects": "No matching projects",
+		"emptyProjects": "It's looking empty in here..."
+	},
+	"library": {
+		"couldNotLoad": "Could not load the library: {{error}}",
+		"couldNotDelete": "Could not delete: {{error}}",
+		"couldNotRename": "Could not rename: {{error}}",
+		"couldNotSavePreferences": "Could not save library preferences: {{error}}",
+		"meetingsNotDeleted": "Meetings that are still being processed were not deleted.",
+		"meetingsServiceUnavailable": "The meetings service is not available.",
+		"untitledFolder": "Untitled folder",
+		"meeting": "Meeting"
+	},
+	"cards": {
+		"select": "Select {{name}}",
+		"optionsFor": "Options for {{name}}",
+		"addFolder": "Add folder",
+		"createFolderHint": "Create a folder in the sidebar",
+		"removeFromFolders": "Remove from all folders",
+		"openMeeting": "Open meeting",
+		"previewFile": "Preview file",
+		"openProject": "Open project",
+		"rename": "Rename",
+		"showInFolder": "Show in folder",
+		"moveToTrash": "Move to trash",
+		"removeFromLibrary": "Remove from library",
+		"deleteProject": "Delete project"
+	},
+	"deleteDialog": {
+		"titleOne": "Delete “{{name}}”?",
+		"titleMany": "Delete {{count}} projects?",
+		"descriptionOne": "The project moves to the system trash and can still be restored from there.",
+		"descriptionMany": "The projects move to the system trash and can still be restored from there.",
+		"alsoDeleteVideoOne": "Also delete the recorded video on disk",
+		"alsoDeleteVideoMany": "Also delete the recorded videos on disk"
+	},
+	"banner": {
+		"meetingInterrupted": "A meeting recording was interrupted",
+		"screenInterrupted": "A screen recording was interrupted",
+		"recoverHint": "Recover it to keep editing.",
+		"discard": "Discard",
+		"recover": "Recover"
+	},
+	"announcements": {
+		"previous": "Previous announcement",
+		"next": "Next announcement",
+		"dot": "Announcement {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Notes ready",
+		"transcriptReady": "Transcript ready",
+		"notTranscribed": "Not transcribed"
+	},
+	"meetingStatus": {
+		"waiting": "Waiting",
+		"processing": "Processing…",
+		"failed": "Failed",
+		"interrupted": "Interrupted",
+		"waitingToStart": "Waiting to start",
+		"transcribing": "Transcribing",
+		"writingNotes": "Writing notes",
+		"namingMeeting": "Naming the meeting"
+	},
+	"settings": {
+		"title": "SETTINGS",
+		"categories": "CATEGORIES",
+		"category": {
+			"general": "General",
+			"permissions": "Permissions",
+			"motion": "Motion",
+			"recording": "Recording",
+			"shortcuts": "Shortcuts",
+			"meetings": "Meetings",
+			"automations": "Automations",
+			"ai": "AI control",
+			"files": "Files"
+		},
+		"meetingSettingsLoading": "Meeting settings are loading. Open this tab again in a moment.",
+		"files": {
+			"showFolder": "Show folder",
+			"projectsFolder": "Projects folder",
+			"openFile": "Open file",
+			"openVideoOrProject": "Open video or project",
+			"hint": "Projects save automatically as you edit. Previews refresh when you return to Projects."
+		},
+		"general": {
+			"languageSystem": "System language",
+			"languageDescription": "Interface language for the whole app. “System language” follows your desktop setting.",
+			"autoZoomsTitle": "Auto-apply zooms to new recordings",
+			"autoZoomsDescription": "Adds zooms on clicks and typing when a fresh recording opens in the editor.",
+			"showCursorTitle": "Show the cursor",
+			"showCursorDescription": "New projects draw the recorded cursor over the video."
+		},
+		"motion": {
+			"connectZoomsTitle": "Connect nearby zooms",
+			"connectZoomsDescription": "Zooms close together glide from one to the next instead of zooming out between them.",
+			"zoomInDurationTitle": "Zoom in duration",
+			"zoomInDurationDescription": "How long a zoom takes to move in.",
+			"zoomOutDurationTitle": "Zoom out duration",
+			"zoomOutDurationDescription": "How long a zoom takes to move back out.",
+			"zoomMotionBlurTitle": "Zoom motion blur",
+			"zoomMotionBlurDescription": "Blur while the camera zooms.",
+			"cursorSmoothingTitle": "Cursor smoothing",
+			"cursorSmoothingDescription": "Smooths shaky cursor movement.",
+			"cursorMotionBlurTitle": "Cursor motion blur",
+			"cursorMotionBlurDescription": "Blur on fast cursor movement.",
+			"cursorSwayTitle": "Cursor sway",
+			"cursorSwayDescription": "How much the cursor tilts as it moves."
+		},
+		"recording": {
+			"micTitle": "Microphone noise reduction",
+			"micDescription": "Cleans background noise from your microphone in new recordings. System audio is not changed. Strong can make voices sound slightly processed.",
+			"keysTitle": "Record key presses",
+			"keysDescription": "Shortcuts only skips normal typing. Key presses are saved only next to the recording. Letters follow the US keyboard layout.",
+			"off": "Off",
+			"light": "Light",
+			"balanced": "Balanced",
+			"strong": "Strong",
+			"shortcutsOnly": "Shortcuts only",
+			"allKeys": "All keys",
+			"micSaveFailed": "Could not update microphone noise reduction",
+			"keysSaveFailed": "Could not update key press capture"
+		},
+		"permissions": {
+			"captureHint": "Choose what to capture when you start a recording.",
+			"mediaTitle": "Microphone and camera",
+			"mediaDescription": "Access is requested when you enable a microphone or camera for recording.",
+			"mediaStatus": "Requested when needed"
+		},
+		"shortcuts": {
+			"title": "Global shortcuts",
+			"cosmicDescription": "Work in every app. Gravaai adds them to COSMIC's keyboard shortcuts for you.",
+			"portalDescription": "Work in every app. Your desktop asks you to confirm them once; change the keys in its keyboard settings.",
+			"cliDescription": "Your desktop doesn't let apps add shortcuts. Bind these commands in its keyboard settings:",
+			"captureNote": "While you pick a shortcut, a combination already used by a Gravaai shortcut also triggers it.",
+			"resetToDefaults": "Reset to defaults",
+			"notSet": "Not set",
+			"pressAShortcut": "Press a shortcut…",
+			"copy": "Copy",
+			"commandCopied": "Command copied",
+			"invalidBinding": "Use Super, Ctrl or Alt with a key",
+			"clearShortcut": "Clear {{action}} shortcut",
+			"actionToggleRecording": "Start / stop recording",
+			"actionTogglePause": "Pause / resume",
+			"actionCancelRecording": "Cancel recording",
+			"actionToggleMeeting": "Start / stop meeting"
+		}
+	}
+}

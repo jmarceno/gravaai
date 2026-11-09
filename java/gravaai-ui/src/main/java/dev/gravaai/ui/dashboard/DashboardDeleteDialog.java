@@ -1,8 +1,10 @@
 package dev.gravaai.ui.dashboard;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Dialog;
 import dev.gravaai.ui.kit.Switch;
@@ -27,22 +29,24 @@ public final class DashboardDeleteDialog {
 		}
 		boolean singular = projectPaths.size() == 1;
 		String title = singular
-				? "Delete \u201c" + displayName(projectPaths.get(0)) + "\u201d?"
-				: "Delete " + projectPaths.size() + " projects?";
+				? UiI18n.t("dashboard:deleteDialog.titleOne",
+						Map.of("name", displayName(projectPaths.get(0))))
+				: UiI18n.t("dashboard:deleteDialog.titleMany",
+						Map.of("count", projectPaths.size()));
 		Dialog dialog = new Dialog(title);
 		dialog.width(420);
 		dialog.description(singular
-				? "The project moves to the system trash and can still be restored from there."
-				: "The projects move to the system trash and can still be restored from there.");
+				? UiI18n.t("dashboard:deleteDialog.descriptionOne")
+				: UiI18n.t("dashboard:deleteDialog.descriptionMany"));
 
 		Switch deleteRecordings = new Switch(
-				singular ? "Also delete the recorded video on disk"
-						: "Also delete the recorded videos on disk");
+				singular ? UiI18n.t("dashboard:deleteDialog.alsoDeleteVideoOne")
+						: UiI18n.t("dashboard:deleteDialog.alsoDeleteVideoMany"));
 		dialog.content(deleteRecordings);
 
-		Button cancel = new Button("Cancel", Button.Variant.GHOST, Button.Size.SM);
+		Button cancel = new Button(UiI18n.t("common:actions.cancel"), Button.Variant.GHOST, Button.Size.SM);
 		cancel.setOnAction(event -> dialog.close());
-		Button delete = new Button("Delete", Button.Variant.DESTRUCTIVE, Button.Size.SM);
+		Button delete = new Button(UiI18n.t("common:actions.delete"), Button.Variant.DESTRUCTIVE, Button.Size.SM);
 		delete.setOnAction(event -> {
 			dialog.close();
 			onConfirm.accept(deleteRecordings.isChecked());

@@ -76,6 +76,7 @@ The port must publish state on the FX thread (`UiEventsFx.onFx` in the adapter) 
   (Electron uses `focusable: false`). No workaround is attempted (status quo under COSMIC).
 - The menu is a full-display window (not tight-sized) so the Electron backdrop/click-outside
   behaviour is preserved; the plan's "tight stage" instruction is applied to the HUD overlay.
-- HUD text uses the English strings from `src/i18n/locales/en/launch.json`; the i18n loader is P1.2
-  and screens wire it in P1.10, so the HUD literals are to be replaced when the locale plumbing
-  lands (they are centralised in `HudBar`/`HudMenuWindow`).
+- HUD text resolves through `UiI18n` (`launch:recording.*`/`launch:permissions.*` keys, bundles in
+  `gravaai-ui/src/main/resources/i18n/`); the bar re-renders on a language switch
+  (`HudOverlayWindow.retranslate`), and the menus pick the language up when they open. The stage
+  title "Gravaai HUD" stays untranslated: `X11Windows.windowId` looks the window up by title.

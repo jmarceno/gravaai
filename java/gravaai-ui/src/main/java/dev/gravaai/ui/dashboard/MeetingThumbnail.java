@@ -1,6 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.Theme;
@@ -25,15 +26,6 @@ import javafx.scene.paint.Color;
  * {@code .project-thumbnail} host and {@code MeetingLibraryView}'s host).
  */
 public final class MeetingThumbnail extends StackPane {
-
-	/** Port of the thumbnail state lines in {@code MeetingThumbnail.tsx}. */
-	public static final String NOTES_READY = "Notes ready";
-
-	/** Port of the thumbnail state lines in {@code MeetingThumbnail.tsx}. */
-	public static final String TRANSCRIPT_READY = "Transcript ready";
-
-	/** Port of the thumbnail state lines in {@code MeetingThumbnail.tsx}. */
-	public static final String NOT_TRANSCRIBED = "Not transcribed";
 
 	public MeetingThumbnail(MeetingLibraryEntry meeting) {
 		getStyleClass().add("meeting-thumbnail");
@@ -80,12 +72,12 @@ public final class MeetingThumbnail extends StackPane {
 	/** Port of the middle line: notes win over the transcript, else "Not transcribed". */
 	public static String stateLabel(MeetingLibraryEntry meeting) {
 		if (meeting.hasNotes()) {
-			return NOTES_READY;
+			return UiI18n.t("dashboard:thumbnails.notesReady");
 		}
 		if (meeting.hasTranscript()) {
-			return TRANSCRIPT_READY;
+			return UiI18n.t("dashboard:thumbnails.transcriptReady");
 		}
-		return NOT_TRANSCRIBED;
+		return UiI18n.t("dashboard:thumbnails.notTranscribed");
 	}
 
 	/** {@code true} when the state line carries the 14 px {@code DocumentText} icon. */

@@ -51,6 +51,7 @@ import dev.gravaai.services.shortcuts.GlobalShortcuts;
 import dev.gravaai.services.shortcuts.GlobalShortcutsService;
 import dev.gravaai.ui.dashboard.DashboardDependencies;
 import dev.gravaai.ui.dashboard.DashboardLibraryStore;
+import dev.gravaai.ui.dashboard.DashboardSection;
 import dev.gravaai.ui.dashboard.DashboardView;
 import dev.gravaai.ui.kit.KitRoot;
 import dev.gravaai.ui.kit.Theme;
@@ -162,6 +163,11 @@ public final class AppContext {
 		// meeting view. Gravaai lives in the tray, so closing the main window hides it; only the
 		// tray Quit action (or an explicit application shutdown) may exit the process.
 		installCloseToTray(primaryStage);
+		// The language preference drives every translated surface; it is read before any window is
+		// built, so the first frame is already in the stored (or system) language. A later change
+		// from the Settings picker rebuilds the translated scenes (see onLocaleChanged).
+		dev.gravaai.ui.i18n.UiI18n.init(appSettings());
+		dev.gravaai.ui.i18n.UiI18n.addListener(this::onLocaleChanged);
 		Windows mainWindows = new Windows(primaryStage, Boolean.getBoolean("gravaai.uiKit"));
 		windows = mainWindows;
 		mainWindows.setEditorLauncher(this::openProjectInEditor);
@@ -399,6 +405,17 @@ public final class AppContext {
 							if (videoPath != null && !videoPath.isBlank()) {
 								openProjectInEditor(Path.of(videoPath));
 							}
+						}
+
+						@Override
+						public void showRecordingError(String message) {
+							// The adapter translates on its (virtual) thread; the hint belongs to FX.
+							Platform.runLater(() -> {
+								HudOverlayWindow hud = hudWindow;
+								if (hud != null) {
+									hud.showHint(message, true);
+								}
+							});
 						}
 					});
 			lazyHudPort.attach(hudPort);
@@ -893,7 +910,7 @@ public final class AppContext {
 			}
 			javafx.scene.control.ProgressIndicator spinner = new javafx.scene.control.ProgressIndicator();
 			javafx.scene.control.Label label = new javafx.scene.control.Label(
-					"Finalizing your recording\u2026 this can take a few seconds.");
+					dev.gravaai.ui.i18n.UiI18n.t("launch:recording.finalizingWindow"));
 			label.setStyle("-fx-text-fill: white; -fx-font-size: 15px;");
 			javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(16, spinner, label);
 			box.setAlignment(javafx.geometry.Pos.CENTER);
@@ -999,6 +1016,40 @@ public final class AppContext {
 		primaryStage.requestFocus();
 		if (dashboardView != null) {
 			dashboardView.refresh();
+		}
+	}
+
+	/**
+	 * A language change from the Settings picker: rebuild the dashboard scene (every string on it
+	 * is read at build time) and re-render the HUD bar. Deferred one pulse so the picker's click
+	 * handler finishes before its scene is swapped out.
+	 */
+	private void onLocaleChanged() {
+		DashboardView current = dashboardView;
+		if (current != null) {
+			Platform.runLater(() -> {
+				if (dashboardView != current || shutdown) {
+					return;
+				}
+				String settingsCategory = current.activeSettingsCategory();
+				boolean inSettings = current.model().section() instanceof DashboardSection.Settings;
+				current.flushPendingEdits();
+				current.dispose();
+				dashboardView = null;
+				dashboardScene = null;
+				if (activeEditor == null) {
+					buildDashboard();
+					if (inSettings && dashboardView != null) {
+						dashboardView.showSettingsSection(settingsCategory);
+					}
+				}
+				// While an editor hosts the window, the dashboard is rebuilt lazily: the next
+				// Home press goes through showDashboardScene, which rebuilds a null scene.
+			});
+		}
+		HudOverlayWindow hud = hudWindow;
+		if (hud != null) {
+			Platform.runLater(hud::retranslate);
 		}
 	}
 

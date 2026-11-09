@@ -7,15 +7,14 @@ import dev.gravaai.core.editor.ExportPreferences.ExportPipelineModel;
 import dev.gravaai.media.export.ExportCancelledException;
 import dev.gravaai.media.export.ExportProgress;
 import dev.gravaai.media.export.ExportStatusModel;
+import dev.gravaai.ui.i18n.UiI18n;
 
 /**
  * View-model of the export progress panel (port of
- * {@code src/components/video-editor/export/useExportStatusViewModel.ts}, plan §5.12).
+ * {@code src/components/video-editor/export/useExportStatusViewModel.ts}, plan §5.12). The labels
+ * resolve through {@code UiI18n} at call time, so a locale switch shows up on the next update.
  */
 public final class ExportProgressViewModel {
-
-	private static final String PREPARING = "Preparing export...";
-	private static final String SAVING = "Opening save dialog...";
 
 	private boolean exporting;
 	private @Nullable ExportProgress progress;
@@ -57,31 +56,35 @@ public final class ExportProgressViewModel {
 	/** {@code exportPercentLabel}. */
 	public String exportPercentLabel() {
 		if (progress == null) {
-			return PREPARING;
+			return UiI18n.t("editor:exportStatus.preparing");
 		}
 		if (status.isExportPreparing()) {
-			return PREPARING;
+			return UiI18n.t("editor:exportStatus.preparing");
 		}
 		if (status.isExportSaving()) {
-			return SAVING;
+			return UiI18n.t("dialogs:export.openingSaveDialog");
 		}
 		if (status.isRenderingAudio()) {
-			return "Rendering audio " + Math.round(audioProgressOrZero() * 100) + "%";
+			return UiI18n.t("dialogs:export.renderingAudio",
+					java.util.Map.of("percent", Math.round(audioProgressOrZero() * 100)));
 		}
 		if (status.isExportFinalizing()) {
 			if (format == ExportFormat.MP4 && pipelineModel == ExportPipelineModel.MODERN) {
 				if (status.isExportFinalSaveIndeterminate()) {
-					return "Muxing audio and saving file...";
+					return UiI18n.t("dialogs:export.muxingSavingFile");
 				}
-				return "Muxing and saving " + (status.exportFinalizingPercent() == null
-						? 100
-						: status.exportFinalizingPercent()) + "%";
+				return UiI18n.t("dialogs:export.muxingSaving",
+						java.util.Map.of("percent", status.exportFinalizingPercent() == null
+								? 100
+								: status.exportFinalizingPercent()));
 			}
-			return "Finalizing " + (status.exportFinalizingPercent() == null
-					? 100
-					: status.exportFinalizingPercent()) + "%";
+			return UiI18n.t("dialogs:export.finalizing",
+					java.util.Map.of("percent", status.exportFinalizingPercent() == null
+							? 100
+							: status.exportFinalizingPercent()));
 		}
-		return Math.round(progress.percentage()) + "% complete";
+		return UiI18n.t("editor:exportStatus.completePercent",
+				java.util.Map.of("percent", Math.round(progress.percentage())));
 	}
 
 	/** {@code exportRenderSpeedLabel}. */
@@ -89,10 +92,12 @@ public final class ExportProgressViewModel {
 		if (status.renderSpeedFps() == null) {
 			return null;
 		}
-		String label = "Render speed " + status.renderSpeedFps() + " FPS";
+		String label = UiI18n.t("dialogs:export.renderSpeed",
+				java.util.Map.of("fps", status.renderSpeedFps()));
 		double remaining = progress == null ? 0 : progress.estimatedTimeRemaining();
 		if (Double.isFinite(remaining) && remaining >= 1) {
-			label += " · " + formatRemaining(remaining) + " left";
+			label += " · " + UiI18n.t("dialogs:export.timeLeft",
+					java.util.Map.of("time", formatRemaining(remaining)));
 		}
 		return label;
 	}
@@ -138,8 +143,9 @@ public final class ExportProgressViewModel {
 		}
 		String message = error.getMessage();
 		return message == null || message.isBlank()
-				? "Export failed"
-				: "Export failed: " + message;
+				? UiI18n.t("dialogs:export.exportFailed")
+				: UiI18n.t("dialogs:export.failedWithError",
+						java.util.Map.of("error", message));
 	}
 
 	private double audioProgressOrZero() {

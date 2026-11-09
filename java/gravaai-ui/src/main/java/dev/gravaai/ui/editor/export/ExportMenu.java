@@ -10,6 +10,7 @@ import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.media.export.ExportProgress;
 import dev.gravaai.media.export.ExportStatusModel;
 import dev.gravaai.ui.editor.export.ExportSettingsMenu.OutputDimensions;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Anchors;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icons;
@@ -110,7 +111,7 @@ public final class ExportMenu {
 		content.getStyleClass().add("export-menu");
 		content.setPrefWidth(WIDTH);
 		content.setMaxWidth(WIDTH);
-		Label heading = new Label("Export");
+		Label heading = new Label(UiI18n.t("settings:export.title"));
 		heading.getStyleClass().add("export-menu__heading");
 		VBox header = new VBox(heading);
 		header.getStyleClass().add("export-menu__header");
@@ -135,7 +136,7 @@ public final class ExportMenu {
 	public void openFromTrigger() {
 		if (session.hasPendingExportSave()) {
 			session.setDropdownOpen(true);
-			session.setError("Save dialog canceled. Click Save Again to save without re-rendering.");
+			session.setError(UiI18n.t("dialogs:export.saveDialogCanceled"));
 			return;
 		}
 		session.setDropdownOpen(true);
@@ -155,14 +156,14 @@ public final class ExportMenu {
 
 	private void buildProgressPane() {
 		progressPane.getStyleClass().add("export-menu__card");
-		Label title = new Label("Exporting");
+		Label title = new Label(UiI18n.t("editor:exportStatus.exporting"));
 		title.getStyleClass().add("export-menu__title");
-		Label subtitle = new Label("Rendering your file.");
+		Label subtitle = new Label(UiI18n.t("editor:exportStatus.renderingFile"));
 		subtitle.getStyleClass().add("export-menu__subtitle");
 		tipLabel.getStyleClass().add("export-menu__note");
 		tipLabel.setWrapText(true);
 		VBox left = new VBox(2, title, subtitle, tipLabel);
-		Button cancel = new Button("Cancel", Button.Variant.OUTLINE, Button.Size.SM);
+		Button cancel = new Button(UiI18n.t("common:actions.cancel"), Button.Variant.OUTLINE, Button.Size.SM);
 		cancel.getStyleClass().add("export-menu__small-button");
 		// The rotating tip line changes the left column height as tips swap. Without a fixed
 		// size the Cancel button stretches/shifts with it; pin it top-right instead.
@@ -202,22 +203,22 @@ public final class ExportMenu {
 
 	private Button buildErrorPane() {
 		errorPane.getStyleClass().add("export-menu__card");
-		Label title = new Label("Export issue");
+		Label title = new Label(UiI18n.t("editor:exportStatus.issue"));
 		title.getStyleClass().add("export-menu__title");
 		errorPathLabel.getStyleClass().add("export-menu__note");
 		errorPathLabel.setWrapText(true);
 		errorTextLabel.getStyleClass().add("export-menu__subtitle");
 		errorTextLabel.getStyleClass().add("export-menu__error-text");
 		errorTextLabel.setWrapText(true);
-		Button copy = new Button("Copy error", Button.Variant.OUTLINE, Button.Size.SM);
+		Button copy = new Button(UiI18n.t("dialogs:export.copyError"), Button.Variant.OUTLINE, Button.Size.SM);
 		copy.getStyleClass().add("export-menu__small-button");
 		copy.setOnAction(event -> copyError());
-		Button retrySave = new Button("Save Again", Button.Variant.DEFAULT, Button.Size.SM);
+		Button retrySave = new Button(UiI18n.t("editor:actions.saveAgain"), Button.Variant.DEFAULT, Button.Size.SM);
 		retrySave.getStyleClass().add("export-menu__small-button");
 		retrySave.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(retrySave, Priority.ALWAYS);
 		retrySave.setOnAction(event -> callbacks.retrySaveExport());
-		Button close = new Button("Close", Button.Variant.OUTLINE, Button.Size.SM);
+		Button close = new Button(UiI18n.t("common:actions.close"), Button.Variant.OUTLINE, Button.Size.SM);
 		close.getStyleClass().add("export-menu__small-button");
 		close.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(close, Priority.ALWAYS);
@@ -230,20 +231,20 @@ public final class ExportMenu {
 
 	private void buildCompletePane() {
 		completePane.getStyleClass().add("export-menu__card");
-		Label title = new Label("Export complete");
+		Label title = new Label(UiI18n.t("editor:exportStatus.complete"));
 		title.getStyleClass().add("export-menu__title");
-		Label subtitle = new Label("Your file was saved successfully.");
+		Label subtitle = new Label(UiI18n.t("editor:exportStatus.savedSuccessfully"));
 		subtitle.getStyleClass().add("export-menu__subtitle");
 		completePathLabel.getStyleClass().add("export-menu__note");
 		completePathLabel.setWrapText(true);
 		completeFileLabel.getStyleClass().add("export-menu__file-name");
 		completeFileLabel.setWrapText(true);
-		Button reveal = new Button("Show In Folder", Button.Variant.DEFAULT, Button.Size.SM);
+		Button reveal = new Button(UiI18n.t("editor:actions.showInFolder"), Button.Variant.DEFAULT, Button.Size.SM);
 		reveal.getStyleClass().add("export-menu__small-button");
 		reveal.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(reveal, Priority.ALWAYS);
 		reveal.setOnAction(event -> callbacks.revealExportedFile());
-		Button done = new Button("Done", Button.Variant.OUTLINE, Button.Size.SM);
+		Button done = new Button(UiI18n.t("common:actions.done"), Button.Variant.OUTLINE, Button.Size.SM);
 		done.getStyleClass().add("export-menu__small-button");
 		done.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(done, Priority.ALWAYS);
@@ -313,7 +314,7 @@ public final class ExportMenu {
 		speedLabel.setVisible(speed != null);
 		speedLabel.setManaged(speed != null);
 		String runtime = status.runtimeLabel();
-		pathLabel.setText(runtime == null ? "" : "Engine: " + runtime);
+		pathLabel.setText(runtime == null ? "" : engineLabel(runtime));
 		pathLabel.setVisible(runtime != null);
 		pathLabel.setManaged(runtime != null);
 		String skip = status.nativeSkipLabel();
@@ -327,7 +328,7 @@ public final class ExportMenu {
 		stopTips();
 		stateHost.getChildren().setAll(errorPane);
 		String runtime = viewModel.status().runtimeLabel();
-		errorPathLabel.setText(runtime == null ? "" : "Engine: " + runtime);
+		errorPathLabel.setText(runtime == null ? "" : engineLabel(runtime));
 		errorPathLabel.setVisible(runtime != null);
 		errorPathLabel.setManaged(runtime != null);
 		errorTextLabel.setText(session.error() == null ? "" : session.error());
@@ -339,7 +340,7 @@ public final class ExportMenu {
 		stopTips();
 		stateHost.getChildren().setAll(completePane);
 		String runtime = viewModel.status().runtimeLabel();
-		completePathLabel.setText(runtime == null ? "" : "Engine: " + runtime);
+		completePathLabel.setText(runtime == null ? "" : engineLabel(runtime));
 		completePathLabel.setVisible(runtime != null);
 		completePathLabel.setManaged(runtime != null);
 		String file = session.exportedFilePath();
@@ -359,7 +360,11 @@ public final class ExportMenu {
 		ClipboardContent clipboard = new ClipboardContent();
 		clipboard.putString(session.error() == null ? "" : session.error());
 		Clipboard.getSystemClipboard().setContent(clipboard);
-		Toast.show(content, "Error copied");
+		Toast.show(content, UiI18n.t("dialogs:export.errorCopied"));
+	}
+
+	private static String engineLabel(String runtime) {
+		return UiI18n.t("dialogs:export.engine", java.util.Map.of("engine", runtime));
 	}
 
 	private static String fileNameOf(@Nullable String path) {

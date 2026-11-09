@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "新建錄製",
+		"home": "首頁",
+		"raw": "原始檔",
+		"meetings": "會議",
+		"folders": "資料夾",
+		"newFolder": "新增資料夾",
+		"settings": "設定",
+		"changeColorFor": "變更「{{name}}」的顏色",
+		"optionsFor": "「{{name}}」的選項",
+		"rename": "重新命名",
+		"removeFolder": "移除資料夾"
+	},
+	"toolbar": {
+		"import": "匯入",
+		"searchRaw": "搜尋原始檔…",
+		"searchRawAccessible": "搜尋原始檔",
+		"searchMeetings": "搜尋會議…",
+		"searchMeetingsAccessible": "搜尋會議",
+		"searchProjects": "搜尋專案…",
+		"searchProjectsAccessible": "搜尋專案"
+	},
+	"filters": {
+		"timeFilters": "時間篩選",
+		"all": "全部",
+		"last7Days": "最近 7 天",
+		"last30Days": "最近 30 天",
+		"sortProjects": "專案排序",
+		"lastEdited": "依修改時間",
+		"lastCreated": "依建立時間",
+		"name": "依名稱",
+		"selectAll": "全選",
+		"selectRawToRemove": "選擇要移除的原始檔",
+		"selectProjectsToDelete": "選擇要刪除的專案",
+		"remove": "移除",
+		"selectedCount": "已選 {{count}} 個"
+	},
+	"empty": {
+		"recordFirst": "錄製你的第一部影片",
+		"clearSearch": "清除搜尋",
+		"retry": "重試",
+		"noMatchingMeetings": "沒有符合的會議",
+		"noMeetings": "還沒有會議。在錄製器中開啟會議模式，或匯入一段錄製。",
+		"noMatchingRaw": "沒有符合的原始檔",
+		"noRaw": "還沒有原始錄製",
+		"noMatchingProjects": "沒有符合的專案",
+		"emptyProjects": "這裡還空空如也..."
+	},
+	"library": {
+		"couldNotLoad": "無法載入媒體庫：{{error}}",
+		"couldNotDelete": "無法刪除：{{error}}",
+		"couldNotRename": "無法重新命名：{{error}}",
+		"couldNotSavePreferences": "無法儲存媒體庫偏好設定：{{error}}",
+		"meetingsNotDeleted": "仍在處理中的會議未被刪除。",
+		"meetingsServiceUnavailable": "會議服務無法使用。",
+		"untitledFolder": "未命名資料夾",
+		"meeting": "會議"
+	},
+	"cards": {
+		"select": "選取 {{name}}",
+		"optionsFor": "{{name}} 的選項",
+		"addFolder": "新增資料夾",
+		"createFolderHint": "在側邊欄中建立一個資料夾",
+		"removeFromFolders": "從所有資料夾中移除",
+		"openMeeting": "開啟會議",
+		"previewFile": "預覽檔案",
+		"openProject": "開啟專案",
+		"rename": "重新命名",
+		"showInFolder": "在資料夾中顯示",
+		"moveToTrash": "移到垃圾桶",
+		"removeFromLibrary": "從媒體庫中移除",
+		"deleteProject": "刪除專案"
+	},
+	"deleteDialog": {
+		"titleOne": "刪除「{{name}}」？",
+		"titleMany": "刪除 {{count}} 個專案？",
+		"descriptionOne": "專案會移入系統垃圾桶，之後仍可從那裡還原。",
+		"descriptionMany": "專案會移入系統垃圾桶，之後仍可從那裡還原。",
+		"alsoDeleteVideoOne": "同時從磁碟刪除錄製的影片",
+		"alsoDeleteVideoMany": "同時從磁碟刪除錄製的影片"
+	},
+	"banner": {
+		"meetingInterrupted": "一段會議錄製被中斷了",
+		"screenInterrupted": "一段螢幕錄製被中斷了",
+		"recoverHint": "復原它即可繼續剪輯。",
+		"discard": "捨棄",
+		"recover": "復原"
+	},
+	"announcements": {
+		"previous": "上一則公告",
+		"next": "下一則公告",
+		"dot": "公告 {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "筆記已就緒",
+		"transcriptReady": "轉錄已就緒",
+		"notTranscribed": "未轉錄"
+	},
+	"meetingStatus": {
+		"waiting": "等待中",
+		"processing": "處理中…",
+		"failed": "失敗",
+		"interrupted": "已中斷",
+		"waitingToStart": "等待開始",
+		"transcribing": "轉錄中",
+		"writingNotes": "撰寫筆記中",
+		"namingMeeting": "正在命名會議"
+	},
+	"settings": {
+		"title": "設定",
+		"categories": "分類",
+		"category": {
+			"general": "一般",
+			"permissions": "權限",
+			"motion": "動態",
+			"recording": "錄製",
+			"shortcuts": "快捷鍵",
+			"meetings": "會議",
+			"automations": "自動化",
+			"ai": "AI 控制",
+			"files": "檔案"
+		},
+		"meetingSettingsLoading": "會議設定正在載入。請稍後重新開啟此分頁。",
+		"files": {
+			"showFolder": "顯示資料夾",
+			"projectsFolder": "專案資料夾",
+			"openFile": "開啟檔案",
+			"openVideoOrProject": "開啟影片或專案",
+			"hint": "專案會在編輯時自動儲存。返回「專案」時預覽會自動重新整理。"
+		},
+		"general": {
+			"languageSystem": "跟隨系統語言",
+			"languageDescription": "整個應用程式的介面語言。「跟隨系統語言」會使用桌面的語言設定。",
+			"autoZoomsTitle": "為新錄製自動套用變焦",
+			"autoZoomsDescription": "新錄製在編輯器中開啟時，為點擊和輸入自動加入變焦。",
+			"showCursorTitle": "顯示游標",
+			"showCursorDescription": "新專案會在影片上繪製錄製的游標。"
+		},
+		"motion": {
+			"connectZoomsTitle": "連接相鄰變焦",
+			"connectZoomsDescription": "相鄰的變焦平滑銜接，而不是在中間拉遠。",
+			"zoomInDurationTitle": "推近時長",
+			"zoomInDurationDescription": "變焦推近所需的時間。",
+			"zoomOutDurationTitle": "拉遠時長",
+			"zoomOutDurationDescription": "變焦拉回所需的時間。",
+			"zoomMotionBlurTitle": "變焦動態模糊",
+			"zoomMotionBlurDescription": "鏡頭變焦時的模糊效果。",
+			"cursorSmoothingTitle": "游標平滑",
+			"cursorSmoothingDescription": "平滑游標的抖動。",
+			"cursorMotionBlurTitle": "游標動態模糊",
+			"cursorMotionBlurDescription": "游標快速移動時的模糊效果。",
+			"cursorSwayTitle": "游標擺動",
+			"cursorSwayDescription": "游標移動時的傾斜程度。"
+		},
+		"recording": {
+			"micTitle": "麥克風降噪",
+			"micDescription": "在新錄製中清理麥克風的背景噪音。系統聲音不受影響。較強檔位可能讓聲音聽起來略有處理痕跡。",
+			"keysTitle": "錄製按鍵",
+			"keysDescription": "「僅快捷鍵」會忽略一般輸入。按鍵只儲存在錄製檔旁邊。字母按鍵遵循美式鍵盤配置。",
+			"off": "關閉",
+			"light": "較弱",
+			"balanced": "適中",
+			"strong": "較強",
+			"shortcutsOnly": "僅快捷鍵",
+			"allKeys": "所有按鍵",
+			"micSaveFailed": "無法更新麥克風降噪設定",
+			"keysSaveFailed": "無法更新按鍵錄製設定"
+		},
+		"permissions": {
+			"captureHint": "選擇開始錄製時要擷取的內容。",
+			"mediaTitle": "麥克風與攝影機",
+			"mediaDescription": "啟用麥克風或攝影機進行錄製時會請求存取權限。",
+			"mediaStatus": "依需求請求"
+		},
+		"shortcuts": {
+			"title": "全域快捷鍵",
+			"cosmicDescription": "在所有應用程式中生效。Gravaai 會自動將它們加入 COSMIC 的鍵盤快捷鍵。",
+			"portalDescription": "在所有應用程式中生效。桌面會要求你確認一次；之後可在其鍵盤設定中修改按鍵。",
+			"cliDescription": "你的桌面不允許應用程式新增快捷鍵。請在它的鍵盤設定中綁定這些指令：",
+			"captureNote": "選擇快捷鍵時，已被 Gravaai 快捷鍵使用的組合也會同時觸發。",
+			"resetToDefaults": "回復預設值",
+			"notSet": "未設定",
+			"pressAShortcut": "請按下快捷鍵…",
+			"copy": "複製",
+			"commandCopied": "指令已複製",
+			"invalidBinding": "請將 Super、Ctrl 或 Alt 與某個按鍵搭配使用",
+			"clearShortcut": "清除 {{action}} 的快捷鍵",
+			"actionToggleRecording": "開始 / 停止錄製",
+			"actionTogglePause": "暫停 / 繼續",
+			"actionCancelRecording": "取消錄製",
+			"actionToggleMeeting": "開始 / 停止會議"
+		}
+	}
+}

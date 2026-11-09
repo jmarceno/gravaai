@@ -122,7 +122,8 @@ public final class EditorHeaderView extends HBox {
 		// mock, and keeps the shortcut discoverable.
 		dev.gravaai.ui.kit.Tooltip.install(save, "Save (Ctrl + S)");
 
-		export = new Button("Export", Button.Variant.DEFAULT, Button.Size.MD);
+		export = new Button(dev.gravaai.ui.i18n.UiI18n.t("settings:export.title"),
+				Button.Variant.DEFAULT, Button.Size.MD);
 		export.getStyleClass().add("editor-header__export");
 		export.icon(Icons.CloudArrowUp, "fill");
 		export.setGraphicTextGap(8);

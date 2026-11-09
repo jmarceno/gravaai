@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Registra nuovo",
+		"home": "Home",
+		"raw": "Originali",
+		"meetings": "Riunioni",
+		"folders": "Cartelle",
+		"newFolder": "Nuova cartella",
+		"settings": "Impostazioni",
+		"changeColorFor": "Cambia il colore di {{name}}",
+		"optionsFor": "Opzioni per {{name}}",
+		"rename": "Rinomina",
+		"removeFolder": "Rimuovi cartella"
+	},
+	"toolbar": {
+		"import": "Importa",
+		"searchRaw": "Cerca file originali…",
+		"searchRawAccessible": "Cerca file originali",
+		"searchMeetings": "Cerca riunioni…",
+		"searchMeetingsAccessible": "Cerca riunioni",
+		"searchProjects": "Cerca progetti…",
+		"searchProjectsAccessible": "Cerca progetti"
+	},
+	"filters": {
+		"timeFilters": "Filtri temporali",
+		"all": "Tutto",
+		"last7Days": "Ultimi 7 giorni",
+		"last30Days": "Ultimi 30 giorni",
+		"sortProjects": "Ordina progetti",
+		"lastEdited": "Ultima modifica",
+		"lastCreated": "Ultima creazione",
+		"name": "Nome",
+		"selectAll": "Seleziona tutto",
+		"selectRawToRemove": "Seleziona i file originali da rimuovere",
+		"selectProjectsToDelete": "Seleziona i progetti da eliminare",
+		"remove": "Rimuovi",
+		"selectedCount": "{{count}} selezionati"
+	},
+	"empty": {
+		"recordFirst": "Registra il tuo primo video",
+		"clearSearch": "Cancella la ricerca",
+		"retry": "Riprova",
+		"noMatchingMeetings": "Nessuna riunione corrispondente",
+		"noMeetings": "Ancora nessuna riunione. Attiva la modalità riunione nel registratore o importa una registrazione.",
+		"noMatchingRaw": "Nessun file originale corrispondente",
+		"noRaw": "Ancora nessuna registrazione originale",
+		"noMatchingProjects": "Nessun progetto corrispondente",
+		"emptyProjects": "Qui sembra tutto vuoto..."
+	},
+	"library": {
+		"couldNotLoad": "Impossibile caricare la libreria: {{error}}",
+		"couldNotDelete": "Impossibile eliminare: {{error}}",
+		"couldNotRename": "Impossibile rinominare: {{error}}",
+		"couldNotSavePreferences": "Impossibile salvare le preferenze della libreria: {{error}}",
+		"meetingsNotDeleted": "Le riunioni ancora in elaborazione non sono state eliminate.",
+		"meetingsServiceUnavailable": "Il servizio riunioni non è disponibile.",
+		"untitledFolder": "Cartella senza titolo",
+		"meeting": "Riunione"
+	},
+	"cards": {
+		"select": "Seleziona {{name}}",
+		"optionsFor": "Opzioni per {{name}}",
+		"addFolder": "Aggiungi cartella",
+		"createFolderHint": "Crea una cartella nella barra laterale",
+		"removeFromFolders": "Rimuovi da tutte le cartelle",
+		"openMeeting": "Apri riunione",
+		"previewFile": "Anteprima file",
+		"openProject": "Apri progetto",
+		"rename": "Rinomina",
+		"showInFolder": "Mostra nella cartella",
+		"moveToTrash": "Sposta nel cestino",
+		"removeFromLibrary": "Rimuovi dalla libreria",
+		"deleteProject": "Elimina progetto"
+	},
+	"deleteDialog": {
+		"titleOne": "Eliminare «{{name}}»?",
+		"titleMany": "Eliminare {{count}} progetti?",
+		"descriptionOne": "Il progetto va nel cestino di sistema e può ancora essere ripristinato da lì.",
+		"descriptionMany": "I progetti vanno nel cestino di sistema e possono ancora essere ripristinati da lì.",
+		"alsoDeleteVideoOne": "Elimina anche il video registrato dal disco",
+		"alsoDeleteVideoMany": "Elimina anche i video registrati dal disco"
+	},
+	"banner": {
+		"meetingInterrupted": "Una registrazione di riunione è stata interrotta",
+		"screenInterrupted": "Una registrazione dello schermo è stata interrotta",
+		"recoverHint": "Recuperala per continuare a montarla.",
+		"discard": "Scarta",
+		"recover": "Recupera"
+	},
+	"announcements": {
+		"previous": "Annuncio precedente",
+		"next": "Annuncio successivo",
+		"dot": "Annuncio {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Note pronte",
+		"transcriptReady": "Trascrizione pronta",
+		"notTranscribed": "Non trascritto"
+	},
+	"meetingStatus": {
+		"waiting": "In attesa",
+		"processing": "Elaborazione…",
+		"failed": "Non riuscito",
+		"interrupted": "Interrotto",
+		"waitingToStart": "In attesa di iniziare",
+		"transcribing": "Trascrizione",
+		"writingNotes": "Scrittura delle note",
+		"namingMeeting": "Assegnazione del titolo"
+	},
+	"settings": {
+		"title": "IMPOSTAZIONI",
+		"categories": "CATEGORIE",
+		"category": {
+			"general": "Generali",
+			"permissions": "Permessi",
+			"motion": "Movimento",
+			"recording": "Registrazione",
+			"shortcuts": "Scorciatoie",
+			"meetings": "Riunioni",
+			"automations": "Automazioni",
+			"ai": "Controllo IA",
+			"files": "File"
+		},
+		"meetingSettingsLoading": "Le impostazioni riunione sono in caricamento. Riapri questa scheda tra un momento.",
+		"files": {
+			"showFolder": "Mostra cartella",
+			"projectsFolder": "Cartella progetti",
+			"openFile": "Apri file",
+			"openVideoOrProject": "Apri video o progetto",
+			"hint": "I progetti vengono salvati automaticamente durante il montaggio. Le anteprime si aggiornano al ritorno in Progetti."
+		},
+		"general": {
+			"languageSystem": "Lingua di sistema",
+			"languageDescription": "Lingua dell'intera interfaccia dell'app. «Lingua di sistema» segue l'impostazione del tuo desktop.",
+			"autoZoomsTitle": "Applica zoom automatici alle nuove registrazioni",
+			"autoZoomsDescription": "Aggiunge zoom su clic e digitazione quando una nuova registrazione si apre nell'editor.",
+			"showCursorTitle": "Mostra il cursore",
+			"showCursorDescription": "I nuovi progetti disegnano il cursore registrato sul video."
+		},
+		"motion": {
+			"connectZoomsTitle": "Collega gli zoom vicini",
+			"connectZoomsDescription": "Gli zoom vicini scorrono uno nell'altro invece di allontanarsi tra loro.",
+			"zoomInDurationTitle": "Durata dello zoom avanti",
+			"zoomInDurationDescription": "Quanto dura l'ingresso nello zoom.",
+			"zoomOutDurationTitle": "Durata dello zoom indietro",
+			"zoomOutDurationDescription": "Quanto dura l'uscita dallo zoom.",
+			"zoomMotionBlurTitle": "Sfocatura di movimento dello zoom",
+			"zoomMotionBlurDescription": "Sfocatura mentre la camera esegue lo zoom.",
+			"cursorSmoothingTitle": "Levigatura del cursore",
+			"cursorSmoothingDescription": "Leviga i movimenti tremolanti del cursore.",
+			"cursorMotionBlurTitle": "Sfocatura di movimento del cursore",
+			"cursorMotionBlurDescription": "Sfocatura sui movimenti rapidi del cursore.",
+			"cursorSwayTitle": "Oscillazione del cursore",
+			"cursorSwayDescription": "Quanto il cursore si inclina mentre si muove."
+		},
+		"recording": {
+			"micTitle": "Riduzione del rumore del microfono",
+			"micDescription": "Pulisce il rumore di fondo del microfono nelle nuove registrazioni. L'audio di sistema non viene modificato. Il livello Forte può dare alle voci un suono leggermente processato.",
+			"keysTitle": "Registra i tasti premuti",
+			"keysDescription": "«Solo scorciatoie» ignora la digitazione normale. I tasti premuti vengono salvati solo accanto alla registrazione. Le lettere seguono il layout di tastiera statunitense.",
+			"off": "Disattivata",
+			"light": "Leggera",
+			"balanced": "Bilanciata",
+			"strong": "Forte",
+			"shortcutsOnly": "Solo scorciatoie",
+			"allKeys": "Tutti i tasti",
+			"micSaveFailed": "Impossibile aggiornare la riduzione del rumore del microfono",
+			"keysSaveFailed": "Impossibile aggiornare la registrazione dei tasti"
+		},
+		"permissions": {
+			"captureHint": "Scegli cosa acquisire quando avvii una registrazione.",
+			"mediaTitle": "Microfono e camera",
+			"mediaDescription": "L'accesso viene richiesto quando attivi un microfono o una camera per registrare.",
+			"mediaStatus": "Richiesto quando necessario"
+		},
+		"shortcuts": {
+			"title": "Scorciatoie globali",
+			"cosmicDescription": "Funzionano in ogni app. Gravaai le aggiunge alle scorciatoie di COSMIC per te.",
+			"portalDescription": "Funzionano in ogni app. Il tuo desktop chiede di confermarle una volta; cambia i tasti nelle sue impostazioni tastiera.",
+			"cliDescription": "Il tuo desktop non permette alle app di aggiungere scorciatoie. Assegna questi comandi nelle sue impostazioni tastiera:",
+			"captureNote": "Mentre scegli una scorciatoia, una combinazione già usata da una scorciatoia di Gravaai si attiva anch'essa.",
+			"resetToDefaults": "Ripristina i valori predefiniti",
+			"notSet": "Non impostata",
+			"pressAShortcut": "Premi una scorciatoia…",
+			"copy": "Copia",
+			"commandCopied": "Comando copiato",
+			"invalidBinding": "Usa Super, Ctrl o Alt con un tasto",
+			"clearShortcut": "Rimuovi la scorciatoia di {{action}}",
+			"actionToggleRecording": "Avvia / interrompi la registrazione",
+			"actionTogglePause": "Pausa / riprendi",
+			"actionCancelRecording": "Annulla la registrazione",
+			"actionToggleMeeting": "Avvia / interrompi la riunione"
+		}
+	}
+}

@@ -1,5 +1,6 @@
 package dev.gravaai.ui.dashboard;
 
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Label;
 import javafx.scene.layout.VBox;
 
@@ -13,24 +14,17 @@ import javafx.scene.layout.VBox;
  */
 public final class RecordingPermissionsSettings extends VBox {
 
-	/** {@code Choose what to capture when you start a recording.} */
-	public static final String CAPTURE_HINT =
-			"Choose what to capture when you start a recording.";
-	/** Microphone and camera row texts. */
-	public static final String MEDIA_TITLE = "Microphone and camera";
-	public static final String MEDIA_DESCRIPTION =
-			"Access is requested when you enable a microphone or camera for recording.";
-	public static final String MEDIA_STATUS = "Requested when needed";
-
 	public RecordingPermissionsSettings() {
 		super(24);
 		getStyleClass().add("recording-permissions");
 
-		Label hint = new Label(CAPTURE_HINT);
+		Label hint = new Label(UiI18n.t("dashboard:settings.permissions.captureHint"));
 		hint.setWrapText(true);
 		hint.getStyleClass().add("recording-permissions__hint");
-		Label mediaStatus = new Label(MEDIA_STATUS);
+		Label mediaStatus = new Label(UiI18n.t("dashboard:settings.permissions.mediaStatus"));
 		mediaStatus.getStyleClass().add("recording-permissions__status");
-		getChildren().addAll(hint, new SettingsRow(MEDIA_TITLE, MEDIA_DESCRIPTION, mediaStatus, true));
+		getChildren().addAll(hint, new SettingsRow(
+				UiI18n.t("dashboard:settings.permissions.mediaTitle"),
+				UiI18n.t("dashboard:settings.permissions.mediaDescription"), mediaStatus, true));
 	}
 }

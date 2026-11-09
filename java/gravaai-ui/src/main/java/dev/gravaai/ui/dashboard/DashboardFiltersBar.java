@@ -3,8 +3,10 @@ package dev.gravaai.ui.dashboard;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import dev.gravaai.core.concurrent.Threads;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -33,7 +35,8 @@ public final class DashboardFiltersBar extends VBox {
 
 	private final List<Button> periodButtons = new ArrayList<>();
 	private final Button trashButton;
-	private final Button sortButton = new Button("Last edited", Button.Variant.GHOST, Button.Size.SM);
+	private final Button sortButton = new Button(UiI18n.t("dashboard:filters.lastEdited"),
+			Button.Variant.GHOST, Button.Size.SM);
 	private final VBox selectionRow = new VBox();
 	private final Label selectedCount = new Label();
 	private final Button deleteSelected;
@@ -44,10 +47,13 @@ public final class DashboardFiltersBar extends VBox {
 
 		HBox timeFilters = new HBox(8);
 		timeFilters.setAlignment(Pos.CENTER_LEFT);
-		timeFilters.setAccessibleText("Time filters");
-		addPeriod(timeFilters, model, "All", DashboardLibraryFilters.Period.ALL);
-		addPeriod(timeFilters, model, "Last 7 days", DashboardLibraryFilters.Period.WEEK);
-		addPeriod(timeFilters, model, "Last 30 days", DashboardLibraryFilters.Period.MONTH);
+		timeFilters.setAccessibleText(UiI18n.t("dashboard:filters.timeFilters"));
+		addPeriod(timeFilters, model, UiI18n.t("dashboard:filters.all"),
+				DashboardLibraryFilters.Period.ALL);
+		addPeriod(timeFilters, model, UiI18n.t("dashboard:filters.last7Days"),
+				DashboardLibraryFilters.Period.WEEK);
+		addPeriod(timeFilters, model, UiI18n.t("dashboard:filters.last30Days"),
+				DashboardLibraryFilters.Period.MONTH);
 
 		trashButton = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		trashButton.setGraphic(Icon.of(Icons.Trash, 16));
@@ -63,22 +69,28 @@ public final class DashboardFiltersBar extends VBox {
 		sortButton.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
 		sortButton.setGraphicTextGap(8);
 		sortButton.setPrefHeight(28);
-		sortButton.setAccessibleText("Sort projects");
+		sortButton.setAccessibleText(UiI18n.t("dashboard:filters.sortProjects"));
 		DropdownMenu sortMenu = new DropdownMenu(sortButton);
-		sortMenu.item("Last edited", () -> model.setSort(DashboardLibraryFilters.Sort.RECENT));
-		sortMenu.item("Last created", () -> model.setSort(DashboardLibraryFilters.Sort.CREATED));
-		sortMenu.item("Name", () -> model.setSort(DashboardLibraryFilters.Sort.NAME));
+		sortMenu.item(UiI18n.t("dashboard:filters.lastEdited"),
+				() -> model.setSort(DashboardLibraryFilters.Sort.RECENT));
+		sortMenu.item(UiI18n.t("dashboard:filters.lastCreated"),
+				() -> model.setSort(DashboardLibraryFilters.Sort.CREATED));
+		sortMenu.item(UiI18n.t("dashboard:filters.name"),
+				() -> model.setSort(DashboardLibraryFilters.Sort.NAME));
 
 		HBox topRow = new HBox(12, timeFilters, spacer, sortButton);
 		topRow.setAlignment(Pos.CENTER_LEFT);
 
 		selectionRow.getStyleClass().add("dashboard-selection");
 		selectionRow.setSpacing(12);
-		Button selectAll = new Button("Select all", Button.Variant.GHOST, Button.Size.SM);
+		Button selectAll = new Button(UiI18n.t("dashboard:filters.selectAll"),
+				Button.Variant.GHOST, Button.Size.SM);
 		selectAll.setOnAction(event -> model.selectAllVisible());
-		Button cancel = new Button("Cancel", Button.Variant.GHOST, Button.Size.SM);
+		Button cancel = new Button(UiI18n.t("common:actions.cancel"),
+				Button.Variant.GHOST, Button.Size.SM);
 		cancel.setOnAction(event -> model.setSelecting(false));
-		deleteSelected = new Button("Delete", Button.Variant.DESTRUCTIVE, Button.Size.SM);
+		deleteSelected = new Button(UiI18n.t("common:actions.delete"),
+				Button.Variant.DESTRUCTIVE, Button.Size.SM);
 		deleteSelected.setOnAction(event -> deleteSelection(model));
 		HBox selectionControls = new HBox(12, selectAll, selectedCount, deleteSelected, cancel);
 		selectionControls.setAlignment(Pos.CENTER_LEFT);
@@ -97,13 +109,18 @@ public final class DashboardFiltersBar extends VBox {
 		model.sortProperty().addListener((observable, oldValue, value) -> {
 			DashboardLibraryFilters.Sort next = value == null
 					? DashboardLibraryFilters.Sort.RECENT : value;
-			sortButton.setText(next == DashboardLibraryFilters.Sort.NAME ? "Name"
-					: next == DashboardLibraryFilters.Sort.CREATED ? "Last created" : "Last edited");
+			sortButton.setText(next == DashboardLibraryFilters.Sort.NAME
+					? UiI18n.t("dashboard:filters.name")
+					: next == DashboardLibraryFilters.Sort.CREATED
+							? UiI18n.t("dashboard:filters.lastCreated")
+							: UiI18n.t("dashboard:filters.lastEdited"));
 		});
 		model.sectionProperty().addListener((observable, oldValue, value) -> {
 			trashButton.setAccessibleText(model.isRaw()
-					? "Select raw files to remove" : "Select projects to delete");
-			deleteSelected.setText(model.isRaw() ? "Remove" : "Delete");
+					? UiI18n.t("dashboard:filters.selectRawToRemove")
+					: UiI18n.t("dashboard:filters.selectProjectsToDelete"));
+			deleteSelected.setText(model.isRaw() ? UiI18n.t("dashboard:filters.remove")
+					: UiI18n.t("common:actions.delete"));
 		});
 		model.selectedPaths().addListener((ListChangeListener<String>) change ->
 				updateSelectionControls(model));
@@ -121,8 +138,9 @@ public final class DashboardFiltersBar extends VBox {
 				try {
 					model.deleteLibraryEntries(paths);
 				} catch (IOException error) {
-					Platform.runLater(() ->
-							model.errorProperty().set("Could not delete: " + error.getMessage()));
+					Platform.runLater(() -> model.errorProperty().set(UiI18n.t(
+							"dashboard:library.couldNotDelete",
+							Map.of("error", String.valueOf(error.getMessage())))));
 				} finally {
 					Platform.runLater(() -> {
 						model.setSelecting(false);
@@ -139,8 +157,9 @@ public final class DashboardFiltersBar extends VBox {
 					model.trashProjects(paths, deleteRecordings);
 					Platform.runLater(() -> model.setSelecting(false));
 				} catch (IOException error) {
-					Platform.runLater(() ->
-							model.errorProperty().set("Could not delete: " + error.getMessage()));
+					Platform.runLater(() -> model.errorProperty().set(UiI18n.t(
+							"dashboard:library.couldNotDelete",
+							Map.of("error", String.valueOf(error.getMessage())))));
 				} finally {
 					Platform.runLater(() -> model.busyProperty().set(false));
 				}
@@ -168,7 +187,7 @@ public final class DashboardFiltersBar extends VBox {
 
 	private void updateSelectionControls(DashboardModel model) {
 		int count = model.selectedPaths().size();
-		selectedCount.setText(count + " selected");
+		selectedCount.setText(UiI18n.t("dashboard:filters.selectedCount", java.util.Map.of("count", count)));
 		deleteSelected.setDisable(count == 0 || model.busyProperty().get());
 	}
 }

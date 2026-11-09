@@ -21,6 +21,7 @@ import dev.gravaai.services.projects.RecoverableRecording;
 import dev.gravaai.services.projects.RecordingEntry;
 import dev.gravaai.services.projects.RenameLibraryProject;
 import dev.gravaai.services.projects.TrashLibraryProjects;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.meeting.MeetingUiService;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -43,8 +44,9 @@ import javafx.collections.ObservableList;
 public final class DashboardModel {
 
 	/** Port of the message {@code useMeetingLibrary.remove} throws for skipped meetings. */
-	public static final String MEETINGS_NOT_DELETED =
-			"Meetings that are still being processed were not deleted.";
+	private static String meetingsNotDeleted() {
+		return UiI18n.t("dashboard:library.meetingsNotDeleted");
+	}
 
 	/**
 	 * Drag payload format for library cards (the dashboard counterpart of
@@ -312,7 +314,7 @@ public final class DashboardModel {
 		List<ProjectLibraryEntry> mapped = new ArrayList<>();
 		for (MeetingLibraryEntry meeting : meetings) {
 			String title = meeting.title() == null || meeting.title().isBlank()
-					? "Meeting" : meeting.title();
+					? UiI18n.t("dashboard:library.meeting") : meeting.title();
 			mapped.add(new ProjectLibraryEntry(meeting.mediaPath().toString(), title,
 					meeting.createdAt(), meeting.createdAt(), null, false, false));
 		}
@@ -364,10 +366,11 @@ public final class DashboardModel {
 
 	/** Adds "Untitled folder", "Untitled folder 1", ... with the first palette colour. */
 	public ProjectFolder createFolder() {
-		String name = "Untitled folder";
+		String base = UiI18n.t("dashboard:library.untitledFolder");
+		String name = base;
 		int index = 1;
 		while (hasFolderName(name)) {
-			name = "Untitled folder " + index++;
+			name = base + " " + index++;
 		}
 		ProjectFolder folder = new ProjectFolder(UUID.randomUUID().toString(), name,
 				ProjectFolder.COLORS.get(0), List.of());
@@ -489,7 +492,7 @@ public final class DashboardModel {
 		if (meeting != null) {
 			MeetingUiService service = dependencies.meetingService();
 			if (service == null) {
-				throw new IOException("The meetings service is not available.");
+				throw new IOException(UiI18n.t("dashboard:library.meetingsServiceUnavailable"));
 			}
 			Result<String> result = service.renameMeeting(meeting.mediaPath(), clean);
 			if (result.isErr()) {
@@ -608,7 +611,7 @@ public final class DashboardModel {
 	private List<String> deleteMeetings(List<String> paths) throws IOException {
 		MeetingUiService service = dependencies.meetingService();
 		if (service == null) {
-			throw new IOException("The meetings service is not available.");
+			throw new IOException(UiI18n.t("dashboard:library.meetingsServiceUnavailable"));
 		}
 		List<Path> mediaPaths = new ArrayList<>();
 		for (String path : paths) {
@@ -632,7 +635,7 @@ public final class DashboardModel {
 			selecting.set(false);
 		}
 		if (deleted.size() < paths.size()) {
-			throw new IOException(MEETINGS_NOT_DELETED);
+			throw new IOException(meetingsNotDeleted());
 		}
 		return deleted;
 	}
@@ -677,7 +680,8 @@ public final class DashboardModel {
 			dependencies.preferences().save(next);
 			error.set("");
 		} catch (IOException exception) {
-			error.set("Could not save library preferences: " + exception.getMessage());
+			error.set(UiI18n.t("dashboard:library.couldNotSavePreferences",
+					Map.of("error", String.valueOf(exception.getMessage()))));
 		}
 		refreshVisible();
 	}

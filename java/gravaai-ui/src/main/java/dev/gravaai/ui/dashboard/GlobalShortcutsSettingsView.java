@@ -12,6 +12,7 @@ import dev.gravaai.services.shortcuts.GlobalShortcutKeyEvent;
 import dev.gravaai.services.shortcuts.GlobalShortcuts;
 import dev.gravaai.services.shortcuts.GlobalShortcutsConfig;
 import dev.gravaai.services.shortcuts.GlobalShortcutsStatus;
+import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
@@ -99,20 +100,20 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		GlobalShortcutsConfig current = loadedConfig();
 		boolean portal = status != null && status.backend() == GlobalShortcutsStatus.Backend.PORTAL;
 		Switch enabled = new Switch("", current.enabled());
-		enabled.setAccessibleText("Global shortcuts");
+		enabled.setAccessibleText(UiI18n.t("dashboard:settings.shortcuts.title"));
 		enabled.setDisable(busy || !(cosmic || portal));
 		enabled.onCheckedChange(checked ->
 				apply(new GlobalShortcutsConfig(checked, current.bindings())));
 		String description;
 		if (cosmic) {
-			description = "Work in every app. Gravaai adds them to COSMIC's keyboard shortcuts for you.";
+			description = UiI18n.t("dashboard:settings.shortcuts.cosmicDescription");
 		} else if (portal) {
-			description = "Work in every app. Your desktop asks you to confirm them once; "
-					+ "change the keys in its keyboard settings.";
+			description = UiI18n.t("dashboard:settings.shortcuts.portalDescription");
 		} else {
-			description = "Your desktop doesn't let apps add shortcuts. Bind these commands in its keyboard settings:";
+			description = UiI18n.t("dashboard:settings.shortcuts.cliDescription");
 		}
-		rows.getChildren().add(new SettingsRow("Global shortcuts", description, enabled));
+		rows.getChildren().add(new SettingsRow(UiI18n.t("dashboard:settings.shortcuts.title"),
+				description, enabled));
 
 		if (portal) {
 			if (current.enabled()) {
@@ -130,12 +131,12 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
 			rows.getChildren().add(buildActionRow(action));
 		}
-		Label note = new Label(
-				"While you pick a shortcut, a combination already used by a Gravaai shortcut also triggers it.");
+		Label note = new Label(UiI18n.t("dashboard:settings.shortcuts.captureNote"));
 		note.getStyleClass().add("global-shortcuts-settings__note");
 		note.setWrapText(true);
 		rows.getChildren().add(note);
-		Button reset = new Button("Reset to defaults", Button.Variant.GHOST, Button.Size.SM);
+		Button reset = new Button(UiI18n.t("dashboard:settings.shortcuts.resetToDefaults"),
+				Button.Variant.GHOST, Button.Size.SM);
 		reset.setGraphic(Icon.of(Icons.ArrowCounterClockwise, 14));
 		reset.setGraphicTextGap(6);
 		reset.setDisable(busy);
@@ -148,12 +149,10 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		java.util.Map<GlobalShortcutAction, String> triggers =
 				status == null ? java.util.Map.of() : status.triggers();
 		for (GlobalShortcutAction action : GlobalShortcutAction.values()) {
-			Label trigger = new Label(triggers.getOrDefault(action, "Not set"));
+			Label trigger = new Label(triggers.getOrDefault(action,
+					UiI18n.t("dashboard:settings.shortcuts.notSet")));
 			trigger.getStyleClass().add("global-shortcuts-settings__command");
-			host.getChildren().add(new SettingsRow(
-					java.util.Objects.requireNonNull(
-					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
-					"missing shortcut label for " + action), "", trigger));
+			host.getChildren().add(new SettingsRow(actionLabel(action), "", trigger));
 		}
 	}
 
@@ -165,28 +164,43 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			Label code = new Label(command);
 			code.getStyleClass().add("global-shortcuts-settings__command");
 			code.setMaxWidth(Double.MAX_VALUE);
-			Button copy = new Button("Copy", Button.Variant.SECONDARY, Button.Size.SM);
+			Button copy = new Button(UiI18n.t("dashboard:settings.shortcuts.copy"),
+					Button.Variant.SECONDARY, Button.Size.SM);
 			copy.setOnAction(event -> copyCommand(command));
-			host.getChildren().add(new SettingsRow(
-					java.util.Objects.requireNonNull(
-					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
-					"missing shortcut label for " + action), "", copy));
+			host.getChildren().add(new SettingsRow(actionLabel(action), "", copy));
 		}
 	}
 
+	/** Translation keys of the action row labels, literal so the key check sees them. */
+	private static final java.util.Map<GlobalShortcutAction, String> ACTION_LABEL_KEYS = java.util.Map.of(
+			GlobalShortcutAction.TOGGLE_RECORDING,
+					"dashboard:settings.shortcuts.actionToggleRecording",
+			GlobalShortcutAction.TOGGLE_PAUSE, "dashboard:settings.shortcuts.actionTogglePause",
+			GlobalShortcutAction.CANCEL_RECORDING,
+					"dashboard:settings.shortcuts.actionCancelRecording",
+			GlobalShortcutAction.TOGGLE_MEETING,
+					"dashboard:settings.shortcuts.actionToggleMeeting");
+
+	/** The translated row label of one action (the service keeps the English COSMIC label). */
+	private static String actionLabel(GlobalShortcutAction action) {
+		String key = ACTION_LABEL_KEYS.get(action);
+		if (key == null) {
+			throw new IllegalArgumentException("missing shortcut label key for " + action);
+		}
+		return UiI18n.t(key);
+	}
+
 	private Region buildActionRow(GlobalShortcutAction action) {
-		String label = java.util.Objects.requireNonNull(
-					GlobalShortcuts.GLOBAL_SHORTCUT_LABELS.get(action),
-					"missing shortcut label for " + action);
+		String label = actionLabel(action);
 		GlobalShortcutBinding binding = loadedConfig().bindings().get(action);
 		String conflict = status == null ? null : status.conflicts().get(action);
 		boolean isCapturing = capturing == action;
 
 		String bindingLabel;
 		if (isCapturing) {
-			bindingLabel = "Press a shortcut…";
+			bindingLabel = UiI18n.t("dashboard:settings.shortcuts.pressAShortcut");
 		} else if (binding == null) {
-			bindingLabel = "Not set";
+			bindingLabel = UiI18n.t("dashboard:settings.shortcuts.notSet");
 		} else {
 			bindingLabel = java.util.Objects.requireNonNull(
 					GlobalShortcuts.formatGlobalBinding(binding),
@@ -200,7 +214,8 @@ public final class GlobalShortcutsSettingsView extends VBox {
 
 		Button clear = new Button("", Button.Variant.GHOST, Button.Size.ICON);
 		clear.setGraphic(Icon.of(Icons.X, 14));
-		clear.setAccessibleText("Clear " + label + " shortcut");
+		clear.setAccessibleText(UiI18n.t("dashboard:settings.shortcuts.clearShortcut",
+				java.util.Map.of("action", label)));
 		clear.setDisable(busy || binding == null || isCapturing);
 		clear.setOnAction(event -> {
 			java.util.Map<GlobalShortcutAction, GlobalShortcutBinding> bindings =
@@ -249,7 +264,8 @@ public final class GlobalShortcutsSettingsView extends VBox {
 				event.isControlDown(), event.isAltDown(), event.isShiftDown(), event.isMetaDown());
 		GlobalShortcutBinding binding = GlobalShortcuts.keyboardEventToBinding(keyEvent);
 		if (binding == null || !GlobalShortcuts.isValidGlobalBinding(binding)) {
-			Platform.runLater(() -> Toast.show(this, "Use Super, Ctrl or Alt with a key")
+			Platform.runLater(() -> Toast.show(this,
+					UiI18n.t("dashboard:settings.shortcuts.invalidBinding"))
 					.variant(Toast.Variant.DANGER));
 			return;
 		}
@@ -303,7 +319,8 @@ public final class GlobalShortcutsSettingsView extends VBox {
 		ClipboardContent content = new ClipboardContent();
 		content.putString(command);
 		Clipboard.getSystemClipboard().setContent(content);
-		Platform.runLater(() -> Toast.show(this, "Command copied").variant(Toast.Variant.SUCCESS));
+		Platform.runLater(() -> Toast.show(this, UiI18n.t("dashboard:settings.shortcuts.commandCopied"))
+				.variant(Toast.Variant.SUCCESS));
 	}
 
 	private void showError(String message) {

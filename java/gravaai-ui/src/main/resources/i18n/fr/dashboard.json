@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Nouvel enregistrement",
+		"home": "Accueil",
+		"raw": "Bruts",
+		"meetings": "Réunions",
+		"folders": "Dossiers",
+		"newFolder": "Nouveau dossier",
+		"settings": "Paramètres",
+		"changeColorFor": "Changer la couleur de {{name}}",
+		"optionsFor": "Options de {{name}}",
+		"rename": "Renommer",
+		"removeFolder": "Supprimer le dossier"
+	},
+	"toolbar": {
+		"import": "Importer",
+		"searchRaw": "Rechercher des fichiers bruts…",
+		"searchRawAccessible": "Rechercher des fichiers bruts",
+		"searchMeetings": "Rechercher des réunions…",
+		"searchMeetingsAccessible": "Rechercher des réunions",
+		"searchProjects": "Rechercher des projets…",
+		"searchProjectsAccessible": "Rechercher des projets"
+	},
+	"filters": {
+		"timeFilters": "Filtres temporels",
+		"all": "Tout",
+		"last7Days": "7 derniers jours",
+		"last30Days": "30 derniers jours",
+		"sortProjects": "Trier les projets",
+		"lastEdited": "Dernière modification",
+		"lastCreated": "Dernière création",
+		"name": "Nom",
+		"selectAll": "Tout sélectionner",
+		"selectRawToRemove": "Sélectionnez les fichiers bruts à retirer",
+		"selectProjectsToDelete": "Sélectionnez les projets à supprimer",
+		"remove": "Retirer",
+		"selectedCount": "{{count}} sélectionnés"
+	},
+	"empty": {
+		"recordFirst": "Enregistrez votre première vidéo",
+		"clearSearch": "Effacer la recherche",
+		"retry": "Réessayer",
+		"noMatchingMeetings": "Aucune réunion correspondante",
+		"noMeetings": "Aucune réunion pour l'instant. Activez le mode réunion dans l'enregistreur ou importez un enregistrement.",
+		"noMatchingRaw": "Aucun fichier brut correspondant",
+		"noRaw": "Aucun enregistrement brut pour l'instant",
+		"noMatchingProjects": "Aucun projet correspondant",
+		"emptyProjects": "C'est plutôt vide par ici..."
+	},
+	"library": {
+		"couldNotLoad": "Impossible de charger la bibliothèque : {{error}}",
+		"couldNotDelete": "Impossible de supprimer : {{error}}",
+		"couldNotRename": "Impossible de renommer : {{error}}",
+		"couldNotSavePreferences": "Impossible d'enregistrer les préférences de la bibliothèque : {{error}}",
+		"meetingsNotDeleted": "Les réunions encore en cours de traitement n'ont pas été supprimées.",
+		"meetingsServiceUnavailable": "Le service de réunions n'est pas disponible.",
+		"untitledFolder": "Dossier sans titre",
+		"meeting": "Réunion"
+	},
+	"cards": {
+		"select": "Sélectionner {{name}}",
+		"optionsFor": "Options de {{name}}",
+		"addFolder": "Ajouter un dossier",
+		"createFolderHint": "Créez un dossier dans la barre latérale",
+		"removeFromFolders": "Retirer de tous les dossiers",
+		"openMeeting": "Ouvrir la réunion",
+		"previewFile": "Aperçu du fichier",
+		"openProject": "Ouvrir le projet",
+		"rename": "Renommer",
+		"showInFolder": "Afficher dans le dossier",
+		"moveToTrash": "Mettre à la corbeille",
+		"removeFromLibrary": "Retirer de la bibliothèque",
+		"deleteProject": "Supprimer le projet"
+	},
+	"deleteDialog": {
+		"titleOne": "Supprimer « {{name}} » ?",
+		"titleMany": "Supprimer {{count}} projets ?",
+		"descriptionOne": "Le projet est déplacé dans la corbeille du système et peut encore y être restauré.",
+		"descriptionMany": "Les projets sont déplacés dans la corbeille du système et peuvent encore y être restaurés.",
+		"alsoDeleteVideoOne": "Supprimer aussi la vidéo enregistrée sur le disque",
+		"alsoDeleteVideoMany": "Supprimer aussi les vidéos enregistrées sur le disque"
+	},
+	"banner": {
+		"meetingInterrupted": "Un enregistrement de réunion a été interrompu",
+		"screenInterrupted": "Un enregistrement d'écran a été interrompu",
+		"recoverHint": "Récupérez-le pour continuer à le monter.",
+		"discard": "Abandonner",
+		"recover": "Récupérer"
+	},
+	"announcements": {
+		"previous": "Annonce précédente",
+		"next": "Annonce suivante",
+		"dot": "Annonce {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Notes prêtes",
+		"transcriptReady": "Transcription prête",
+		"notTranscribed": "Non transcrit"
+	},
+	"meetingStatus": {
+		"waiting": "En attente",
+		"processing": "Traitement…",
+		"failed": "Échec",
+		"interrupted": "Interrompu",
+		"waitingToStart": "En attente de démarrage",
+		"transcribing": "Transcription en cours",
+		"writingNotes": "Rédaction des notes",
+		"namingMeeting": "Attribution du titre"
+	},
+	"settings": {
+		"title": "PARAMÈTRES",
+		"categories": "CATÉGORIES",
+		"category": {
+			"general": "Général",
+			"permissions": "Autorisations",
+			"motion": "Mouvement",
+			"recording": "Enregistrement",
+			"shortcuts": "Raccourcis",
+			"meetings": "Réunions",
+			"automations": "Automatisations",
+			"ai": "Contrôle IA",
+			"files": "Fichiers"
+		},
+		"meetingSettingsLoading": "Les paramètres de réunion se chargent. Rouvrez cet onglet dans un instant.",
+		"files": {
+			"showFolder": "Afficher le dossier",
+			"projectsFolder": "Dossier des projets",
+			"openFile": "Ouvrir un fichier",
+			"openVideoOrProject": "Ouvrir une vidéo ou un projet",
+			"hint": "Les projets sont enregistrés automatiquement pendant le montage. Les aperçus s'actualisent au retour dans Projets."
+		},
+		"general": {
+			"languageSystem": "Langue du système",
+			"languageDescription": "Langue de l'interface de toute l'application. « Langue du système » suit le réglage de votre bureau.",
+			"autoZoomsTitle": "Appliquer automatiquement les zooms aux nouveaux enregistrements",
+			"autoZoomsDescription": "Ajoute des zooms sur les clics et la saisie quand un nouvel enregistrement s'ouvre dans l'éditeur.",
+			"showCursorTitle": "Afficher le curseur",
+			"showCursorDescription": "Les nouveaux projets dessinent le curseur enregistré sur la vidéo."
+		},
+		"motion": {
+			"connectZoomsTitle": "Relier les zooms proches",
+			"connectZoomsDescription": "Les zooms proches glissent de l'un à l'autre au lieu de dézoomer entre eux.",
+			"zoomInDurationTitle": "Durée du zoom avant",
+			"zoomInDurationDescription": "Durée de l'entrée dans un zoom.",
+			"zoomOutDurationTitle": "Durée du zoom arrière",
+			"zoomOutDurationDescription": "Durée de la sortie d'un zoom.",
+			"zoomMotionBlurTitle": "Flou de mouvement du zoom",
+			"zoomMotionBlurDescription": "Flou pendant le mouvement de la caméra.",
+			"cursorSmoothingTitle": "Lissage du curseur",
+			"cursorSmoothingDescription": "Lisse les mouvements tremblotants du curseur.",
+			"cursorMotionBlurTitle": "Flou de mouvement du curseur",
+			"cursorMotionBlurDescription": "Flou lors des mouvements rapides du curseur.",
+			"cursorSwayTitle": "Balancement du curseur",
+			"cursorSwayDescription": "Inclinaison du curseur pendant ses déplacements."
+		},
+		"recording": {
+			"micTitle": "Réduction du bruit du micro",
+			"micDescription": "Nettoie le bruit de fond du micro dans les nouveaux enregistrements. L'audio système n'est pas modifié. Le niveau Fort peut donner aux voix un son légèrement traité.",
+			"keysTitle": "Enregistrer les touches",
+			"keysDescription": "« Raccourcis seulement » ignore la frappe normale. Les touches sont enregistrées uniquement à côté de l'enregistrement. Les lettres suivent la disposition clavier américaine.",
+			"off": "Désactivé",
+			"light": "Léger",
+			"balanced": "Équilibré",
+			"strong": "Fort",
+			"shortcutsOnly": "Raccourcis seulement",
+			"allKeys": "Toutes les touches",
+			"micSaveFailed": "Impossible de mettre à jour la réduction du bruit du micro",
+			"keysSaveFailed": "Impossible de mettre à jour la capture des touches"
+		},
+		"permissions": {
+			"captureHint": "Choisissez ce qu'il faut capturer au démarrage d'un enregistrement.",
+			"mediaTitle": "Micro et caméra",
+			"mediaDescription": "L'accès est demandé quand vous activez un micro ou une caméra pour enregistrer.",
+			"mediaStatus": "Demandé au besoin"
+		},
+		"shortcuts": {
+			"title": "Raccourcis globaux",
+			"cosmicDescription": "Ils fonctionnent dans toutes les applications. Gravaai les ajoute aux raccourcis clavier de COSMIC pour vous.",
+			"portalDescription": "Ils fonctionnent dans toutes les applications. Votre bureau vous demande de les confirmer une fois ; modifiez les touches dans ses paramètres clavier.",
+			"cliDescription": "Votre bureau ne permet pas aux applications d'ajouter des raccourcis. Affectez ces commandes dans ses paramètres clavier :",
+			"captureNote": "Pendant le choix d'un raccourci, une combinaison déjà utilisée par un raccourci Gravaai se déclenche aussi.",
+			"resetToDefaults": "Rétablir les valeurs par défaut",
+			"notSet": "Non défini",
+			"pressAShortcut": "Appuyez sur un raccourci…",
+			"copy": "Copier",
+			"commandCopied": "Commande copiée",
+			"invalidBinding": "Utilisez Super, Ctrl ou Alt avec une touche",
+			"clearShortcut": "Effacer le raccourci de {{action}}",
+			"actionToggleRecording": "Démarrer / arrêter l'enregistrement",
+			"actionTogglePause": "Pause / reprise",
+			"actionCancelRecording": "Annuler l'enregistrement",
+			"actionToggleMeeting": "Démarrer / arrêter la réunion"
+		}
+	}
+}

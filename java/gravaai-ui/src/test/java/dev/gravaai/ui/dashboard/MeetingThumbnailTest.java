@@ -23,11 +23,11 @@ class MeetingThumbnailTest {
 	@Test
 	@DisplayName("notes win over the transcript, then Not transcribed")
 	void stateLabels() {
-		assertEquals(MeetingThumbnail.NOTES_READY,
+		assertEquals(dev.gravaai.ui.i18n.UiI18n.t("dashboard:thumbnails.notesReady"),
 				MeetingThumbnail.stateLabel(meeting(true, true, MeetingLibraryEntry.Status.IDLE)));
-		assertEquals(MeetingThumbnail.TRANSCRIPT_READY,
+		assertEquals(dev.gravaai.ui.i18n.UiI18n.t("dashboard:thumbnails.transcriptReady"),
 				MeetingThumbnail.stateLabel(meeting(true, false, MeetingLibraryEntry.Status.IDLE)));
-		assertEquals(MeetingThumbnail.NOT_TRANSCRIBED,
+		assertEquals(dev.gravaai.ui.i18n.UiI18n.t("dashboard:thumbnails.notTranscribed"),
 				MeetingThumbnail.stateLabel(meeting(false, false, MeetingLibraryEntry.Status.IDLE)));
 
 		assertTrue(MeetingThumbnail.hasNotesIcon(meeting(true, true, MeetingLibraryEntry.Status.IDLE)));

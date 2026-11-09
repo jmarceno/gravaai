@@ -1,0 +1,195 @@
+{
+	"sidebar": {
+		"recordNew": "Nieuwe opname",
+		"home": "Start",
+		"raw": "Ruwe bestanden",
+		"meetings": "Vergaderingen",
+		"folders": "Mappen",
+		"newFolder": "Nieuwe map",
+		"settings": "Instellingen",
+		"changeColorFor": "Kleur van {{name}} wijzigen",
+		"optionsFor": "Opties voor {{name}}",
+		"rename": "Naam wijzigen",
+		"removeFolder": "Map verwijderen"
+	},
+	"toolbar": {
+		"import": "Importeren",
+		"searchRaw": "Ruwe bestanden doorzoeken…",
+		"searchRawAccessible": "Ruwe bestanden doorzoeken",
+		"searchMeetings": "Vergaderingen doorzoeken…",
+		"searchMeetingsAccessible": "Vergaderingen doorzoeken",
+		"searchProjects": "Projecten doorzoeken…",
+		"searchProjectsAccessible": "Projecten doorzoeken"
+	},
+	"filters": {
+		"timeFilters": "Tijdfilters",
+		"all": "Alles",
+		"last7Days": "Laatste 7 dagen",
+		"last30Days": "Laatste 30 dagen",
+		"sortProjects": "Projecten sorteren",
+		"lastEdited": "Laatst bewerkt",
+		"lastCreated": "Laatst aangemaakt",
+		"name": "Naam",
+		"selectAll": "Alles selecteren",
+		"selectRawToRemove": "Selecteer ruwe bestanden om te verwijderen",
+		"selectProjectsToDelete": "Selecteer projecten om te verwijderen",
+		"remove": "Verwijderen",
+		"selectedCount": "{{count}} geselecteerd"
+	},
+	"empty": {
+		"recordFirst": "Neem je eerste video op",
+		"clearSearch": "Zoekopdracht wissen",
+		"retry": "Opnieuw proberen",
+		"noMatchingMeetings": "Geen overeenkomende vergaderingen",
+		"noMeetings": "Nog geen vergaderingen. Zet de vergadermodus aan in de recorder of importeer een opname.",
+		"noMatchingRaw": "Geen overeenkomende ruwe bestanden",
+		"noRaw": "Nog geen ruwe opnames",
+		"noMatchingProjects": "Geen overeenkomende projecten",
+		"emptyProjects": "Het ziet er hier behoorlijk leeg uit..."
+	},
+	"library": {
+		"couldNotLoad": "Kan de bibliotheek niet laden: {{error}}",
+		"couldNotDelete": "Verwijderen mislukt: {{error}}",
+		"couldNotRename": "Hernoemen mislukt: {{error}}",
+		"couldNotSavePreferences": "Kan de bibliotheekvoorkeuren niet opslaan: {{error}}",
+		"meetingsNotDeleted": "Vergaderingen die nog worden verwerkt, zijn niet verwijderd.",
+		"meetingsServiceUnavailable": "De vergaderdienst is niet beschikbaar.",
+		"untitledFolder": "Naamloze map",
+		"meeting": "Vergadering"
+	},
+	"cards": {
+		"select": "{{name}} selecteren",
+		"optionsFor": "Opties voor {{name}}",
+		"addFolder": "Map toevoegen",
+		"createFolderHint": "Maak een map in de zijbalk",
+		"removeFromFolders": "Uit alle mappen verwijderen",
+		"openMeeting": "Vergadering openen",
+		"previewFile": "Bestand bekijken",
+		"openProject": "Project openen",
+		"rename": "Naam wijzigen",
+		"showInFolder": "Tonen in map",
+		"moveToTrash": "Naar de prullenbak verplaatsen",
+		"removeFromLibrary": "Uit de bibliotheek verwijderen",
+		"deleteProject": "Project verwijderen"
+	},
+	"deleteDialog": {
+		"titleOne": "„{{name}}” verwijderen?",
+		"titleMany": "{{count}} projecten verwijderen?",
+		"descriptionOne": "Het project gaat naar de systeemprullenbak en kan daar nog worden hersteld.",
+		"descriptionMany": "De projecten gaan naar de systeemprullenbak en kunnen daar nog worden hersteld.",
+		"alsoDeleteVideoOne": "Ook de opgenomen video van de schijf verwijderen",
+		"alsoDeleteVideoMany": "Ook de opgenomen video's van de schijf verwijderen"
+	},
+	"banner": {
+		"meetingInterrupted": "Een vergaderopname is onderbroken",
+		"screenInterrupted": "Een schermopname is onderbroken",
+		"recoverHint": "Herstel hem om verder te kunnen bewerken.",
+		"discard": "Weggooien",
+		"recover": "Herstellen"
+	},
+	"announcements": {
+		"previous": "Vorige aankondiging",
+		"next": "Volgende aankondiging",
+		"dot": "Aankondiging {{count}}"
+	},
+	"thumbnails": {
+		"notesReady": "Notities klaar",
+		"transcriptReady": "Transcript klaar",
+		"notTranscribed": "Niet getranscribeerd"
+	},
+	"meetingStatus": {
+		"waiting": "Wachten",
+		"processing": "Verwerken…",
+		"failed": "Mislukt",
+		"interrupted": "Onderbroken",
+		"waitingToStart": "Wacht op de start",
+		"transcribing": "Transcriberen",
+		"writingNotes": "Notities schrijven",
+		"namingMeeting": "Vergadering een naam geven"
+	},
+	"settings": {
+		"title": "INSTELLINGEN",
+		"categories": "CATEGORIEËN",
+		"category": {
+			"general": "Algemeen",
+			"permissions": "Machtigingen",
+			"motion": "Beweging",
+			"recording": "Opname",
+			"shortcuts": "Sneltoetsen",
+			"meetings": "Vergaderingen",
+			"automations": "Automatiseringen",
+			"ai": "AI-besturing",
+			"files": "Bestanden"
+		},
+		"meetingSettingsLoading": "De vergaderinstellingen worden geladen. Open dit tabblad over een ogenblik opnieuw.",
+		"files": {
+			"showFolder": "Map tonen",
+			"projectsFolder": "Projectmap",
+			"openFile": "Bestand openen",
+			"openVideoOrProject": "Video of project openen",
+			"hint": "Projecten worden automatisch opgeslagen tijdens het bewerken. Voorbeelden worden vernieuwd wanneer je terugkeert naar Projecten."
+		},
+		"general": {
+			"languageSystem": "Systeemtaal",
+			"languageDescription": "Interfacetaal van de hele app. „Systeemtaal” volgt de instelling van je bureaublad.",
+			"autoZoomsTitle": "Automatisch zoomen toepassen op nieuwe opnames",
+			"autoZoomsDescription": "Voegt zooms toe op klikken en typen zodra een nieuwe opname in de editor opent.",
+			"showCursorTitle": "Cursor tonen",
+			"showCursorDescription": "Nieuwe projecten tekenen de opgenomen cursor over de video."
+		},
+		"motion": {
+			"connectZoomsTitle": "Nabije zooms verbinden",
+			"connectZoomsDescription": "Nabije zooms glijden in elkaar over in plaats van ertussen uit te zoomen.",
+			"zoomInDurationTitle": "Duur van het inzoomen",
+			"zoomInDurationDescription": "Hoe lang het inzoomen duurt.",
+			"zoomOutDurationTitle": "Duur van het uitzoomen",
+			"zoomOutDurationDescription": "Hoe lang het terug uitzoomen duurt.",
+			"zoomMotionBlurTitle": "Zoombewegingsonscherpte",
+			"zoomMotionBlurDescription": "Onscherpte terwijl de camera zoemt.",
+			"cursorSmoothingTitle": "Cursorgladmaken",
+			"cursorSmoothingDescription": "Gladt trillende cursorbewegingen af.",
+			"cursorMotionBlurTitle": "Cursorbewegingsonscherpte",
+			"cursorMotionBlurDescription": "Onscherpte bij snelle cursorbewegingen.",
+			"cursorSwayTitle": "Cursormeanderen",
+			"cursorSwayDescription": "Hoeveel de cursor helt tijdens het bewegen."
+		},
+		"recording": {
+			"micTitle": "Microfoonruisonderdrukking",
+			"micDescription": "Verwijdert achtergrondruis van de microfoon in nieuwe opnames. Systeemaudio blijft ongewijzigd. Sterk kan stemmen licht bewerkt laten klinken.",
+			"keysTitle": "Toetsaanslagen opnemen",
+			"keysDescription": "Alleen sneltoetsen slaat normaal typen over. Toetsaanslagen worden alleen naast de opname opgeslagen. Letters volgen het Amerikaanse toetsenbordlayout.",
+			"off": "Uit",
+			"light": "Licht",
+			"balanced": "Gebalanceerd",
+			"strong": "Sterk",
+			"shortcutsOnly": "Alleen sneltoetsen",
+			"allKeys": "Alle toetsen",
+			"micSaveFailed": "Kan de microfoonruisonderdrukking niet bijwerken",
+			"keysSaveFailed": "Kan het opnemen van toetsaanslagen niet bijwerken"
+		},
+		"permissions": {
+			"captureHint": "Kies wat er wordt opgenomen wanneer je een opname start.",
+			"mediaTitle": "Microfoon en camera",
+			"mediaDescription": "Toegang wordt gevraagd wanneer je een microfoon of camera inschakelt om op te nemen.",
+			"mediaStatus": "Gevraagd indien nodig"
+		},
+		"shortcuts": {
+			"title": "Globale sneltoetsen",
+			"cosmicDescription": "Werken in elke app. Gravaai voegt ze voor je toe aan COSMIC's sneltoetsen.",
+			"portalDescription": "Werken in elke app. Je bureaublad vraagt ze eenmalig te bevestigen; wijzig de toetsen in de toetsenbordinstellingen.",
+			"cliDescription": "Je bureaublad staat niet toe dat apps sneltoetsen toevoegen. Koppel deze opdrachten in de toetsenbordinstellingen:",
+			"captureNote": "Terwijl je een sneltoets kiest, activeert een combinatie die al door een Gravaai-sneltoets wordt gebruikt deze ook.",
+			"resetToDefaults": "Terug naar standaardwaarden",
+			"notSet": "Niet ingesteld",
+			"pressAShortcut": "Druk op een sneltoets…",
+			"copy": "Kopiëren",
+			"commandCopied": "Opdracht gekopieerd",
+			"invalidBinding": "Gebruik Super, Ctrl of Alt met een toets",
+			"clearShortcut": "Sneltoets van {{action}} wissen",
+			"actionToggleRecording": "Opname starten / stoppen",
+			"actionTogglePause": "Pauzeren / hervatten",
+			"actionCancelRecording": "Opname annuleren",
+			"actionToggleMeeting": "Vergadering starten / stoppen"
+		}
+	}
+}

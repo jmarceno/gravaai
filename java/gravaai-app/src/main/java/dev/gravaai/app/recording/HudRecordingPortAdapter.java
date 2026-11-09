@@ -79,6 +79,12 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 		/** A finished meeting recording: opens it in the meeting view of the main window. */
 		default void openMeeting(String mediaPath) {}
+
+		/**
+		 * A recording could not start: the message is shown in the HUD hint bubble (already
+		 * translated through {@code UiI18n}; the app hops it to the FX thread).
+		 */
+		default void showRecordingError(String message) {}
 	}
 
 	/** The values persisted in {@code recordings-settings.json}. */
@@ -239,6 +245,10 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 						LOG.log(System.Logger.Level.WARNING,
 								"recording start failed: countdown unavailable: "
 										+ countdownResult.error());
+						navigation.showRecordingError(dev.gravaai.ui.i18n.UiI18n.t(
+								"launch:permissions.failedToStart",
+								Map.of("error", countdownResult.error() == null
+										? "" : countdownResult.error())));
 					}
 					publish();
 					return;
@@ -272,6 +282,9 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 			}
 			if (!result.success()) {
 				LOG.log(System.Logger.Level.WARNING, "recording start failed: " + result.message());
+				navigation.showRecordingError(dev.gravaai.ui.i18n.UiI18n.t(
+						"launch:permissions.failedToStart",
+						Map.of("error", result.message() == null ? "" : result.message())));
 				discardWebcam(webcam);
 				publish();
 				return;
@@ -289,6 +302,8 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 			publish();
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "could not start the recording: " + error);
+			navigation.showRecordingError(dev.gravaai.ui.i18n.UiI18n.t(
+					"launch:permissions.failedToStartGeneric"));
 			publish();
 		}
 	}

@@ -21,6 +21,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import dev.gravaai.core.os.HostOs;
+
 /**
  * Atomic project-file writes (port of {@code electron/ipc/project/atomicSave.ts}, plan §5.2).
  *
@@ -125,7 +127,8 @@ public final class AtomicProjectSave {
 	}
 
 	private static void syncParentDirectory(Path parentDir) throws IOException {
-		if (java.io.File.separatorChar == '\\') {
+		if (HostOs.current().isWindows()) {
+			// Windows cannot open a directory handle to fsync it.
 			return;
 		}
 		try (FileChannel channel = FileChannel.open(parentDir, StandardOpenOption.READ)) {

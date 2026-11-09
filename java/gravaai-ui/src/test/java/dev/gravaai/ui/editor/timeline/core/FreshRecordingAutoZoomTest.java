@@ -84,8 +84,8 @@ class FreshRecordingAutoZoomTest {
 	@DisplayName("removes auto zooms when the real source turns out ineligible")
 	void removesAutoZoomsForIneligibleSource() {
 		assertTrue(FreshRecordingAutoZoom.shouldRemoveAutoRegions("/media/a.mp4", true, 1,
-				"/media/a.mp4", 960, 1020, "linux"));
+				"/media/a.mp4", 960, 1020));
 		assertFalse(FreshRecordingAutoZoom.shouldRemoveAutoRegions("/media/a.mp4", true, 1,
-				"/media/a.mp4", 1920, 1080, "linux"));
+				"/media/a.mp4", 1920, 1080));
 	}
 }

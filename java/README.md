@@ -59,6 +59,29 @@ parity/            golden frames, UI reference screenshots, fixture projects
 Dependency direction: `core <- platform <- media <- services <- ui <- app`. Never add a cycle.
 Java package root: `dev.gravaai.<module>.<area>`.
 
+## Platform and desktop-environment rules
+
+A desktop environment or compositor difference is **one decision in one place**, never an `if`
+inside a larger class:
+
+* `platform/…/compositor/` owns the whole question. `SessionType` classifies
+  `XDG_SESSION_TYPE`/`WAYLAND_DISPLAY`/`DISPLAY`; `DesktopEnvironment` is the full list of desktop
+  names, each declared with its own `DesktopProfile` (capture backend, cursor backend, shortcut
+  strategy); `DesktopSession` combines them. **No other code reads `XDG_CURRENT_DESKTOP` or
+  `XDG_SESSION_TYPE`.** Adding a desktop is one enum constant plus its aliases.
+* `core/…/xdg/` owns the freedesktop base-directory rules; nothing re-derives `$XDG_*_HOME` by hand.
+* `core/…/os/HostOs` owns the host-OS question (`os.name`), for the few ported branches that still
+  ask it.
+* `platform/…/process/ExecutableLookup` owns `$PATH` lookup; `platform/…/filemanager/DesktopOpener`
+  owns `xdg-open`. Tools are located through `NativeHelpers.payloadPath`/`payloadFile`, not through
+  ad-hoc relative-path ladders.
+* Desktop integration that can be absent (portal, tray, notifications, D-Bus) is grouped in
+  `app/…/DesktopServices` and degrades to a null service, never to a failed start.
+
+Concession: when a difference really is a state machine (which capture and pointer mechanism a
+session gets), it is modelled as one — an explicit enum plus a profile — rather than as a chain of
+conditionals.
+
 ## Machine rules (plan §1.1)
 
 * Software libx264 only; never GPU/VA-API/VDPAU/Vulkan video, never `-hwaccel`.

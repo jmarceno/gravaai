@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.os.HostOs;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -102,14 +103,16 @@ public final class ProjectPersistence {
 	}
 
 	public static double getDefaultBorderRadiusPercent() {
-		return getDefaultBorderRadiusPercent(System.getProperty("os.name", ""));
+		return getDefaultBorderRadiusPercent(HostOs.current());
 	}
 
-	/** {@code getDefaultBorderRadiusPercent}: 8% on macOS, square corners elsewhere. */
-	public static double getDefaultBorderRadiusPercent(String platform) {
-		return platform != null && platform.toLowerCase(Locale.ROOT).contains("mac")
-				? MACOS_DEFAULT_BORDER_RADIUS_PERCENT
-				: 0;
+	/**
+	 * {@code getDefaultBorderRadiusPercent}: 8% on macOS, square corners elsewhere.
+	 *
+	 * @param os the host OS the project is being created on
+	 */
+	public static double getDefaultBorderRadiusPercent(HostOs os) {
+		return os.isMac() ? MACOS_DEFAULT_BORDER_RADIUS_PERCENT : 0;
 	}
 
 	/** {@code legacyBorderRadiusPixelsToPercent}: 1080p-relative pixels to percent of the short side. */

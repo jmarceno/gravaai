@@ -10,6 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
 
 /**
@@ -47,7 +48,7 @@ class CaptureSelectionTest {
 	@DisplayName("rejects old X11 IDs on Wayland without enumerating portal sources")
 	void rejectsOldX11IdsOnWayland() {
 		FakeOutputs outputs = new FakeOutputs();
-		CaptureSelection selection = new CaptureSelection(outputs, WAYLAND);
+		CaptureSelection selection = new CaptureSelection(outputs, DesktopSession.detect(WAYLAND));
 		assertNull(selection.validateCaptureSource(window()));
 		assertNull(selection.validateCaptureSource(SelectedSource.screen("screen:1:0", "Screen", "1")));
 		assertEquals(0, outputs.calls);
@@ -58,12 +59,12 @@ class CaptureSelectionTest {
 	void validatesThePortalSentinel() {
 		SelectedSource candidate = SelectedSource.screen(
 				SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null);
-		SelectedSource validated = new CaptureSelection(new FakeOutputs(), WAYLAND)
+		SelectedSource validated = new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND))
 				.validateCaptureSource(candidate);
 		assertEquals(
 				SelectedSource.screen(SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null),
 				validated);
-		assertNull(new CaptureSelection(new FakeOutputs(), X11).validateCaptureSource(candidate));
+		assertNull(new CaptureSelection(new FakeOutputs(), DesktopSession.detect(X11)).validateCaptureSource(candidate));
 	}
 
 	@Test
@@ -71,7 +72,7 @@ class CaptureSelectionTest {
 	void revalidatesCosmicOutputs() {
 		FakeOutputs outputs = new FakeOutputs();
 		outputs.outputs.add(OUTPUT);
-		CaptureSelection selection = new CaptureSelection(outputs, WAYLAND);
+		CaptureSelection selection = new CaptureSelection(outputs, DesktopSession.detect(WAYLAND));
 		assertEquals(
 				CaptureSelection.createCosmicScreenSource(OUTPUT, List.of()),
 				selection.validateCaptureSource(
@@ -86,7 +87,7 @@ class CaptureSelectionTest {
 	void handlesListingFailures() {
 		FakeOutputs outputs = new FakeOutputs();
 		outputs.failure = new IllegalStateException("helper missing");
-		CaptureSelection selection = new CaptureSelection(outputs, WAYLAND);
+		CaptureSelection selection = new CaptureSelection(outputs, DesktopSession.detect(WAYLAND));
 		assertNull(selection.validateCaptureSource(
 				SelectedSource.screen("screen:cosmic:DP-1", "Screen DP-1", null)));
 		assertEquals(

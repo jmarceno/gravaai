@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
 
 /** Ported from the Linux Wayland cases of {@code electron/ipc/register/capturePicker.test.ts}. */
@@ -40,10 +41,9 @@ class CapturePickerServiceTest {
 
 	private SourceService sources(Map<String, String> env) {
 		return new SourceService(
-				env,
-				"linux",
+				DesktopSession.detect(env),
 				recording::get,
-				new CaptureSelection(() -> List.of(DP1), env),
+				new CaptureSelection(() -> List.of(DP1), DesktopSession.detect(env)),
 				new SourceService.SourceSelectorUi() {
 					@Override
 					public void open() {
@@ -62,8 +62,7 @@ class CapturePickerServiceTest {
 
 	private CapturePickerService picker(Map<String, String> env, SourceService sources) {
 		return new CapturePickerService(
-				env,
-				"linux",
+				DesktopSession.detect(env),
 				recording::get,
 				timeoutMs -> {
 					clickCalls.incrementAndGet();

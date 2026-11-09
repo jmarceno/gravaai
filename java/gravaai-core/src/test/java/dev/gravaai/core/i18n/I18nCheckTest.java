@@ -93,10 +93,20 @@ class I18nCheckTest {
 			return Path.of(override);
 		}
 
+		// Anchor on a file that is committed next to the locales rather than on documentation,
+		// which moves and gets deleted: walk up from the module directory until the module layout
+		// is recognisable.
 		Path directory = Path.of(System.getProperty("user.dir")).toAbsolutePath();
 		for (Path candidate = directory; candidate != null; candidate = candidate.getParent()) {
-			if (Files.exists(candidate.resolve("docs/java-rewrite-plan.md"))) {
-				return candidate.resolve("java/gravaai-ui/src/main/resources/i18n");
+			Path javaRoot = candidate.resolve("gravaai-ui").resolve("src/main/resources/i18n");
+			if (Files.isDirectory(candidate.resolve("gravaai-core"))
+					&& Files.isDirectory(javaRoot)) {
+				return javaRoot;
+			}
+			Path nested = candidate.resolve("java/gravaai-ui/src/main/resources/i18n");
+			if (Files.isDirectory(candidate.resolve("java/gravaai-core"))
+					&& Files.isDirectory(nested)) {
+				return nested;
 			}
 		}
 		throw new AssertionError("Could not locate the repository root from " + directory);

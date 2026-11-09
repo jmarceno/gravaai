@@ -2,9 +2,10 @@ package dev.gravaai.services.sources;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
 import dev.gravaai.services.recording.CosmicSources;
 
@@ -25,47 +26,21 @@ public final class CaptureSelection {
 	}
 
 	private final CosmicOutputs cosmicOutputs;
-	private final Map<String, String> env;
+	private final DesktopSession session;
 
-	public CaptureSelection(CosmicOutputs cosmicOutputs, Map<String, String> env) {
+	public CaptureSelection(CosmicOutputs cosmicOutputs, DesktopSession session) {
 		this.cosmicOutputs = cosmicOutputs;
-		this.env = env;
+		this.session = session;
 	}
 
-	/** True on a Linux Wayland session, where direct COSMIC capture is used. */
+	/** True on a Wayland session, where portal or direct COSMIC capture is used. */
 	public boolean isWaylandSession() {
-		return SourceMapping.isLikelyLinuxWaylandSession(env);
+		return session.isWayland();
 	}
 
 	/** Revalidate identity and geometry; never substitute a broader capture source. */
 	public @Nullable SelectedSource validateCaptureSource(SelectedSource candidate) {
-		if (candidate == null || candidate.id() == null || candidate.name() == null) {
-			return null;
-		}
-		if (SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID.equals(candidate.id())) {
-			return isWaylandSession()
-					? SelectedSource.screen(candidate.id(), "System picker", null)
-					: null;
-		}
-		if (!isWaylandSession()) {
-			return null;
-		}
-		if (!CosmicSources.isCosmicSourceId(candidate.id())) {
-			return null;
-		}
-		String outputName = CosmicSources.outputNameForSourceId(candidate.id());
-		List<CosmicOutput> outputs;
-		try {
-			outputs = cosmicOutputs.list();
-		} catch (Exception error) {
-			outputs = List.of();
-		}
-		for (CosmicOutput output : outputs) {
-			if (output.name().equals(outputName)) {
-				return createCosmicScreenSource(output, List.of());
-			}
-		}
-		return null;
+		return validateCaptureSource(candidate, List.of());
 	}
 
 	/** Revalidate against a known display list, so the cosmic source carries its display id. */
@@ -109,7 +84,7 @@ public final class CaptureSelection {
 		} catch (Exception error) {
 			return List.of();
 		}
-		List<SelectedSource> screens = new java.util.ArrayList<>();
+		List<SelectedSource> screens = new ArrayList<>();
 		for (CosmicOutput output : outputs) {
 			screens.add(createCosmicScreenSource(output, displays));
 		}

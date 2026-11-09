@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
 
+import dev.gravaai.core.xdg.XdgDirectories;
+
 /**
  * The per-user data directory (plan §5.2).
  *
@@ -52,11 +54,7 @@ public record UserData(Path dir) {
 
 	/** {@code app.getPath("appData")} equivalent: {@code $XDG_CONFIG_HOME}, default {@code ~/.config}. */
 	public static Path appDataDir() {
-		String xdgConfigHome = System.getenv("XDG_CONFIG_HOME");
-		Path configHome = xdgConfigHome != null && !xdgConfigHome.isBlank()
-				? Path.of(xdgConfigHome)
-				: Path.of(System.getProperty("user.home"), ".config");
-		return configHome.toAbsolutePath();
+		return XdgDirectories.current().configHome();
 	}
 
 	/**

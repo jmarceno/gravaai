@@ -40,7 +40,7 @@ public final class FreshRecordingAutoZoom {
 		}
 		if (input.videoPath() != null && input.videoPath().equals(input.pendingAutoZoomPath())
 				&& input.previewReady() && !ZoomSuggestionUtils
-						.shouldAutoApplyFreshRecordingZoomsForSource(null, null, input.appPlatform())) {
+						.shouldAutoApplyFreshRecordingZoomsForSource(null, null)) {
 			return Decision.SUPPRESSED;
 		}
 		if (input.videoPath() == null || input.loading() || !input.previewReady()
@@ -66,10 +66,10 @@ public final class FreshRecordingAutoZoom {
 	 */
 	public static boolean shouldRemoveAutoRegions(String videoPath, boolean previewReady,
 			int zoomRegionCount, String autoSuggestedVideoPath, Integer sourceWidth,
-			Integer sourceHeight, String platform) {
+			Integer sourceHeight) {
 		return videoPath != null && previewReady && zoomRegionCount > 0
 				&& videoPath.equals(autoSuggestedVideoPath)
 				&& !ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(sourceWidth,
-						sourceHeight, platform);
+						sourceHeight);
 	}
 }

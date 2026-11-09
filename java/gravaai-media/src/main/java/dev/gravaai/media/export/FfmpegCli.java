@@ -1,9 +1,7 @@
 package dev.gravaai.media.export;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import dev.gravaai.platform.nativehelpers.NativeHelpers;
 import dev.gravaai.platform.process.ProcessRunner;
@@ -51,18 +49,12 @@ public final class FfmpegCli {
 		if (explicit != null && !explicit.isBlank()) {
 			return Path.of(explicit).toAbsolutePath().normalize();
 		}
-		List<Path> candidates = List.of(
-				NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve(name),
-				Path.of("native", "build", "ffmpeg", "bin", name),
-				Path.of("..", "native", "build", "ffmpeg", "bin", name),
-				Path.of("..", "..", "native", "build", "ffmpeg", "bin", name),
-				Path.of("..", "..", "..", "native", "build", "ffmpeg", "bin", name));
-		for (Path candidate : candidates) {
-			if (Files.isRegularFile(candidate)) {
-				return candidate.toAbsolutePath().normalize();
-			}
+		Path bundled = NativeHelpers.payloadFile("ffmpeg/bin/" + name);
+		if (bundled != null) {
+			return bundled;
 		}
-		throw new IllegalStateException("bundled ffmpeg CLI not found (tried " + candidates
+		throw new IllegalStateException("bundled ffmpeg CLI not found (tried "
+				+ NativeHelpers.developmentPayloadCandidates("ffmpeg/bin/" + name)
 				+ "); run java/native/build-ffmpeg.sh");
 	}
 }

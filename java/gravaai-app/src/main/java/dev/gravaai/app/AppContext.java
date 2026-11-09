@@ -7,6 +7,7 @@ import dev.gravaai.app.agent.AgentWiring;
 import dev.gravaai.app.export.ProjectExporter;
 import dev.gravaai.app.editor.EditorSession;
 import dev.gravaai.app.editor.EditorWindow;
+import dev.gravaai.app.editor.ProjectPoster;
 import dev.gravaai.app.meeting.MeetingHosts;
 import dev.gravaai.app.meeting.MeetingIntegration;
 import dev.gravaai.app.meeting.MeetingWindow;
@@ -19,16 +20,13 @@ import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.RecentProjectsStore;
 import dev.gravaai.core.storage.StorageFiles;
 import dev.gravaai.core.storage.UserData;
-import dev.gravaai.platform.dbus.SessionBus;
-import dev.gravaai.media.ffmpeg.MediaProbe;
+
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.platform.filemanager.FileManager;
 import dev.gravaai.platform.nativehelpers.NativeHelpers;
-import dev.gravaai.platform.notification.Notifications;
 import dev.gravaai.platform.portal.Portal;
-import dev.gravaai.platform.tray.Tray;
-import dev.gravaai.platform.tray.TrayIcon;
 import dev.gravaai.platform.trash.Trash;
-import dev.gravaai.platform.tray.TrayMenu;
+
 import dev.gravaai.services.automations.AutomationService;
 import dev.gravaai.media.export.ExportPublisher;
 import dev.gravaai.services.export.ExportCoordinator;
@@ -44,6 +42,7 @@ import dev.gravaai.services.projects.RecordingsDirectory;
 import dev.gravaai.services.projects.RecordingsReadModel;
 import dev.gravaai.services.recording.CosmicRecorder.StopResult;
 import dev.gravaai.services.recording.RecordingService;
+import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.shortcuts.DesktopShortcutPortal;
 import dev.gravaai.services.shortcuts.GlobalShortcutAction;
 import dev.gravaai.services.shortcuts.GlobalShortcutDispatcher;
@@ -97,13 +96,8 @@ public final class AppContext {
 	private @Nullable AppSettingsStore appSettings;
 	private @Nullable GlobalShortcutDispatcher dispatcher;
 	private @Nullable GlobalShortcutsService shortcutsService;
-	private @Nullable SessionBus bus;
-	private @Nullable Portal portal;
-	private @Nullable FileManager fileManager;
-	private @Nullable Notifications notifications;
-	private @Nullable AutomationService automationService;
-	private @Nullable Tray tray;
-	private @Nullable AutoCloseable trayRecordingSubscription;
+	/** D-Bus, portals, notifications, automations and the tray; every piece degrades to null. */
+	private final DesktopServices desktopServices = new DesktopServices(new TrayOperations());
 	private @Nullable DashboardView dashboardView;
 	/** The dashboard scene kept for single-window navigation (plan §5.1). */
 	private @Nullable Scene dashboardScene;
@@ -183,7 +177,7 @@ public final class AppContext {
 			// P2.11 skeleton-first: show an editor-shaped skeleton immediately, then build the real
 			// EditorWindow on the next FX pulse (the skeleton is the visible startup window).
 			String launchName = launchPath.getFileName().toString().replaceFirst("\\.(gravaai|openscreen)$", "");
-			javafx.scene.image.Image preloadedPoster = loadPoster(launchPath);
+			javafx.scene.image.Image preloadedPoster = loadSidecarPoster(launchPath);
 			// Single window: the skeleton is shown in the app's main window and the real editor
 			// replaces its scene on the next FX pulse (no second native window).
 			EditorSkeletonWindow skeleton = EditorSkeletonWindow.show(primaryStage, launchName,
@@ -194,16 +188,12 @@ public final class AppContext {
 			}
 			if (preloadedPoster == null) {
 				Thread.ofVirtual().name("gravaai-editor-poster").start(() -> {
-					try {
-						java.nio.file.Path poster = extractPoster(launchPath);
-						if (poster != null) {
-							Platform.runLater(() -> {
-								skeleton.setPoster(new javafx.scene.image.Image(poster.toUri().toString()));
-								Startup.log("first preview frame");
-							});
-						}
-					} catch (Exception ignored) {
-						// Poster is an optimisation: fall back to the skeleton placeholder.
+					Path poster = ProjectPoster.extractFrame(launchPath);
+					if (poster != null) {
+						Platform.runLater(() -> {
+							skeleton.setPoster(new javafx.scene.image.Image(poster.toUri().toString()));
+							Startup.log("first preview frame");
+						});
 					}
 				});
 			}
@@ -322,38 +312,8 @@ public final class AppContext {
 		}
 		backgroundServicesStarted = true;
 		initializeExtensions();
-		// One D-Bus connection serves the tray, the portal-backed file dialogs and the file manager.
-		Optional<SessionBus> connection = SessionBus.tryConnect();
-		bus = connection.orElse(null);
-		if (bus != null) {
-			try {
-				portal = new Portal(bus);
-			} catch (Exception error) {
-				LOG.log(System.Logger.Level.INFO, "xdg-desktop-portal unavailable: " + error);
-			}
-			try {
-				fileManager = new FileManager(bus);
-			} catch (Exception error) {
-				LOG.log(System.Logger.Level.INFO, "FileManager1 unavailable: " + error);
-			}
-			try {
-				notifications = new Notifications(bus);
-			} catch (Exception error) {
-				LOG.log(System.Logger.Level.INFO, "notifications unavailable: " + error);
-			}
-		}
-		try {
-			automationService = new AutomationService(
-					userData.automationsFile(),
-					new AppAutomationHost(portal, fileManager, notifications),
-					path -> {
-						double seconds = MediaProbe.probe(path).durationSeconds();
-						return Double.isFinite(seconds) && seconds > 0 ? seconds : null;
-					},
-					Path.of(System.getProperty("user.home")));
-		} catch (RuntimeException error) {
-			LOG.log(System.Logger.Level.WARNING, "automations unavailable: " + error);
-		}
+		desktopServices.connect();
+		desktopServices.startAutomations(userData);
 	}
 
 	/**
@@ -460,8 +420,8 @@ public final class AppContext {
 			return;
 		}
 		try {
-			meeting = MeetingIntegration.create(userData, appSettings(), recordingWiring, fileManager,
-					automationService);
+			meeting = MeetingIntegration.create(userData, appSettings(), recordingWiring,
+					desktopServices.fileManager(), desktopServices.automations());
 			meeting.service().onOpenRequested(() -> Platform.runLater(this::openMeetingWindow));
 			LOG.log(System.Logger.Level.INFO, "meeting services ready");
 			String autoOpen = System.getenv("GRAVAAI_MEETING_OPEN");
@@ -504,11 +464,13 @@ public final class AppContext {
 	}
 
 	private void initializeExport() {
-		if (exporter != null || automationService == null) {
+		AutomationService automations = desktopServices.automations();
+		if (exporter != null || automations == null) {
 			return;
 		}
-		ExportPublisher publisher = new ExportPublisher(fileManager != null ? fileManager::reveal : null);
-		exportCoordinator = new ExportCoordinator(publisher, automationService.triggers());
+		FileManager manager = desktopServices.fileManager();
+		ExportPublisher publisher = new ExportPublisher(manager != null ? manager::reveal : null);
+		exportCoordinator = new ExportCoordinator(publisher, automations.triggers());
 		EditorPreferencesStore preferencesStore = new EditorPreferencesStore(appSettings());
 		exporter = new ProjectExporter(exportCoordinator, publisher, preferencesStore);
 		exporter.setExtensionHost(extensionHost());
@@ -745,11 +707,12 @@ public final class AppContext {
 
 	/** {@code fireRecordingSaved}: automations for every saved recording (plan P1.13). */
 	private void onRecordingSaved(StopResult result) {
-		if (automationService == null || result == null || !result.success() || result.path() == null) {
+		AutomationService automations = desktopServices.automations();
+		if (automations == null || result == null || !result.success() || result.path() == null) {
 			return;
 		}
 		try {
-			automationService.fireRecordingSaved(new AutomationTriggers.RecordingSavedResult(
+			automations.fireRecordingSaved(new AutomationTriggers.RecordingSavedResult(
 					true, result.path(), result.meeting() != null));
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "recording-saved automation failed: " + error);
@@ -771,7 +734,8 @@ public final class AppContext {
 			return;
 		}
 		shutdown = true;
-		closeTrayRecordingSubscription();
+		// Stop tray updates before the services they read are torn down.
+		desktopServices.close();
 		if (recordingWiring != null) {
 			try {
 				recordingWiring.close();
@@ -813,9 +777,7 @@ public final class AppContext {
 		if (shortcutsService != null) {
 			shortcutsService.close();
 		}
-		if (tray != null) {
-			tray.close();
-		}
+		desktopServices.close();
 		if (extensionHost != null) {
 			try {
 				extensionHost.close();
@@ -823,18 +785,6 @@ public final class AppContext {
 				LOG.log(System.Logger.Level.WARNING, "extension host shutdown failed: " + error);
 			}
 			extensionHost = null;
-		}
-		if (automationService != null) {
-			automationService.close();
-			automationService = null;
-		}
-		if (portal != null) {
-			portal.close();
-			portal = null;
-		}
-		if (bus != null) {
-			bus.close();
-			bus = null;
 		}
 		for (EditorWindow window : List.copyOf(editorWindows)) {
 			try {
@@ -936,7 +886,7 @@ public final class AppContext {
 	 */
 	private void onRecordingFinalizing(boolean finalizing) {
 		if (finalizing) {
-			applyTrayRecordingState(false, "");
+			desktopServices.applyTrayRecordingState(false, "");
 			Stage stage = primaryStage;
 			if (stage == null || shutdown || activeEditor != null) {
 				return;
@@ -1108,7 +1058,7 @@ public final class AppContext {
 
 				@Override
 				public void importMeeting() {
-					Portal chooser = portal;
+					Portal chooser = desktopServices.portal();
 					MeetingIntegration current = meeting;
 					if (chooser == null || current == null) {
 						LOG.log(System.Logger.Level.WARNING,
@@ -1133,7 +1083,7 @@ public final class AppContext {
 
 				@Override
 				public void importFile() {
-					Portal chooser = portal;
+					Portal chooser = desktopServices.portal();
 					if (chooser == null) {
 						LOG.log(System.Logger.Level.WARNING, "import file: no xdg-desktop-portal available");
 						return;
@@ -1158,7 +1108,7 @@ public final class AppContext {
 
 				@Override
 				public void revealInFolder(String path) {
-					FileManager manager = fileManager;
+					FileManager manager = desktopServices.fileManager();
 					if (manager == null) {
 						LOG.log(System.Logger.Level.WARNING, "reveal in folder: FileManager1 unavailable for " + path);
 						return;
@@ -1182,7 +1132,7 @@ public final class AppContext {
 
 				@Override
 				public void openExternalUrl(String url) {
-					Portal opener = portal;
+					Portal opener = desktopServices.portal();
 					if (opener == null) {
 						LOG.log(System.Logger.Level.WARNING, "no portal to open " + url);
 						return;
@@ -1228,11 +1178,14 @@ public final class AppContext {
 					});
 				}
 			};
+			AutomationService automations = desktopServices.automations();
 			DashboardDependencies dependencies = new DashboardDependencies(
 					userData, projectManager, recordings, recoverable, preferences, Trash.defaultTrash(), actions,
 					new ServiceGlobalShortcutsController(requireShortcutsService()),
-					new PlaceholderAgentSettingsController(appPath()),
-					automationService == null ? null : new ServiceAutomationsController(automationService, portal),
+					new PlaceholderAgentSettingsController(AppLaunchPath.current()),
+					automations == null
+							? null
+							: new ServiceAutomationsController(automations, desktopServices.portal()),
 					agentWiring == null ? null : agentWiring.ui(),
 					() -> meeting == null ? null
 							: new dev.gravaai.ui.meeting.ServiceMeetingUiService(
@@ -1425,7 +1378,7 @@ public final class AppContext {
 
 	/** Reveals the recordings folder in the system file manager (the Clips panel menu). */
 	private void openRecordingsFolder() {
-		FileManager manager = fileManager;
+		FileManager manager = desktopServices.fileManager();
 		if (manager == null) {
 			return;
 		}
@@ -1438,40 +1391,18 @@ public final class AppContext {
 		});
 	}
 
-	/** Instant poster for the startup skeleton: the project preview sidecar next to the file. */
-	private static javafx.scene.image.@Nullable Image loadPoster(Path projectPath) {
+	/** The project's preview sidecar as a JavaFX image, when it exists (instant, no child process). */
+	private static javafx.scene.image.@Nullable Image loadSidecarPoster(Path projectPath) {
+		Path thumbnail = ProjectPoster.sidecar(projectPath);
+		if (thumbnail == null) {
+			return null;
+		}
 		try {
-			Path thumbnail = dev.gravaai.services.projects.ProjectManager
-					.getProjectThumbnailPath(projectPath);
-			if (thumbnail == null) {
-				return null;
-			}
-			if (java.nio.file.Files.isRegularFile(thumbnail)) {
-				return new javafx.scene.image.Image(thumbnail.toUri().toString());
-			}
-		} catch (RuntimeException ignored) {
+			return new javafx.scene.image.Image(thumbnail.toUri().toString());
+		} catch (RuntimeException error) {
 			// No poster: the skeleton keeps its placeholder (and the ffmpeg fallback runs).
-		}
-		return null;
-	}
-
-	/** Fallback poster: one frame from the project video through the bundled ffmpeg CLI. */
-	private static @Nullable Path extractPoster(Path projectPath) throws java.io.IOException,
-			InterruptedException {
-		var document = dev.gravaai.core.project.ProjectDocument.load(projectPath);
-		String video = document.videoPath();
-		if (video == null || video.isBlank()) {
 			return null;
 		}
-		Path ffmpeg = NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg");
-		Path poster = java.nio.file.Files.createTempFile("gravaai-poster", ".png");
-		Process process = new ProcessBuilder(ffmpeg.toString(), "-y", "-ss", "0", "-i", video,
-				"-frames:v", "1", "-f", "image2", poster.toString()).redirectErrorStream(true).start();
-		if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
-			process.destroyForcibly();
-			return null;
-		}
-		return process.exitValue() == 0 && java.nio.file.Files.isRegularFile(poster) ? poster : null;
 	}
 
 	private static boolean isProjectFile(Path path) {
@@ -1530,7 +1461,7 @@ public final class AppContext {
 	private static Path ffmpegBinary() {
 		// NativeHelpers resolves <app>/lib/native/linux-x64 (packaged) or java/native/build (dev);
 		// the CLI lives in that directory's ffmpeg/bin subdirectory.
-		return NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg");
+		return AppBinaries.ffmpeg();
 	}
 
 	/** Constructs the global-shortcut service (cheap); {@link #startShortcuts()} starts it. */
@@ -1563,7 +1494,7 @@ public final class AppContext {
 			shortcutsService = new GlobalShortcutsService(
 					settingsPort,
 					() -> NativeHelpers.path("gravaai-ctl"),
-					appPath(),
+					AppLaunchPath.current(),
 					System.getenv(),
 					// The control socket reads on a virtual thread, but every action ends in the HUD,
 					// which is JavaFX: hand over through the FX thread like the other two sinks.
@@ -1645,78 +1576,28 @@ public final class AppContext {
 	}
 
 	private void startTray() {
-		if (bus == null) {
-			LOG.log(System.Logger.Level.INFO, "no D-Bus session; tray disabled");
-			return;
-		}
-		// Building a second Tray would overwrite the field with one whose exportObject() throws
-		// (the paths are taken) and whose install() never runs, leaving a dead tray that swallows
-		// every state update. The startup branches are exclusive today; this keeps them so.
-		if (tray != null && tray.isInstalled()) {
-			return;
-		}
-		if (!Tray.isSupported(bus)) {
-			LOG.log(System.Logger.Level.INFO, "no StatusNotifierWatcher on the session bus; tray disabled");
-			return;
-		}
-		try {
-			Path iconPath = icons.load("gravaai-32.png");
-			Path recordingIconPath = icons.loadOrNull("rec-button.png");
-			TrayIcon icon = TrayIcon.load(iconPath);
-			TrayIcon recordingIcon = recordingIconPath != null ? TrayIcon.load(recordingIconPath) : icon;
-			TrayMenu.Actions actions = new TrayMenu.Actions(
-					() -> Platform.runLater(this::showHud),
-					() -> Platform.runLater(this::openDashboard),
-					() -> Platform.runLater(this::stopRecordingFromTray),
-					() -> Platform.runLater(this::quit));
-			Tray created = new Tray(bus, icon, recordingIcon, actions);
-			created.install();
-			// Assigned only after install(): a tray that failed to install must not replace a
-			// working one (or leave a non-null field that the guard above would then skip).
-			tray = created;
-			subscribeTrayRecordingState();
-			LOG.log(System.Logger.Level.INFO, "tray installed");
-		} catch (Exception error) {
-			LOG.log(System.Logger.Level.WARNING, "tray unavailable: " + error);
-		}
-	}
-
-	/** Keeps the tray icon/tooltip/menu in sync with recording events, including in-flight state. */
-	private void subscribeTrayRecordingState() {
-		closeTrayRecordingSubscription();
+		Path iconPath = icons.load("gravaai-32.png");
+		Path recordingIconPath = icons.loadOrNull("rec-button.png");
 		RecordingWiring wiring = recordingWiring;
+		boolean recordingActive = wiring != null && wiring.recording().isRecordingActive();
+		String sourceName = recordingSourceName(wiring);
+		desktopServices.installTray(iconPath, recordingIconPath, recordingActive, sourceName);
+		if (wiring != null) {
+			desktopServices.subscribeTrayRecordingState(
+					wiring.events().onRecordingStateChanged(state -> Platform.runLater(
+							() -> desktopServices.applyTrayRecordingState(
+									state.recording(), state.sourceName()))));
+		}
+	}
+
+	/** The name the tray tooltip shows for the current selection. */
+	private static String recordingSourceName(@Nullable RecordingWiring wiring) {
 		if (wiring == null) {
-			return;
+			return "Screen";
 		}
-		trayRecordingSubscription = wiring.events().onRecordingStateChanged(state ->
-				Platform.runLater(() -> applyTrayRecordingState(state.recording(), state.sourceName())));
-		var source = wiring.sources().getSelectedSource();
-		String sourceName = source == null || source.name() == null || source.name().isBlank()
+		SelectedSource source = wiring.sources().getSelectedSource();
+		return source == null || source.name() == null || source.name().isBlank()
 				? "Screen" : source.name();
-		// startTray can run after recording started (editor fast path); seed the tray with the
-		// current service state so it is immediately a working stop button.
-		applyTrayRecordingState(wiring.recording().isRecordingActive(), sourceName);
-	}
-
-	private void applyTrayRecordingState(boolean recording, String sourceName) {
-		Tray current = tray;
-		if (current != null && !shutdown) {
-			current.setRecording(recording, sourceName);
-		}
-	}
-
-	private void closeTrayRecordingSubscription() {
-		AutoCloseable subscription = trayRecordingSubscription;
-		trayRecordingSubscription = null;
-		if (subscription == null) {
-			return;
-		}
-		try {
-			subscription.close();
-		} catch (Exception error) {
-			LOG.log(System.Logger.Level.WARNING,
-					"could not close the tray recording subscription: " + error);
-		}
 	}
 
 	/** Shows and raises the main window, e.g. so a confirmation dialog is visible. */
@@ -1752,18 +1633,6 @@ public final class AppContext {
 		Platform.exit();
 	}
 
-	private static String appPath() {
-		String appImage = System.getenv("APPIMAGE");
-		if (appImage != null && !appImage.isBlank()) {
-			return appImage;
-		}
-		String jpackagePath = System.getProperty("jpackage.app-path");
-		if (jpackagePath != null && !jpackagePath.isBlank()) {
-			return jpackagePath;
-		}
-		return ProcessHandle.current().info().command().orElse("gravaai");
-	}
-
 	private void scheduleExitIfRequested() {
 		long exitAfterMs = exitAfterMs();
 		if (exitAfterMs <= 0) {
@@ -1793,10 +1662,20 @@ public final class AppContext {
 		}
 	}
 
+	/**
+	 * Logs the session variables a bug report needs and the JavaFX screen list.
+	 *
+	 * <p>Read-only: the classification itself comes from
+	 * {@link dev.gravaai.platform.compositor.DesktopSession}, which the log line names.
+	 */
 	private static void logEnvironment() {
 		LOG.log(System.Logger.Level.INFO, "java " + System.getProperty("java.runtime.version") + " ("
 				+ System.getProperty("java.vm.name") + ")");
 		LOG.log(System.Logger.Level.INFO, "javafx " + System.getProperty("javafx.runtime.version"));
+		DesktopSession session = DesktopSession.current();
+		LOG.log(System.Logger.Level.INFO, "session " + session.type() + " / " + session.environment()
+				+ " (capture " + session.captureBackend() + ", pointer " + session.cursorBackend()
+				+ ", shortcuts " + session.shortcutStrategy() + ")");
 		for (String key : new String[] {"XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "WAYLAND_DISPLAY",
 				"DISPLAY", "GDK_BACKEND", "GDK_SCALE"}) {
 			LOG.log(System.Logger.Level.INFO, "env " + key + "=" + System.getenv(key));
@@ -1806,6 +1685,30 @@ public final class AppContext {
 					+ screen.getVisualBounds() + " scale=" + screen.getOutputScaleX() + "x"
 					+ screen.getOutputScaleY() + " dpi=" + screen.getDpi()
 					+ (screen.equals(Screen.getPrimary()) ? " primary" : ""));
+		}
+	}
+
+	/** The tray actions, marshalled to the FX thread by {@link DesktopServices}. */
+	private final class TrayOperations implements DesktopServices.OperationSink {
+
+		@Override
+		public void showHud() {
+			AppContext.this.showHud();
+		}
+
+		@Override
+		public void openDashboard() {
+			AppContext.this.openDashboard();
+		}
+
+		@Override
+		public void stopRecording() {
+			stopRecordingFromTray();
+		}
+
+		@Override
+		public void quit() {
+			AppContext.this.quit();
 		}
 	}
 }

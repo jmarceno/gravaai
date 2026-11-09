@@ -1086,11 +1086,11 @@ public final class EditorWindow {
 			return;
 		}
 		int[] size = actions.exportSourceSize();
-		if (!dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils
-				.shouldAutoApplyFreshRecordingZoomsForSource(size == null ? null : size[0],
-						size == null ? null : size[1], "linux")) {
-			return;
-		}
+			if (!dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils
+					.shouldAutoApplyFreshRecordingZoomsForSource(size == null ? null : size[0],
+							size == null ? null : size[1])) {
+				return;
+			}
 		var result = timeline.suggestZooms();
 		if (result.status() != dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils
 				.SuggestionStatus.OK) {

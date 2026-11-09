@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
 
 /** Ported from the Linux Wayland cases of {@code electron/ipc/register/sources.test.ts}. */
@@ -48,11 +49,12 @@ class SourceServiceTest {
 	private final FakeSelectorUi selectorUi = new FakeSelectorUi();
 
 	private SourceService service(Map<String, String> env) {
+		DesktopSession session = DesktopSession.detect(env);
 		CaptureSelection selection = new CaptureSelection(() -> {
 			cosmicCalls.incrementAndGet();
 			return List.of(new CosmicOutput("DP-1", 0, 0, 1728, 1117));
-		}, env);
-		return new SourceService(env, "linux", recording::get, selection, selectorUi);
+		}, session);
+		return new SourceService(session, recording::get, selection, selectorUi);
 	}
 
 	@Test
@@ -93,10 +95,9 @@ class SourceServiceTest {
 	@DisplayName("leaves the selection unchanged when a source is no longer available")
 	void rejectsUnavailableSources() {
 		SourceService sourceService = new SourceService(
-				WAYLAND,
-				"linux",
+				DesktopSession.detect(WAYLAND),
 				recording::get,
-				new CaptureSelection(() -> List.of(), WAYLAND),
+				new CaptureSelection(() -> List.of(), DesktopSession.detect(WAYLAND)),
 				selectorUi);
 		IOException error = assertThrows(
 				IOException.class,
@@ -122,12 +123,12 @@ class SourceServiceTest {
 	@DisplayName("does not change sources if recording starts during validation")
 	void doesNotChangeSourcesIfRecordingStartsDuringValidation() throws IOException {
 		AtomicBoolean active = new AtomicBoolean(false);
+		DesktopSession session = DesktopSession.detect(WAYLAND);
 		CaptureSelection selection = new CaptureSelection(() -> {
 			active.set(true);
 			return List.of(new CosmicOutput("DP-1", 0, 0, 1728, 1117));
-		}, WAYLAND);
-		SourceService sourceService = new SourceService(
-				WAYLAND, "linux", active::get, selection, selectorUi);
+		}, session);
+		SourceService sourceService = new SourceService(session, active::get, selection, selectorUi);
 		sourceService.selectSource(SelectedSource.screen("screen:cosmic:DP-1", "Screen DP-1", null));
 		assertNull(sourceService.getSessionCaptureSource());
 	}

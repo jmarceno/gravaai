@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import dev.gravaai.core.os.HostOs;
+
 /**
  * Editor keyboard shortcuts (port of {@code src/lib/shortcuts.ts}, plan §5.12): the configurable
  * actions with their defaults, the fixed (non-configurable) shortcuts, conflict detection, platform
@@ -171,7 +173,7 @@ public final class Shortcuts {
 
 	/** macOS uses Cmd as the primary modifier (React's {@code isMac} from platformUtils). */
 	public static boolean isMacPlatform() {
-		return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+		return HostOs.current().isMac();
 	}
 
 	/**

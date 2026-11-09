@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import dev.gravaai.core.concurrent.Threads;
+import dev.gravaai.core.xdg.XdgDirectories;
 
 /**
  * Gravaai's control socket: one action per line answered {@code ok}/{@code error}, exactly like
@@ -63,10 +64,13 @@ public final class ControlSocket {
 
 	/** Port of {@code getControlSocketPath}; must match gravaai-ctl's {@code socket_path}. */
 	public static Path getControlSocketPath(Map<String, String> env) {
-		String runtimeDir = trimToNull(env == null ? null : env.get("XDG_RUNTIME_DIR"));
+		Path runtimeDir = XdgDirectories.of(env, Path.of(System.getProperty("user.home", ".")))
+				.runtimeDirectory();
 		if (runtimeDir != null) {
-			return Path.of(runtimeDir).resolve("gravaai").resolve("control.sock");
+			return runtimeDir.resolve("gravaai").resolve("control.sock");
 		}
+		// Without a runtime directory the socket needs a per-user location in the temp dir: the
+		// socket grants actions, so it must never be writable by another user.
 		String tmpDir = trimToNull(env == null ? null : env.get("TMPDIR"));
 		if (tmpDir == null) {
 			tmpDir = "/tmp";

@@ -59,33 +59,21 @@ class ZoomSuggestionUtilsTest {
 	@Test
 	@DisplayName("allows automatic fresh-recording zooms for landscape captures")
 	void allowsLandscapeCaptures() {
-		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1920, 1080,
-				"linux"));
-		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1280, 960,
-				"linux"));
+		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1920, 1080));
+		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1280, 960));
 	}
 
 	@Test
 	@DisplayName("blocks automatic fresh-recording zooms for narrow or near-square captures")
 	void blocksNarrowCaptures() {
-		assertFalse(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(960, 1020,
-				"linux"));
-		assertFalse(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1080, 1080,
-				"linux"));
-	}
-
-	@Test
-	@DisplayName("allows narrow Windows window captures when click telemetry is available")
-	void allowsWindowsWindowCaptures() {
-		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(936, 1028,
-				"win32"));
+		assertFalse(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(960, 1020));
+		assertFalse(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(1080, 1080));
 	}
 
 	@Test
 	@DisplayName("does not block when source dimensions are not available yet")
 	void allowsMissingDimensions() {
-		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(null, null,
-				"linux"));
+		assertTrue(ZoomSuggestionUtils.shouldAutoApplyFreshRecordingZoomsForSource(null, null));
 	}
 
 	@Test

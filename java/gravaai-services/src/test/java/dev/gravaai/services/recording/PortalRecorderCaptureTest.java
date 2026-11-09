@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import dev.gravaai.platform.compositor.CaptureBackend;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceMapping;
 
@@ -39,7 +40,7 @@ class PortalRecorderCaptureTest {
 				"XDG_SESSION_TYPE", "wayland",
 				"XDG_CURRENT_DESKTOP", "KDE");
 
-		assertEquals(CaptureBackend.PORTAL, CaptureBackend.detect(env));
+		assertEquals(CaptureBackend.PORTAL, DesktopSession.detect(env).captureBackend());
 		assertEquals("gravaai-portal-capture", CaptureBackend.PORTAL.helperName());
 	}
 
@@ -50,7 +51,7 @@ class PortalRecorderCaptureTest {
 				"XDG_SESSION_TYPE", "wayland",
 				"XDG_CURRENT_DESKTOP", "COSMIC");
 
-		assertEquals(CaptureBackend.EXT_IMAGE_COPY, CaptureBackend.detect(env));
+		assertEquals(CaptureBackend.EXT_IMAGE_COPY, DesktopSession.detect(env).captureBackend());
 		assertEquals("gravaai-wayland-capture", CaptureBackend.EXT_IMAGE_COPY.helperName());
 	}
 }

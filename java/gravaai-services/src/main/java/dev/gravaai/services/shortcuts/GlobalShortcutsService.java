@@ -13,14 +13,16 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import dev.gravaai.platform.compositor.DesktopSession;
+import dev.gravaai.platform.compositor.ShortcutStrategy;
 import dev.gravaai.platform.portal.GlobalShortcutsPortal;
+import dev.gravaai.core.xdg.XdgDirectories;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -51,7 +53,9 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	private final GlobalShortcutSettings settings;
 	private final Supplier<Path> bundledCtl;
 	private final String appPath;
+	/** XDG locations only; desktop identity comes from {@link #session}. */
 	private final Map<String, String> env;
+	private final DesktopSession session;
 	private final Consumer<GlobalShortcutAction> actionSink;
 	/** Null when a second launch cannot bring the app to the front. */
 	private final @Nullable Runnable showSink;
@@ -128,27 +132,21 @@ public final class GlobalShortcutsService implements AutoCloseable {
 		this.bundledCtl = bundledCtl;
 		this.appPath = appPath;
 		this.env = env == null ? Map.of() : Map.copyOf(env);
+		this.session = DesktopSession.detect(this.env);
 		this.actionSink = actionSink;
 		this.showSink = showSink;
 		this.openFileSink = openFileSink;
 		this.portalOpener = portalOpener;
 	}
 
-	/** Port of {@code isCosmicDesktop}. */
+	/**
+	 * Port of {@code isCosmicDesktop}: whether COSMIC owns the shortcut config.
+	 *
+	 * <p>The settings page needs this to describe what will happen, so it is public; the decision
+	 * itself comes from the session's {@link ShortcutStrategy}.
+	 */
 	public boolean isCosmicDesktop() {
-		if (!isLinux()) {
-			return false;
-		}
-		String desktop = env.get("XDG_CURRENT_DESKTOP");
-		if (desktop == null) {
-			return false;
-		}
-		for (String name : desktop.split(":", -1)) {
-			if (name.toLowerCase(Locale.ROOT).contains("cosmic")) {
-				return true;
-			}
-		}
-		return false;
+		return session.shortcutStrategy() == ShortcutStrategy.COSMIC_CONFIG;
 	}
 
 	/** Port of {@code readGlobalShortcutsConfig}. */
@@ -415,13 +413,8 @@ public final class GlobalShortcutsService implements AutoCloseable {
 	 */
 	private Path installCtl() throws IOException {
 		Path bundled = bundledCtl.get();
-		String dataHome = env.get("XDG_DATA_HOME");
-		if (dataHome == null || dataHome.isBlank()) {
-			dataHome = Path.of(System.getProperty("user.home"), ".local", "share").toString();
-		} else {
-			dataHome = dataHome.trim();
-		}
-		Path target = Path.of(dataHome).resolve("gravaai").resolve("bin").resolve(CTL_BINARY_NAME);
+		Path target = XdgDirectories.of(env, Path.of(System.getProperty("user.home", ".")))
+				.dataHome().resolve("gravaai").resolve("bin").resolve(CTL_BINARY_NAME);
 		String bundledHash = sha256(bundled);
 		String targetHash = sha256(target);
 		if (bundledHash == null) {
@@ -453,9 +446,5 @@ public final class GlobalShortcutsService implements AutoCloseable {
 
 	private static String describe(Exception error) {
 		return error.getMessage() != null ? error.getMessage() : error.toString();
-	}
-
-	private static boolean isLinux() {
-		return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
 	}
 }

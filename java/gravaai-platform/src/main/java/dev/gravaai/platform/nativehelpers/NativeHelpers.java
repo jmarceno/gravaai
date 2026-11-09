@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -37,6 +38,17 @@ public final class NativeHelpers {
 		return nativeDir().resolve(requireName(name));
 	}
 
+	/**
+	 * Absolute path of a payload file by its payload-relative path, such as
+	 * {@code ffmpeg/bin/ffmpeg}; the file is not required to exist.
+	 *
+	 * <p>Unlike {@link #path(String)} this accepts subdirectories, because not every bundled tool is
+	 * a flat helper next to the capture binaries.
+	 */
+	public static Path payloadPath(String relative) {
+		return nativeDir().resolve(requireRelative(relative));
+	}
+
 	/** The helper path when the file exists. */
 	public static Optional<Path> existing(String name) {
 		Path path = path(name);
@@ -51,6 +63,67 @@ public final class NativeHelpers {
 					+ " (native payload does not look installed; rebuild with -Pdist)");
 		}
 		return path;
+	}
+
+	/**
+	 * Resolves a payload subdirectory that may live either in the packaged payload or in a
+	 * development build tree: {@code <nativeDir>/<relative>}, then
+	 * {@code native/build/<relative>} at, one, two or three parent levels of the working directory.
+	 *
+	 * <p>{@code FfmpegCli}, {@code FfmpegLibs} and {@code OnnxLibs} each grew this ladder by hand,
+	 * with the same four relative candidates in a different order and slightly different error
+	 * text. Maven Surefire and IDE runs start in the module directory, the build helper starts in
+	 * {@code java/}, and a packaged run finds the payload through {@link #nativeDir()}; the ladder
+	 * only exists for those development layouts.
+	 *
+	 * @param relative the payload-relative path inside each candidate root (for example
+	 *     {@code ffmpeg/bin}); must not be absolute
+	 * @return the first existing directory, or null when no candidate exists
+	 */
+	public static @Nullable Path payloadDirectory(String relative) {
+		Path bundled = nativeDir().resolve(relative);
+		if (Files.isDirectory(bundled)) {
+			return bundled;
+		}
+		for (Path candidate : developmentPayloadCandidates(relative)) {
+			if (Files.isDirectory(candidate)) {
+				return candidate.toAbsolutePath().normalize();
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Resolves a payload file the same way {@link #payloadDirectory(String)} resolves a directory.
+	 *
+	 * @param relative the payload-relative file path; must not be absolute
+	 * @return the first existing file, or null when no candidate exists
+	 */
+	public static @Nullable Path payloadFile(String relative) {
+		Path bundled = nativeDir().resolve(relative);
+		if (Files.isRegularFile(bundled)) {
+			return bundled;
+		}
+		for (Path candidate : developmentPayloadCandidates(relative)) {
+			if (Files.isRegularFile(candidate)) {
+				return candidate.toAbsolutePath().normalize();
+			}
+		}
+		return null;
+	}
+
+	/** The development-tree candidates for a payload-relative path, in search order. */
+	public static List<Path> developmentPayloadCandidates(String relative) {
+		Path relativePath = Path.of(relative);
+		if (relativePath.isAbsolute()) {
+			throw new IllegalArgumentException("payload path must be relative: " + relative);
+		}
+		Path fromRepoRoot = Path.of(BUILD_DIR).resolve(relativePath);
+		return List.of(
+				fromRepoRoot,
+				Path.of("native", "build").resolve(relativePath),
+				Path.of("..", "native", "build").resolve(relativePath),
+				Path.of("..", "..", "native", "build").resolve(relativePath));
 	}
 
 	/** Directory that holds the native payload for this run; always present (it may not exist yet). */
@@ -110,5 +183,20 @@ public final class NativeHelpers {
 			throw new IllegalArgumentException("native helper name must be a plain file name: " + name);
 		}
 		return name;
+	}
+
+	/** Guards a payload-relative path: relative, non-blank and never climbing out of the payload. */
+	private static Path requireRelative(String relative) {
+		if (relative == null || relative.isBlank()) {
+			throw new IllegalArgumentException("payload path must not be blank");
+		}
+		Path path = Path.of(relative);
+		if (path.isAbsolute()) {
+			throw new IllegalArgumentException("payload path must be relative: " + relative);
+		}
+		if (path.normalize().startsWith("..")) {
+			throw new IllegalArgumentException("payload path must not climb out of the payload: " + relative);
+		}
+		return path;
 	}
 }

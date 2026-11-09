@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import dev.gravaai.core.os.HostOs;
 import dev.gravaai.core.project.AnnotationRegion;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.CameraLayout;
@@ -307,7 +308,6 @@ public final class TimelineView extends Region {
 	/** Live spans of the same-row group during a multi-selection move drag (id → translated span). */
 	private java.util.@Nullable LinkedHashMap<String, Span> dragGroupSpans;
 	private TimelineShortcuts.Bindings shortcutBindings = TimelineShortcuts.defaults();
-	private boolean macPlatform;
 
 	public TimelineView(TimelineDataSource dataSource, TimelineCommands commands) {
 		this.dataSource = dataSource;
@@ -1314,11 +1314,6 @@ public final class TimelineView extends Region {
 		redraw();
 	}
 
-	/** macOS uses Cmd as the primary modifier (port of {@code matchesShortcut} platform flag). */
-	public void setMacPlatform(boolean mac) {
-		this.macPlatform = mac;
-	}
-
 	private @Nullable TimelineSelection captionHitAt(double x, double y) {
 		for (TimelineRenderItem item : items) {
 			if (item.variant() != TimelineRenderItem.Variant.CAPTION) {
@@ -1408,9 +1403,11 @@ public final class TimelineView extends Region {
 
 	private void keyAction(KeyCode code, boolean ctrl, boolean meta, boolean shift, boolean alt,
 			@Nullable KeyEvent event) {
-		boolean primary = macPlatform ? meta : ctrl;
+		// One host lookup per keystroke: matchesShortcut needs it to pick Ctrl vs Cmd.
+		boolean mac = HostOs.current().isMac();
+		boolean primary = mac ? meta : ctrl;
 		boolean deleteShortcut = TimelineShortcuts.matches(code, ctrl, meta, shift, alt,
-				shortcutBindings.deleteSelected(), macPlatform)
+				shortcutBindings.deleteSelected(), mac)
 				|| ((code == KeyCode.DELETE || code == KeyCode.BACK_SPACE) && !ctrl && !meta
 						&& !alt && !shift);
 		if (deleteShortcut) {
@@ -1441,13 +1438,13 @@ public final class TimelineView extends Region {
 			return;
 		}
 		if (TimelineShortcuts.matches(code, ctrl, meta, shift, alt,
-				TimelineShortcuts.Binding.of("a", true, false, false), macPlatform)) {
+				TimelineShortcuts.Binding.of("a", true, false, false), mac)) {
 			selectAllZooms();
 			consume(event);
 			return;
 		}
 		if (TimelineShortcuts.matches(code, ctrl, meta, shift, alt, shortcutBindings.addZoom(),
-				macPlatform)) {
+				mac)) {
 			addZoomAtPlayhead();
 			consume(event);
 			return;
@@ -1459,7 +1456,7 @@ public final class TimelineView extends Region {
 			return;
 		}
 		if (TimelineShortcuts.matches(code, ctrl, meta, shift, alt, shortcutBindings.splitClip(),
-				macPlatform)) {
+				mac)) {
 			TimelineRenderItem clip = clipAtPlayhead();
 			if (clip != null) {
 				commands.splitClip(clip.id(), currentTimeMs);

@@ -21,6 +21,7 @@ import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.media.capture.WebcamDevices;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.projects.RecordingsDirectory;
 import dev.gravaai.services.recording.CosmicOutput;
 import dev.gravaai.services.recording.CosmicRecorder;
@@ -175,11 +176,12 @@ public final class RecordingWiring implements AutoCloseable {
 			}
 		};
 		RecordingProcesses processes = new PlatformRecordingProcesses();
-		// Resolves the screen-capture helper for this compositor: COSMIC keeps the direct
+		// The session decides the capture and pointer helpers once: COSMIC keeps the direct
 		// ext-image-copy-capture helper, portal-only desktops (KDE/GNOME/wlroots) get the
 		// xdg-desktop-portal one. Everything else is delegated unchanged.
+		DesktopSession session = DesktopSession.current();
 		RecordingEnvironment environment =
-				new CompositorRecordingEnvironment(new PlatformRecordingEnvironment(), System.getenv());
+				new CompositorRecordingEnvironment(new PlatformRecordingEnvironment(), session);
 		FxCursorScreen cursorScreen = new FxCursorScreen();
 
 		RecordingLibrary library = new RecordingLibrary(recordingsDir, new PlatformRecordingTrash());
@@ -223,7 +225,7 @@ public final class RecordingWiring implements AutoCloseable {
 				LOG.log(System.Logger.Level.WARNING, "Could not list COSMIC outputs: " + error);
 				return List.of();
 			}
-		}, System.getenv());
+		}, session);
 
 		SourceService.SourceSelectorUi selectorUi = new SourceService.SourceSelectorUi() {
 			@Override
@@ -251,7 +253,7 @@ public final class RecordingWiring implements AutoCloseable {
 			}
 		};
 		SourceService sources = new SourceService(
-				System.getenv(), "linux", recordingActive::getAsBoolean, captureSelection, selectorUi);
+				session, recordingActive::getAsBoolean, captureSelection, selectorUi);
 		sourcesRef.set(sources);
 		SourceSelectorOverlay sourceSelector =
 				new SourceSelectorOverlay(sources, recordingActive::getAsBoolean);
@@ -312,8 +314,7 @@ public final class RecordingWiring implements AutoCloseable {
 		// The capture picker (and its overlay) is not needed to show the HUD: build it on first use
 		// so it never sits on the startup path (COSMIC uses the click-pick path, not the overlay).
 		Supplier<CapturePickerService> capturePickerFactory = () -> new CapturePickerService(
-				System.getenv(),
-				"linux",
+				session,
 				recordingActive::getAsBoolean,
 				cosmic::waitForCosmicOutputClick,
 				sources,

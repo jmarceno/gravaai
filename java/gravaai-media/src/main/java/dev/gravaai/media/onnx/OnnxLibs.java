@@ -85,24 +85,15 @@ public final class OnnxLibs {
 		if (explicit != null && !explicit.isBlank()) {
 			return Path.of(explicit);
 		}
-		Path bundled = NativeHelpers.nativeDir().resolve("onnxruntime").resolve("lib");
-		if (Files.isDirectory(bundled)) {
-			return bundled;
-		}
-		List<Path> candidates = List.of(
-				Path.of("native", "build", "onnxruntime", "lib"),
-				Path.of("..", "native", "build", "onnxruntime", "lib"),
-				Path.of("..", "..", "native", "build", "onnxruntime", "lib"),
-				Path.of("..", "..", "..", "native", "build", "onnxruntime", "lib"));
-		for (Path candidate : candidates) {
-			if (Files.isDirectory(candidate)) {
-				return candidate.toAbsolutePath().normalize();
-			}
+		Path resolved = NativeHelpers.payloadDirectory("onnxruntime/lib");
+		if (resolved != null) {
+			return resolved;
 		}
 		throw new IllegalStateException(
 				"ONNX Runtime shared library not found. Run java/native/build-onnxruntime.sh, then"
 						+ " pass -Dgravaai.onnxruntime.lib.dir=<dir> or -Dgravaai.nativeDir=<dir>."
-						+ " Tried: " + bundled + " and " + candidates);
+						+ " Tried: " + NativeHelpers.nativeDir().resolve("onnxruntime/lib") + " and "
+						+ NativeHelpers.developmentPayloadCandidates("onnxruntime/lib"));
 	}
 
 	/**
@@ -149,24 +140,15 @@ public final class OnnxLibs {
 	 * development {@code native/build/models/<kind>/} layout of the Maven/IDE runs.
 	 */
 	private static Path resolveBundledModel(String kind, String fileName) {
-		Path bundled = NativeHelpers.nativeDir().resolve("models").resolve(kind)
-				.resolve(fileName);
-		if (Files.isRegularFile(bundled)) {
-			return bundled;
-		}
-		List<Path> candidates = List.of(
-				Path.of("native", "build", "models", kind, fileName),
-				Path.of("..", "native", "build", "models", kind, fileName),
-				Path.of("..", "..", "native", "build", "models", kind, fileName),
-				Path.of("..", "..", "..", "native", "build", "models", kind, fileName));
-		for (Path candidate : candidates) {
-			if (Files.isRegularFile(candidate)) {
-				return candidate.toAbsolutePath().normalize();
-			}
+		String relative = "models/" + kind + "/" + fileName;
+		Path resolved = NativeHelpers.payloadFile(relative);
+		if (resolved != null) {
+			return resolved;
 		}
 		throw new IllegalStateException(
 				fileName + " not found. Run java/native/build-onnxruntime.sh, then pass"
 						+ " -Dgravaai.nativeDir=<dir> (the models live in models/" + kind + ")."
-						+ " Tried: " + bundled + " and " + candidates);
+						+ " Tried: " + NativeHelpers.nativeDir().resolve(relative) + " and "
+						+ NativeHelpers.developmentPayloadCandidates(relative));
 	}
 }

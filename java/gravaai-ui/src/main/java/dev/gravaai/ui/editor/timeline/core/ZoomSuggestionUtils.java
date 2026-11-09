@@ -135,12 +135,15 @@ public final class ZoomSuggestionUtils {
 	private ZoomSuggestionUtils() {
 	}
 
-	/** Port of {@code shouldAutoApplyFreshRecordingZoomsForSource}. */
+	/**
+	 * Port of {@code shouldAutoApplyFreshRecordingZoomsForSource}.
+	 *
+	 * <p>Windows was exempt upstream because its capture path reported no usable source size; the
+	 * Java app always reports one, and this is a Linux-only build, so the exemption is gone and the
+	 * aspect-ratio rule is the only rule.
+	 */
 	public static boolean shouldAutoApplyFreshRecordingZoomsForSource(@Nullable Integer sourceWidth,
-			@Nullable Integer sourceHeight, String platform) {
-		if ("win32".equals(platform)) {
-			return true;
-		}
+			@Nullable Integer sourceHeight) {
 		if (sourceWidth == null || sourceHeight == null || sourceWidth <= 0 || sourceHeight <= 0) {
 			return true;
 		}

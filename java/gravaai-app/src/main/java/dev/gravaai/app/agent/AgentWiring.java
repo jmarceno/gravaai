@@ -137,11 +137,7 @@ public final class AgentWiring implements AutoCloseable {
 
 	/** The packaged executable for the MCP command; falls back to {@code gravaai}. */
 	private static String appExecutablePath() {
-		String appImage = System.getenv("GRAVAAI_APPIMAGE");
-		if (appImage != null && !appImage.isBlank()) {
-			return appImage;
-		}
-		return ProcessHandle.current().info().command().orElse("gravaai");
+		return dev.gravaai.app.AppLaunchPath.current();
 	}
 
 	/**

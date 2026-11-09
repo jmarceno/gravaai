@@ -4,12 +4,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import dev.gravaai.platform.compositor.CaptureBackend;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
 
 /**
@@ -20,6 +20,10 @@ import dev.gravaai.services.recording.CosmicOutput;
  * want and the output under the pointer is recorded directly. The Electron overlay picker and the
  * macOS screen/area rules are platform code (plan §2.3); the selection-only completion helpers are
  * kept for a future X11 source list.
+ *
+ * <p>Which picker a session gets is decided by the {@link DesktopSession}: a portal compositor uses
+ * the desktop's own dialog, a direct-capture compositor waits for a click, and an X11 session opens
+ * the source list. This class never inspects the environment itself.
  */
 public final class CapturePickerService {
 
@@ -30,7 +34,7 @@ public final class CapturePickerService {
 				long timeoutMs);
 	}
 
-	/** What the capture-picker overlay asks for; {@code lastArea} is always null (never reused). */
+	/** What the capture-picker overlay asks for. */
 	public record CapturePickerContext(
 			@Nullable CaptureArea displayBounds,
 			@Nullable CaptureArea lastArea,
@@ -40,8 +44,7 @@ public final class CapturePickerService {
 			double cursorY) {
 	}
 
-	private final Map<String, String> env;
-	private final String platform;
+	private final DesktopSession session;
 	private final Supplier<Boolean> cursorCaptureActive;
 	private final OutputClickWaiter clickWaiter;
 	private final SourceService sources;
@@ -55,8 +58,7 @@ public final class CapturePickerService {
 	private List<CapturePickerWindow> loadedWindows = List.of();
 
 	public CapturePickerService(
-			Map<String, String> env,
-			String platform,
+			DesktopSession session,
 			Supplier<Boolean> cursorCaptureActive,
 			OutputClickWaiter clickWaiter,
 			SourceService sources,
@@ -64,8 +66,7 @@ public final class CapturePickerService {
 			Supplier<List<CapturePickerWindow>> pickableWindows,
 			Supplier<double[]> cursorPoint,
 			Supplier<SourceListPicker> sourceListPicker) {
-		this.env = env;
-		this.platform = platform;
+		this.session = session;
 		this.cursorCaptureActive = cursorCaptureActive;
 		this.clickWaiter = clickWaiter;
 		this.sources = sources;
@@ -98,16 +99,16 @@ public final class CapturePickerService {
 		if (cursorCaptureActive.get()) {
 			return CompletableFuture.completedFuture(SourceService.PickResult.canceledPick());
 		}
-		if ("linux".equals(platform) && SourceMapping.isLikelyLinuxWaylandSession(env)) {
-			if (CaptureBackend.detect(env) == CaptureBackend.PORTAL) {
-				// On a portal compositor the desktop's own screen-sharing dialog is the picker:
-				// it asks the user which monitor to share and remembers the choice. Waiting for a
-				// click would never resolve, because the portal hides where the cursor is.
-				SelectedSource source = SelectedSource.screen(
-						SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null);
-				sources.applySelection(source);
-				return CompletableFuture.completedFuture(SourceService.PickResult.picked(source));
-			}
+		if (session.isWayland() && session.captureBackend() == CaptureBackend.PORTAL) {
+			// On a portal compositor the desktop's own screen-sharing dialog is the picker:
+			// it asks the user which monitor to share and remembers the choice. Waiting for a
+			// click would never resolve, because the portal hides where the cursor is.
+			SelectedSource source = SelectedSource.screen(
+					SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null);
+			sources.applySelection(source);
+			return CompletableFuture.completedFuture(SourceService.PickResult.picked(source));
+		}
+		if (session.isWayland()) {
 			// The portal screencast is unreliable on COSMIC, so record an output
 			// directly: the user clicks anywhere on the screen they want.
 			return clickWaiter.waitForCosmicOutputClick(15_000).thenApply(output -> {
@@ -119,17 +120,13 @@ public final class CapturePickerService {
 				return SourceService.PickResult.picked(source);
 			});
 		}
-		if ("linux".equals(platform)) {
-			// X11 keeps the existing source-list window.
-			return sourceListPicker.get().open().thenApply(result -> {
-				SelectedSource source = result.source();
-				return result.success() && source != null
-						? SourceService.PickResult.picked(source)
-						: SourceService.PickResult.canceledPick();
-			});
-		}
-		return CompletableFuture.completedFuture(SourceService.PickResult.failed(
-				"The capture picker is not available on this platform."));
+		// X11 keeps the existing source-list window.
+		return sourceListPicker.get().open().thenApply(result -> {
+			SelectedSource source = result.source();
+			return result.success() && source != null
+					? SourceService.PickResult.picked(source)
+					: SourceService.PickResult.canceledPick();
+		});
 	}
 
 	/** The monitors the HUD lists, so the user chooses one without clicking a screen. */
@@ -162,13 +159,16 @@ public final class CapturePickerService {
 	/**
 	 * {@code complete-capture-pick}: the overlay reports a pick; the selection is forced to
 	 * selection-only and validated against the displays and windows the picker offered.
+	 *
+	 * <p>An area pick is rejected unless the picker offered one. The Linux pickers never do, so a
+	 * rectangle from a stale overlay can never become a recording selection.
 	 */
 	public void completeCapturePick(@Nullable CapturePickRequest input) {
-		if (input != null && "area".equals(input.kind()) && !"darwin".equals(platform)) {
-			return;
-		}
 		if (input == null || cursorCaptureActive.get()) {
 			finishPick(null);
+			return;
+		}
+		if ("area".equals(input.kind()) && !areaSelectionSupported()) {
 			return;
 		}
 		CapturePickRequest selectionOnly = new CapturePickRequest(
@@ -181,6 +181,11 @@ public final class CapturePickerService {
 				input.displayId(),
 				false);
 		finishPick(SourceArea.normalizeCapturePick(selectionOnly, displays.get(), loadedWindows));
+	}
+
+	/** Whether this session's picker can offer a rectangle. Linux pickers cannot. */
+	private boolean areaSelectionSupported() {
+		return false;
 	}
 
 	private void finishPick(@Nullable CapturePick pick) {
@@ -221,6 +226,6 @@ public final class CapturePickerService {
 		}
 		// A previous area is never offered again: always draw a fresh picker.
 		return new CapturePickerContext(
-				bounds, null, "darwin".equals(platform), List.copyOf(intersecting), cursor[0], cursor[1]);
+				bounds, null, areaSelectionSupported(), List.copyOf(intersecting), cursor[0], cursor[1]);
 	}
 }

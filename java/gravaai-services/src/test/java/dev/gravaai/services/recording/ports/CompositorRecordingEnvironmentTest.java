@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import dev.gravaai.platform.compositor.CaptureBackend;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.platform.compositor.CursorBackend;
 
 /**
@@ -63,9 +64,8 @@ class CompositorRecordingEnvironmentTest {
 
 	private static CompositorRecordingEnvironment environment(
 			RecordingEnvironment delegate, String desktop, Path nativeDir) {
-		Map<String, String> env = wayland(desktop);
 		return new CompositorRecordingEnvironment(
-				delegate, CaptureBackend.detect(env), CursorBackend.detect(env), nativeDir);
+				delegate, DesktopSession.detect(wayland(desktop)), nativeDir);
 	}
 
 	@Test

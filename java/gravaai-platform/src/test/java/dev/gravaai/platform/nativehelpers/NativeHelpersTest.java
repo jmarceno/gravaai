@@ -126,4 +126,37 @@ class NativeHelpersTest {
 		assertThrows(IllegalArgumentException.class, () -> NativeHelpers.path(""));
 		assertThrows(IllegalArgumentException.class, () -> NativeHelpers.path("../ffmpeg"));
 	}
+
+	@Test
+	@DisplayName("payload paths accept subdirectories but never escape the payload")
+	void payloadPathsStayInsideThePayload() throws Exception {
+		Path nativeDir = Files.createDirectories(tempDir.resolve("native"));
+		Files.createDirectories(nativeDir.resolve("ffmpeg/bin"));
+		Path ffmpeg = Files.createFile(nativeDir.resolve("ffmpeg/bin/ffmpeg"));
+		// A name no real development build can contain, so the ladder cannot find it and the
+		// "missing" assertions test the resolver rather than the machine's native/build tree.
+		String absentDirectory = "gravaai-absent-" + java.util.UUID.randomUUID();
+		String missing = absentDirectory + "/ffprobe";
+		String previous = System.getProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
+		try {
+			System.setProperty(NativeHelpers.NATIVE_DIR_PROPERTY, nativeDir.toString());
+
+			assertEquals(ffmpeg, NativeHelpers.payloadPath("ffmpeg/bin/ffmpeg"));
+			assertEquals(ffmpeg, NativeHelpers.payloadFile("ffmpeg/bin/ffmpeg"));
+			assertNull(NativeHelpers.payloadFile(missing));
+			assertEquals(nativeDir.resolve("ffmpeg/bin"),
+					NativeHelpers.payloadDirectory("ffmpeg/bin"));
+			assertNull(NativeHelpers.payloadDirectory(absentDirectory));			assertThrows(IllegalArgumentException.class,
+					() -> NativeHelpers.payloadPath("/etc/passwd"));
+			assertThrows(IllegalArgumentException.class,
+					() -> NativeHelpers.payloadPath("../escape"));
+			assertThrows(IllegalArgumentException.class, () -> NativeHelpers.payloadPath(""));
+		} finally {
+			if (previous == null) {
+				System.clearProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
+			} else {
+				System.setProperty(NativeHelpers.NATIVE_DIR_PROPERTY, previous);
+			}
+		}
+	}
 }

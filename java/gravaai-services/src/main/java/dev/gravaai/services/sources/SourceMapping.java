@@ -2,6 +2,8 @@ package dev.gravaai.services.sources;
 
 import java.util.Map;
 
+import dev.gravaai.platform.compositor.DesktopSession;
+
 /**
  * Maps displays to capture source ids, ported from {@code electron/ipc/register/sourceMapping.ts}.
  *
@@ -15,18 +17,9 @@ public final class SourceMapping {
 	private SourceMapping() {
 	}
 
-	/** True when this is (or looks like) a Wayland session. */
+	/** True when this is (or looks like) a Wayland session; see {@link DesktopSession}. */
 	public static boolean isLikelyLinuxWaylandSession(Map<String, String> env) {
-		String sessionType = env.get("XDG_SESSION_TYPE");
-		sessionType = sessionType == null ? null : sessionType.trim().toLowerCase();
-		if ("wayland".equals(sessionType)) {
-			return true;
-		}
-		if ("x11".equals(sessionType)) {
-			return false;
-		}
-		String waylandDisplay = env.get("WAYLAND_DISPLAY");
-		return waylandDisplay != null && !waylandDisplay.isEmpty();
+		return DesktopSession.detect(env).isWayland();
 	}
 
 	/**

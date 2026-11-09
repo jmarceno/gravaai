@@ -14,31 +14,36 @@ class CursorBackendTest {
 		return Map.of("XDG_SESSION_TYPE", "wayland", "XDG_CURRENT_DESKTOP", desktop);
 	}
 
+	private static CursorBackend cursor(String desktop) {
+		return DesktopSession.detect(wayland(desktop)).cursorBackend();
+	}
+
 	@Test
 	@DisplayName("KDE Plasma reads the pointer through a KWin script")
 	void kdeUsesKwinScript() {
-		assertEquals(CursorBackend.KWIN_SCRIPT, CursorBackend.detect(wayland("KDE")));
-		assertEquals(CursorBackend.KWIN_SCRIPT, CursorBackend.detect(wayland("KDE:KDE Plasma")));
+		assertEquals(CursorBackend.KWIN_SCRIPT, cursor("KDE"));
+		assertEquals(CursorBackend.KWIN_SCRIPT, cursor("KDE:KDE Plasma"));
 	}
 
 	@Test
 	@DisplayName("COSMIC keeps its ext-image-copy-capture cursor helper")
 	void cosmicKeepsItsHelper() {
-		assertEquals(CursorBackend.EXT_IMAGE_COPY, CursorBackend.detect(wayland("COSMIC")));
-		assertEquals(CursorBackend.EXT_IMAGE_COPY, CursorBackend.detect(wayland("COSMIC:KDE")));
+		assertEquals(CursorBackend.EXT_IMAGE_COPY, cursor("COSMIC"));
+		assertEquals(CursorBackend.EXT_IMAGE_COPY, cursor("COSMIC:KDE"));
 	}
 
 	@Test
 	@DisplayName("GNOME reads the pointer through its shell extension bridge")
 	void gnomeUsesShellExtensionBridge() {
-		assertEquals(CursorBackend.GNOME_BRIDGE, CursorBackend.detect(wayland("GNOME")));
-		assertEquals(CursorBackend.GNOME_BRIDGE, CursorBackend.detect(wayland("ubuntu:GNOME")));
+		assertEquals(CursorBackend.GNOME_BRIDGE, cursor("GNOME"));
+		assertEquals(CursorBackend.GNOME_BRIDGE, cursor("ubuntu:GNOME"));
 	}
 
 	@Test
 	@DisplayName("an X11 KDE session keeps the historical helper")
 	void x11KdeKeepsHistoricalHelper() {
 		assertEquals(CursorBackend.EXT_IMAGE_COPY,
-				CursorBackend.detect(Map.of("XDG_SESSION_TYPE", "x11", "XDG_CURRENT_DESKTOP", "KDE")));
+				DesktopSession.detect(Map.of("XDG_SESSION_TYPE", "x11", "XDG_CURRENT_DESKTOP", "KDE"))
+						.cursorBackend());
 	}
 }

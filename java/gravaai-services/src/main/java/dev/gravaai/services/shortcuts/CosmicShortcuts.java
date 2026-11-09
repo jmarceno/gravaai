@@ -10,12 +10,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
+import dev.gravaai.core.xdg.XdgDirectories;
 
 /**
  * Reader/writer for COSMIC's keyboard shortcut config
@@ -166,17 +167,11 @@ public final class CosmicShortcuts {
 	}
 
 	public static CosmicShortcutPaths getCosmicShortcutPaths(Map<String, String> env, Path home) {
-		String configHome = trimToNull(env == null ? null : env.get("XDG_CONFIG_HOME"));
-		Path configHomePath = configHome != null ? Path.of(configHome) : home.resolve(".config");
-		String dataDirsValue = trimToNull(env == null ? null : env.get("XDG_DATA_DIRS"));
-		String dataDirsText = dataDirsValue != null ? dataDirsValue : "/usr/local/share:/usr/share";
-		List<String> dataDirs = Arrays.stream(dataDirsText.split(":", -1))
-				.filter(entry -> !entry.isEmpty())
-				.toList();
-		Path userDir = configHomePath.resolve(SHORTCUTS_SUBDIR);
+		XdgDirectories xdg = XdgDirectories.of(env == null ? Map.of() : env, home);
+		Path userDir = xdg.configHome().resolve(SHORTCUTS_SUBDIR);
 		List<Path> systemDefaults = new ArrayList<>();
-		for (String dir : dataDirs) {
-			systemDefaults.add(Path.of(dir).resolve(SHORTCUTS_SUBDIR).resolve("defaults"));
+		for (Path dataDir : xdg.dataDirs()) {
+			systemDefaults.add(dataDir.resolve(SHORTCUTS_SUBDIR).resolve("defaults"));
 		}
 		return new CosmicShortcutPaths(
 				userDir.resolve("custom"), userDir.resolve("defaults"), systemDefaults);
@@ -288,17 +283,8 @@ public final class CosmicShortcuts {
 		}
 	}
 
-	private static @Nullable String trimToNull(@Nullable String value) {
-		if (value == null) {
-			return null;
-		}
-		String trimmed = value.trim();
-		return trimmed.isEmpty() ? null : trimmed;
-	}
-
 	/** The recursive-descent parser of {@link #parseCosmicShortcuts(String)}. */
 	private static final class Parser {
-
 		private final String text;
 		private final List<Token> tokens;
 		private int pos;

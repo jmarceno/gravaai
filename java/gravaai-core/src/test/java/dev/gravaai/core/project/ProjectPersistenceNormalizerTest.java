@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.editor.EditorHistory;
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.os.HostOs;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -42,9 +43,20 @@ class ProjectPersistenceNormalizerTest {
 	@Test
 	@DisplayName("defaults to 8% on macOS and square corners elsewhere")
 	void defaultsBorderRadiusPerPlatform() {
-		assertEquals(8, ProjectPersistence.getDefaultBorderRadiusPercent("MacIntel"));
-		assertEquals(0, ProjectPersistence.getDefaultBorderRadiusPercent("Win32"));
-		assertEquals(0, ProjectPersistence.getDefaultBorderRadiusPercent("Linux x86_64"));
+		assertEquals(8, ProjectPersistence.getDefaultBorderRadiusPercent(HostOs.MACOS));
+		assertEquals(0, ProjectPersistence.getDefaultBorderRadiusPercent(HostOs.WINDOWS));
+		assertEquals(0, ProjectPersistence.getDefaultBorderRadiusPercent(HostOs.LINUX));
+	}
+
+	@Test
+	@DisplayName("classifies the os.name values a JVM reports")
+	void classifiesHostOs() {
+		assertEquals(HostOs.MACOS, HostOs.detect("Mac OS X"));
+		assertEquals(HostOs.MACOS, HostOs.detect("Darwin"));
+		assertEquals(HostOs.WINDOWS, HostOs.detect("Windows 11"));
+		assertEquals(HostOs.LINUX, HostOs.detect("Linux"));
+		assertEquals(HostOs.OTHER, HostOs.detect(null));
+		assertEquals(HostOs.OTHER, HostOs.detect("FreeBSD"));
 	}
 
 	@Test

@@ -32,7 +32,7 @@ import org.freedesktop.dbus.messages.DBusSignal;
 import org.freedesktop.dbus.types.UInt32;
 import org.freedesktop.dbus.types.Variant;
 import dev.gravaai.platform.dbus.SessionBus;
-import dev.gravaai.platform.process.ProcessRunner;
+import dev.gravaai.platform.filemanager.DesktopOpener;
 
 /**
  * XDG desktop portal client (plan §5.5): the FileChooser for open/save dialogs and the OpenURI
@@ -57,7 +57,6 @@ public final class Portal implements AutoCloseable {
 	private static final String PARENT_WINDOW = "";
 	private static final Duration FILE_DIALOG_TIMEOUT = Duration.ofMinutes(10);
 	private static final Duration OPEN_TIMEOUT = Duration.ofSeconds(30);
-	private static final Duration XDG_OPEN_TIMEOUT = Duration.ofSeconds(10);
 
 	/** One file dialog filter: a label and shell-style globs (for example {@code *.mp4}). */
 	public record FileFilter(String label, List<String> globs) {
@@ -371,17 +370,7 @@ public final class Portal implements AutoCloseable {
 	}
 
 	private void xdgOpen(String target) {
-		try {
-			var result = ProcessRunner.of("xdg-open", target).timeout(XDG_OPEN_TIMEOUT).run();
-			if (!result.succeeded()) {
-				LOG.log(System.Logger.Level.WARNING, "xdg-open " + target + " failed: " + result.stderr().strip());
-			}
-		} catch (IOException | InterruptedException error) {
-			if (error instanceof InterruptedException) {
-				Thread.currentThread().interrupt();
-			}
-			LOG.log(System.Logger.Level.WARNING, "xdg-open " + target + " failed: " + error);
-		}
+		DesktopOpener.open(target);
 	}
 
 	@Override

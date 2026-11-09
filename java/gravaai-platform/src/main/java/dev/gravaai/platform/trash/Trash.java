@@ -23,6 +23,8 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+import dev.gravaai.core.xdg.XdgDirectories;
+
 /**
  * Freedesktop.org Trash specification implementation (plan §5.5): trash, list, recover and empty.
  *
@@ -50,12 +52,8 @@ public final class Trash {
 
 	/** Trash for the current user: {@code $XDG_DATA_HOME/Trash}, defaulting to the XDG spec default. */
 	public static Trash defaultTrash() {
-		Path home = Path.of(System.getProperty("user.home", ".")).toAbsolutePath().normalize();
-		String xdgDataHome = System.getenv("XDG_DATA_HOME");
-		Path dataHome = xdgDataHome == null || xdgDataHome.isBlank()
-				? home.resolve(".local/share")
-				: Path.of(xdgDataHome);
-		return new Trash(dataHome, home);
+		XdgDirectories xdg = XdgDirectories.current();
+		return new Trash(xdg.dataHome(), xdg.home());
 	}
 
 	/**

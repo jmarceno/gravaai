@@ -11,6 +11,8 @@ import java.util.OptionalInt;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.gravaai.core.os.HostOs;
+import dev.gravaai.platform.process.ExecutableLookup;
 import dev.gravaai.services.meeting.ports.ProcessRunnerPort;
 
 /**
@@ -129,7 +131,13 @@ public final class CaptionWhisper {
 		return String.join("\n", java.util.Arrays.copyOfRange(lines, start, lines.length));
 	}
 
-	/** Resolves whisper-cli: bundled path first, then {@code WHISPER_CPP_PATH}, then PATH. */
+	/**
+	 * Resolves whisper-cli: bundled path first, then {@code WHISPER_CPP_PATH}, then PATH.
+	 *
+	 * <p>The {@code processes} port is no longer needed for the PATH lookup (it used to spawn
+	 * {@code which}); it stays in the signature because callers pass their meeting port and the
+	 * parameter documents the resolution's provenance.
+	 */
 	public static Path resolveExecutable(Path bundled, ProcessRunnerPort processes) {
 		if (bundled != null && Files.isRegularFile(bundled) && Files.isExecutable(bundled)) {
 			return bundled.toAbsolutePath().normalize();
@@ -141,29 +149,14 @@ public final class CaptionWhisper {
 				return candidate.toAbsolutePath().normalize();
 			}
 		}
-		for (String name : List.of("whisper-cli", "whisper-cpp", "whisper", "main")) {
-			try {
-				ProcessRunnerPort.ProcessResult result = processes.run(
-						List.of("which", name), Duration.ofSeconds(5), Map.of());
-				if (result.exitCode() == 0) {
-					String resolved = result.stdout().lines()
-							.map(String::trim).filter(line -> !line.isEmpty())
-							.findFirst().orElse("");
-					if (!resolved.isEmpty()) {
-						Path candidate = Path.of(resolved);
-						if (Files.isExecutable(candidate)) {
-							return candidate.toAbsolutePath().normalize();
-						}
-					}
-				}
-			} catch (IOException | InterruptedException error) {
-				if (error instanceof InterruptedException) {
-					Thread.currentThread().interrupt();
-				}
-			}
+		// PATH lookup without spawning `which`: the resolver is the platform's own.
+		java.util.Optional<Path> onPath = ExecutableLookup.findAny(
+				System.getenv(), List.of("whisper-cli", "whisper-cpp", "whisper", "main"));
+		if (onPath.isPresent()) {
+			return onPath.get();
 		}
 		throw new IllegalStateException(
-				"No Whisper runtime was found for " + System.getProperty("os.name") + "/"
+				"No Whisper runtime was found for " + HostOs.current() + "/"
 						+ System.getProperty("os.arch") + ". This Gravaai build is missing its "
 						+ "bundled caption runtime. Reinstall or update Gravaai, or select a "
 						+ "whisper-cli executable in Caption settings.");

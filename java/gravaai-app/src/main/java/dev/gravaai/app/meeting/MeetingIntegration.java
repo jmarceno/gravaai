@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 
+import dev.gravaai.app.AppBinaries;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.core.storage.UserData;
 import dev.gravaai.platform.filemanager.FileManager;
@@ -92,7 +93,7 @@ public final class MeetingIntegration implements AutoCloseable {
 
 	/** The ffmpeg CLI bundled by java/native/build-ffmpeg.sh. */
 	public static Path ffmpegPath() {
-		return NativeHelpers.nativeDir().resolve("ffmpeg/bin/ffmpeg");
+		return AppBinaries.ffmpeg();
 	}
 
 	/** A process runner over the platform ProcessRunner, shared with auto-captions. */
@@ -102,7 +103,7 @@ public final class MeetingIntegration implements AutoCloseable {
 
 	/** whisper-cli bundled by java/native/build-whisper.sh. */
 	public static Path whisperCliPath() {
-		return NativeHelpers.nativeDir().resolve("whisper/whisper-cli");
+		return AppBinaries.whisperCli();
 	}
 
 	@Override

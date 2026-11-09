@@ -20,6 +20,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.app.AppBinaries;
 import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
@@ -239,7 +240,7 @@ public final class EditorSession implements AutoCloseable {
 			KeySoundSettings keySound = store.state().keySound();
 			PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
-					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+					AppBinaries.ffmpeg(),
 					clickTrackFor(clickSound, media.videoPath(), media.clips()),
 					keyTrackFor(keySound, media.videoPath(), media.clips()));
 			appliedClickSound = clickSound;
@@ -298,7 +299,7 @@ public final class EditorSession implements AutoCloseable {
 			KeySoundSettings keySound = store.state().keySound();
 			audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 					media.clips(),
-					NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+					AppBinaries.ffmpeg(),
 					clickTrackFor(clickSound, media.videoPath(), media.clips()),
 					keyTrackFor(keySound, media.videoPath(), media.clips()));
 			appliedClickSound = clickSound;
@@ -355,7 +356,7 @@ public final class EditorSession implements AutoCloseable {
 				ClickSoundSettings clickSound = store.state().clickSound();
 				KeySoundSettings keySound = store.state().keySound();
 				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(video, clips,
-						NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"),
+						AppBinaries.ffmpeg(),
 						clickTrackFor(clickSound, video, clips),
 						keyTrackFor(keySound, video, clips));
 				appliedClickSound = clickSound;
@@ -570,7 +571,7 @@ public final class EditorSession implements AutoCloseable {
 			try {
 				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
 						media.clips(),
-						NativeHelpers.nativeDir().resolve("ffmpeg").resolve("bin").resolve("ffmpeg"));
+						AppBinaries.ffmpeg());
 				AudioMediaClock clock = new AudioMediaClock();
 				PlaybackEngine engine = new PlaybackEngine(PlaybackEngine.Dependencies.production(
 						DecoderFrameSourceProvider.ffmpegBacked(), clock, true));

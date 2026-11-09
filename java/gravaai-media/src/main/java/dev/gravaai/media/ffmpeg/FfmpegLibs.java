@@ -168,25 +168,15 @@ public final class FfmpegLibs {
 		}
 		// The canonical native payload locator (plan §5.5): packaged app image, -Dgravaai.nativeDir,
 		// $GRAVAAI_NATIVE_DIR, or the development java/native/build directory.
-		Path bundled = NativeHelpers.nativeDir().resolve("ffmpeg").resolve("lib");
-		if (Files.isDirectory(bundled)) {
-			return bundled;
-		}
-		// Module-directory working directory fallbacks (Maven Surefire, IDE runs from gravaai-media/).
-		List<Path> candidates = List.of(
-				Path.of("native", "build", "ffmpeg", "lib"),
-				Path.of("..", "native", "build", "ffmpeg", "lib"),
-				Path.of("..", "..", "native", "build", "ffmpeg", "lib"),
-				Path.of("..", "..", "..", "native", "build", "ffmpeg", "lib"));
-		for (Path candidate : candidates) {
-			if (Files.isDirectory(candidate)) {
-				return candidate.toAbsolutePath().normalize();
-			}
+		Path resolved = NativeHelpers.payloadDirectory("ffmpeg/lib");
+		if (resolved != null) {
+			return resolved;
 		}
 		throw new IllegalStateException(
 				"FFmpeg shared libraries not found. Run java/native/build-ffmpeg.sh, then pass"
 						+ " -Dgravaai.ffmpeg.lib.dir=<dir> or -Dgravaai.nativeDir=<dir>."
-						+ " Tried: " + bundled + " and " + candidates);
+						+ " Tried: " + NativeHelpers.nativeDir().resolve("ffmpeg/lib") + " and "
+						+ NativeHelpers.developmentPayloadCandidates("ffmpeg/lib"));
 	}
 
 	/**

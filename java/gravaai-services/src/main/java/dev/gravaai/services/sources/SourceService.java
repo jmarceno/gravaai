@@ -5,11 +5,11 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.platform.process.ProcessRunner;
 import dev.gravaai.services.recording.RecordingPaths;
 
@@ -22,6 +22,9 @@ import dev.gravaai.services.recording.RecordingPaths;
  * sentinel and the capture picker records a COSMIC output directly; the app targets Linux Wayland
  * (plan §2), so Electron's {@code desktopCapturer} enumeration and the macOS/Windows branches are
  * not ported (plan §2.3).
+ *
+ * <p>Every session question is answered by the injected {@link DesktopSession}; this class never
+ * reads an environment variable.
  */
 public final class SourceService {
 
@@ -59,8 +62,7 @@ public final class SourceService {
 	private record CacheEntry(String key, long expiresAt, List<SelectedSource> value) {
 	}
 
-	private final Map<String, String> env;
-	private final String platform;
+	private final DesktopSession session;
 	private final Supplier<Boolean> cursorCaptureActive;
 	private final CaptureSelection captureSelection;
 	private final SourceSelectorUi sourceSelectorUi;
@@ -70,20 +72,19 @@ public final class SourceService {
 	private @Nullable CacheEntry sourceListCache;
 
 	public SourceService(
-			Map<String, String> env,
-			String platform,
+			DesktopSession session,
 			Supplier<Boolean> cursorCaptureActive,
 			CaptureSelection captureSelection,
 			SourceSelectorUi sourceSelectorUi) {
-		this.env = env;
-		this.platform = platform;
+		this.session = session;
 		this.cursorCaptureActive = cursorCaptureActive;
 		this.captureSelection = captureSelection;
 		this.sourceSelectorUi = sourceSelectorUi;
 	}
 
+	/** True on a Wayland session, where the portal sentinel is the only screen source. */
 	public boolean isWaylandSession() {
-		return SourceMapping.isLikelyLinuxWaylandSession(env);
+		return session.isWayland();
 	}
 
 	/**
@@ -123,7 +124,7 @@ public final class SourceService {
 	/** {@code get-sources}: the source list for one window's request. */
 	public List<SelectedSource> getDesktopSources(List<String> types) {
 		boolean includeScreens = types == null || types.contains("screen");
-		if ("linux".equals(platform) && isWaylandSession()) {
+		if (session.isWayland()) {
 			if (types != null && !includeScreens) {
 				return List.of();
 			}
@@ -143,13 +144,10 @@ public final class SourceService {
 		if (cursorCaptureActive.get()) {
 			return selectedSource;
 		}
-		SelectedSource candidate = source;
-		if ("linux".equals(platform)) {
-			candidate = captureSelection.validateCaptureSource(source, List.of());
-			if (candidate == null) {
-				throw new IOException(
-						"That window or screen is no longer available. Refresh the source list.");
-			}
+		SelectedSource candidate = captureSelection.validateCaptureSource(source, List.of());
+		if (candidate == null) {
+			throw new IOException(
+					"That window or screen is no longer available. Refresh the source list.");
 		}
 		if (candidate.id() != null && candidate.id().startsWith("window:")) {
 			bringSelectedWindowForward(candidate);
@@ -167,7 +165,7 @@ public final class SourceService {
 		if (cursorCaptureActive.get()) {
 			return;
 		}
-		if ("linux".equals(platform) && isWaylandSession()) {
+		if (session.isWayland()) {
 			setSelectedSource(SelectedSource.screen(
 					SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null));
 			broadcastSelectedSourceChange();
@@ -178,14 +176,14 @@ public final class SourceService {
 
 	/**
 	 * Raises the selected window (best effort; selection and capture continue when it fails).
-	 * Ported from {@code bringSelectedWindowForward}; X11 only, so on COSMIC it is a no-op.
+	 * Ported from {@code bringSelectedWindowForward}; X11 only, so on Wayland it is a no-op.
 	 */
 	private void bringSelectedWindowForward(SelectedSource source) {
 		Integer windowId = RecordingPaths.parseWindowId(source.id());
 		if (windowId == null) {
 			return;
 		}
-		if (!"linux".equals(platform) || isWaylandSession()) {
+		if (!session.isX11()) {
 			return;
 		}
 		try {

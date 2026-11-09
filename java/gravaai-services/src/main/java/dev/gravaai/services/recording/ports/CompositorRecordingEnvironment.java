@@ -5,10 +5,10 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 import dev.gravaai.platform.compositor.CaptureBackend;
 import dev.gravaai.platform.compositor.CursorBackend;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.platform.nativehelpers.NativeHelpers;
 
 /**
@@ -21,6 +21,9 @@ import dev.gravaai.platform.nativehelpers.NativeHelpers;
  * each kind share one command line and one stdout contract, so {@code CosmicRecorder} and
  * {@code CursorCaptureSession} record identically.
  *
+ * <p>Which helper to use is decided once, by the {@link DesktopSession} the app classifies at
+ * startup; this class only turns that decision into paths.
+ *
  * <p>If a chosen helper is missing from the payload the request fails loudly rather than falling
  * back to another backend: they capture different things (direct output vs. the portal's own
  * picker), so a silent swap would record the wrong surface.
@@ -32,13 +35,28 @@ public final class CompositorRecordingEnvironment implements RecordingEnvironmen
 	private final CursorBackend cursor;
 	private final Path nativeDir;
 
-	public CompositorRecordingEnvironment(RecordingEnvironment delegate, Map<String, String> env) {
-		this(delegate, CaptureBackend.detect(env), CursorBackend.detect(env), NativeHelpers.nativeDir());
+	/**
+	 * Resolves the helpers the session asks for.
+	 *
+	 * @param delegate the platform environment the non-compositor parts delegate to
+	 * @param session the classified session
+	 */
+	public CompositorRecordingEnvironment(RecordingEnvironment delegate, DesktopSession session) {
+		this(delegate, session, NativeHelpers.nativeDir());
 	}
 
 	/**
 	 * Resolves helpers from an explicit directory; used by tests and by callers that already know
 	 * where the native payload lives.
+	 */
+	public CompositorRecordingEnvironment(
+			RecordingEnvironment delegate, DesktopSession session, Path nativeDir) {
+		this(delegate, session.captureBackend(), session.cursorBackend(), nativeDir);
+	}
+
+	/**
+	 * Resolves helpers from explicit backends and directory; used by tests that pin one mechanism
+	 * without going through a whole session.
 	 */
 	public CompositorRecordingEnvironment(
 			RecordingEnvironment delegate, CaptureBackend capture, CursorBackend cursor, Path nativeDir) {

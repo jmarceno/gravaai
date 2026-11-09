@@ -28,9 +28,6 @@ class CapturePickerServiceTest {
 	private static final CosmicOutput DP1 = new CosmicOutput("DP-1", 0, 0, 1728, 1117);
 	private static final List<SourceArea.PickerDisplay> DISPLAYS =
 			List.of(new SourceArea.PickerDisplay(1, new CaptureArea(0, 0, 1728, 1117)));
-	private static final List<CapturePickerWindow> WINDOWS = List.of(
-			new CapturePickerWindow("window:42:0", "Safari", "Docs", "1", 10, 40, 400, 300),
-			new CapturePickerWindow("window:43:0", "Safari", "Offscreen", "1", 5000, 40, 400, 300));
 
 	private final AtomicBoolean recording = new AtomicBoolean(false);
 	private final AtomicReference<CompletableFuture<CosmicOutput>> clicks = new AtomicReference<>();
@@ -71,13 +68,11 @@ class CapturePickerServiceTest {
 				},
 				sources,
 				() -> DISPLAYS,
-				() -> WINDOWS,
-				() -> new double[] {0, 0},
 				() -> sourceListPicker);
 	}
 
 	@Test
-	@DisplayName("picks a Wayland output by click, without overlays or geometry probes")
+	@DisplayName("picks a Wayland output by click, without a window list")
 	void picksAWaylandOutputByClick() {
 		clicks.set(CompletableFuture.completedFuture(DP1));
 		SourceService sources = sources(WAYLAND);
@@ -141,32 +136,6 @@ class CapturePickerServiceTest {
 	}
 
 	@Test
-	@DisplayName("opens a fresh picker even when an area is already selected")
-	void opensAFreshPickerEvenWhenAnAreaIsSelected() {
-		SourceService sources = sources(WAYLAND);
-		sources.applySelection(SelectedSource.area(
-				"1", new CaptureArea(100, 200, 400, 300), "Area 400×300"));
-		CapturePickerService picker = picker(WAYLAND, sources);
-
-		CapturePickerService.CapturePickerContext context = picker.getCapturePickerContext(1);
-
-		assertNull(context.lastArea());
-		assertEquals(new CaptureArea(0, 0, 1728, 1117), context.displayBounds());
-		assertEquals(false, context.allowArea());
-		assertEquals(1, context.windows().size());
-		assertEquals(0.0, context.cursorX());
-	}
-
-	@Test
-	@DisplayName("returns no display bounds for an unknown display")
-	void returnsNoBoundsForAnUnknownDisplay() {
-		CapturePickerService picker = picker(WAYLAND, sources(WAYLAND));
-		CapturePickerService.CapturePickerContext context = picker.getCapturePickerContext(9);
-		assertNull(context.displayBounds());
-		assertTrue(context.windows().isEmpty());
-	}
-
-	@Test
 	@DisplayName("a portal compositor uses the desktop's own picker instead of waiting for a click")
 	void portalCompositorUsesTheSystemPicker() {
 		SourceService sources = sources(KDE_WAYLAND);
@@ -180,5 +149,17 @@ class CapturePickerServiceTest {
 		// The portal dialog chose the screen; a click would never arrive.
 		assertEquals(0, clickCalls.get());
 		assertEquals(0, pickerWindowsCreated.get());
+	}
+
+	@Test
+	@DisplayName("the HUD monitor list comes from the session's screen sources")
+	void listsTheSessionsScreenSources() {
+		SourceService sources = sources(WAYLAND);
+		CapturePickerService picker = picker(WAYLAND, sources);
+
+		List<SelectedSource> screens = picker.screenSources();
+		assertEquals(1, screens.size());
+		assertTrue(picker.selectScreen(screens.getFirst().id()));
+		assertEquals(screens.getFirst(), sources.getSelectedSource());
 	}
 }

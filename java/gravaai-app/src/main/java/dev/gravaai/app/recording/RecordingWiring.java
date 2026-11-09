@@ -49,14 +49,12 @@ import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.sources.CaptureArea;
 import dev.gravaai.services.sources.CaptureSelection;
 import dev.gravaai.services.sources.CapturePickerService;
-import dev.gravaai.services.sources.CapturePickerWindow;
 import dev.gravaai.services.sources.DisplayOutputResolver;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceArea;
 import dev.gravaai.services.sources.SourceListPicker;
 import dev.gravaai.services.sources.SourceService;
 import dev.gravaai.ui.overlays.AreaRecordingBorder;
-import dev.gravaai.ui.overlays.CapturePickerOverlay;
 import dev.gravaai.ui.overlays.CountdownOverlay;
 import dev.gravaai.ui.overlays.RecordingOverlayHooks;
 import dev.gravaai.ui.overlays.SourceSelectorOverlay;
@@ -101,9 +99,7 @@ public final class RecordingWiring implements AutoCloseable {
 	private final CountdownService countdown;
 	private final ScheduledExecutorService countdownScheduler;
 	private final Supplier<CapturePickerService> capturePickerFactory;
-	private final java.util.function.Function<CapturePickerService, CapturePickerOverlay> capturePickerOverlayFactory;
 	private volatile @Nullable CapturePickerService capturePicker;
-	private volatile @Nullable CapturePickerOverlay capturePickerOverlay;
 	private final MicLevelMeterService micLevelMeter;
 	private final AreaRecordingBorder areaBorder;
 	private final RecordingThumbnails thumbnails;
@@ -128,7 +124,6 @@ public final class RecordingWiring implements AutoCloseable {
 			CountdownService countdown,
 			ScheduledExecutorService countdownScheduler,
 			Supplier<CapturePickerService> capturePickerFactory,
-			java.util.function.Function<CapturePickerService, CapturePickerOverlay> capturePickerOverlayFactory,
 			MicLevelMeterService micLevelMeter,
 			AreaRecordingBorder areaBorder,
 			RecordingThumbnails thumbnails,
@@ -151,7 +146,6 @@ public final class RecordingWiring implements AutoCloseable {
 		this.countdown = countdown;
 		this.countdownScheduler = countdownScheduler;
 		this.capturePickerFactory = capturePickerFactory;
-		this.capturePickerOverlayFactory = capturePickerOverlayFactory;
 		this.micLevelMeter = micLevelMeter;
 		this.areaBorder = areaBorder;
 		this.thumbnails = thumbnails;
@@ -301,36 +295,20 @@ public final class RecordingWiring implements AutoCloseable {
 			}
 			return displays;
 		};
-		Supplier<List<CapturePickerWindow>> pickableWindows = List::of;
-		Supplier<double[]> cursorPoint = () -> {
-			CursorScreen.Point point = cursorScreen.cursorScreenPoint();
-			return new double[] {point.x(), point.y()};
-		};
 		Supplier<SourceListPicker> listPicker = () -> {
 			SourceListPicker picker = new SourceListPicker(sourceSelector::open);
 			listPickerRef.set(picker);
 			return picker;
 		};
-		// The capture picker (and its overlay) is not needed to show the HUD: build it on first use
-		// so it never sits on the startup path (COSMIC uses the click-pick path, not the overlay).
+		// The capture picker is not needed to show the HUD: build it on first use so it never sits
+		// on the startup path (COSMIC picks by clicking a screen, not through a picker window).
 		Supplier<CapturePickerService> capturePickerFactory = () -> new CapturePickerService(
 				session,
 				recordingActive::getAsBoolean,
 				cosmic::waitForCosmicOutputClick,
 				sources,
 				pickerDisplays,
-				pickableWindows,
-				cursorPoint,
 				listPicker);
-		java.util.function.Function<CapturePickerService, CapturePickerOverlay> capturePickerOverlayFactory =
-				picker -> {
-					List<CapturePickerOverlay.DisplayOverlay> overlayDisplays = new ArrayList<>();
-					for (Screen screen : FxCursorScreen.screens()) {
-						overlayDisplays.add(
-								new CapturePickerOverlay.DisplayOverlay(FxCursorScreen.idOf(screen), screen));
-					}
-					return new CapturePickerOverlay(picker, overlayDisplays);
-				};
 
 		MicLevelMeterService micLevelMeter = new MicLevelMeterService(level -> {
 			Consumer<Double> listener = micLevelRef.get();
@@ -364,7 +342,6 @@ public final class RecordingWiring implements AutoCloseable {
 				countdown,
 				countdownScheduler,
 				capturePickerFactory,
-				capturePickerOverlayFactory,
 				micLevelMeter,
 				areaBorder,
 				thumbnails,
@@ -415,25 +392,6 @@ public final class RecordingWiring implements AutoCloseable {
 			}
 		}
 		return picker;
-	}
-
-	/** The capture-picker overlay (FX thread; not used by the COSMIC click path). */
-	public CapturePickerOverlay capturePickerOverlay() {
-		CapturePickerOverlay overlay = capturePickerOverlay;
-		if (overlay != null) {
-			return overlay;
-		}
-		if (!Platform.isFxApplicationThread()) {
-			throw new IllegalStateException("The capture-picker overlay must be created on the JavaFX thread");
-		}
-		synchronized (this) {
-			overlay = capturePickerOverlay;
-			if (overlay == null) {
-				overlay = capturePickerOverlayFactory.apply(capturePicker());
-				capturePickerOverlay = overlay;
-			}
-		}
-		return overlay;
 	}
 
 	/** The recordings folder supplier (honours the custom directory setting). */
@@ -537,10 +495,6 @@ public final class RecordingWiring implements AutoCloseable {
 		closeQuietly(recordingStateSubscription);
 		closeQuietly(selectedSourceSubscription);
 		sourceSelector.close();
-		CapturePickerOverlay pickerOverlay = capturePickerOverlay;
-		if (pickerOverlay != null) {
-			pickerOverlay.close();
-		}
 		countdown.cancel();
 		countdownOverlay.closeActive();
 		countdownScheduler.shutdownNow();

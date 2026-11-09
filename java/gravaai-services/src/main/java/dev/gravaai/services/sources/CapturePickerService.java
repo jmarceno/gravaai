@@ -1,11 +1,8 @@
 package dev.gravaai.services.sources;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import dev.gravaai.platform.compositor.CaptureBackend;
@@ -17,13 +14,11 @@ import dev.gravaai.services.recording.CosmicOutput;
  * {@code electron/ipc/register/capturePicker.ts} (plan §7.1 P1.6).
  *
  * <p>The portal screencast is unreliable on COSMIC, so the user clicks anywhere on the screen they
- * want and the output under the pointer is recorded directly. The Electron overlay picker and the
- * macOS screen/area rules are platform code (plan §2.3); the selection-only completion helpers are
- * kept for a future X11 source list.
+ * want and the output under the pointer is recorded directly.
  *
  * <p>Which picker a session gets is decided by the {@link DesktopSession}: a portal compositor uses
  * the desktop's own dialog, a direct-capture compositor waits for a click, and an X11 session opens
- * the source list. This class never inspects the environment itself.
+ * the source-list window. This class never inspects the environment itself.
  */
 public final class CapturePickerService {
 
@@ -34,28 +29,14 @@ public final class CapturePickerService {
 				long timeoutMs);
 	}
 
-	/** What the capture-picker overlay asks for. */
-	public record CapturePickerContext(
-			@Nullable CaptureArea displayBounds,
-			@Nullable CaptureArea lastArea,
-			boolean allowArea,
-			List<CapturePickerWindow> windows,
-			double cursorX,
-			double cursorY) {
-	}
-
 	private final DesktopSession session;
 	private final Supplier<Boolean> cursorCaptureActive;
 	private final OutputClickWaiter clickWaiter;
 	private final SourceService sources;
 	private final Supplier<List<SourceArea.PickerDisplay>> displays;
-	private final Supplier<List<CapturePickerWindow>> pickableWindows;
-	private final Supplier<double[]> cursorPoint;
 	private final Supplier<SourceListPicker> sourceListPicker;
 
-	private @Nullable CompletableFuture<SourceService.PickResult> activePick;
-	private @Nullable Consumer<CapturePick> resolvePendingPick;
-	private List<CapturePickerWindow> loadedWindows = List.of();
+	private @org.jspecify.annotations.Nullable CompletableFuture<SourceService.PickResult> activePick;
 
 	public CapturePickerService(
 			DesktopSession session,
@@ -63,16 +44,12 @@ public final class CapturePickerService {
 			OutputClickWaiter clickWaiter,
 			SourceService sources,
 			Supplier<List<SourceArea.PickerDisplay>> displays,
-			Supplier<List<CapturePickerWindow>> pickableWindows,
-			Supplier<double[]> cursorPoint,
 			Supplier<SourceListPicker> sourceListPicker) {
 		this.session = session;
 		this.cursorCaptureActive = cursorCaptureActive;
 		this.clickWaiter = clickWaiter;
 		this.sources = sources;
 		this.displays = displays;
-		this.pickableWindows = pickableWindows;
-		this.cursorPoint = cursorPoint;
 		this.sourceListPicker = sourceListPicker;
 	}
 
@@ -120,7 +97,7 @@ public final class CapturePickerService {
 				return SourceService.PickResult.picked(source);
 			});
 		}
-		// X11 keeps the existing source-list window.
+		// X11 keeps the source-list window.
 		return sourceListPicker.get().open().thenApply(result -> {
 			SelectedSource source = result.source();
 			return result.success() && source != null
@@ -154,78 +131,5 @@ public final class CapturePickerService {
 			infos.add(new DisplayOutputResolver.DisplayInfo(display.id(), display.bounds()));
 		}
 		return infos;
-	}
-
-	/**
-	 * {@code complete-capture-pick}: the overlay reports a pick; the selection is forced to
-	 * selection-only and validated against the displays and windows the picker offered.
-	 *
-	 * <p>An area pick is rejected unless the picker offered one. The Linux pickers never do, so a
-	 * rectangle from a stale overlay can never become a recording selection.
-	 */
-	public void completeCapturePick(@Nullable CapturePickRequest input) {
-		if (input == null || cursorCaptureActive.get()) {
-			finishPick(null);
-			return;
-		}
-		if ("area".equals(input.kind()) && !areaSelectionSupported()) {
-			return;
-		}
-		CapturePickRequest selectionOnly = new CapturePickRequest(
-				input.kind(),
-				input.x(),
-				input.y(),
-				input.width(),
-				input.height(),
-				input.windowId(),
-				input.displayId(),
-				false);
-		finishPick(SourceArea.normalizeCapturePick(selectionOnly, displays.get(), loadedWindows));
-	}
-
-	/** Whether this session's picker can offer a rectangle. Linux pickers cannot. */
-	private boolean areaSelectionSupported() {
-		return false;
-	}
-
-	private void finishPick(@Nullable CapturePick pick) {
-		Consumer<CapturePick> resolve;
-		synchronized (this) {
-			resolve = resolvePendingPick;
-			resolvePendingPick = null;
-		}
-		if (resolve != null) {
-			resolve.accept(pick);
-		}
-	}
-
-	/** {@code get-capture-picker-context}: the windows that intersect one display. */
-	public CapturePickerContext getCapturePickerContext(int displayId) {
-		List<CapturePickerWindow> windows = pickableWindows.get();
-		loadedWindows = windows;
-		SourceArea.PickerDisplay display = null;
-		for (SourceArea.PickerDisplay candidate : displays.get()) {
-			if (candidate.id() == displayId) {
-				display = candidate;
-				break;
-			}
-		}
-		double[] cursor = cursorPoint.get();
-		if (display == null) {
-			return new CapturePickerContext(null, null, false, List.of(), cursor[0], cursor[1]);
-		}
-		CaptureArea bounds = display.bounds();
-		List<CapturePickerWindow> intersecting = new ArrayList<>();
-		for (CapturePickerWindow window : windows) {
-			if (window.x() < bounds.x() + bounds.width()
-					&& window.x() + window.width() > bounds.x()
-					&& window.y() < bounds.y() + bounds.height()
-					&& window.y() + window.height() > bounds.y()) {
-				intersecting.add(window);
-			}
-		}
-		// A previous area is never offered again: always draw a fresh picker.
-		return new CapturePickerContext(
-				bounds, null, areaSelectionSupported(), List.copyOf(intersecting), cursor[0], cursor[1]);
 	}
 }

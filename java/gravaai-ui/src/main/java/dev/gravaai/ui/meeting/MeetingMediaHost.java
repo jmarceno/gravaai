@@ -1,6 +1,7 @@
 package dev.gravaai.ui.meeting;
 
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 import javafx.scene.Node;
 
@@ -16,4 +17,16 @@ public interface MeetingMediaHost {
 
 	/** Plays the recording from the given position in seconds. */
 	void seek(double seconds);
+
+	/** Pauses when playing; the position is kept (the close-to-tray rule, like the editor). */
+	void pausePlayback();
+
+	/** Whether the current meeting is playing right now. */
+	boolean isPlaying();
+
+	/**
+	 * Subscribes to playhead updates in seconds; invoked on the FX thread. Close the handle to
+	 * unsubscribe (the transcript highlight rides on this).
+	 */
+	AutoCloseable onTime(Consumer<Double> listener);
 }

@@ -25,6 +25,11 @@ import javafx.scene.text.TextFlow;
  * Renders the Markdown subset the meeting notes and transcripts use (port of
  * {@code MeetingMarkdown.tsx}): headings, bullets, checklists, bold, italics, inline code, and
  * clickable [HH:MM:SS] timestamps that seek the recording.
+ *
+ * <p>While the recording plays, {@link #setPlaybackSeconds} keeps the line of the current position
+ * highlighted ({@code [HH:MM:SS]}-led blocks only); the notes pane decides when to scroll it into
+ * view, so reading is never interrupted here. The highlight state machine lives in
+ * {@link MeetingTranscriptLines}.
  */
 public final class MeetingMarkdownView extends VBox {
 
@@ -33,6 +38,7 @@ public final class MeetingMarkdownView extends VBox {
 					+ " -fx-background-radius: 4; -fx-padding: 0 4 0 4;";
 
 	private final @Nullable Consumer<Integer> onSeek;
+	private final MeetingTranscriptLines lines = new MeetingTranscriptLines();
 	private String source = "";
 
 	public MeetingMarkdownView() {
@@ -50,6 +56,7 @@ public final class MeetingMarkdownView extends VBox {
 	public void refresh(@Nullable String source) {
 		this.source = source == null ? "" : source;
 		getChildren().clear();
+		lines.clear();
 		if (source == null || source.isBlank()) {
 			return;
 		}
@@ -60,21 +67,51 @@ public final class MeetingMarkdownView extends VBox {
 				list = null;
 				getChildren().add(headingNode(heading));
 			} else if (block instanceof MeetingMarkdownParser.Bullet bullet) {
+				Node row = bulletNode(bullet);
 				if (list == null) {
 					list = new VBox(4);
 					list.setPadding(new Insets(0, 0, 6, 0));
 					getChildren().add(list);
 				}
-				list.getChildren().add(bulletNode(bullet));
+				list.getChildren().add(row);
+				indexTimestampRow(bullet.text(), row);
 			} else if (block instanceof MeetingMarkdownParser.Paragraph paragraph) {
 				list = null;
-				getChildren().add(paragraphNode(paragraph.text()));
+				Node row = paragraphNode(paragraph.text());
+				getChildren().add(row);
+				indexTimestampRow(paragraph.text(), row);
 			}
+		}
+	}
+
+	/** Timestamp-led blocks (the transcript lines) map their seconds to the rendered row. */
+	private void indexTimestampRow(String text, Node row) {
+		Integer seconds = MeetingMarkdownParser.parseTimestampSeconds(text);
+		if (seconds != null) {
+			lines.index(seconds, row);
 		}
 	}
 
 	public String source() {
 		return source;
+	}
+
+	/**
+	 * Highlights the last line whose timestamp is at or before {@code seconds}; returns the
+	 * highlighted timestamp in seconds, or null when the playhead is before the first line.
+	 */
+	public @Nullable Integer setPlaybackSeconds(double seconds) {
+		return lines.highlight(seconds);
+	}
+
+	/** The currently highlighted timestamp in seconds, or null. */
+	public @Nullable Integer activeSeconds() {
+		return lines.activeSeconds();
+	}
+
+	/** The rendered row of a timestamped line (the notes pane reveals it when following). */
+	public @Nullable Node nodeForSeconds(int seconds) {
+		return lines.rowFor(seconds);
 	}
 
 	private Node headingNode(MeetingMarkdownParser.Heading heading) {

@@ -56,6 +56,7 @@ import dev.gravaai.ui.dashboard.DashboardView;
 import dev.gravaai.ui.kit.KitRoot;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.launch.HudOverlayWindow;
+import dev.gravaai.ui.meeting.MeetingPlayerHost;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -116,6 +117,7 @@ public final class AppContext {
 	private @Nullable HudOverlayWindow hudWindow;
 	private @Nullable MeetingIntegration meeting;
 	private @Nullable MeetingWindow meetingWindow;
+	private @Nullable MeetingPlayerHost meetingMediaHost;
 	private @Nullable AgentWiring agentWiring;
 	private volatile @Nullable ProjectExporter exporter;
 	private @Nullable ExportCoordinator exportCoordinator;
@@ -696,13 +698,21 @@ public final class AppContext {
 			finalizingSceneShown = false;
 			if (meetingWindow == null) {
 				meetingWindow = MeetingWindow.createIn(stage, integration.service(),
-						this::closeMeetingWindow);
+						this::closeMeetingWindow, meetingMediaHost());
 			}
 			meetingWindow.open(mediaPath);
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "meeting window unavailable: " + error);
 			meetingWindow = null;
 		}
+	}
+
+	/** The meeting playback host; the bundled ffmpeg CLI decodes the audio for the player. */
+	private MeetingPlayerHost meetingMediaHost() {
+		if (meetingMediaHost == null) {
+			meetingMediaHost = new MeetingPlayerHost(ffmpegBinary());
+		}
+		return meetingMediaHost;
 	}
 
 	private static boolean envFlag(String name) {
@@ -1607,6 +1617,12 @@ public final class AppContext {
 				// Close-to-tray only hides the window: the engine keeps decoding on its background
 				// threads, so the preview must pause before the window disappears.
 				editor.pausePlayback();
+			}
+			// Same rule for the meeting player: its pump thread keeps writing to the output
+			// otherwise, and the user would come back to a meeting that played to the end.
+			MeetingWindow meeting = meetingWindow;
+			if (meeting != null) {
+				meeting.pausePlayback();
 			}
 			stage.hide();
 		});

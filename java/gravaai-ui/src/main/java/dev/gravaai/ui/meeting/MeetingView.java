@@ -46,8 +46,9 @@ import javafx.scene.layout.VBox;
  * // host view.ui() inside a KitRoot, then call view.open(mediaPath) (or let the service's
  * // open-request flow do it) after adding it to the scene.
  * }</pre>
- * The player is a seam ({@link MeetingMediaHost}); without it the view shows the player
- * placeholder and timestamps are not clickable, matching the P2 media staging.
+ * The player is a seam ({@link MeetingMediaHost}); AppContext injects the real
+ * {@link MeetingPlayerHost} (play/pause, seek, speed, waveform), and views without one fall back to
+ * the placeholder with disabled timestamps (snapshots/tests).
  */
 public final class MeetingView extends Region {
 
@@ -68,6 +69,7 @@ public final class MeetingView extends Region {
 	private boolean editingTitle;
 	private @Nullable Node player;
 	private @Nullable Subscription jobSubscription;
+	private @Nullable AutoCloseable mediaTimeSubscription;
 	private Subscription openSubscription;
 
 	/** AppContext entry point (real service). */
@@ -93,6 +95,12 @@ public final class MeetingView extends Region {
 				this.actions.media().seek(seconds);
 			}
 		});
+		MeetingMediaHost mediaHost = this.actions.media();
+		if (mediaHost != null) {
+			// The transcript highlight follows the playhead; the notes pane owns the scroll rule.
+			this.mediaTimeSubscription = mediaHost.onTime(seconds ->
+					this.notes.setPlaybackSeconds(seconds, mediaHost.isPlaying()));
+		}
 
 		getStyleClass().add("meeting-view");
 		setStyle("-fx-background-color: " + css(Theme.BG) + ";");
@@ -153,12 +161,32 @@ public final class MeetingView extends Region {
 
 	/** Closes the meeting view (back button); also notifies the app shell. */
 	public void close() {
+		pausePlayback();
+		unsubscribeMediaTime();
 		unsubscribeJob();
 		notes.close();
 		mediaPath = null;
 		meta = null;
 		updateVisibility();
 		actions.onClose().run();
+	}
+
+	/** Pauses when the player is playing; the position is kept (the editor's close-to-tray rule). */
+	public void pausePlayback() {
+		if (actions.media() != null) {
+			actions.media().pausePlayback();
+		}
+	}
+
+	private void unsubscribeMediaTime() {
+		if (mediaTimeSubscription != null) {
+			try {
+				mediaTimeSubscription.close();
+			} catch (Exception ignored) {
+				// The subscription is going away; nothing useful to report.
+			}
+			mediaTimeSubscription = null;
+		}
 	}
 
 	/** Re-reads the metadata (job updates and renames do this automatically). */

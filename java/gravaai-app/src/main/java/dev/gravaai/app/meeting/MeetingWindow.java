@@ -9,6 +9,7 @@ import dev.gravaai.app.StageScenes;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.ui.kit.KitRoot;
 import dev.gravaai.ui.kit.Theme;
+import dev.gravaai.ui.meeting.MeetingMediaHost;
 import dev.gravaai.ui.meeting.MeetingView;
 import dev.gravaai.ui.meeting.MeetingViewActions;
 import javafx.application.Platform;
@@ -39,28 +40,30 @@ public final class MeetingWindow {
 	 *
 	 * @param onClose invoked by the view's back button after the stage is hidden
 	 */
-	public static MeetingWindow create(MeetingService service, Runnable onClose) {
-		return build(new Stage(), service, onClose, true);
+	public static MeetingWindow create(MeetingService service, Runnable onClose,
+			@Nullable MeetingMediaHost media) {
+		return build(new Stage(), service, onClose, true, media);
 	}
 
 	/**
 	 * Hosts the meeting view in an existing stage (the app's single main window, plan §5.1); no
 	 * second OS window is created.
 	 */
-	public static MeetingWindow createIn(Stage stage, MeetingService service, Runnable onClose) {
+	public static MeetingWindow createIn(Stage stage, MeetingService service, Runnable onClose,
+			@Nullable MeetingMediaHost media) {
 		Objects.requireNonNull(stage, "stage");
-		return build(stage, service, onClose, false);
+		return build(stage, service, onClose, false, media);
 	}
 
 	private static MeetingWindow build(Stage stage, MeetingService service, Runnable onClose,
-			boolean ownsStage) {
+			boolean ownsStage, @Nullable MeetingMediaHost media) {
 		Objects.requireNonNull(service, "service");
 		MeetingView view = MeetingView.create(service, new MeetingViewActions(
 				() -> {
 					if (onClose != null) {
 						onClose.run();
 					}
-				}, () -> null, null));
+				}, () -> null, media));
 		double initialWidth = !ownsStage && stage.getScene() != null && stage.getWidth() > 0
 				? stage.getWidth() : 1200;
 		double initialHeight = !ownsStage && stage.getScene() != null && stage.getHeight() > 0
@@ -80,6 +83,11 @@ public final class MeetingWindow {
 	/** True when the meeting view is hosted by the app's main window. */
 	public boolean isHosted() {
 		return hosted;
+	}
+
+	/** Pauses the meeting player when playing (close-to-tray rule; the position is kept). */
+	public void pausePlayback() {
+		view.pausePlayback();
 	}
 
 	/** Releases the view resources; the hosted main window stays open. Idempotent. */

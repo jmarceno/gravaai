@@ -41,6 +41,9 @@ import javafx.scene.layout.VBox;
  */
 public final class MeetingNotesView extends VBox {
 
+	/** How long a user scroll keeps auto-follow off (the "still reading" window). */
+	private static final long USER_SCROLL_IDLE_MS = 3_000;
+
 	private enum Tab {
 		NOTES,
 		TRANSCRIPT
@@ -57,7 +60,7 @@ public final class MeetingNotesView extends VBox {
 	private final ScrollPane scroll = new ScrollPane(contentHost);
 	private final TextArea editor = new TextArea();
 	private final VBox emptyHost = new VBox(12);
-	private final MeetingMarkdownView markdown = new MeetingMarkdownView();
+	private final MeetingMarkdownView markdown;
 
 	private @Nullable Path mediaPath;
 	private MeetingService.@Nullable FilesView files;
@@ -67,10 +70,19 @@ public final class MeetingNotesView extends VBox {
 	private @Nullable String draft;
 	private boolean loading;
 	private @Nullable Subscription jobSubscription;
+	/** Last time the user scrolled by wheel or scrollbar (auto-follow stays off for a while). */
+	private volatile long lastUserScrollAt;
+	private boolean scrollTrackingInstalled;
+	private boolean following;
+	private @Nullable Integer lastFollowedSeconds;
 
 	public MeetingNotesView(MeetingUiService service, Consumer<Double> onSeek) {
 		this.service = service;
 		this.onSeek = onSeek;
+		// The field initializers run before the constructor body, so the markdown view (which
+		// captures onSeek) is created here, after the assignment.
+		this.markdown = new MeetingMarkdownView(null,
+				seconds -> this.onSeek.accept((double) seconds));
 		getStyleClass().add("meeting-notes");
 		setSpacing(12);
 
@@ -146,6 +158,71 @@ public final class MeetingNotesView extends VBox {
 
 	public @Nullable Path mediaPath() {
 		return mediaPath;
+	}
+
+	/**
+	 * Drives the transcript highlight while the recording plays and scrolls the newly active line
+	 * into view — but only when the user has not scrolled for a few seconds (auto-follow must
+	 * never steal scroll while they are reading).
+	 */
+	public void setPlaybackSeconds(double seconds, boolean playing) {
+		Integer active = markdown.setPlaybackSeconds(seconds);
+		if (active == null) {
+			lastFollowedSeconds = null;
+			return;
+		}
+		if (active.equals(lastFollowedSeconds)) {
+			return;
+		}
+		lastFollowedSeconds = active;
+		if (playing && System.currentTimeMillis() - lastUserScrollAt > USER_SCROLL_IDLE_MS) {
+			followLine(active);
+		}
+	}
+
+	/** Scrolls the playing line into view (one-third from the top of the viewport). */
+	private void followLine(int seconds) {
+		Node row = markdown.nodeForSeconds(seconds);
+		if (row == null || !row.isVisible()) {
+			return;
+		}
+		installScrollTracking();
+		javafx.geometry.Bounds inContent = contentHost.sceneToLocal(
+				row.localToScene(row.getBoundsInLocal()));
+		if (inContent == null) {
+			return;
+		}
+		double range = contentHost.getHeight() - scroll.getHeight();
+		if (range <= 0) {
+			return;
+		}
+		double target = (inContent.getMinY() - scroll.getHeight() * 0.25) / range;
+		following = true;
+		try {
+			scroll.setVvalue(Math.max(0, Math.min(1, target)));
+		} finally {
+			following = false;
+		}
+	}
+
+	/** Wheel and scrollbar drags mark the user as reading; programmatic follows do not. */
+	private void installScrollTracking() {
+		if (scrollTrackingInstalled) {
+			return;
+		}
+		scrollTrackingInstalled = true;
+		scroll.addEventFilter(javafx.scene.input.ScrollEvent.ANY,
+				event -> lastUserScrollAt = System.currentTimeMillis());
+		for (javafx.scene.Node child : scroll.lookupAll(".scroll-bar")) {
+			if (child instanceof javafx.scene.control.ScrollBar bar
+					&& bar.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
+				bar.valueProperty().addListener((observable, oldValue, newValue) -> {
+					if (!following) {
+						lastUserScrollAt = System.currentTimeMillis();
+					}
+				});
+			}
+		}
 	}
 
 	private void unsubscribe() {

@@ -12,7 +12,8 @@ import java.util.function.Supplier;
  * @param onClose invoked by the meeting view's back button
  * @param importFileChooser opens the file chooser and returns the picked media path, or null when
  *     cancelled
- * @param media the playback host, or null until the media playback layer is wired
+ * @param media the playback host ({@link MeetingPlayerHost} in the app shell); null for views
+ *     without playback (snapshots/tests)
  */
 public record MeetingViewActions(Runnable onClose, Supplier<@Nullable Path> importFileChooser,
 		@Nullable MeetingMediaHost media) {

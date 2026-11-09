@@ -1,0 +1,260 @@
+package dev.gravaai.services.recording.cosmic;
+
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+
+import dev.gravaai.services.recording.CosmicSession.CosmicAudioInput;
+import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
+import dev.gravaai.services.recording.CosmicSession.CosmicMuxInput;
+import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
+import dev.gravaai.services.recording.CosmicSession.CosmicMux;
+import dev.gravaai.services.recording.MicNoiseReduction;
+import dev.gravaai.services.recording.MicNoiseReductionFilters;
+import dev.gravaai.services.recording.ports.RecordingEnvironment;
+import dev.gravaai.services.recording.ports.RecordingProcesses;
+import dev.gravaai.services.recording.ports.RecordingProcesses.SpawnOptions;
+import dev.gravaai.services.recording.ports.SpawnedProcess;
+
+/**
+ * The stop-time mux: raw audio tracks and the encoded video are combined into the final file, and
+ * meeting recordings also get their per-speaker tracks.
+ *
+ * <p>Everything here is ffmpeg argument building plus process supervision, split out of the
+ * recorder so the pipeline and the state machine stay readable.
+ */
+final class CosmicMuxer implements CosmicMux {
+
+	private static final System.Logger LOG = System.getLogger("gravaai.recording");
+
+	private static final int AUDIO_RATE = 48_000;
+	private static final int AUDIO_CHANNELS = 2;
+	private static final String AUDIO_ENCODING = "192k";
+	private static final String SPEAKER_ENCODING = "48k";
+
+	private final RecordingEnvironment environment;
+	private final RecordingProcesses processes;
+	private final ExecutorService pipeDrains;
+
+	CosmicMuxer(RecordingEnvironment environment, RecordingProcesses processes,
+			ExecutorService pipeDrains) {
+		this.environment = environment;
+		this.processes = processes;
+		this.pipeDrains = pipeDrains;
+	}
+
+	/** One track as the filter builders see it. */
+	record TrackRef(CosmicAudioRole role, long startedAtMs) {
+	}
+
+	/** Muxes the temp files into the final recording, plus the speaker tracks for meetings. */
+	@Override
+	public CosmicMuxResult mux(CosmicMuxInput input) {
+		List<String> micFilters = prepareMicFilters(input.micNoiseReduction());
+		List<String> args = new ArrayList<>(List.of("-hide_banner", "-loglevel", "error", "-y"));
+		if (input.videoPath() != null) {
+			// A video that was never finalised may end in a truncated cluster.
+			if (input.recovering()) {
+				args.addAll(List.of("-fflags", "+genpts+discardcorrupt", "-err_detect", "ignore_err"));
+			}
+			args.add("-i");
+			args.add(input.videoPath());
+		}
+		int firstAudioInput = input.videoPath() != null ? 1 : 0;
+		for (CosmicAudioInput track : input.audio()) {
+			args.addAll(rawTrackInput(Path.of(track.path())));
+		}
+		if (input.videoPath() != null) {
+			args.addAll(List.of("-map", "0:v"));
+		}
+		if (!input.audio().isEmpty()) {
+			for (CosmicAudioInput track : input.audio()) {
+				LOG.log(System.Logger.Level.INFO,
+						Path.of(track.path()).getFileName() + " align "
+								+ alignTrackFilter(track.startedAtMs(), input.startedAtMs()));
+			}
+			args.addAll(List.of("-filter_complex",
+					buildMixFilter(trackRefs(input.audio()), input.startedAtMs(), firstAudioInput, micFilters),
+					"-map", "[a]"));
+		}
+		if (input.videoPath() != null) {
+			args.addAll(List.of("-c:v", "copy"));
+		}
+		if (!input.audio().isEmpty()) {
+			args.addAll(List.of("-c:a", "aac", "-b:a", AUDIO_ENCODING));
+		}
+		args.add("-movflags");
+		args.add("+faststart");
+		if (input.videoPath() != null) {
+			args.add("-shortest");
+		}
+		args.add(input.outputPath());
+
+		// Speaker tracks are transcription input only: mono, aligned like the mix, never played
+		// back (listeners always get the mixed track above).
+		List<FfmpegRun> speakerRuns = new ArrayList<>();
+		if (input.keepSpeakerTracks()) {
+			for (CosmicAudioInput track : input.audio()) {
+				speakerRuns.add(runFfmpeg(speakerArgs(input, track, micFilters)));
+			}
+		}
+
+		FfmpegRun mux = runFfmpeg(args);
+		int muxCode = waitFor(mux);
+		String muxStderr = mux.stderr().join();
+		for (FfmpegRun speaker : speakerRuns) {
+			if (waitFor(speaker) != 0) {
+				LOG.log(System.Logger.Level.WARNING, "Speaker track failed: " + speaker.stderr().join());
+			}
+		}
+		if (muxCode != 0) {
+			return CosmicMuxResult.err(muxStderr.isEmpty()
+					? "Muxing failed with code " + muxCode + "."
+					: muxStderr);
+		}
+		return CosmicMuxResult.ok();
+	}
+
+	/** The per-speaker ffmpeg run for one track, or null when the track needs none. */
+	private static List<String> speakerArgs(
+			CosmicMuxInput input, CosmicAudioInput track, List<String> micFilters) {
+		List<String> speakerArgs = new ArrayList<>(List.of("-hide_banner", "-loglevel", "error", "-y"));
+		speakerArgs.addAll(rawTrackInput(Path.of(track.path())));
+		speakerArgs.addAll(List.of(
+				"-af",
+				String.join(",", trackFilterChain(
+						new TrackRef(track.role(), track.startedAtMs()), input.startedAtMs(), micFilters)),
+				"-ac", "1",
+				"-c:a", "libopus",
+				"-b:a", SPEAKER_ENCODING,
+				speakerTrackPath(input.outputPath(), track.role())));
+		return List.copyOf(speakerArgs);
+	}
+
+	private List<String> prepareMicFilters(MicNoiseReduction level) {
+		// Logs why it fell back when the model is missing.
+		Path modelPath = level == MicNoiseReduction.OFF ? null : environment.rnnoiseModel();
+		if ((level == MicNoiseReduction.BALANCED || level == MicNoiseReduction.STRONG) && modelPath == null) {
+			LOG.log(System.Logger.Level.WARNING,
+					"RNNoise model not found; using the light mic filter.");
+		}
+		LOG.log(System.Logger.Level.INFO, "mic noise reduction: " + level.wire());
+		return MicNoiseReductionFilters.buildMicNoiseFilters(
+				level, modelPath == null ? null : modelPath.toString());
+	}
+
+	private static List<TrackRef> trackRefs(List<CosmicAudioInput> audio) {
+		List<TrackRef> tracks = new ArrayList<>();
+		for (CosmicAudioInput track : audio) {
+			tracks.add(new TrackRef(track.role(), track.startedAtMs()));
+		}
+		return List.copyOf(tracks);
+	}
+
+	private record FfmpegRun(SpawnedProcess process, CompletableFuture<String> stderr) {
+	}
+
+	/** Runs the bundled ffmpeg CLI with {@code args} (the arguments only, without the program). */
+	private FfmpegRun runFfmpeg(List<String> args) {
+		List<String> command = new ArrayList<>(args.size() + 1);
+		command.add(environment.ffmpeg().toString());
+		command.addAll(args);
+		try {
+			SpawnedProcess process = processes.spawn(command, new SpawnOptions(false, false, true));
+			InputStream errorStream = process.stderr();
+			CompletableFuture<String> stderr = CompletableFuture.supplyAsync(() -> {
+				if (errorStream == null) {
+					return "";
+				}
+				try (InputStream in = errorStream) {
+					return new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+				} catch (IOException error) {
+					return "";
+				}
+			}, pipeDrains);
+			return new FfmpegRun(process, stderr);
+		} catch (IOException error) {
+			throw new IllegalStateException("Could not start ffmpeg", error);
+		}
+	}
+
+	private static int waitFor(FfmpegRun run) {
+		try {
+			return run.process().waitFor();
+		} catch (InterruptedException error) {
+			Thread.currentThread().interrupt();
+			return -1;
+		}
+	}
+
+	private static List<String> rawTrackInput(Path file) {
+		return List.of(
+				"-f", "s16le",
+				"-ar", String.valueOf(AUDIO_RATE),
+				"-ac", String.valueOf(AUDIO_CHANNELS),
+				"-i", file.toString());
+	}
+
+	/**
+	 * The -filter_complex that lines every audio track up and mixes them into [a].
+	 *
+	 * @param tracks the tracks in input order
+	 * @param referenceMs the recording's reference start
+	 * @param firstInputIndex the ffmpeg input index of the first track
+	 * @param micFilters the denoise chain for the microphone track
+	 */
+	static String buildMixFilter(
+			List<TrackRef> tracks, long referenceMs, int firstInputIndex, List<String> micFilters) {
+		List<String> chains = new ArrayList<>();
+		for (int index = 0; index < tracks.size(); index++) {
+			TrackRef track = tracks.get(index);
+			chains.add("[" + (index + firstInputIndex) + ":a]"
+					+ String.join(",", trackFilterChain(track, referenceMs, micFilters))
+					+ "[a" + index + "]");
+		}
+		if (tracks.size() == 1) {
+			return chains.get(0).replace("[a0]", "[a]");
+		}
+		StringBuilder labels = new StringBuilder();
+		for (int index = 0; index < tracks.size(); index++) {
+			labels.append("[a").append(index).append("]");
+		}
+		return String.join(";", chains)
+				+ ";" + labels + "amix=inputs=" + tracks.size() + ":duration=longest:normalize=0[a]";
+	}
+
+	/** Filters for one track, in order: alignment first so timing stays exact, then mic denoise. */
+	static List<String> trackFilterChain(TrackRef track, long referenceMs, List<String> micFilters) {
+		List<String> filters = new ArrayList<>();
+		filters.add(alignTrackFilter(track.startedAtMs(), referenceMs));
+		if (track.role() == CosmicAudioRole.MIC) {
+			filters.addAll(micFilters);
+		}
+		return List.copyOf(filters);
+	}
+
+	/** ffmpeg filter that lines a raw track up with the recording's reference start. */
+	static String alignTrackFilter(long trackStartedAtMs, long referenceMs) {
+		long offsetMs = Math.round((double) (trackStartedAtMs - referenceMs));
+		return offsetMs > 0
+				? "adelay=" + offsetMs + ":all=1"
+				: "atrim=start=" + String.format(Locale.ROOT, "%.3f", (-offsetMs) / 1000.0)
+						+ ",asetpts=PTS-STARTPTS";
+	}
+
+	/** Path of the per-speaker meeting track kept next to a recording. */
+	static String speakerTrackPath(String outputPath, CosmicAudioRole role) {
+		int slash = Math.max(outputPath.lastIndexOf('/'), outputPath.lastIndexOf('\\'));
+		int dot = outputPath.lastIndexOf('.');
+		String stem = dot > slash ? outputPath.substring(0, dot) : outputPath;
+		return stem + ".meeting-" + role.wire() + ".opus";
+	}
+}

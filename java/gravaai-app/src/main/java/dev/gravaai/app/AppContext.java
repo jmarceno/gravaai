@@ -40,7 +40,7 @@ import dev.gravaai.services.projects.RecoverableRecordingsProvider;
 import dev.gravaai.services.projects.RecordingEntry;
 import dev.gravaai.services.projects.RecordingsDirectory;
 import dev.gravaai.services.projects.RecordingsReadModel;
-import dev.gravaai.services.recording.CosmicRecorder.StopResult;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder.StopResult;
 import dev.gravaai.services.recording.RecordingService;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.shortcuts.DesktopShortcutPortal;

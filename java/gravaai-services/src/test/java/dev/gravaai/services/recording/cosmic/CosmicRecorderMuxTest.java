@@ -1,4 +1,4 @@
-package dev.gravaai.services.recording;
+package dev.gravaai.services.recording.cosmic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +22,8 @@ import dev.gravaai.services.recording.CosmicSession.CosmicAudioInput;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxInput;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
+import dev.gravaai.services.recording.MicNoiseReduction;
+import dev.gravaai.services.recording.RecordingEvents;
 import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingProcesses;
 
@@ -86,13 +88,20 @@ class CosmicRecorderMuxTest {
 		Files.write(system, sinePcm(1000, 2));
 		Path output = dir.resolve("recording-1.mp4");
 
+		CosmicProcessIo processIo = new CosmicProcessIo(new PlatformRecordingProcesses());
 		CosmicRecorder recorder = new CosmicRecorder(() -> dir, new PlatformRecordingProcesses(),
-				environment, null, null, null, () -> MicNoiseReduction.OFF);
-		CosmicMuxResult result = recorder.mux(new CosmicMuxInput(
-				video.toString(),
-				List.of(new CosmicAudioInput(CosmicAudioRole.MIC, mic.toString(), 1000),
-						new CosmicAudioInput(CosmicAudioRole.SYSTEM, system.toString(), 1000)),
-				1000, output.toString(), false, MicNoiseReduction.OFF, false));
+				environment, new RecordingEvents(), null, null, () -> MicNoiseReduction.OFF);
+		CosmicMuxResult result;
+		try {
+			result = recorder.mux(new CosmicMuxInput(
+					video.toString(),
+					List.of(new CosmicAudioInput(CosmicAudioRole.MIC, mic.toString(), 1000),
+							new CosmicAudioInput(CosmicAudioRole.SYSTEM, system.toString(), 1000)),
+					1000, output.toString(), false, MicNoiseReduction.OFF, false));
+		} finally {
+			processIo.close();
+			recorder.close();
+		}
 
 		assertTrue(result.success(), () -> "mux failed: " + result.error());
 		assertTrue(Files.size(output) > 0, "the recording file is empty");

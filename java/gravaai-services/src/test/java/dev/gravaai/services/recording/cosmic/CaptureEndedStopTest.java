@@ -1,15 +1,15 @@
-package dev.gravaai.services.recording;
+package dev.gravaai.services.recording.cosmic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
@@ -22,6 +22,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
+import dev.gravaai.services.recording.CursorTelemetrySource;
+import dev.gravaai.services.recording.KeystrokeTypes;
+import dev.gravaai.services.recording.MicNoiseReduction;
+import dev.gravaai.services.recording.RecordingEvents;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.SpawnedProcess;
 import dev.gravaai.services.sources.SelectedSource;
@@ -110,7 +115,7 @@ class CaptureEndedStopTest {
 			}
 
 			@Override
-			public List<CursorTelemetry.CursorTelemetryPoint> snapshotAndTakePendingSamples() {
+			public List<CursorTelemetryPoint> snapshotAndTakePendingSamples() {
 				return List.of();
 			}
 		};

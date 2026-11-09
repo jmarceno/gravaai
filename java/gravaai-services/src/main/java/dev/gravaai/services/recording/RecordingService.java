@@ -15,9 +15,11 @@ import java.util.function.Supplier;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.settings.AppSettingsStore;
-import dev.gravaai.services.recording.CosmicRecorder.RecordingOptions;
-import dev.gravaai.services.recording.CosmicRecorder.StartResult;
-import dev.gravaai.services.recording.CosmicRecorder.StopResult;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder.RecordingOptions;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder.StartResult;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder.StopResult;
+import dev.gravaai.services.recording.cursor.CursorCaptureSession;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxInput;
 import dev.gravaai.services.recording.CosmicSession.MeetingInfo;
 import dev.gravaai.services.recording.CosmicSession.RecoverResult;

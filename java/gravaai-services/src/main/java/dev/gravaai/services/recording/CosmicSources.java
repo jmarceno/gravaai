@@ -12,7 +12,8 @@ import dev.gravaai.services.sources.SelectedSource;
 /**
  * Source-id and output-list helpers from {@code electron/ipc/recording/cosmic.ts}.
  *
- * <p>Pure logic only: the recording pipeline lives in {@link CosmicRecorder}. The helpers are kept
+ * <p>Pure logic only: the recording pipeline lives in
+ * {@link dev.gravaai.services.recording.cosmic.CosmicRecorder}. The helpers are kept
  * together so the capture-selection code can resolve COSMIC outputs without starting a recording.
  */
 public final class CosmicSources {

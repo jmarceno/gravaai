@@ -1,4 +1,4 @@
-package dev.gravaai.services.recording;
+package dev.gravaai.services.recording.cosmic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,6 +10,9 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
+import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
+
 /**
  * Guards the recording-length contract.
  *
@@ -20,31 +23,20 @@ import org.junit.jupiter.api.Test;
  */
 class RecordingTimestampContractTest {
 
-	private static List<String> encoderArguments() {
-		CursorTelemetrySource noTelemetry = new CursorTelemetrySource() {
-			@Override
-			public long cursorCaptureStartTimeMs() {
-				return 0;
-			}
-
-			@Override
-			public List<CursorTelemetry.CursorTelemetryPoint> snapshotAndTakePendingSamples() {
-				return List.of();
-			}
-		};
-		KeystrokeSource noKeystrokes = () -> java.util.List.<KeystrokeTypes.KeystrokeEvent>of();
-		CosmicRecorder recorder = new CosmicRecorder(
-				() -> Path.of("/tmp"),
+	private static CosmicVideoPipeline pipeline() {
+		return new CosmicVideoPipeline(
 				(command, options) -> {
 					throw new UnsupportedOperationException("no processes in this test");
 				},
-				new dev.gravaai.services.recording.ports.PlatformRecordingEnvironment(),
-				new RecordingEvents(),
-				noTelemetry,
-				noKeystrokes,
-				() -> MicNoiseReduction.OFF);
-		return recorder.encoderCommand(
-				new CosmicRecorder.CaptureFormat(1920, 1080, "bgra", 0), "format=yuv420p",
+				new PlatformRecordingEnvironment(),
+				new CosmicProcessIo((command, options) -> {
+					throw new UnsupportedOperationException("no processes in this test");
+				}));
+	}
+
+	private static List<String> encoderArguments() {
+		return pipeline().encoderCommand(
+				new CaptureFormat(1920, 1080, "bgra", 0), "format=yuv420p",
 				Path.of("/tmp/out.mkv"));
 	}
 

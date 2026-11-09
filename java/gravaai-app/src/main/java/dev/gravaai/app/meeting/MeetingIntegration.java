@@ -36,7 +36,7 @@ import dev.gravaai.services.meeting.ports.RecordingDirectories;
 import dev.gravaai.services.meeting.ports.Reveal;
 import dev.gravaai.services.meeting.ports.SettingsStore;
 import dev.gravaai.services.projects.RecordingsDirectory;
-import dev.gravaai.services.recording.CosmicRecorder;
+import dev.gravaai.services.recording.cosmic.CosmicRecorder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 

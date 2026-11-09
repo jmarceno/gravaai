@@ -1,9 +1,10 @@
-package dev.gravaai.services.recording;
+package dev.gravaai.services.recording.cosmic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -12,10 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import dev.gravaai.core.json.Json;
-import dev.gravaai.services.recording.CosmicRecorder.TrackRef;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
-import dev.gravaai.services.recording.ports.RecordingEnvironment;
-import dev.gravaai.services.recording.ports.RecordingProcesses;
+import dev.gravaai.services.recording.cosmic.CosmicMuxer.TrackRef;
+import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 
 /** Ported from {@code electron/ipc/recording/cosmic.test.ts}; the recorder's pure pipeline helpers. */
 class CosmicRecorderTest {
@@ -26,9 +26,9 @@ class CosmicRecorderTest {
 	@Test
 	@DisplayName("delays late tracks and trims early ones")
 	void delaysLateTracksAndTrimsEarlyOnes() {
-		assertEquals("adelay=12:all=1", CosmicRecorder.alignTrackFilter(1012, 1000));
-		assertEquals("atrim=start=0.010,asetpts=PTS-STARTPTS", CosmicRecorder.alignTrackFilter(990, 1000));
-		assertEquals("atrim=start=0.000,asetpts=PTS-STARTPTS", CosmicRecorder.alignTrackFilter(1000, 1000));
+		assertEquals("adelay=12:all=1", CosmicMuxer.alignTrackFilter(1012, 1000));
+		assertEquals("atrim=start=0.010,asetpts=PTS-STARTPTS", CosmicMuxer.alignTrackFilter(990, 1000));
+		assertEquals("atrim=start=0.000,asetpts=PTS-STARTPTS", CosmicMuxer.alignTrackFilter(1000, 1000));
 	}
 
 	// Output from before the filter was extracted from stopCosmicRecording().
@@ -37,11 +37,11 @@ class CosmicRecorderTest {
 	void matchesThePreviousOutputWithNoMicFilters() {
 		assertEquals(
 				"[1:a]adelay=12:all=1[a]",
-				CosmicRecorder.buildCosmicAudioMixFilter(
+				CosmicMuxer.buildMixFilter(
 						List.of(new TrackRef(CosmicAudioRole.MIC, 1012)), 1000, 1, List.of()));
 		assertEquals(
 				"[1:a]adelay=12:all=1[a0];[2:a]atrim=start=0.010,asetpts=PTS-STARTPTS[a1];[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]",
-				CosmicRecorder.buildCosmicAudioMixFilter(
+				CosmicMuxer.buildMixFilter(
 						List.of(
 								new TrackRef(CosmicAudioRole.MIC, 1012),
 								new TrackRef(CosmicAudioRole.SYSTEM, 990)),
@@ -50,7 +50,7 @@ class CosmicRecorderTest {
 						List.of()));
 		assertEquals(
 				"[0:a]atrim=start=0.000,asetpts=PTS-STARTPTS[a]",
-				CosmicRecorder.buildCosmicAudioMixFilter(
+				CosmicMuxer.buildMixFilter(
 						List.of(new TrackRef(CosmicAudioRole.SYSTEM, 1000)), 1000, 0, List.of()));
 	}
 
@@ -59,7 +59,7 @@ class CosmicRecorderTest {
 	void denoisesOnlyTheMicTrackAfterAlignment() {
 		assertEquals(
 				"[0:a]atrim=start=0.010,asetpts=PTS-STARTPTS[a0];[1:a]adelay=12:all=1,highpass=f=80,afftdn=nr=10:nf=-50:tn=1[a1];[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]",
-				CosmicRecorder.buildCosmicAudioMixFilter(
+				CosmicMuxer.buildMixFilter(
 						List.of(
 								new TrackRef(CosmicAudioRole.SYSTEM, 990),
 								new TrackRef(CosmicAudioRole.MIC, 1012)),
@@ -68,7 +68,7 @@ class CosmicRecorderTest {
 						DENOISE));
 		assertEquals(
 				"[1:a]adelay=12:all=1,highpass=f=80,afftdn=nr=10:nf=-50:tn=1[a]",
-				CosmicRecorder.buildCosmicAudioMixFilter(
+				CosmicMuxer.buildMixFilter(
 						List.of(new TrackRef(CosmicAudioRole.MIC, 1012)), 1000, 1, DENOISE));
 	}
 
@@ -77,10 +77,10 @@ class CosmicRecorderTest {
 	void leavesTheSystemSpeakerTrackUnfiltered() {
 		assertEquals(
 				List.of("adelay=12:all=1"),
-				CosmicRecorder.trackFilterChain(new TrackRef(CosmicAudioRole.SYSTEM, 1012), 1000, DENOISE));
+				CosmicMuxer.trackFilterChain(new TrackRef(CosmicAudioRole.SYSTEM, 1012), 1000, DENOISE));
 		assertEquals(
 				List.of("adelay=12:all=1", "highpass=f=80", "afftdn=nr=10:nf=-50:tn=1"),
-				CosmicRecorder.trackFilterChain(new TrackRef(CosmicAudioRole.MIC, 1012), 1000, DENOISE));
+				CosmicMuxer.trackFilterChain(new TrackRef(CosmicAudioRole.MIC, 1012), 1000, DENOISE));
 	}
 
 	@Test
@@ -88,11 +88,11 @@ class CosmicRecorderTest {
 	void keepsTheSpeakerTrackNextToTheRecording() {
 		assertEquals(
 				"/tmp/Gravaai/recordings/recording-1720588800000.meeting-mic.opus",
-				CosmicRecorder.speakerTrackPath(
+				CosmicMuxer.speakerTrackPath(
 						"/tmp/Gravaai/recordings/recording-1720588800000.mp4", CosmicAudioRole.MIC));
 		assertEquals(
 				"/tmp/Gravaai/recordings/recording-1720588800000.meeting-system.opus",
-				CosmicRecorder.speakerTrackPath(
+				CosmicMuxer.speakerTrackPath(
 						"/tmp/Gravaai/recordings/recording-1720588800000.m4a", CosmicAudioRole.SYSTEM));
 	}
 
@@ -107,19 +107,38 @@ class CosmicRecorderTest {
 				""");
 		assertEquals(
 				"alsa_input.usb-Mic-00.analog-stereo",
-				CosmicRecorder.pickPulseMicrophone(sources, "USB Microphone Analog Stereo"));
+				PulseAudioSources.pickMicrophone(sources, "USB Microphone Analog Stereo"));
 		assertEquals(
 				"alsa_input.usb-Mic-00.analog-stereo",
-				CosmicRecorder.pickPulseMicrophone(sources, "USB Microphone"));
-		assertNull(CosmicRecorder.pickPulseMicrophone(sources, "No such device"));
-		assertNull(CosmicRecorder.pickPulseMicrophone(null, "USB Microphone"));
+				PulseAudioSources.pickMicrophone(sources, "USB Microphone"));
+		assertNull(PulseAudioSources.pickMicrophone(sources, "No such device"));
+		assertNull(PulseAudioSources.pickMicrophone(null, "USB Microphone"));
 	}
 
 	@Test
 	@DisplayName("resolves the free space of the recordings folder")
 	void resolvesFreeSpace(@TempDir Path dir) {
-		Long free = CosmicRecorder.getFreeBytes(dir);
-		org.junit.jupiter.api.Assertions.assertNotNull(free);
-		org.junit.jupiter.api.Assertions.assertTrue(free > 0);
+		Long free = CosmicDiskGuard.freeBytes(dir);
+		assertNotNull(free);
+		assertTrue(free > 0);
+	}
+
+	@Test
+	@DisplayName("maps the helper's transform code to a transpose filter")
+	void mapsTransformToTransposeFilter() {
+		assertNull(CosmicVideoPipeline.transposeFilter(0));
+		assertEquals("transpose=1", CosmicVideoPipeline.transposeFilter(1));
+		assertEquals("hflip,vflip", CosmicVideoPipeline.transposeFilter(2));
+		assertEquals("transpose=2", CosmicVideoPipeline.transposeFilter(3));
+		assertEquals("hflip", CosmicVideoPipeline.transposeFilter(4));
+		assertEquals("hflip,transpose=1", CosmicVideoPipeline.transposeFilter(5));
+	}
+
+	@Test
+	@DisplayName("accepts a frame size the capture helper reported")
+	void parsesACaptureFormat() {
+		CaptureFormat format = new CaptureFormat(1920, 1080, "bgra", 0);
+		assertEquals(1920, format.width());
+		assertEquals(1080, format.height());
 	}
 }

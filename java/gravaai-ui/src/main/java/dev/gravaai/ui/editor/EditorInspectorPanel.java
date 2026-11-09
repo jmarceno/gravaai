@@ -26,6 +26,8 @@ import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.ClipTransition;
+import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.CursorClickEffectStyle;
 import dev.gravaai.core.project.CursorMotionPresets;
@@ -661,10 +663,43 @@ public final class EditorInspectorPanel extends VBox {
 		Switch mute = Switch.xs("Mute clip");
 		mute.setChecked(Boolean.TRUE.equals(clip.muted()));
 		mute.onCheckedChange(value -> store.apply(new ClipCommands.SetMuted(value)));
-		root.getChildren().add(group("Clip", null, speed, mute,
-				deleteSelectionButton("Delete Clip",
-						() -> store.apply(new ClipCommands.Delete(clip.id())))));
+		List<Node> transition = transitionControls(clip);
+		transition.add(deleteSelectionButton("Delete Clip",
+				() -> store.apply(new ClipCommands.Delete(clip.id()))));
+		root.getChildren().add(group("Clip", null, speed, mute));
+		root.getChildren().add(group("Transition", null, transition.toArray(Node[]::new)));
 		return root;
+	}
+
+	/**
+	 * The outgoing transition of one clip: None / Fade through black, plus the fade duration once a
+	 * fade is set (the camera block's "Switch in" pattern). Both controls write through
+	 * {@code ClipCommands.SetTransition}; removal is the null transition.
+	 */
+	private List<Node> transitionControls(ClipRegion clip) {
+		ClipTransition transition = clip.transitionOut();
+		boolean fade = transition != null && transition.kind() == ClipTransitionKind.FADE_BLACK;
+		ChoiceGroup kind = choice("none", "None", "fade-black", "Fade");
+		kind.setValue(fade ? "fade-black" : "none");
+		kind.onValueChange(value -> store.apply(new ClipCommands.SetTransition(
+				"fade-black".equals(value) ? new ClipTransition(ClipTransitionKind.FADE_BLACK,
+						transition != null ? transition.durationMs()
+								: ClipTransition.DEFAULT_CLIP_TRANSITION_MS)
+						: null)));
+		List<Node> controls = new ArrayList<>();
+		controls.add(row("Fade out", kind));
+		if (fade && transition != null) {
+			Slider duration = new Slider("Duration");
+			duration.range(ClipTransition.MIN_CLIP_TRANSITION_MS,
+					ClipTransition.MAX_CLIP_TRANSITION_MS).step(100)
+					.formatter(value -> Math.round(value) + " ms").sliderControl();
+			duration.setValue(transition.durationMs());
+			duration.setMaxWidth(Double.MAX_VALUE);
+			duration.onValueCommit(value -> store.apply(new ClipCommands.SetTransition(
+					new ClipTransition(ClipTransitionKind.FADE_BLACK, Math.round(value)))));
+			controls.add(duration);
+		}
+		return controls;
 	}
 
 	private @Nullable Node audioSelectionSection() {

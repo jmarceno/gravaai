@@ -1,5 +1,8 @@
 package dev.gravaai.ui.editor.timeline;
 
+import org.jspecify.annotations.Nullable;
+
+import dev.gravaai.core.project.ClipTransition;
 import dev.gravaai.ui.editor.timeline.core.Span;
 
 /**
@@ -117,6 +120,13 @@ public interface TimelineCommands {
 
 	/** Split the clip at a timeline time. */
 	void splitClip(String clipId, double timeMs);
+
+	/**
+	 * Sets the outgoing fade of one clip (Fade through black + duration); {@code null} removes it.
+	 * The default is a no-op so preview-only command sinks stay valid.
+	 */
+	default void setClipFade(String clipId, @Nullable ClipTransition transition) {
+	}
 
 	/** Delete the current selection. */
 	void deleteSelection();

@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.event.Subscription;
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.project.ClipTransition;
+import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.ZoomFocus;
@@ -90,6 +92,21 @@ class StoreTimelineAdaptersTest {
 		assertEquals(1500, store.state().clipRegions().get(0).endMs());
 		assertEquals(1500, store.state().clipRegions().get(1).startMs());
 		assertEquals(3000, store.state().clipRegions().get(1).endMs());
+	}
+
+	@Test
+	@DisplayName("setClipFade selects the clip and writes (or clears) its outgoing transition")
+	void setsAndRemovesClipFade() {
+		EditorStore store = store();
+		StoreTimelineCommands commands = new StoreTimelineCommands(store, seconds -> { });
+
+		commands.setClipFade("clip-1",
+				new ClipTransition(ClipTransitionKind.FADE_BLACK, 800));
+		assertEquals("clip-1", store.selectedClipId());
+		assertEquals(800, store.state().clipRegions().get(0).transitionOut().durationMs());
+
+		commands.setClipFade("clip-1", null);
+		assertNull(store.state().clipRegions().get(0).transitionOut());
 	}
 
 	@Test

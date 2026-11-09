@@ -230,9 +230,9 @@ public final class ClipCommands {
 
 	/** {@code handleClipTransitionChange}; a null transition removes the outgoing fade. */
 	public static final class SetTransition implements EditorCommand {
-		private final ClipTransition transition;
+		private final @Nullable ClipTransition transition;
 
-		public SetTransition(ClipTransition transition) {
+		public SetTransition(@Nullable ClipTransition transition) {
 			this.transition = transition;
 		}
 

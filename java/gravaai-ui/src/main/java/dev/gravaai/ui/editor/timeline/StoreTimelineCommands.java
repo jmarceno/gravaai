@@ -25,6 +25,7 @@ import dev.gravaai.core.editor.SourceAudioCommands;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.core.project.CaptionOps;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.ClipTransition;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.ui.editor.timeline.core.Span;
 import dev.gravaai.ui.editor.timeline.core.TimelineConstants;
@@ -207,6 +208,14 @@ public final class StoreTimelineCommands implements TimelineCommands {
 		}
 		store.setSelectedClipId(clipId);
 		store.apply(new ClipCommands.Split(timeMs));
+	}
+
+	@Override
+	public void setClipFade(String clipId, @Nullable ClipTransition transition) {
+		// The context menu selects the clip first, so the inspector opens on it and
+		// SetTransition's selected-clip target is the menu's clip.
+		store.apply(new ClipCommands.Select(clipId));
+		store.apply(new ClipCommands.SetTransition(transition));
 	}
 
 	@Override

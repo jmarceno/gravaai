@@ -17,6 +17,8 @@ import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.project.CaptionCue;
 import dev.gravaai.core.project.CaptionTimeline;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.ClipTransition;
+import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.TrimRegion;
@@ -39,9 +41,12 @@ import dev.gravaai.ui.editor.timeline.core.TimelineRenderItem;
 import dev.gravaai.ui.editor.timeline.core.TimelineRows;
 import dev.gravaai.ui.editor.timeline.core.TimelineScale;
 import dev.gravaai.ui.editor.timeline.core.TimelineConstants;
+import dev.gravaai.ui.kit.Anchors;
 import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
+import dev.gravaai.ui.kit.Popup;
 import javafx.geometry.HPos;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
 import javafx.scene.canvas.Canvas;
@@ -59,6 +64,7 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
@@ -183,6 +189,11 @@ public final class TimelineView extends Region {
 	/** Dark pill behind clip labels (mock {@code .clip__lbl}). */
 	private static final Color BADGE_FILL = Color.web("#060a0d", 0.55);
 	private static final Color BADGE_TEXT = Color.web("#e9f1f4", 0.92);
+	/** The fade diamond at a clip's outgoing boundary: light fill over a dark outline. */
+	private static final Color FADE_MARK_FILL = Color.web("#e9f1f4");
+	private static final Color FADE_MARK_OUTLINE = Color.web("#060a0d", 0.8);
+	/** Quick fade durations in the clip context menu, between the transition min and max. */
+	private static final long[] FADE_DURATION_CHOICES_MS = {200, 500, 1000, 2000};
 
 	private static final Font AXIS_FONT = AppFonts.monoFont(9);
 	private static final Font BLOCK_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9.5);
@@ -805,6 +816,11 @@ public final class TimelineView extends Region {
 	/* ---------- pointer gestures (drag / resize / lane add) ---------- */
 
 	private void handleMousePressed(MouseEvent event) {
+		if (event.getButton() == MouseButton.SECONDARY) {
+			openClipContextMenu(event.getX(), event.getY());
+			event.consume();
+			return;
+		}
 		if (event.getButton() != MouseButton.PRIMARY) {
 			return;
 		}
@@ -967,6 +983,126 @@ public final class TimelineView extends Region {
 	private static boolean isMultiSelectableKind(String kind) {
 		return TimelineSelection.ZOOM.equals(kind) || TimelineSelection.ANNOTATION.equals(kind)
 				|| TimelineSelection.AUDIO.equals(kind);
+	}
+
+	/**
+	 * Right-click on a clip: select it and open the fade menu at the pointer. A right-click
+	 * anywhere else keeps the plain OS behaviour (nothing to open on empty lanes yet).
+	 */
+	private void openClipContextMenu(double x, double canvasY) {
+		ProjectEditorState project = dataSource.project();
+		if (project == null) {
+			return;
+		}
+		TimelineSelection hit = hitTest(x, contentY(canvasY));
+		if (hit == null || !TimelineSelection.CLIP.equals(hit.kind())) {
+			return;
+		}
+		if (project.clipRegions().stream().noneMatch(clip -> clip.id().equals(hit.id()))) {
+			return;
+		}
+		selectedIds.clear();
+		setSelection(hit);
+		commands.select(hit);
+		fireItemPressed();
+		redraw();
+		showFadeMenu(hit.id(), x, canvasY + TLBAR_HEIGHT);
+	}
+
+	/**
+	 * The clip's outgoing fade picker as a kit menu at the pointer: None / Fade through black, plus
+	 * duration presets once a fade is set (the inspector slider covers fine tuning). Edits go
+	 * through {@code TimelineCommands.setClipFade}, so undo/redo and the store publish like any
+	 * other timeline gesture.
+	 */
+	private void showFadeMenu(String clipId, double canvasX, double viewY) {
+		ClipRegion clip = null;
+		for (ClipRegion candidate : dataSource.project().clipRegions()) {
+			if (candidate.id().equals(clipId)) {
+				clip = candidate;
+				break;
+			}
+		}
+		if (clip == null) {
+			return;
+		}
+		ClipTransition transition = clip.transitionOut();
+		boolean fade = transition != null && transition.kind() == ClipTransitionKind.FADE_BLACK;
+
+		// Invisible anchor at the pointer: the kit Popup places content beside its owner node.
+		Region anchor = new Region();
+		anchor.setManaged(false);
+		anchor.resizeRelocate(canvasX, viewY, 1, 1);
+		getChildren().add(anchor);
+
+		VBox menu = new VBox();
+		menu.getStyleClass().add("menu");
+		VBox content = new VBox(menu);
+		content.getStyleClass().add("popover");
+		Label heading = new Label("Fade out");
+		heading.getStyleClass().add("menu__label");
+		menu.getChildren().add(heading);
+
+		Popup[] holder = new Popup[1];
+		menu.getChildren().add(fadeMenuRow("None", !fade, holder,
+				() -> commands.setClipFade(clipId, null)));
+		menu.getChildren().add(fadeMenuRow("Fade through black", fade, holder,
+				() -> commands.setClipFade(clipId, new ClipTransition(ClipTransitionKind.FADE_BLACK,
+						transition != null ? transition.durationMs()
+								: ClipTransition.DEFAULT_CLIP_TRANSITION_MS))));
+		if (transition != null) {
+			Region separator = new Region();
+			separator.getStyleClass().add("menu__separator");
+			separator.setMaxWidth(Double.MAX_VALUE);
+			VBox.setMargin(separator, new Insets(4, 0, 4, 0));
+			Label duration = new Label("Duration");
+			duration.getStyleClass().add("menu__label");
+			menu.getChildren().addAll(separator, duration);
+			for (long ms : fadeDurationChoices(transition.durationMs())) {
+				menu.getChildren().add(fadeMenuRow(ms + " ms", transition.durationMs() == ms,
+						holder, () -> commands.setClipFade(clipId,
+								new ClipTransition(ClipTransitionKind.FADE_BLACK, ms))));
+			}
+		}
+
+		Popup popup = new Popup(anchor, content);
+		popup.side(Anchors.Side.BOTTOM).align(Anchors.Align.START).offset(4).modal(true);
+		popup.onHide(closed -> getChildren().remove(anchor));
+		holder[0] = popup;
+		popup.show();
+	}
+
+	/** The preset durations plus the current one when the agent set a custom value. */
+	private static List<Long> fadeDurationChoices(long currentMs) {
+		List<Long> choices = new ArrayList<>();
+		for (long preset : FADE_DURATION_CHOICES_MS) {
+			choices.add(preset);
+		}
+		if (!choices.contains(currentMs)) {
+			choices.add(currentMs);
+			choices.sort(Comparator.naturalOrder());
+		}
+		return choices;
+	}
+
+	/** One kit menu row with a check mark for the active option (Select's list-box row shape). */
+	private HBox fadeMenuRow(String label, boolean checked, Popup[] popup, Runnable action) {
+		HBox row = new HBox();
+		row.getStyleClass().add("menu-item");
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setSpacing(12);
+		Label text = new Label(label);
+		text.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(text, Priority.ALWAYS);
+		Icon check = Icon.of(Icons.Check, 12, "bold");
+		check.getStyleClass().add("list-box-item__indicator");
+		check.setVisible(checked);
+		row.getChildren().addAll(text, check);
+		row.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+			popup[0].hide();
+			action.run();
+		});
+		return row;
 	}
 
 	private void handleMouseDragged(MouseEvent event) {
@@ -2181,6 +2317,7 @@ public final class TimelineView extends Region {
 			graphics.fillRoundRect(x, blockTop, blockWidth, blockHeight, 3, 3);
 			drawFilmstrip(graphics, item, x, blockTop, blockWidth, blockHeight);
 			drawFade(graphics, item, x, blockTop, blockWidth, blockHeight);
+			drawFadeBoundaryMark(graphics, item, endX, blockTop, blockHeight);
 			graphics.setStroke(CLIP_BORDER);
 			graphics.setLineWidth(1);
 			graphics.strokeRoundRect(x + 0.5, blockTop + 0.5, Math.max(1, blockWidth - 1),
@@ -2300,6 +2437,26 @@ public final class TimelineView extends Region {
 		for (double cell = 0; cell < width; cell += 42) {
 			graphics.fillRect(x + cell + 1, y + 3, 40, height - 6);
 		}
+	}
+
+	/**
+	 * The fade diamond at a clip's outgoing boundary: a light marker on the seam so a boundary with
+	 * a transition reads at a glance (the shading inside the clip comes from {@link #drawFade}).
+	 */
+	private void drawFadeBoundaryMark(GraphicsContext graphics, TimelineRenderItem item,
+			double endX, double blockTop, double blockHeight) {
+		if (item.fadeOutMs() == null || item.fadeOutMs() <= 0) {
+			return;
+		}
+		double centerY = blockTop + blockHeight / 2;
+		double half = 4.5;
+		double[] xs = {endX, endX + half, endX, endX - half};
+		double[] ys = {centerY - half, centerY, centerY + half, centerY};
+		graphics.setFill(FADE_MARK_FILL);
+		graphics.fillPolygon(xs, ys, 4);
+		graphics.setStroke(FADE_MARK_OUTLINE);
+		graphics.setLineWidth(1);
+		graphics.strokePolygon(xs, ys, 4);
 	}
 
 	private void drawFade(GraphicsContext graphics, TimelineRenderItem item, double x, double y,

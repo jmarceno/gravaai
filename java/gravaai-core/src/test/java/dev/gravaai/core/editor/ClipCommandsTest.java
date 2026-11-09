@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.ClipTransition;
+import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.ZoomRegion;
@@ -115,9 +117,8 @@ class ClipCommandsTest {
 		store.apply(new ClipCommands.SetMuted(true));
 		store.apply(new ClipCommands.SetCameraLayout(
 				dev.gravaai.core.project.ClipCameraLayout.CAMERA_ONLY));
-		store.apply(new ClipCommands.SetTransition(
-				new dev.gravaai.core.project.ClipTransition(
-						dev.gravaai.core.project.ClipTransitionKind.FADE_BLACK, 500)));
+		store.apply(new ClipCommands.SetTransition(new ClipTransition(
+				ClipTransitionKind.FADE_BLACK, 500)));
 		store.apply(new ClipCommands.SetShowSourceAudio(true));
 
 		ClipRegion clip = store.state().clipRegions().get(0);
@@ -128,5 +129,40 @@ class ClipCommandsTest {
 				store.state().cameraLayoutSegments().get(0).layout().wire());
 		assertEquals(500, clip.transitionOut().durationMs());
 		assertEquals(true, clip.showSourceAudio());
+	}
+
+	@Test
+	@DisplayName("sets, changes and removes a clip fade across undo/redo")
+	void fadesSetChangeRemoveUndoRedo() {
+		EditorStore store = new EditorStore(state("""
+				{"clipRegions":[{"id":"a","startMs":0,"endMs":2000,"speed":1}]}
+				"""));
+		store.apply(new ClipCommands.Select("a"));
+
+		store.apply(new ClipCommands.SetTransition(
+				new ClipTransition(ClipTransitionKind.FADE_BLACK, 500)));
+		assertEquals(500, store.state().clipRegions().get(0).transitionOut().durationMs());
+
+		store.apply(new ClipCommands.SetTransition(
+				new ClipTransition(ClipTransitionKind.FADE_BLACK, 1200)));
+		assertEquals(1200, store.state().clipRegions().get(0).transitionOut().durationMs());
+
+		// The null transition removes the fade (the inspector's None chip / menu item).
+		store.apply(new ClipCommands.SetTransition(null));
+		assertNull(store.state().clipRegions().get(0).transitionOut());
+
+		// Undo walks the removal, the duration change and the set; redo replays them.
+		assertTrue(store.undo());
+		assertEquals(1200, store.state().clipRegions().get(0).transitionOut().durationMs());
+		assertTrue(store.undo());
+		assertEquals(500, store.state().clipRegions().get(0).transitionOut().durationMs());
+		assertTrue(store.undo());
+		assertNull(store.state().clipRegions().get(0).transitionOut());
+		assertTrue(store.redo());
+		assertEquals(500, store.state().clipRegions().get(0).transitionOut().durationMs());
+		assertTrue(store.redo());
+		assertEquals(1200, store.state().clipRegions().get(0).transitionOut().durationMs());
+		assertTrue(store.redo());
+		assertNull(store.state().clipRegions().get(0).transitionOut());
 	}
 }

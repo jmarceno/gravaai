@@ -6,10 +6,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +24,7 @@ import java.util.function.Supplier;
 
 import dev.gravaai.app.AppBinaries;
 import dev.gravaai.core.concurrent.Threads;
+import dev.gravaai.core.storage.UserData;
 import dev.gravaai.core.editor.AnnotationCommands;
 import dev.gravaai.core.editor.AudioCommands;
 import dev.gravaai.core.editor.CaptionCommands;
@@ -41,6 +44,7 @@ import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectFileNaming;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.result.Result;
+import dev.gravaai.media.audio.AudioPeaks;
 import dev.gravaai.media.audio.ClickSoundHits;
 import dev.gravaai.media.audio.KeySoundHits;
 import dev.gravaai.media.audio.ClickSounds;
@@ -50,6 +54,7 @@ import dev.gravaai.media.playback.DecoderFrameSourceProvider;
 import dev.gravaai.media.playback.PlaybackAudioProducer;
 import dev.gravaai.media.playback.PlaybackAudioTrack;
 import dev.gravaai.media.compose.CursorSample;
+import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.platform.nativehelpers.NativeHelpers;
 import dev.gravaai.media.playback.PlaybackEngine;
 import dev.gravaai.media.playback.PlaybackMedia;
@@ -61,12 +66,14 @@ import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.ui.editor.preview.PlaybackControllerPort;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
+import dev.gravaai.ui.editor.timeline.CachingWaveformProvider;
 import dev.gravaai.ui.editor.timeline.StoreTimelineCommands;
 import dev.gravaai.ui.editor.timeline.StoreTimelineDataSource;
 import dev.gravaai.ui.editor.timeline.TimelineCommands;
 import dev.gravaai.ui.editor.timeline.TimelineDataSource;
 import dev.gravaai.ui.editor.timeline.TimelineSelection;
-import dev.gravaai.ui.editor.timeline.WaveformProvider;
+import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack;
+import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTracks;
 import dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils;
 import dev.gravaai.ui.editor.timeline.core.Span;
 import tools.jackson.databind.JsonNode;
@@ -127,6 +134,10 @@ public final class EditorSession implements AutoCloseable {
 	private final AutoCloseable timeSubscription;
 	private final StoreTimelineDataSource dataSource;
 	private final TimelineCommands timelineCommands;
+	/** Serializes the background peak decodes; closed with the session. */
+	private final ExecutorService waveformExecutor;
+	/** The timeline's waveform source (decode + project-beside cache). */
+	private final CachingWaveformProvider waveforms;
 	private volatile @Nullable PlaybackAudioTrack audioTrack;
 	private volatile boolean closed;
 	/** The clips playback was last given; null until media is attached. */
@@ -170,8 +181,11 @@ public final class EditorSession implements AutoCloseable {
 			syncClickSound();
 			syncKeySound();
 		});
+		this.waveformExecutor = Threads.daemon("gravaai-waveforms");
+		this.waveforms = new CachingWaveformProvider(this::waveformCachePath,
+				AudioPeaks::loadPeaks, AudioPeaks.PEAKS_PER_SECOND, waveformExecutor);
 		this.dataSource = new StoreTimelineDataSource(store, this::timelineDurationMs,
-				() -> (double) playheadMs.get(), WaveformProvider.empty());
+				() -> (double) playheadMs.get(), waveforms);
 		this.timelineCommands = new StoreTimelineCommands(store, seconds -> {
 			PlaybackSeek lateBound = timelineSeek.get();
 			if (lateBound != null) {
@@ -209,9 +223,87 @@ public final class EditorSession implements AutoCloseable {
 		return points;
 	}
 
+	/**
+	 * Resolves the recording's source-audio tracks (mic/system sidecars, embedded audio) off the
+	 * FX thread and pushes them into the timeline data source, so the source-audio lanes render
+	 * per clip with their own waveforms. Late-arriving by design: the store change listeners
+	 * repaint the timeline when the tracks land.
+	 */
+	private void refreshSourceAudioTracks() {
+		String videoPath = mediaSource.videoPath();
+		List<TimelineSourceAudioTrack> tracks;
+		if (videoPath == null || videoPath.isBlank()
+				|| !Files.isRegularFile(Path.of(videoPath))) {
+			tracks = List.of();
+		} else {
+			Path video = Path.of(videoPath);
+			boolean hasEmbeddedAudio = false;
+			try {
+				hasEmbeddedAudio = !MediaProbe.probe(video).audioStreams().isEmpty();
+			} catch (RuntimeException | LinkageError error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"audio probe failed for " + video.getFileName() + ": " + error);
+			}
+			String mic = firstExistingSidecar(video, "mic");
+			String system = firstExistingSidecar(video, "system");
+			// The has*Sidecar flags gate the paths; the absent ones carry an unused empty string.
+			tracks = TimelineSourceAudioTracks.buildTracks(hasEmbeddedAudio, videoPath,
+					mic != null, mic == null ? "" : mic,
+					system != null, system == null ? "" : system,
+					TimelineSourceAudioTracks.Labels.DEFAULT);
+		}
+		dataSource.setSourceAudioTracks(tracks);
+	}
+
+	/** The first existing {@code <recording>.<suffix>.wav|m4a|webm} sidecar, or null. */
+	private static @Nullable String firstExistingSidecar(Path video, String suffix) {
+		for (String candidate : TimelineSourceAudioTracks
+				.buildSidecarPathCandidates(video.toString(), suffix)) {
+			Path path = Path.of(candidate);
+			if (Files.isRegularFile(path)) {
+				return path.toString();
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The persistent peaks cache for an audio file: beside the recording when the file lives in
+	 * the session directory the app already owns (next to its {@code .cursor.json}/
+	 * {@code .keys.json} sidecars), otherwise the per-user cache — an imported audio file from
+	 * anywhere on disk must not grow siblings. Both locations survive reopening a project, so the
+	 * decode happens once per media file.
+	 */
+	private Path waveformCachePath(String audioPath) {
+		Path audio = Path.of(audioPath).toAbsolutePath().normalize();
+		String video = document.videoPath();
+		Path sessionDirectory = video == null || video.isBlank() ? null
+				: Path.of(video).toAbsolutePath().normalize().getParent();
+		if (sessionDirectory != null && sessionDirectory.equals(audio.getParent())) {
+			return audio.resolveSibling(audio.getFileName().toString() + ".peaks");
+		}
+		return UserData.resolve().dir().resolve("peaks")
+				.resolve(sha256Hex(audio.toString()) + ".peaks");
+	}
+
+	/** Lower-case hex SHA-256 of {@code value} (the user-cache key for an absolute path). */
+	private static String sha256Hex(String value) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			StringBuilder hex = new StringBuilder();
+			for (byte b : digest.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+				hex.append(String.format("%02x", b));
+			}
+			return hex.toString();
+		} catch (java.security.NoSuchAlgorithmException impossible) {
+			throw new IllegalStateException("SHA-256 unavailable", impossible);
+		}
+	}
+
 	/** Heavy media attach (probe/audio producer/decode), called off the FX thread after the window is visible. */
 	public void attachMedia() {
 		LOG.log(System.Logger.Level.INFO, "editor media attach start: " + mediaSource.videoPath());
+		refreshSourceAudioTracks();
 		long generation = mediaGeneration.get();
 		PlaybackMedia media = loadMedia(mediaSource);
 		if (media == null) {
@@ -284,6 +376,7 @@ public final class EditorSession implements AutoCloseable {
 		document = next;
 		mediaSource = next;
 		mediaGeneration.incrementAndGet();
+		refreshSourceAudioTracks();
 		PlaybackMedia media = loadMedia(mediaSource);
 		if (media == null) {
 			LOG.log(System.Logger.Level.WARNING,
@@ -1001,6 +1094,8 @@ public final class EditorSession implements AutoCloseable {
 		closed = true;
 		cancelPendingAutosave();
 		clipSync.shutdownNow();
+		waveforms.close();
+		waveformExecutor.shutdownNow();
 		closeQuietly(timeSubscription);
 		closeQuietly(changeSubscription);
 		closeQuietly(playback);

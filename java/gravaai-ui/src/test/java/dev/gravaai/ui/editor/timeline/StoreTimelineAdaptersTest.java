@@ -16,6 +16,7 @@ import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.ZoomFocus;
 import dev.gravaai.ui.editor.timeline.core.Span;
+import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -201,6 +202,27 @@ class StoreTimelineAdaptersTest {
 
 		commands.clearSelection();
 		assertNull(store.selectedZoomId());
+		subscription.close();
+	}
+
+	@Test
+	@DisplayName("late-arriving source-audio tracks replace the empty default and notify")
+	void publishesSourceAudioTracks() {
+		EditorStore store = store();
+		StoreTimelineDataSource source = new StoreTimelineDataSource(store, () -> 6000, () -> 0,
+				null);
+		assertEquals(List.of(), source.sourceAudioTracks(), "no tracks before the session resolves them");
+
+		AtomicInteger changes = new AtomicInteger();
+		Subscription subscription = source.onChange(changes::incrementAndGet);
+		List<TimelineSourceAudioTrack> tracks = List.of(
+				new TimelineSourceAudioTrack("mic", "Source Mic", "/recording.mic.wav"));
+		source.setSourceAudioTracks(tracks);
+		assertEquals(1, changes.get(), "the view repaints when the tracks land");
+		assertEquals(tracks, source.sourceAudioTracks());
+
+		source.setSourceAudioTracks(null);
+		assertEquals(List.of(), source.sourceAudioTracks(), "null clears the tracks");
 		subscription.close();
 	}
 

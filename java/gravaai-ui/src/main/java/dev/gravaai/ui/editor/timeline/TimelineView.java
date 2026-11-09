@@ -92,7 +92,10 @@ public final class TimelineView extends Region {
 	private static final double COMPACT_ROW_HEIGHT = TimelineLayout.TIMELINE_ROW_MIN_HEIGHT_PX;
 	private static final double ROW_GAP = 0;
 	private static final double MIN_VISIBLE_RANGE_MS = 300;
-	private static final int WAVEFORM_BARS = 96;
+	/** Draw one waveform bar every so many pixels (the peaks request samples the visible window). */
+	private static final double WAVEFORM_BAR_PITCH_PX = 3;
+	/** Opacity of a muted source-audio block's waveform (mock .clip--muted half-visibility). */
+	private static final double WAVEFORM_MUTED_ALPHA = 0.35;
 	private static final double RESIZE_EDGE_PX = 6;
 	private static final double DRAG_THRESHOLD_PX = 3;
 	private static final double GHOST_ZOOM_MS = 1000;
@@ -355,6 +358,8 @@ public final class TimelineView extends Region {
 		canvas.setOnKeyPressed(this::handleKeyPressed);
 		widthProperty().addListener((observable, oldValue, value) -> requestLayout());
 		heightProperty().addListener((observable, oldValue, value) -> requestLayout());
+		// Waveforms computed in the background repaint once they land (the provider calls any thread).
+		dataSource.waveforms().setOnPeaksReady(() -> javafx.application.Platform.runLater(this::redraw));
 		refreshData();
 	}
 
@@ -558,6 +563,8 @@ public final class TimelineView extends Region {
 		}
 		rangeInitialised = true;
 		currentTimeMs = Math.max(0, Math.min(dataSource.currentTimeMs(), total));
+		// Tracks first: the items below include one block per track per source-audio clip.
+		sourceAudioTracks = dataSource.sourceAudioTracks();
 		items = TimelineModel.buildTimelineItems(new TimelineModel.ItemsRequest(
 				project.zoomRegions(), project.clipRegions(), project.annotationRegions(),
 				project.audioRegions(), project.autoCaptions(),
@@ -569,7 +576,6 @@ public final class TimelineView extends Region {
 		for (CameraLayoutSegment segment : project.cameraLayoutSegments()) {
 			cameraLayouts.put(segment.id(), segment);
 		}
-		sourceAudioTracks = dataSource.sourceAudioTracks();
 		FilmstripProvider provider = dataSource.filmstripProvider();
 		filmstripProvider = provider == null ? FilmstripProvider.empty() : provider;
 		filmstripProvider.setOnFrameReady(
@@ -2828,7 +2834,7 @@ public final class TimelineView extends Region {
 		double y = row.top() + 5;
 		graphics.setFill(AUDIO_FILL);
 		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
-		drawWaveform(graphics, item, x, y, blockWidth, height);
+		drawWaveform(graphics, item, display, startX, endX, y, height, width);
 		graphics.setStroke(AUDIO_BORDER);
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
@@ -2851,9 +2857,14 @@ public final class TimelineView extends Region {
 		double x = Math.max(-blockWidth, startX);
 		double height = row.height() - 10;
 		double y = row.top() + 5;
+		boolean muted = Boolean.TRUE.equals(item.muted());
+		if (muted) {
+			// Mock .clip--muted: the whole block at half opacity.
+			graphics.setGlobalAlpha(0.5);
+		}
 		graphics.setFill(SOURCE_AUDIO_FILL);
 		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
-		drawWaveform(graphics, item, x, y, blockWidth, height);
+		drawWaveform(graphics, item, display, startX, endX, y, height, width);
 		graphics.setStroke(AUDIO_BORDER);
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
@@ -2879,6 +2890,9 @@ public final class TimelineView extends Region {
 				sourceAudioOwnerClipId(item.rowId(), item.id()))) {
 			drawSelection(graphics, x, y, blockWidth, height, CLIP_SELECTED);
 		}
+		if (muted) {
+			graphics.setGlobalAlpha(1);
+		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}
 
@@ -2903,26 +2917,72 @@ public final class TimelineView extends Region {
 		return items;
 	}
 
-	private void drawWaveform(GraphicsContext graphics, TimelineRenderItem item, double x,
-			double y, double width, double height) {
-		if (item.audioPath() == null) {
+	/**
+	 * One bar per ~3px of the block's <em>visible</em> width, sampled from the audio file's own
+	 * time axis: the caller's display span maps onto the clip's source span (trims and speed move
+	 * the mapping, not the wave) or onto the file from its start for imported audio, and the
+	 * portion under the header gutter is never requested. Muted blocks render dimmed.
+	 */
+	private void drawWaveform(GraphicsContext graphics, TimelineRenderItem item, Span displaySpan,
+			double startX, double endX, double y, double height, double width) {
+		if (item.audioPath() == null || endX <= startX) {
 			return;
 		}
-		float @Nullable [] peaks = dataSource.waveforms().peaks(item.audioPath(), WAVEFORM_BARS);
+		double audioStartMs;
+		double audioEndMs;
+		Span sourceSpan = item.sourceSpan();
+		Span itemSpan = item.span();
+		if (sourceSpan != null && itemSpan.duration() > 0) {
+			// The sidecar tracks share the recording's time axis: the clip's source span, offset by
+			// how much of the block the (fade-trimmed) display span skips.
+			double scale = sourceSpan.duration() / itemSpan.duration();
+			audioStartMs = sourceSpan.start() + (displaySpan.start() - itemSpan.start()) * scale;
+			audioEndMs = sourceSpan.start() + (displaySpan.end() - itemSpan.start()) * scale;
+		} else {
+			// Imported audio plays the file at 1x from its start; the display span is its sub-window.
+			audioStartMs = Math.max(0, displaySpan.start() - itemSpan.start());
+			audioEndMs = audioStartMs + displaySpan.duration();
+		}
+		if (audioEndMs <= audioStartMs) {
+			return;
+		}
+		double visibleX0 = Math.max(startX, GUTTER_WIDTH);
+		double visibleX1 = Math.min(endX, width);
+		if (visibleX1 - visibleX0 < 1) {
+			return;
+		}
+		double blockX = Math.max(1, endX - startX);
+		double audioStart = audioStartMs
+				+ (visibleX0 - startX) / blockX * (audioEndMs - audioStartMs);
+		double audioEnd = audioStartMs + (visibleX1 - startX) / blockX * (audioEndMs - audioStartMs);
+		int bars = Math.max(1, (int) Math.ceil((visibleX1 - visibleX0) / WAVEFORM_BAR_PITCH_PX));
+		float @Nullable [] peaks = dataSource.waveforms().peaks(item.audioPath(), audioStart,
+				audioEnd, bars);
 		if (peaks == null || peaks.length == 0) {
 			return;
 		}
 		double gain = item.audioGain() == null ? 1 : Math.max(0, Math.min(1, item.audioGain()));
+		boolean muted = Boolean.TRUE.equals(item.muted());
+		double blockAlpha = graphics.getGlobalAlpha();
+		if (muted) {
+			// Dim on top of whatever the block already draws at (drawSourceAudio dims muted blocks).
+			graphics.setGlobalAlpha(blockAlpha * WAVEFORM_MUTED_ALPHA);
+		}
 		graphics.setFill(WAVEFORM_COLOR);
 		double centerY = y + height / 2;
 		double maxAmplitude = height * 0.35;
-		int bars = Math.min(peaks.length, Math.max(1, (int) Math.floor(width / 3)));
-		for (int bar = 0; bar < bars; bar++) {
-			double ratio = peaks[(int) ((long) bar * peaks.length / bars)];
-			double amplitude = Math.max(0, Math.min(1, ratio)) * gain * maxAmplitude;
-			double barX = x + 2 + (width - 4) * bar / bars;
-			graphics.fillRect(barX, centerY - amplitude, Math.max(1, (width - 4) / bars - 1),
-					amplitude * 2);
+		double visibleWidth = visibleX1 - visibleX0;
+		double barWidth = Math.max(1, visibleWidth / bars - 1);
+		for (int bar = 0; bar < bars && bar < peaks.length; bar++) {
+			double amplitude = Math.max(0, Math.min(1, peaks[bar])) * gain * maxAmplitude;
+			if (amplitude <= 0) {
+				continue;
+			}
+			double barX = visibleX0 + visibleWidth * bar / bars;
+			graphics.fillRect(barX, centerY - amplitude, barWidth, amplitude * 2);
+		}
+		if (muted) {
+			graphics.setGlobalAlpha(blockAlpha);
 		}
 	}
 

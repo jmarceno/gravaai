@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -13,13 +14,16 @@ import dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.event.Subscription;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack;
 
 /**
  * {@link TimelineDataSource} over the real {@link EditorStore} (plan §5.11 / P2.7).
  *
  * <p>AppContext/EditorSession owns the store and supplies the media duration and the live playhead
  * (playback engine); the timeline only reads. Subscribe with {@link #onChange(Runnable)} and call
- * {@link TimelineView#refreshData()} on the FX thread to repaint after edits.
+ * {@link TimelineView#refreshData()} on the FX thread to repaint after edits. Store edits and the
+ * session's late-arriving media facts (source-audio tracks) both notify the listeners; the
+ * subscriber marshals to the FX thread.
  */
 public final class StoreTimelineDataSource implements TimelineDataSource {
 
@@ -28,6 +32,8 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 	private final DoubleSupplier playheadMs;
 	private final WaveformProvider waveforms;
 	private Supplier<List<ZoomSuggestionUtils.CursorTelemetryPoint>> cursorTelemetry = List::of;
+	private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
+	private volatile List<TimelineSourceAudioTrack> sourceAudioTracks = List.of();
 
 	/** @param waveforms optional waveform source; {@code null} means "no waveforms yet". */
 	public StoreTimelineDataSource(EditorStore store, LongSupplier totalDurationMs,
@@ -36,6 +42,7 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		this.totalDurationMs = totalDurationMs == null ? () -> 0L : totalDurationMs;
 		this.playheadMs = playheadMs == null ? () -> 0.0 : playheadMs;
 		this.waveforms = waveforms == null ? WaveformProvider.empty() : waveforms;
+		this.store.onChange(changed -> changeListeners.forEach(Runnable::run));
 	}
 
 	public EditorStore store() {
@@ -54,9 +61,19 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return cursorTelemetry.get();
 	}
 
-	/** Subscribes to store edits; adapt to the FX thread before calling refreshData(). */
+	/** Subscribes to store edits and late-arriving data; marshal to the FX thread before repaint. */
 	public Subscription onChange(Runnable listener) {
-		return store.onChange(changed -> listener.run());
+		changeListeners.add(listener);
+		return () -> changeListeners.remove(listener);
+	}
+
+	/**
+	 * Replaces the source-audio tracks once the session resolved the recording's sidecars (off the
+	 * FX thread); notifies the change listeners so the view refreshes on the FX thread.
+	 */
+	public void setSourceAudioTracks(List<TimelineSourceAudioTrack> tracks) {
+		this.sourceAudioTracks = tracks == null ? List.of() : List.copyOf(tracks);
+		changeListeners.forEach(Runnable::run);
 	}
 
 	@Override
@@ -77,5 +94,10 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 	@Override
 	public WaveformProvider waveforms() {
 		return waveforms;
+	}
+
+	@Override
+	public List<TimelineSourceAudioTrack> sourceAudioTracks() {
+		return sourceAudioTracks;
 	}
 }

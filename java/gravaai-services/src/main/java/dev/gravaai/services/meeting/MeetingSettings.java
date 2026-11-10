@@ -23,6 +23,7 @@ public record MeetingSettings(
 		String apiChatModel,
 		List<SummarizerCapability> apiChatCapabilities,
 		int apiTimeoutMinutes,
+		String notesTemplate,
 		String summaryPrompt,
 		String titlePrompt,
 		boolean autoProcess,
@@ -39,6 +40,7 @@ public record MeetingSettings(
 			"gpt-4.1-mini",
 			List.of(SummarizerCapability.TEXT),
 			5,
+			NoteTemplates.GENERAL_ID,
 			"",
 			"",
 			true,
@@ -50,86 +52,107 @@ public record MeetingSettings(
 
 	public MeetingSettings withTranscriptionService(MeetingServiceKind value) {
 		return new MeetingSettings(value, whisperModel, language, summarizationService, localModel,
-				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
-				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt, autoProcess,
+				autoTitle);
 	}
 
 	public MeetingSettings withWhisperModel(String value) {
 		return new MeetingSettings(transcriptionService, value, language, summarizationService,
 				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+				apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt, autoProcess,
+				autoTitle);
 	}
 
 	public MeetingSettings withLanguage(String value) {
 		return new MeetingSettings(transcriptionService, whisperModel, value, summarizationService,
 				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+				apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt, autoProcess,
+				autoTitle);
 	}
 
 	public MeetingSettings withSummarizationService(MeetingServiceKind value) {
 		return new MeetingSettings(transcriptionService, whisperModel, language, value, localModel,
-				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
-				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+				apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
+				apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt, autoProcess,
+				autoTitle);
 	}
 
 	public MeetingSettings withLocalModel(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				value, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, value, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withApiBaseUrl(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, value, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, value, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withApiTranscriptionModel(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, value, apiChatModel, apiChatCapabilities, apiTimeoutMinutes,
-				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, value, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withApiChatModel(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, value, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, value,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withApiChatCapabilities(List<SummarizerCapability> value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, List.copyOf(value),
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				List.copyOf(value), apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withApiTimeoutMinutes(int value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities, value,
-				summaryPrompt, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, value, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
+	}
+
+	public MeetingSettings withNotesTemplate(String value) {
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, value, summaryPrompt, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withSummaryPrompt(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, value, titlePrompt, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, value, titlePrompt,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withTitlePrompt(String value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, value, autoProcess, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, value,
+				autoProcess, autoTitle);
 	}
 
 	public MeetingSettings withAutoProcess(boolean value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, value, autoTitle);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				value, autoTitle);
 	}
 
 	public MeetingSettings withAutoTitle(boolean value) {
-		return new MeetingSettings(transcriptionService, whisperModel, language, summarizationService,
-				localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel, apiChatCapabilities,
-				apiTimeoutMinutes, summaryPrompt, titlePrompt, autoProcess, value);
+		return new MeetingSettings(transcriptionService, whisperModel, language,
+				summarizationService, localModel, apiBaseUrl, apiTranscriptionModel, apiChatModel,
+				apiChatCapabilities, apiTimeoutMinutes, notesTemplate, summaryPrompt, titlePrompt,
+				autoProcess, value);
 	}
 
 	/** Runs these settings through the same checks a stored file gets. */
@@ -154,6 +177,7 @@ public record MeetingSettings(
 		}
 		raw.put("apiChatCapabilities", capabilities);
 		raw.put("apiTimeoutMinutes", apiTimeoutMinutes);
+		raw.put("notesTemplate", notesTemplate);
 		raw.put("summaryPrompt", summaryPrompt);
 		raw.put("titlePrompt", titlePrompt);
 		raw.put("autoProcess", autoProcess);
@@ -200,6 +224,11 @@ public record MeetingSettings(
 				value -> value instanceof Number number && number.doubleValue() >= 1
 						&& number.doubleValue() <= 60,
 				DEFAULT.apiTimeoutMinutes())).intValue();
+		// The template id is only checked for shape here; an id that matches no template any more
+		// falls back to General when the pipeline resolves it.
+		String notesTemplate = (String) pick(input, "notesTemplate",
+				value -> value instanceof String && !((String) value).strip().isEmpty(),
+				DEFAULT.notesTemplate());
 		String summaryPrompt = (String) pick(input, "summaryPrompt",
 				value -> value instanceof String, DEFAULT.summaryPrompt());
 		String titlePrompt = (String) pick(input, "titlePrompt",
@@ -219,6 +248,7 @@ public record MeetingSettings(
 				apiChatModel,
 				List.copyOf(apiChatCapabilities),
 				apiTimeoutMinutes,
+				notesTemplate,
 				summaryPrompt,
 				titlePrompt,
 				autoProcess,

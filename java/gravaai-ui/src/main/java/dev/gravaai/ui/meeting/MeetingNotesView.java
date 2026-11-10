@@ -13,9 +13,11 @@ import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingService;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
+import dev.gravaai.ui.kit.ChoiceGroup;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.kit.Toast;
 import dev.gravaai.ui.kit.ToggleGroup;
@@ -56,11 +58,13 @@ public final class MeetingNotesView extends VBox {
 	private final Label errorLabel = new Label();
 	private final ToggleGroup tabs = new ToggleGroup(ToggleGroup.Mode.SINGLE);
 	private final HBox actions = new HBox(6);
+	private final HBox templateBar = new HBox(10);
 	private final VBox contentHost = new VBox();
 	private final ScrollPane scroll = new ScrollPane(contentHost);
 	private final TextArea editor = new TextArea();
 	private final VBox emptyHost = new VBox(12);
 	private final MeetingMarkdownView markdown;
+	private final List<NoteTemplates.Template> templates;
 
 	private @Nullable Path mediaPath;
 	private MeetingService.@Nullable FilesView files;
@@ -69,6 +73,11 @@ public final class MeetingNotesView extends VBox {
 	private @Nullable Tab editing;
 	private @Nullable String draft;
 	private boolean loading;
+	/** The template the next notes run uses (the picker's selection). */
+	private @Nullable String selectedTemplateId;
+	/** The template id the metadata last showed, so a picker change survives a refresh. */
+	private @Nullable String lastStoredTemplate;
+	private @Nullable String defaultTemplateId;
 	private @Nullable Subscription jobSubscription;
 	/** Last time the user scrolled by wheel or scrollbar (auto-follow stays off for a while). */
 	private volatile long lastUserScrollAt;
@@ -110,6 +119,13 @@ public final class MeetingNotesView extends VBox {
 		toolbar.setAlignment(Pos.CENTER_LEFT);
 		toolbar.setPadding(new Insets(0, 0, 2, 0));
 
+		// Built-ins are in memory; the user's templates are one directory listing in the profile.
+		this.templates = service.listNoteTemplates();
+		templateBar.setVisible(false);
+		templateBar.setManaged(false);
+		templateBar.setAlignment(Pos.CENTER_LEFT);
+		templateBar.getStyleClass().add("meeting-notes__templates");
+
 		editor.setWrapText(true);
 		editor.setStyle("-fx-font-family: 'monospace'; -fx-font-size: 12px; -fx-control-inner-background: "
 				+ css(Theme.FIELD) + "; -fx-text-fill: " + css(Theme.FG) + ";");
@@ -126,7 +142,7 @@ public final class MeetingNotesView extends VBox {
 		contentHost.setPadding(new Insets(0, 4, 0, 0));
 		contentHost.setStyle("-fx-background-color: " + css(Theme.BG) + ";");
 
-		getChildren().addAll(jobHost, errorLabel, toolbar, editor, scroll);
+		getChildren().addAll(jobHost, errorLabel, toolbar, templateBar, editor, scroll);
 		rebuildContent();
 		rebuildActions();
 	}
@@ -139,6 +155,8 @@ public final class MeetingNotesView extends VBox {
 		job = null;
 		editing = null;
 		loading = newMediaPath != null;
+		selectedTemplateId = null;
+		lastStoredTemplate = null;
 		if (newMediaPath == null) {
 			rebuildContent();
 			rebuildActions();
@@ -232,27 +250,74 @@ public final class MeetingNotesView extends VBox {
 		}
 	}
 
+	private record FilesLoad(Result<MeetingService.FilesView> files,
+			@Nullable String defaultTemplateId) {
+	}
+
 	private void refresh() {
 		Path current = mediaPath;
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.getFiles(current), UiThreads.background())
-				.thenAcceptAsync(result -> {
+		CompletableFuture.supplyAsync(() -> new FilesLoad(service.getFiles(current),
+				defaultTemplateId()), UiThreads.background())
+				.thenAcceptAsync(loaded -> {
 					if (!current.equals(mediaPath)) {
 						return;
 					}
 					loading = false;
-					if (result.isErr()) {
-						showError(result.errorMessage());
+					defaultTemplateId = loaded.defaultTemplateId();
+					if (loaded.files().isErr()) {
+						showError(loaded.files().errorMessage());
 					} else {
 						error(null);
-						files = result.orNull();
+						files = loaded.files().orNull();
 					}
+					syncTemplateSelection();
 					rebuildJobStatus();
 					rebuildContent();
 					rebuildActions();
 				}, Platform::runLater);
+	}
+
+	/** The settings' default template id, or null when the settings could not be read. */
+	private @Nullable String defaultTemplateId() {
+		try {
+			return service.settings().settings().notesTemplate();
+		} catch (RuntimeException error) {
+			return null;
+		}
+	}
+
+	/**
+	 * Follows the stored template on the meeting: it is what the picker shows, unless the user has
+	 * already picked one for the same stored state (picking must survive a refresh).
+	 */
+	private void syncTemplateSelection() {
+		MeetingService.FilesView currentFiles = files;
+		String stored = currentFiles != null && currentFiles.meta() != null
+				? currentFiles.meta().notesTemplate()
+				: null;
+		if (selectedTemplateId != null && java.util.Objects.equals(stored, lastStoredTemplate)) {
+			return;
+		}
+		lastStoredTemplate = stored;
+		selectedTemplateId = resolveTemplateId(stored, defaultTemplateId);
+	}
+
+	/** The stored id when it exists, then the settings default, then General. */
+	private String resolveTemplateId(@Nullable String stored, @Nullable String fallback) {
+		if (stored != null && hasTemplate(stored)) {
+			return stored;
+		}
+		if (fallback != null && hasTemplate(fallback)) {
+			return fallback;
+		}
+		return NoteTemplates.GENERAL_ID;
+	}
+
+	private boolean hasTemplate(String id) {
+		return templates.stream().anyMatch(template -> template.id().equals(id));
 	}
 
 	private void loadLatestJob() {
@@ -425,6 +490,7 @@ public final class MeetingNotesView extends VBox {
 
 	private void rebuildActions() {
 		actions.getChildren().clear();
+		rebuildTemplateBar();
 		boolean hasContent = files != null && currentContent() != null
 				&& !currentContent().isBlank();
 		if (editing != null) {
@@ -461,6 +527,32 @@ public final class MeetingNotesView extends VBox {
 				actions.getChildren().add(redo);
 			}
 		}
+	}
+
+	/**
+	 * The template row of the notes tab: the meeting's template is what the picker shows, and the
+	 * next "Write notes"/"Rewrite notes" runs with the selection. Hidden while editing or on the
+	 * transcript tab.
+	 */
+	private void rebuildTemplateBar() {
+		boolean show = tab == Tab.NOTES && editing == null && files != null && !templates.isEmpty();
+		templateBar.setVisible(show);
+		templateBar.setManaged(show);
+		if (!show) {
+			templateBar.getChildren().clear();
+			return;
+		}
+		Label caption = new Label("Template");
+		caption.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.MUTED) + ";");
+		ChoiceGroup picker = new ChoiceGroup();
+		for (NoteTemplates.Template template : templates) {
+			picker.item(template.id(), template.label());
+		}
+		picker.setValue(selectedTemplateId == null ? NoteTemplates.GENERAL_ID
+				: selectedTemplateId);
+		picker.onValueChange(value -> selectedTemplateId = value);
+		picker.setDisable(busy());
+		templateBar.getChildren().setAll(caption, picker);
 	}
 
 	private @Nullable String currentContent() {
@@ -518,7 +610,9 @@ public final class MeetingNotesView extends VBox {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> service.runJob(current, mode), UiThreads.background())
+		CompletableFuture
+				.supplyAsync(() -> service.runJob(current, mode, selectedTemplateId),
+						UiThreads.background())
 				.thenAcceptAsync(result -> {
 					if (result.isErr()) {
 						showError(result.errorMessage());

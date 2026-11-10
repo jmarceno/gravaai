@@ -19,7 +19,7 @@ class MeetingTextTest {
 	@DisplayName("prefers the saved meeting title")
 	void prefersSavedTitle() {
 		MeetingMeta meta = new MeetingMeta("meeting", "2026-10-27T12:00:00Z", true, null, 3_600_000L,
-				"  Weekly sync  ", null, null, null, null, null, null);
+				"  Weekly sync  ", null, null, null, null, null, null, null);
 
 		assertEquals("Weekly sync", MeetingText.meetingTitle(meta, null));
 	}
@@ -29,10 +29,10 @@ class MeetingTextTest {
 	void fallsBackToDateTime() {
 		assertEquals("Meeting", MeetingText.meetingTitle(null, null));
 		assertEquals("Meeting", MeetingText.meetingTitle(new MeetingMeta(null, null, null, null, null,
-				null, null, null, null, null, null, null), null));
+				null, null, null, null, null, null, null, null), null));
 
 		String fromMeta = MeetingText.meetingTitle(new MeetingMeta(null, "2026-10-27T12:00:00Z", null,
-				null, null, null, null, null, null, null, null, null), null);
+				null, null, null, null, null, null, null, null, null, null), null);
 		assertTrue(fromMeta.startsWith("Meeting "), fromMeta);
 		assertTrue(fromMeta.contains(":"), fromMeta);
 

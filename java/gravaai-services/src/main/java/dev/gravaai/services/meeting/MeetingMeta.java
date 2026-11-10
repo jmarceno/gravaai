@@ -20,6 +20,7 @@ public record MeetingMeta(
 		@Nullable String summarizedAt,
 		@Nullable String transcriptionSource,
 		@Nullable String summarizationSource,
+		@Nullable String notesTemplate,
 		@Nullable LastJob lastJob) {
 
 	/**
@@ -45,9 +46,10 @@ public record MeetingMeta(
 				text(raw, "titleSource"),
 				text(raw, "transcribedAt"),
 				text(raw, "summarizedAt"),
-				text(raw, "transcriptionSource"),
-				text(raw, "summarizationSource"),
-				lastJob(raw.get("lastJob")));
+		text(raw, "transcriptionSource"),
+		text(raw, "summarizationSource"),
+		text(raw, "notesTemplate"),
+		lastJob(raw.get("lastJob")));
 	}
 
 	private static @Nullable String text(Map<?, ?> raw, String key) {

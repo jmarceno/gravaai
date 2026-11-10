@@ -31,10 +31,12 @@ public final class MeetingJobs {
 	public interface Pipeline {
 
 		/**
+		 * @param templateId the per-meeting notes template, or null to use the settings default
 		 * @param onStatus the stage callback, or null when the caller does not track stages
 		 */
 		void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-				CancelSignal signal, @Nullable StageListener onStatus);
+				@Nullable String templateId, CancelSignal signal,
+				@Nullable StageListener onStatus);
 	}
 
 	/** Maps a pipeline status callback onto the job's stage field. */
@@ -50,6 +52,7 @@ public final class MeetingJobs {
 		private final String id;
 		private final Path mediaPath;
 		private final MeetingJobMode mode;
+		private final @Nullable String templateId;
 		private MeetingJob.Status status;
 		private MeetingJob.@Nullable Stage stage;
 		private String message;
@@ -58,10 +61,12 @@ public final class MeetingJobs {
 		private final String createdAt;
 		private @Nullable String finishedAt;
 
-		private JobState(String id, Path mediaPath, MeetingJobMode mode, String createdAt) {
+		private JobState(String id, Path mediaPath, MeetingJobMode mode,
+				@Nullable String templateId, String createdAt) {
 			this.id = id;
 			this.mediaPath = mediaPath;
 			this.mode = mode;
+			this.templateId = templateId;
 			this.createdAt = createdAt;
 			this.status = MeetingJob.Status.QUEUED;
 			this.message = "Waiting…";
@@ -125,6 +130,14 @@ public final class MeetingJobs {
 	}
 
 	public MeetingJob enqueue(Path mediaPath, MeetingJobMode mode) {
+		return enqueue(mediaPath, mode, null);
+	}
+
+	/**
+	 * @param templateId the notes template chosen for this meeting, or null to use the settings
+	 *     default
+	 */
+	public MeetingJob enqueue(Path mediaPath, MeetingJobMode mode, @Nullable String templateId) {
 		MeetingJob queued;
 		synchronized (lock) {
 			Optional<JobState> existing = jobs.stream()
@@ -133,7 +146,8 @@ public final class MeetingJobs {
 			if (existing.isPresent()) {
 				return existing.get().snapshot();
 			}
-			JobState job = new JobState(ids.get(), mediaPath, mode, Times.isoNow(clock));
+			JobState job = new JobState(ids.get(), mediaPath, mode, templateId,
+					Times.isoNow(clock));
 			jobs.add(job);
 			List<JobState> finished = new ArrayList<>();
 			for (JobState entry : jobs) {
@@ -227,7 +241,7 @@ public final class MeetingJobs {
 		}
 		try {
 			metaStore.update(job.mediaPath, lastJob(job.mode, "running", null, Times.isoNow(clock)));
-			pipeline.run(job.mediaPath, job.mode, settings.get(), controller,
+			pipeline.run(job.mediaPath, job.mode, settings.get(), job.templateId, controller,
 					(stage, message, progress) -> update(job, stage, message, progress));
 			// Meta first, so anyone reacting to "done" reads the finished state.
 			metaStore.update(job.mediaPath, lastJob(job.mode, "done", null, Times.isoNow(clock)));

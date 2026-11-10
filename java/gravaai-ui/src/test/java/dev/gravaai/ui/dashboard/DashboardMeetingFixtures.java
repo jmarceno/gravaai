@@ -18,6 +18,7 @@ import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingSettings;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.ui.meeting.MeetingUiService;
 
@@ -160,6 +161,16 @@ final class DashboardMeetingFixtures {
 		@Override
 		public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode) {
 			throw new UnsupportedOperationException("runJob not used by the dashboard");
+		}
+
+		@Override
+		public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode, String templateId) {
+			throw new UnsupportedOperationException("runJob not used by the dashboard");
+		}
+
+		@Override
+		public List<NoteTemplates.Template> listNoteTemplates() {
+			throw new UnsupportedOperationException("listNoteTemplates not used by the dashboard");
 		}
 
 		@Override

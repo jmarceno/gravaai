@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.function.UnaryOperator;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import dev.gravaai.services.meeting.MeetingMeta;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingSettings;
 import dev.gravaai.services.meeting.MeetingServiceKind;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.Subscription;
 
 /**
@@ -74,6 +77,7 @@ final class MeetingFixtures {
 		private final Map<Path, String> transcripts = new LinkedHashMap<>();
 		private final Map<Path, String> notes = new LinkedHashMap<>();
 		private final Map<String, Integer> assetProgress = new LinkedHashMap<>();
+		private final List<String> runJobTemplateIds = new ArrayList<>();
 		private MeetingSettings.View settings = new MeetingSettings.View(MeetingSettings.DEFAULT, true);
 		private final List<String> downloadedAssets = new ArrayList<>();
 		private final List<String> removedAssets = new ArrayList<>();
@@ -189,10 +193,11 @@ final class MeetingFixtures {
 				return Result.err("Unknown meeting");
 			}
 			MeetingMeta meta = new MeetingMeta("meeting", "2026-10-27T12:00:00Z", true,
-					"english", 3_661_000L, "Design review", "auto", null, null, null, null, null);
+					"english", 3_661_000L, "Design review", "auto", null, null, null, null, "general",
+					null);
 			if (mediaPath.equals(AUDIO_MEETING)) {
 				meta = new MeetingMeta("meeting", "2026-10-26T09:30:00Z", false, "english",
-						305_000L, "Weekly sync", "auto", null, null, null, null, null);
+						305_000L, "Weekly sync", "auto", null, null, null, null, "general", null);
 			}
 			return Result.ok(new MeetingService.FilesView(null, transcript, body, meta, false));
 		}
@@ -209,11 +214,27 @@ final class MeetingFixtures {
 
 		@Override
 		public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode) {
+			return runJob(mediaPath, mode, null);
+		}
+
+		@Override
+		public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode,
+				@Nullable String templateId) {
+			runJobTemplateIds.add(templateId);
 			activeJob = new MeetingJob("job-" + (jobs.size() + 1), mediaPath, mode,
 					MeetingJob.Status.QUEUED, MeetingJob.Stage.TRANSCRIBE, "Waiting to start", null,
 					null, "2026-10-27T19:00:00Z", null);
 			jobs.add(activeJob);
 			return Result.ok(activeJob);
+		}
+
+		@Override
+		public List<NoteTemplates.Template> listNoteTemplates() {
+			return NoteTemplates.builtIns();
+		}
+
+		List<String> runJobTemplateIds() {
+			return runJobTemplateIds;
 		}
 
 		@Override

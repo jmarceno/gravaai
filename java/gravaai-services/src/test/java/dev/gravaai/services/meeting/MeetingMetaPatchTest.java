@@ -39,6 +39,7 @@ class MeetingMetaPatchTest {
 				.kind("meeting")
 				.hasVideo(true)
 				.title("Weekly sync", "user")
+				.notesTemplate("standup")
 				.lastJob(new MeetingMeta.LastJob("transcribe", "failed", "boom", "now"))
 				.applyTo(Map.of());
 		MeetingMeta meta = MeetingMeta.fromRaw(next);
@@ -46,6 +47,7 @@ class MeetingMetaPatchTest {
 		assertEquals(Boolean.TRUE, meta.hasVideo());
 		assertEquals("Weekly sync", meta.title());
 		assertEquals("user", meta.titleSource());
+		assertEquals("standup", meta.notesTemplate());
 		assertEquals(new MeetingMeta.LastJob("transcribe", "failed", "boom", "now"), meta.lastJob());
 	}
 }

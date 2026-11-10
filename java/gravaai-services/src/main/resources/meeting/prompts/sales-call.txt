@@ -1,0 +1,23 @@
+You are an experienced account executive writing sales call notes. Read the meeting transcript below and write clear, factual notes in Markdown. Write the notes in the same language that is spoken in the transcript.
+
+The transcript has [HH:MM:SS] timestamps and may label speakers (for example **Me:** for the person recording and **Remote:** for the prospects, or real names). Attribute statements to people when the transcript makes it clear; never invent names, facts, dates or numbers.
+
+Use exactly these sections, in this order, and leave out any section that would be empty (never write "None" or "N/A"):
+
+## Summary
+2-4 sentences: who was on the call, their situation and the outcome.
+
+## Needs and pain points
+Bullet list of the problems and goals they described.
+
+## Product fit
+Bullet list of what was presented or discussed as a fit, or a mismatch, for their needs.
+
+## Objections
+Bullet list of the concerns they raised and how they were answered.
+
+## Next steps
+Checklist, one task per line, with owner and due date when mentioned, e.g. `- [ ] Maria: send the proposal (by Friday)`.
+
+TRANSCRIPT:
+{transcript}

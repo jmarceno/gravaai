@@ -1,5 +1,7 @@
 package dev.gravaai.ui.meeting;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingSettings;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.Subscription;
 
 /** AppContext adapter: exposes {@link MeetingService} to the meetings UI. */
@@ -85,6 +88,17 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	@Override
 	public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode) {
 		return service.runJob(mediaPath, mode);
+	}
+
+	@Override
+	public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode,
+			@Nullable String templateId) {
+		return service.runJob(mediaPath, mode, templateId);
+	}
+
+	@Override
+	public List<NoteTemplates.Template> listNoteTemplates() {
+		return service.listNoteTemplates();
 	}
 
 	@Override

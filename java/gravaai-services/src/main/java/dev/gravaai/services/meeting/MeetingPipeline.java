@@ -30,12 +30,13 @@ public final class MeetingPipeline {
 	private final LlamaServer llama;
 	private final OpenAiClient client;
 	private final MeetingMetaStore metaStore;
+	private final Path userTemplatesDir;
 	private final Clock clock;
 
 	public MeetingPipeline(MeetingSettingsService settingsService, MeetingAssets assets,
 			AssetInstaller installer, WhisperTranscriber whisper,
 			ApiTranscription apiTranscription, LlamaServer llama, OpenAiClient client,
-			MeetingMetaStore metaStore, Clock clock) {
+			MeetingMetaStore metaStore, Path userTemplatesDir, Clock clock) {
 		this.settingsService = settingsService;
 		this.assets = assets;
 		this.installer = installer;
@@ -44,11 +45,13 @@ public final class MeetingPipeline {
 		this.llama = llama;
 		this.client = client;
 		this.metaStore = metaStore;
+		this.userTemplatesDir = userTemplatesDir;
 		this.clock = clock;
 	}
 
 	public void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-			CancelSignal signal, MeetingJobs.@Nullable StageListener onStatus) {
+			@Nullable String templateId, CancelSignal signal,
+			MeetingJobs.@Nullable StageListener onStatus) {
 		MeetingJobs.StageListener status = onStatus == null ? (stage, message, progress) -> {
 		} : onStatus;
 		MeetingStatusCallback transcribeStatus = (message, progress) ->
@@ -78,14 +81,17 @@ public final class MeetingPipeline {
 		MeetingStatusCallback summarizeStatus = (message, progress) ->
 				status.onStatus(MeetingJob.Stage.SUMMARIZE, message, progress);
 		try {
-			SummarizerHolder holder = createSummarizer(settings, summarizeStatus);
+			NoteTemplates.Template template = NoteTemplates.effective(templateId,
+					settings.summaryPrompt(), settings.notesTemplate(), userTemplatesDir);
+			SummarizerHolder holder = createSummarizer(settings, template, summarizeStatus);
 			MeetingMeta meta = metaStore.read(mediaPath);
 			MeetingContext context = new MeetingContext(transcript, language, meta.durationMs(),
 					null, List.of());
 			String notes = holder.summarizer().summarize(context, summarizeStatus, signal);
 			writeTextAtomic(files.notes(), notes);
 			metaStore.update(mediaPath,
-					new MeetingMetaPatch().summarized(Times.isoNow(clock), holder.source()));
+					new MeetingMetaPatch().summarized(Times.isoNow(clock), holder.source())
+							.notesTemplate(template.id()));
 
 			if (settings.autoTitle() && !"user".equals(meta.titleSource())) {
 				signal.throwIfCancelled();
@@ -177,7 +183,7 @@ public final class MeetingPipeline {
 	}
 
 	private SummarizerHolder createSummarizer(MeetingSettings settings,
-			MeetingStatusCallback onStatus) {
+			NoteTemplates.Template template, MeetingStatusCallback onStatus) {
 		if (settings.summarizationService() == MeetingServiceKind.API) {
 			return new SummarizerHolder(new ChatSummarizer(client, new ChatSummarizer.Config(
 					apiEndpoint(settings),
@@ -187,10 +193,11 @@ public final class MeetingPipeline {
 					// meetings.
 					300_000,
 					settings.apiTimeoutMinutes() * 60_000L,
-					settings.summaryPrompt(),
+					template.prompt(),
 					settings.titlePrompt(),
 					null,
-					false)),
+					false,
+					NoteTemplates.mergePromptFor(template))),
 					"api:" + settings.apiChatModel());
 		}
 		String baseUrl = llama.start(settings.localModel(), onStatus);
@@ -201,11 +208,12 @@ public final class MeetingPipeline {
 				Summarizer.transcriptCharBudget(LlamaServer.LOCAL_CONTEXT_TOKENS),
 				// CPU prompt processing of a long meeting can take many minutes.
 				30 * 60_000L,
-				settings.summaryPrompt(),
+				template.prompt(),
 				settings.titlePrompt(),
 				Map.<String, Object>of("chat_template_kwargs",
 						Map.of("enable_thinking", false)),
-				true)),
+				true,
+				NoteTemplates.mergePromptFor(template))),
 				"local:" + settings.localModel());
 	}
 

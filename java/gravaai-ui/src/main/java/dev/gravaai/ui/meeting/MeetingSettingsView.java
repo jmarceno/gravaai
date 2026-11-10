@@ -15,6 +15,7 @@ import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingServiceKind;
 import dev.gravaai.services.meeting.MeetingSettings;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.dashboard.SettingsRow;
@@ -58,6 +59,7 @@ public final class MeetingSettingsView extends VBox {
 
 	private MeetingSettings.@Nullable View view;
 	private List<MeetingService.AssetStatus> assets = List.of();
+	private List<NoteTemplates.Template> templates = List.of();
 	private final Map<String, Integer> progress = new LinkedHashMap<>();
 	private @Nullable Subscription assetSubscription;
 	private boolean loading = true;
@@ -90,9 +92,11 @@ public final class MeetingSettingsView extends VBox {
 		}
 	}
 
-	private record Loaded(MeetingSettings.View settings, List<MeetingService.AssetStatus> assets) {
+	private record Loaded(MeetingSettings.View settings, List<MeetingService.AssetStatus> assets,
+			List<NoteTemplates.Template> templates) {
 		Loaded {
 			assets = List.copyOf(assets);
+			templates = List.copyOf(templates);
 		}
 	}
 
@@ -100,10 +104,12 @@ public final class MeetingSettingsView extends VBox {
 		CompletableFuture.supplyAsync(() -> {
 			MeetingSettings.View settings = service.settings();
 			List<MeetingService.AssetStatus> statuses = service.listAssets();
-			return new Loaded(settings, statuses);
+			List<NoteTemplates.Template> templates = service.listNoteTemplates();
+			return new Loaded(settings, statuses, templates);
 		}, UiThreads.background()).thenAcceptAsync(loaded -> {
 			view = loaded.settings();
 			assets = loaded.assets();
+			templates = loaded.templates();
 			loading = false;
 			rebuild();
 		}, Platform::runLater);
@@ -155,8 +161,28 @@ public final class MeetingSettingsView extends VBox {
 		rows.getChildren().add(new SettingsRow("Name meetings from their notes", "",
 				autoSwitch(settings.autoTitle(), "Name meetings from their notes",
 						MeetingSettings::withAutoTitle)));
+		rows.getChildren().add(buildTemplatePicker(settings));
 		rows.getChildren().add(buildPrompt(settings));
 		rows.getChildren().add(buildDownloads());
+	}
+
+	/** Port of the template picker: built-ins plus the user's files, default for new meetings. */
+	private Node buildTemplatePicker(MeetingSettings settings) {
+		ChoiceGroup choice = new ChoiceGroup();
+		for (NoteTemplates.Template template : templates) {
+			choice.item(template.id(), template.label());
+		}
+		String stored = settings.notesTemplate();
+		String selected = stored != null && templates.stream()
+				.anyMatch(template -> template.id().equals(stored))
+				? stored
+				: NoteTemplates.GENERAL_ID;
+		choice.setValue(selected);
+		choice.onValueChange(value -> save(s -> s.withNotesTemplate(value)));
+		return new SettingsRow("Notes template",
+				"How the notes are structured. Your own templates are .txt files in"
+						+ " ~/.config/Gravaai/meeting/templates/.",
+				choice, true);
 	}
 
 	private Node buildTranscription(MeetingSettings settings) {
@@ -284,7 +310,8 @@ public final class MeetingSettingsView extends VBox {
 
 	private Node buildPrompt(MeetingSettings settings) {
 		TextArea prompt = new TextArea(
-				"Leave empty to use the built-in prompt. Use {transcript} where the text goes.");
+				"Overrides the template. Leave empty to use it. Use {transcript} where the text"
+						+ " goes.");
 		prompt.text(settings.summaryPrompt());
 		prompt.setPrefHeight(112);
 		prompt.setPrefWidth(560);
@@ -300,8 +327,7 @@ public final class MeetingSettingsView extends VBox {
 		});
 		VBox column = new VBox(8, prompt);
 		if (settings.summaryPrompt() != null && !settings.summaryPrompt().isBlank()) {
-			Button reset = new Button("Use the built-in prompt", Button.Variant.GHOST,
-					Button.Size.SM);
+			Button reset = new Button("Use the template", Button.Variant.GHOST, Button.Size.SM);
 			reset.setOnAction(event -> save(s -> s.withSummaryPrompt("")));
 			column.getChildren().add(reset);
 		}

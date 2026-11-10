@@ -65,6 +65,11 @@ public final class MeetingMetaPatch {
 		return put("summarizedAt", at).put("summarizationSource", source);
 	}
 
+	/** Records which notes template produced the current notes. */
+	public MeetingMetaPatch notesTemplate(String notesTemplate) {
+		return put("notesTemplate", notesTemplate);
+	}
+
 	public MeetingMetaPatch lastJob(MeetingMeta.LastJob job) {
 		Map<String, Object> raw = new LinkedHashMap<>();
 		raw.put("mode", job.mode());

@@ -82,6 +82,27 @@ class MeetingSettingsTest {
 	}
 
 	@Test
+	@DisplayName("keeps the default template and a stored id, but not a blank one")
+	void notesTemplateNormalization() {
+		assertEquals(NoteTemplates.GENERAL_ID, MeetingSettings.DEFAULT.notesTemplate());
+		assertEquals(MeetingSettings.DEFAULT, MeetingSettings.normalize(Map.of(), assets));
+
+		Map<String, Object> raw = new LinkedHashMap<>();
+		raw.put("notesTemplate", "standup");
+		assertEquals("standup", MeetingSettings.normalize(raw, assets).notesTemplate());
+
+		Map<String, Object> blank = new LinkedHashMap<>();
+		blank.put("notesTemplate", "  ");
+		assertEquals(NoteTemplates.GENERAL_ID,
+				MeetingSettings.normalize(blank, assets).notesTemplate());
+
+		MeetingSettingsService service = new MeetingSettingsService(
+				new MeetingTestSupport.FakeSettingsStore(), new MeetingTestSupport.FakeApiKeyStore(),
+				assets);
+		assertEquals("retro", service.update(s -> s.withNotesTemplate("retro")).notesTemplate());
+	}
+
+	@Test
 	@DisplayName("leaves room for the prompt and the answer")
 	void transcriptCharBudgetLeavesRoom() {
 		assertEquals((16_384 - 3_500) * 3, Summarizer.transcriptCharBudget(16_384));

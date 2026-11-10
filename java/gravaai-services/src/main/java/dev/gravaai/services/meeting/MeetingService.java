@@ -101,6 +101,7 @@ public final class MeetingService {
 	private final MeetingAudioRecorder audioRecorder;
 	private final ExecutorService asyncExecutor;
 	private final ExecutorService jobExecutor;
+	private final Path userTemplatesDir;
 	private final List<Runnable> openListeners = new CopyOnWriteArrayList<>();
 	private final List<Consumer<AssetProgress>> assetListeners = new CopyOnWriteArrayList<>();
 	private final Object openLock = new Object();
@@ -110,7 +111,7 @@ public final class MeetingService {
 			MeetingSettingsService settings, MeetingMetaStore metaStore, MeetingJobs jobs,
 			MeetingLibrary library, LlamaServer llama, Reveal reveal,
 			MeetingAudioRecorder audioRecorder, ExecutorService asyncExecutor,
-			ExecutorService jobExecutor) {
+			ExecutorService jobExecutor, Path userTemplatesDir) {
 		this.assets = assets;
 		this.assetInstaller = assetInstaller;
 		this.settings = settings;
@@ -122,6 +123,7 @@ public final class MeetingService {
 		this.audioRecorder = audioRecorder;
 		this.asyncExecutor = asyncExecutor;
 		this.jobExecutor = jobExecutor;
+		this.userTemplatesDir = userTemplatesDir;
 	}
 
 	/**
@@ -171,7 +173,8 @@ public final class MeetingService {
 		ApiTranscription apiTranscription = new ApiTranscription(client, processes, mediaTools,
 				tempDirectory);
 		MeetingPipeline pipeline = new MeetingPipeline(settingsService, assets, installer, whisper,
-				apiTranscription, llama, client, metaStore, clock);
+				apiTranscription, llama, client, metaStore,
+				NoteTemplates.userTemplatesDir(userDataDir), clock);
 		ExecutorService jobExecutor = Threads.daemon("meeting-jobs");
 		MeetingJobs jobs = new MeetingJobs(pipeline::run, settingsService::read, metaStore, clock,
 				() -> UUID.randomUUID().toString(), jobExecutor, onMeetingNotesReady);
@@ -179,7 +182,8 @@ public final class MeetingService {
 				trash, clock, () -> UUID.randomUUID().toString());
 		ExecutorService asyncExecutor = Executors.newVirtualThreadPerTaskExecutor();
 		return new MeetingService(assets, installer, settingsService, metaStore, jobs, library,
-				llama, reveal, audioRecorder, asyncExecutor, jobExecutor);
+				llama, reveal, audioRecorder, asyncExecutor, jobExecutor,
+				NoteTemplates.userTemplatesDir(userDataDir));
 	}
 
 	// --- settings ---------------------------------------------------------------------------
@@ -320,14 +324,30 @@ public final class MeetingService {
 	}
 
 	public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode) {
+		return runJob(mediaPath, mode, null);
+	}
+
+	/**
+	 * meeting-run-job with a per-meeting notes template.
+	 *
+	 * @param templateId the template id chosen for this meeting, or null to use the settings
+	 *     default
+	 */
+	public Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode,
+			@Nullable String templateId) {
 		try {
 			if (mode == null) {
 				throw new IllegalStateException("Unknown job mode.");
 			}
-			return Result.ok(jobs.enqueue(mediaPath, mode));
+			return Result.ok(jobs.enqueue(mediaPath, mode, templateId));
 		} catch (RuntimeException error) {
 			return Result.err(message(error));
 		}
+	}
+
+	/** The templates the pickers show: the built-ins followed by the user's own. */
+	public List<NoteTemplates.Template> listNoteTemplates() {
+		return NoteTemplates.all(userTemplatesDir);
 	}
 
 	public boolean cancelJob(String jobId) {

@@ -14,6 +14,7 @@ import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
 import dev.gravaai.services.meeting.MeetingService;
+import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.MeetingSettings;
 import dev.gravaai.services.meeting.Subscription;
 
@@ -50,6 +51,15 @@ public interface MeetingUiService {
 	Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content);
 
 	Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode);
+
+	/**
+	 * Runs a job with the notes template chosen for this meeting; null uses the settings default.
+	 */
+	Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode,
+			@org.jspecify.annotations.Nullable String templateId);
+
+	/** The templates the pickers show: the built-ins followed by the user's own. */
+	List<NoteTemplates.Template> listNoteTemplates();
 
 	boolean cancelJob(String jobId);
 

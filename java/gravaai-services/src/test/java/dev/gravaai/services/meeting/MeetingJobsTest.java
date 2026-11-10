@@ -72,6 +72,14 @@ class MeetingJobsTest {
 		assertTrue(updates.stream().anyMatch(job -> job.stage() == MeetingJob.Stage.TRANSCRIBE
 				&& Integer.valueOf(50).equals(job.progress())));
 		assertEquals(List.of(media), notesReady);
+		assertEquals(java.util.Arrays.asList((String) null), pipeline.templateIds);
+	}
+
+	@Test
+	@DisplayName("a job carries the per-meeting template to the pipeline")
+	void passesTheMeetingTemplateToThePipeline() throws Exception {
+		jobs.enqueue(media("six.mp4"), MeetingJobMode.SUMMARIZE, "retro");
+		assertEquals(List.of("retro"), pipeline.templateIds);
 	}
 
 	@Test
@@ -118,7 +126,7 @@ class MeetingJobsTest {
 		FakePipeline blocking = new FakePipeline() {
 			@Override
 			public void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-					CancelSignal signal, MeetingJobs.StageListener onStatus) {
+					String templateId, CancelSignal signal, MeetingJobs.StageListener onStatus) {
 				started.countDown();
 				while (!signal.isCancelled()) {
 					Thread.onSpinWait();
@@ -180,12 +188,14 @@ class MeetingJobsTest {
 	private static class FakePipeline implements MeetingJobs.Pipeline {
 
 		final List<Path> calls = new ArrayList<>();
+		final List<String> templateIds = new ArrayList<>();
 		RuntimeException failure;
 
 		@Override
 		public void run(Path mediaPath, MeetingJobMode mode, MeetingSettings settings,
-				CancelSignal signal, MeetingJobs.StageListener onStatus) {
+				String templateId, CancelSignal signal, MeetingJobs.StageListener onStatus) {
 			calls.add(mediaPath);
+			templateIds.add(templateId);
 			if (failure != null) {
 				throw failure;
 			}

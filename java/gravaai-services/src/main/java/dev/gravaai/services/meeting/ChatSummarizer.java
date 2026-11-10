@@ -27,6 +27,8 @@ public final class ChatSummarizer implements Summarizer {
 	 *     when the request needs none
 	 * @param limitAnswerTokens cap answer length; only for the local model, because hosted
 	 *     reasoning models count their thinking against the cap and would return nothing
+	 * @param mergePrompt the long-meeting merge prompt shaped by the chosen template, or null to
+	 *     use the built-in General merge prompt
 	 */
 	public record Config(
 			OpenAiEndpoint endpoint,
@@ -37,7 +39,8 @@ public final class ChatSummarizer implements Summarizer {
 			String summaryPrompt,
 			String titlePrompt,
 			@Nullable Map<String, Object> requestExtra,
-			boolean limitAnswerTokens) {
+			boolean limitAnswerTokens,
+			@Nullable String mergePrompt) {
 	}
 
 	private final OpenAiClient client;
@@ -117,7 +120,10 @@ public final class ChatSummarizer implements Summarizer {
 			merged.append("### Part ").append(index + 1).append('\n').append(partials.get(index));
 		}
 		String mergeTemplate = MeetingPrompts.withLanguageInstruction(
-				MeetingPrompts.MERGE_SUMMARY_PROMPT, context.language());
+				config.mergePrompt() == null
+						? MeetingPrompts.MERGE_SUMMARY_PROMPT
+						: config.mergePrompt(),
+				context.language());
 		Map<String, Object> mergeValues = new LinkedHashMap<>();
 		String mergedNotes = merged.toString();
 		// The merge pass must see every partial heading: truncating it to the chunk size (as if it

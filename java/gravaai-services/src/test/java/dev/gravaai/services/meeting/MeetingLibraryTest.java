@@ -45,9 +45,10 @@ class MeetingLibraryTest {
 				new MeetingTestSupport.FakeApiKeyStore(), new MeetingAssets(userData));
 		trash = new MeetingTestSupport.FakeTrash();
 		AtomicInteger ids = new AtomicInteger();
-		MeetingJobs jobs = new MeetingJobs((mediaPath, mode, settingsValue, signal, onStatus) -> {
-			processed.add(mediaPath);
-		}, settings::read, metaStore, MeetingTestSupport.CLOCK,
+		MeetingJobs jobs = new MeetingJobs(
+				(mediaPath, mode, settingsValue, templateId, signal, onStatus) -> {
+					processed.add(mediaPath);
+				}, settings::read, metaStore, MeetingTestSupport.CLOCK,
 				() -> "0000" + ids.incrementAndGet(), MeetingTestSupport.DIRECT_EXECUTOR,
 				path -> {
 				});

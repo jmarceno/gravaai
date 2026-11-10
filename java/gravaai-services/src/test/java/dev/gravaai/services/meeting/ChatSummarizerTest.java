@@ -33,7 +33,8 @@ class ChatSummarizerTest {
 				summaryPrompt,
 				titlePrompt,
 				Map.of("chat_template_kwargs", Map.of("enable_thinking", false)),
-				limitAnswerTokens));
+				limitAnswerTokens,
+				null));
 	}
 
 	private static String promptOf(ChatCompletionRequest request) {

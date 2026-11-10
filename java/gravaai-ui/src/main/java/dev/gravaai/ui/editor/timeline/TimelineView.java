@@ -138,6 +138,8 @@ public final class TimelineView extends Region {
 	private static final Color ZOOM_SELECTED = Color.web("#2fe6d0");
 	/** The sparkle marking zoom stages that run the deep-zoom sharpening pass ({@link ZoomSharpen}). */
 	private static final Color ZOOM_SHARPEN_GLYPH = Color.web("#a5ecff");
+	/** The ring marking stages an export will upscale with the optional SR model. */
+	private static final Color ZOOM_UPSCALE_GLYPH = Color.web("#c8a6ff");
 	private static final Color GRADE_FILL = Color.web("#f0b429", 0.10);
 	private static final Color GRADE_BORDER = Color.web("#f0b429", 0.35);
 	private static final Color GRADE_SELECTED = Color.web("#f0b429");
@@ -325,6 +327,11 @@ public final class TimelineView extends Region {
 	/** Live spans of the same-row group during a multi-selection move drag (id → translated span). */
 	private java.util.@Nullable LinkedHashMap<String, Span> dragGroupSpans;
 	private TimelineShortcuts.Bindings shortcutBindings = TimelineShortcuts.defaults();
+	/**
+	 * Zoom stages at this depth are upscaled by an export (the optional SR model). Zero disables
+	 * the marker: the feature is off, or the model is not installed.
+	 */
+	private double exportUpscaleFromScale;
 
 	public TimelineView(TimelineDataSource dataSource, TimelineCommands commands) {
 		this.dataSource = dataSource;
@@ -2586,17 +2593,49 @@ public final class TimelineView extends Region {
 		String label = zoomLabel(item);
 		double labelX = x + 6;
 		double labelWidth = blockWidth - 12;
-		// Deep-zoom stages run the sharpening pass; a sparkle before the scale marks them.
+		// Deep-zoom stages run the sharpening pass; a sparkle before the scale marks them. Stages
+		// the export will additionally upscale get the ring, so the timeline says which are which.
 		if (item.zoomDepth() != null && ZoomSharpen.isSharpened(item.zoomDepth().scale())) {
 			drawSharpenSparkle(graphics, x + 12, y + height / 2);
 			labelX = x + 19;
 			labelWidth = blockWidth - 25;
+			if (isExportUpscaled(item.zoomDepth().scale())) {
+				drawUpscaleRing(graphics, x + 12, y + height / 2);
+			}
 		}
 		drawBlockLabel(graphics, label, labelX, y + height / 2, labelWidth, CYAN);
 		if (isSelected(TimelineSelection.ZOOM, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, ZOOM_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
+	/** Whether an export will upscale a stage at this depth scale (0 = marker off). */
+	private boolean isExportUpscaled(double scale) {
+		return exportUpscaleFromScale > 0 && scale >= exportUpscaleFromScale;
+	}
+
+	/**
+	 * Marks the zoom stages an export upscales with the optional super-resolution model. The
+	 * preview never runs that pass, so the ring is a promise about the exported file, not about
+	 * what is on screen right now.
+	 *
+	 * @param fromScale the camera scale from which exports upscale, or 0 to remove the marker
+	 */
+	public void setExportUpscaleFromScale(double fromScale) {
+		double next = Double.isFinite(fromScale) && fromScale > 0 ? fromScale : 0;
+		if (next == exportUpscaleFromScale) {
+			return;
+		}
+		exportUpscaleFromScale = next;
+		redraw();
+	}
+
+	/** The ring around the sharpen sparkle: an export will upscale this stage. */
+	private void drawUpscaleRing(GraphicsContext graphics, double cx, double cy) {
+		graphics.setStroke(ZOOM_UPSCALE_GLYPH);
+		graphics.setLineWidth(1.2);
+		graphics.strokeOval(cx - 6.5, cy - 6.5, 13, 13);
 	}
 
 	/** The 4-point sparkle marking zoom stages that run the deep-zoom sharpening pass. */

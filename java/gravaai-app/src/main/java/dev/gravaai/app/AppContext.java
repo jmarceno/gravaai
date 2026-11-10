@@ -638,6 +638,22 @@ public final class AppContext {
 		}
 	}
 
+	/**
+	 * The optional export-only deep-zoom upscaler for one editor window: the Settings row and the
+	 * preference the exporter reads. The preview gets nothing from this, by design.
+	 */
+	private void attachSuperResolution(EditorWindow window) {
+		try {
+			dev.gravaai.app.editor.SuperResolutionController controller =
+					dev.gravaai.app.editor.SuperResolutionController.create(
+					appSettings(), userData.dir());
+			controller.refresh();
+			window.setSuperResolutionController(controller);
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "deep-zoom upscaling unavailable: " + error);
+		}
+	}
+
 	private void attachAgent(EditorWindow window) {
 		AgentWiring wiring = agentWiring;
 		if (wiring == null) {
@@ -1420,6 +1436,7 @@ public final class AppContext {
 		attachAgent(window);
 		attachCaptions(window);
 		attachAutoMask(window);
+		attachSuperResolution(window);
 		if (path != null) {
 			rememberProject(path);
 		}

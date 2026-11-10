@@ -113,6 +113,9 @@ public final class EditorInspectorPanel extends VBox {
 	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
 	private dev.gravaai.ui.editor.@Nullable AutoMaskUiService autoMask;
 	private @Nullable AutoCloseable autoMaskSubscription;
+	/** The export-only deep-zoom upscaler (Settings section); null until the app wires it. */
+	private dev.gravaai.ui.editor.@Nullable SuperResolutionUiService superResolution;
+	private @Nullable AutoCloseable superResolutionSubscription;
 	/** Detector toggles; both on by default, matching the ship defaults. */
 	private boolean autoMaskFaces = true;
 	private boolean autoMaskText = true;
@@ -414,6 +417,27 @@ public final class EditorInspectorPanel extends VBox {
 							rebuild();
 						}
 					}));
+		}
+		rebuild();
+	}
+
+	/**
+	 * Connects the SETTINGS section's export quality row to the app's upscaler controller. Rebuilds
+	 * on every state change so the download progress and the toggle follow the install.
+	 */
+	public void setSuperResolutionService(SuperResolutionUiService service) {
+		closeQuietly(superResolutionSubscription);
+		superResolutionSubscription = null;
+		superResolution = service;
+		if (service != null) {
+			java.util.function.Consumer<SuperResolutionUiService.State> listener =
+					state -> javafx.application.Platform.runLater(() -> {
+						if (!annotationMode && section == EditorSidebarRail.Section.SETTINGS) {
+							rebuild();
+						}
+					});
+			service.addListener(listener);
+			superResolutionSubscription = () -> service.removeListener(listener);
 		}
 		rebuild();
 	}
@@ -2342,9 +2366,74 @@ public final class EditorInspectorPanel extends VBox {
 
 		// React editor Settings -> Permissions category (Linux parts of the page).
 		root.getChildren().add(group("General", null, autoZooms, buttons));
+		root.getChildren().add(superResolutionGroup());
 		root.getChildren().add(group("Permissions", null,
 				new dev.gravaai.ui.dashboard.RecordingPermissionsSettings()));
 		return root;
+	}
+
+	/**
+	 * Export quality row for the optional deep-zoom upscaler. Export only, so the label says so:
+	 * the preview keeps the cheap sharpening pass and the toggle changes what an export writes.
+	 */
+	private VBox superResolutionGroup() {
+		SuperResolutionUiService service = superResolution;
+		SuperResolutionUiService.State state = service != null ? service.state()
+				: new SuperResolutionUiService.State(false, false, 0, null, false);
+
+		Switch upscale = Switch.xs("Upscale deep zooms in exports");
+		upscale.setChecked(state.enabled());
+		upscale.onCheckedChange(value -> {
+			if (service != null) {
+				service.setEnabled(value);
+			}
+		});
+
+		VBox body = new VBox(10);
+		body.getChildren().add(upscale);
+		body.getChildren().add(new Label(
+				"Runs a super-resolution model on the deepest zoom stages when you export, so"
+						+ " text on a 1080p recording stays legible at 3.5–5×. The preview keeps"
+						+ " the fast sharpening pass; exports get the sharper texture."));
+
+		if (!state.modelInstalled() && !state.enabled()) {
+			Label hint = new Label("The model (4.9 MB) downloads when you turn this on.");
+			hint.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			body.getChildren().add(hint);
+		}
+		if (state.enabled() && !state.modelInstalled() && !state.failed()) {
+			javafx.scene.control.ProgressBar progress = new javafx.scene.control.ProgressBar(
+					Math.clamp(state.percent(), 0, 100) / 100.0);
+			progress.setMaxWidth(Double.MAX_VALUE);
+			body.getChildren().add(progress);
+			if (state.message() != null) {
+				Label message = new Label(state.message());
+				message.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+				body.getChildren().add(message);
+			}
+		}
+		if (state.failed() && state.message() != null) {
+			Label failure = new Label(state.message());
+			failure.setWrapText(true);
+			failure.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-danger;");
+			body.getChildren().add(failure);
+		}
+		if (state.modelInstalled()) {
+			HBox actions = new HBox(8);
+			actions.setAlignment(Pos.CENTER_LEFT);
+			Label installed = new Label("Model installed.");
+			installed.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			Button remove = new Button("Remove model", Button.Variant.GHOST, Button.Size.SM);
+			remove.setOnAction(event -> {
+				if (service != null) {
+					service.removeModel();
+				}
+			});
+			HBox.setHgrow(installed, Priority.ALWAYS);
+			actions.getChildren().addAll(installed, remove);
+			body.getChildren().add(actions);
+		}
+		return group("Export quality", null, body);
 	}
 
 	private Button settingsButton(String text, String icon, Runnable action) {

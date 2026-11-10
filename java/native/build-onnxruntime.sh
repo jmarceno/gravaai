@@ -27,6 +27,13 @@
 #     (MIT, opencv_zoo) for face detection, and PP-OCRv4 mobile det+rec
 #     (Apache-2.0) for screen text. The build script stages copies into
 #     build/models/ like the rnnoise model so package-dist.sh has one layout.
+#   * The super-resolution model (Real-ESRGAN general x4v3, BSD-3-Clause) is
+#     NOT staged and NOT bundled: it is an optional ~4.9 MB download installed
+#     on first use (SuperResAssets/SuperResInstaller), like the GLiNER
+#     auto-mask asset. The committed copy under
+#     java/native/models/superres/ is the pinned source tests run against; it
+#     is deliberately absent from build/models/ so package-dist never ships
+#     megabytes every user would then download again into their profile.
 #
 # Usage: ./build-onnxruntime.sh [--clean]
 #   GRAVAAI_NATIVE_CACHE   scratch download directory

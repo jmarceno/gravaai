@@ -169,6 +169,7 @@ public final class EditorWindow {
 	private boolean previewFrameLogged;
 	private @Nullable AutoCaptionController captions;
 	private @Nullable AutoMaskController autoMask;
+	private @Nullable SuperResolutionController superResolution;
 	/** Webcam background-blur segmenter handed to the preview; closed with the window. */
 	private @Nullable WebcamSegmenter webcamSegmenter;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
@@ -592,6 +593,17 @@ public final class EditorWindow {
 		}
 		autoMask = controller;
 		shell.setAutoMaskService(controller);
+	}
+
+	/** Connects the Settings section's export-quality row to the upscaler controller. */
+	public void setSuperResolutionController(SuperResolutionController controller) {
+		superResolution = controller;
+		shell.setSuperResolutionService(controller.service());
+	}
+
+	/** The upscaler controller, or null when this window never got one. */
+	public @Nullable SuperResolutionController superResolutionController() {
+		return superResolution;
 	}
 
 	/** Mounts the AI control chip/highlights and routes them to the timeline overlay. */
@@ -1325,7 +1337,12 @@ public final class EditorWindow {
 				return;
 			}
 			LOG.log(System.Logger.Level.INFO, "export requested for " + session.projectPath());
-			exporter.startExport(session, preferences, shell.exportSession(), stage);
+			// The Settings toggle governs this: the engine is opened only when the user opted in
+			// and the model is installed, so an untouched machine exports exactly as before.
+			SuperResolutionController superRes = superResolution;
+			var engine = superRes == null ? null
+					: superRes.openEngineForExport(superRes.installedModelPath());
+			exporter.startExport(session, preferences, shell.exportSession(), stage, engine);
 		}
 
 		@Override

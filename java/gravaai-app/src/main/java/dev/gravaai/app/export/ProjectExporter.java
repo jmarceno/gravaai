@@ -110,6 +110,20 @@ public final class ProjectExporter {
 	 */
 	public boolean startExport(EditorSession session, ExportPreferences preferences,
 			ExportSessionModel model, Window owner) {
+		return startExport(session, preferences, model, owner, null);
+	}
+
+	/**
+	 * Starts an export, optionally with the deep-zoom super-resolution engine (the Settings
+	 * "Upscale deep zooms in exports" preference). The engine is export-only: the preview's
+	 * compositor never gets one, so its cheap sharpening pass stays the preview's ceiling.
+	 *
+	 * <p>The caller opens the engine (null when the feature is off or the model is missing) and
+	 * hands over ownership: the provider closes it with the export's GL context.</p>
+	 */
+	public boolean startExport(EditorSession session, ExportPreferences preferences,
+			ExportSessionModel model, Window owner,
+			dev.gravaai.media.superres.@Nullable SuperResolutionEngine superResolution) {
 		int runId = model.beginExportRun();
 		model.setDropdownOpen(true);
 		model.setExporting(true);
@@ -145,7 +159,7 @@ public final class ProjectExporter {
 					wallpaperRoot, prepared.frameRate(), new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE));
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
-					elementHooks);
+					elementHooks, superResolution);
 			Run run = new Run(session, model, runId, prepared, stagingDir, owner, provider, factory,
 					elementHooks);
 			boolean started = coordinator.start(prepared.request(), provider, run);
@@ -157,6 +171,11 @@ public final class ProjectExporter {
 			return true;
 		} catch (IOException | RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "export failed to start: " + error);
+			// The provider owns the engine once it exists; if the export never started, nothing
+			// else will close it (an ORT session and its env are not collectable garbage).
+			if (superResolution != null) {
+				superResolution.close();
+			}
 			model.setExporting(false);
 			model.setError(errorMessage(error));
 			return false;

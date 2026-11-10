@@ -120,6 +120,17 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 	 */
 	public CompositorExportFrameProvider(int width, int height, int frameRate,
 			FrameAtTime.FrameInputFactory inputFactory, FrameOverlayHooks overlayHooks) {
+		this(width, height, frameRate, inputFactory, overlayHooks, null);
+	}
+
+	/**
+	 * @param superResolution the deep-zoom ONNX upscaler, or null to export with the sharpening
+	 *        pass only. The compositor takes ownership and closes it with the export's GL
+	 *        resources. This is an export-only pass: the preview never installs one.
+	 */
+	public CompositorExportFrameProvider(int width, int height, int frameRate,
+			FrameAtTime.FrameInputFactory inputFactory, FrameOverlayHooks overlayHooks,
+			dev.gravaai.media.superres.@Nullable SuperResolutionEngine superResolution) {
 		if (width <= 0 || height <= 0) {
 			throw new IllegalArgumentException("invalid export frame size: " + width + "x" + height);
 		}
@@ -132,6 +143,14 @@ public final class CompositorExportFrameProvider implements ExportFrameProvider 
 		this.inputFactory = Objects.requireNonNull(inputFactory, "inputFactory");
 		this.compositor = new Compositor(width, height);
 		this.compositor.setOverlayHooks(overlayHooks == null ? FrameOverlayHooks.NONE : overlayHooks);
+		if (superResolution != null) {
+			this.compositor.setSuperResolution(superResolution);
+		}
+	}
+
+	/** The compositor this provider renders with (the export report reads its counters). */
+	public Compositor compositor() {
+		return compositor;
 	}
 
 	@Override

@@ -29,6 +29,8 @@ import io.github.humbleui.types.Rect;
 import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.WebcamBackgroundEffect;
 import dev.gravaai.media.gl.SkiaGlSurface;
+import dev.gravaai.media.superres.SuperResolution;
+import dev.gravaai.media.superres.SuperResolutionEngine;
 
 /**
  * The single compositor used by both preview and export (plan §5.8), so the two can never
@@ -102,6 +104,14 @@ public final class Compositor implements AutoCloseable {
 	private @Nullable Surface blurSurface;
 	// Deep-zoom quality pass: the offscreen capture of the magnified video layer (ZoomSharpen).
 	private @Nullable Surface sharpenSurface;
+	// Optional deep-zoom super-resolution (export only): the engine, the decoded frame the draw
+	// path is currently rendering, and the uploaded image of the engine's cached window. All null
+	// unless the exporter installed an engine.
+	private @Nullable SuperResolutionEngine superResolution;
+	private @Nullable RgbaFrame superResolutionFrame;
+	private @Nullable RgbaFrame superResolutionUploaded;
+	private @Nullable Image superResolutionImage;
+	private @Nullable SuperResPlacement lastSuperResPlacement;
 	// Persistent GL textures for the screen and webcam frames (no per-frame copies or allocations).
 	private final GpuFrameTextures frameTextures = new GpuFrameTextures();
 	private @Nullable SkiaGlSurface currentTarget;
@@ -124,6 +134,49 @@ public final class Compositor implements AutoCloseable {
 		this.colorSpace = ColorSpace.getSRGB();
 	}
 
+	/**
+	 * Installs the optional deep-zoom super-resolution engine (export only). The compositor takes
+	 * ownership: {@link #close()} closes it.
+	 *
+	 * <p>With an engine installed, frames whose camera magnification reaches
+	 * {@link dev.gravaai.media.superres.SuperResolution#MIN_MAGNIFICATION} draw the upscaled window
+	 * instead of the stretched source. Without one the render path is byte-identical to the
+	 * sharpening-only compositor: the preview never installs an engine, so it cannot pay for an
+	 * inference it cannot afford.</p>
+	 */
+	public void setSuperResolution(@Nullable SuperResolutionEngine engine) {
+		if (superResolution == engine) {
+			return;
+		}
+		if (superResolution != null) {
+			superResolution.close();
+		}
+		releaseSuperResolutionImage();
+		superResolution = engine;
+	}
+
+	/** The engine installed for this compositor, or null (tests and the export report). */
+	@Nullable SuperResolutionEngine superResolution() {
+		return superResolution;
+	}
+
+	/**
+	 * Where the last frame's upscaled window was drawn, or null when it drew the plain source
+	 * (tests, and the export report's deep-zoom frame count).
+	 */
+	@Nullable SuperResPlacement lastSuperResPlacement() {
+		return lastSuperResPlacement;
+	}
+
+	/**
+	 * One drawn upscaled window.
+	 *
+	 * @param crop        the source window the inference covered
+	 * @param destination where it was drawn, in video-box coordinates
+	 */
+	record SuperResPlacement(SuperResolution.Crop crop, Rect destination) {
+	}
+
 	public int width() {
 		return width;
 	}
@@ -142,6 +195,13 @@ public final class Compositor implements AutoCloseable {
 		resetZoomState();
 		resetMotionBlur();
 		lastMaskRect = null;
+		lastSuperResPlacement = null;
+		// A reset starts a fresh pass over the timeline (the GIF exporter's palette run, a reused
+		// provider): drop the uploaded upscale so the next deep zoom in this run re-infers.
+		releaseSuperResolutionImage();
+		if (superResolution != null) {
+			superResolution.reset();
+		}
 		cursorRenderer.reset();
 	}
 
@@ -923,6 +983,18 @@ public final class Compositor implements AutoCloseable {
 	// ---- stage 2 + 4 (partial): video layer ----------------------------------------------
 
 	private void renderSourceVideo(Canvas canvas, FrameInput input, RgbaFrame frame) {
+		// The super-resolution tier reads pixels, not the uploaded texture: hand the decoded frame
+		// to the draw path for this frame only (cleared after, so a background-only next frame can
+		// never feed a stale buffer to the network).
+		superResolutionFrame = frame;
+		try {
+			renderSourceVideoScene(canvas, input, frame);
+		} finally {
+			superResolutionFrame = null;
+		}
+	}
+
+	private void renderSourceVideoScene(Canvas canvas, FrameInput input, RgbaFrame frame) {
 		LayoutSpec spec = input.layout();
 		// Split screen: the screen content fits into the region left of/above the camera strip
 		// (the full frame for the overlay mode). The padded layout runs inside that region.
@@ -1054,13 +1126,28 @@ public final class Compositor implements AutoCloseable {
 	}
 
 	/**
-	 * Draws the camera-transformed video layer (shadow stack + masked video) onto a canvas. Deep
-	 * zoom stages ({@link ZoomSharpen#MIN_MAGNIFICATION} and up) take the sharpening pass; every
-	 * other frame draws the plain bilinear layer exactly as before it existed.
+	 * Draws the camera-transformed video layer (shadow stack + masked video) onto a canvas.
+	 *
+	 * <p>Three quality tiers, cheapest first: frames whose camera magnification is at or above
+	 * {@link dev.gravaai.media.superres.SuperResolution#MIN_MAGNIFICATION} draw the ONNX-upscaled
+	 * window of the source when the exporter installed an engine; deep zooms from
+	 * {@link ZoomSharpen#MIN_MAGNIFICATION} up take the unsharp pass; everything else draws the
+	 * plain bilinear layer exactly as it did before either pass existed.</p>
 	 */
 	private void drawVideoScene(Canvas canvas, Image image, Rect source, Rect baseMask,
 			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform,
 			GradeSpec.@Nullable Window grade, ZoomSharpen.Pass sharpen) {
+		lastSuperResPlacement = null;
+		if (superResolution != null) {
+			SuperResPlacement placement = drawSuperResolvedScene(canvas, image, source, baseMask,
+					maskRadius, style, transform, grade);
+			if (placement != null) {
+				lastSuperResPlacement = placement;
+				return;
+			}
+			// Mild zoom, or an inference that failed: fall through to the sharpening/plain path
+			// so the frame still draws from the source.
+		}
 		if (sharpen.enabled()) {
 			Surface capture = ensureSharpenSurfaceOrNull();
 			if (capture != null) {
@@ -1077,6 +1164,97 @@ public final class Compositor implements AutoCloseable {
 		fillImage(canvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
 				SamplingMode.LINEAR, null, screenGrade.filter(grade));
 		canvas.restore();
+	}
+
+	/**
+	 * The export-only super-resolution tier: the upscaled window replaces the stretched source
+	 * inside the same camera transform, so shadows, the squircle mask and the grade behave exactly
+	 * as they do on the plain draw.
+	 *
+	 * <p>The source image the engine sees is the decoded frame, not the GL texture: the network
+	 * needs pixels, and the frame is already on the producer thread that fills the prefetch slot.
+	 * The result is uploaded once per inference (the engine caches the window across frames), so a
+	 * moving camera re-uses one upload instead of paying a network run per frame.</p>
+	 *
+	 * @return where the upscaled window was drawn, or null when this frame has no upscale
+	 */
+	private @Nullable SuperResPlacement drawSuperResolvedScene(Canvas canvas, Image image,
+			Rect source, Rect baseMask, double maskRadius, FrameStyle style,
+			ZoomTransform.AppliedTransform transform, GradeSpec.@Nullable Window grade) {
+		SuperResolutionEngine engine = superResolution;
+		RgbaFrame frame = superResolutionFrame;
+		if (engine == null || frame == null) {
+			return null;
+		}
+		var upscaled = engine.upscaleFor(frame, source, baseMask, transform, width, height);
+		if (upscaled == null) {
+			return null;
+		}
+		// Upload before touching the canvas: if the upscale cannot be turned into a drawable
+		// image, the caller falls through to the plain path rather than this method returning a
+		// placement for a layer it never painted.
+		Image upscaledImage = superResolutionImageFor(upscaled.upscaled());
+		if (upscaledImage == null) {
+			return null;
+		}
+		Rect destination = SuperResolution.destinationOf(upscaled.crop(), source, baseMask);
+		canvas.save();
+		canvas.translate((float) transform.x(), (float) transform.y());
+		canvas.scale((float) transform.scale(), (float) transform.scale());
+		drawVideoShadowLayers(canvas, baseMask, maskRadius, style);
+		// The upscaled window is drawn with the same matrix that placed it in box coordinates, so
+		// its pixels land exactly where the stretched source crop would have been.
+		try (Shader shader = upscaledImage.makeShader(FilterTileMode.CLAMP,
+				FilterTileMode.CLAMP, SamplingMode.LINEAR,
+				rectToRectMatrix(
+						Rect.makeWH(upscaled.upscaled().width(), upscaled.upscaled().height()),
+						destination));
+				Paint paint = new Paint();
+				Path path = SquircleGeometry.toPath(squircleRect(baseMask, maskRadius))) {
+			paint.setAntiAlias(true);
+			paint.setShader(shader);
+			paint.setColorFilter(screenGrade.filter(grade));
+			if (path != null && maskRadius > 0.5) {
+				// The squircle path clips the draw to the video layer.
+				canvas.drawPath(path, paint);
+			} else {
+				// Square corners: the destination covers the padded window, which is larger than
+				// the video box, so it must be clipped to the box or the extra upscaled pixels
+				// would paint over the background.
+				canvas.save();
+				canvas.clipRect(baseMask);
+				canvas.drawRect(destination, paint);
+				canvas.restore();
+			}
+		}
+		canvas.restore();
+		return new SuperResPlacement(upscaled.crop(), destination);
+	}
+
+	/**
+	 * The GL image of the engine's current upscaled window. Re-uploaded only when the engine hands
+	 * out a different buffer (a new inference), so a cached window costs nothing per frame.
+	 */
+	private @Nullable Image superResolutionImageFor(RgbaFrame upscaled) {
+		Image current = superResolutionImage;
+		if (current != null && superResolutionUploaded == upscaled) {
+			return current;
+		}
+		releaseSuperResolutionImage();
+		Image uploaded = frameTextures.image(currentTarget(), GpuFrameTextures.Slot.SUPER_RES,
+				upscaled, colorSpace);
+		superResolutionImage = uploaded;
+		superResolutionUploaded = upscaled;
+		return uploaded;
+	}
+
+	/** Releases the uploaded upscale (a new inference replaces it; close() drops it). */
+	private void releaseSuperResolutionImage() {
+		if (superResolutionImage != null) {
+			superResolutionImage.close();
+			superResolutionImage = null;
+		}
+		superResolutionUploaded = null;
 	}
 
 	/**
@@ -1399,6 +1577,13 @@ public final class Compositor implements AutoCloseable {
 		invalidateBackgroundCache();
 		screenGrade.close();
 		cameraGrade.close();
+		// The ONNX session is not a GL resource: release it regardless of the calling thread.
+		releaseSuperResolutionImage();
+		if (superResolution != null) {
+			superResolution.close();
+			superResolution = null;
+		}
+		superResolutionFrame = null;
 		// GPU resources go with the GL context; release them early only on the GL thread (an owner
 		// that closes after its context is gone has nothing left to free).
 		if (glCurrentOnThisThread()) {

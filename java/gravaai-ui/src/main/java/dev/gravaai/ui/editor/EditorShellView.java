@@ -56,6 +56,8 @@ public final class EditorShellView extends VBox {
 	private @Nullable EditorInspectorPanel inspector;
 	private dev.gravaai.ui.editor.transcript.@Nullable CaptionModelUiService captionModels;
 	private dev.gravaai.ui.editor.@Nullable AutoMaskUiService autoMask;
+	private dev.gravaai.ui.editor.@Nullable SuperResolutionUiService superResolution;
+	private @Nullable AutoCloseable superResolutionSubscription;
 	private Region inspectorPlaceholder;
 	private HBox body;
 	private final VBox dropHost;
@@ -269,6 +271,29 @@ public final class EditorShellView extends VBox {
 		}
 	}
 
+	/** Connects the Settings section's export-quality row to the upscaler controller. */
+	public void setSuperResolutionService(SuperResolutionUiService service) {
+		if (superResolutionSubscription != null) {
+			try {
+				superResolutionSubscription.close();
+			} catch (Exception ignored) {
+				// A failed unsubscribe must not break rewiring the service.
+			}
+			superResolutionSubscription = null;
+		}
+		superResolution = service;
+		if (service != null) {
+			java.util.function.Consumer<SuperResolutionUiService.State> listener =
+					state -> javafx.application.Platform.runLater(this::applyExportUpscaleMarker);
+			service.addListener(listener);
+			superResolutionSubscription = () -> service.removeListener(listener);
+		}
+		if (inspector != null) {
+			inspector.setSuperResolutionService(service);
+		}
+		applyExportUpscaleMarker();
+	}
+
 	/** The highlights controller for the timeline overlay (null until setAgentUiService). */
 	public @Nullable AgentHighlightsController agentHighlights() {
 		return agentHighlights;
@@ -301,6 +326,9 @@ public final class EditorShellView extends VBox {
 		}
 		if (captionModels != null) {
 			inspector.setCaptionModelService(captionModels);
+		}
+		if (superResolution != null) {
+			inspector.setSuperResolutionService(superResolution);
 		}
 		inspector.showSelectionSettings();
 		if (inspector.selectionEditor() == EditorInspectorPanel.SelectionEditor.NONE) {
@@ -337,6 +365,20 @@ public final class EditorShellView extends VBox {
 	public void setTimelineContent(Node timelineContent) {
 		this.timelineContent = timelineContent;
 		timelinePanel.setContent(timelineContent);
+		applyExportUpscaleMarker();
+	}
+
+	/**
+	 * Tells the timeline which zoom stages an export will upscale. Zero clears the marker (the
+	 * feature is off or the model is not installed); the timeline keeps the sharpening sparkle.
+	 */
+	private void applyExportUpscaleMarker() {
+		SuperResolutionUiService current = superResolution;
+		boolean active = current != null && current.state().active();
+		if (timelineContent instanceof dev.gravaai.ui.editor.timeline.TimelineView timelineView) {
+			timelineView.setExportUpscaleFromScale(
+					active ? dev.gravaai.media.superres.SuperResolution.MIN_MAGNIFICATION : 0);
+		}
 	}
 
 	private @Nullable Node timelineContent;

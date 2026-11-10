@@ -51,8 +51,8 @@ import io.github.humbleui.skija.SurfaceOrigin;
  */
 final class GpuFrameTextures implements AutoCloseable {
 
-	/** One texture per video layer. */
-	enum Slot { SOURCE, WEBCAM }
+	/** One texture per video layer, plus the export-only deep-zoom upscale window. */
+	enum Slot { SOURCE, WEBCAM, SUPER_RES }
 
 	private record Texture(int id, int width, int height) {}
 

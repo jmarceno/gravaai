@@ -644,6 +644,7 @@ public final class ProjectDocument {
 		node.put("highQualityMaskWhilePlaying", webcam.highQualityMaskWhilePlaying());
 		node.put("maskPrecision", webcam.maskPrecision());
 		node.put("maskOffset", webcam.maskOffset());
+		node.put("smartFraming", webcam.smartFraming());
 		return node;
 	}
 }

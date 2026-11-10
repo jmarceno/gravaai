@@ -137,6 +137,9 @@ public final class EditorSession implements AutoCloseable {
 	private final AutoCloseable changeSubscription;
 	private final AutoCloseable timeSubscription;
 	private final StoreTimelineDataSource dataSource;
+	/** The smart-framing dodge plan and the state it was walked for (Camera-track markers). */
+	private @Nullable ProjectEditorState smartFramingPlanState;
+	private dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFramingPlan;
 	private final TimelineCommands timelineCommands;
 	/** Serializes the background peak decodes; closed with the session. */
 	private final ExecutorService waveformExecutor;
@@ -221,6 +224,32 @@ public final class EditorSession implements AutoCloseable {
 		// Suggest-zooms telemetry, read from the current source video on demand (React keeps
 		// normalizedCursorTelemetry for project.videoSourcePath; imports swap the source).
 		this.dataSource.cursorTelemetry(this::cursorTelemetryPoints);
+		// Smart-framing dodge markers on the Camera layout track: the same plan the preview and
+		// the export render with, cached per project state.
+		this.dataSource.smartFramingPlan(this::smartFramingPlan);
+	}
+
+	/**
+	 * The project's smart-framing dodge schedule for the Camera-track indicators, cached until the
+	 * project state changes (the walk is per state, not per paint). Null when smart framing is off.
+	 */
+	public dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFramingPlan() {
+		ProjectEditorState state = store.state();
+		var webcam = state.webcam();
+		if (webcam == null || !webcam.smartFraming()) {
+			smartFramingPlanState = state;
+			return null;
+		}
+		if (smartFramingPlanState != state) {
+			smartFramingPlanState = state;
+			Path video = Path.of(videoPath());
+			smartFramingPlan = dev.gravaai.ui.editor.SmartFramingPlans.forState(state,
+					CursorTelemetryLoader.load(videoPath()), video, webcamPath(),
+					timelineDurationMs() / 1000.0,
+					dev.gravaai.media.compose.WebcamOverlay.REFERENCE_VIEWPORT_WIDTH,
+					dev.gravaai.media.compose.WebcamOverlay.referenceViewportHeight());
+		}
+		return smartFramingPlan;
 	}
 
 	/** The current document (raw tree + editor state), including post-import replacements. */

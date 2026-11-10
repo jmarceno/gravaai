@@ -7,6 +7,8 @@ import java.net.URL;
 import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.project.AspectRatios;
 import dev.gravaai.core.project.CropRegion;
+import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.media.compose.SmartFraming;
 import dev.gravaai.media.playback.PlaybackController;
 import dev.gravaai.media.playback.PlaybackStatus;
 import dev.gravaai.ui.editor.preview.AnnotationOverlayController;
@@ -79,6 +81,12 @@ public final class EditorPreviewPanel extends VBox {
 	private @Nullable Node previewContent;
 	/** Uncommitted overlay drag/resize; the composited annotation follows it live. */
 	private AnnotationOverlayController.@Nullable LiveBox liveAnnotationBox;
+	/** The smart-framing plan cache: state, track, and stage size the plan was walked for. */
+	private SmartFraming.@Nullable Plan smartFramingPlan;
+	private @Nullable ProjectEditorState smartFramingPlanState;
+	private PreviewFrameMapper.@Nullable CursorTrack smartFramingPlanTrack;
+	private int smartFramingPlanWidth = -1;
+	private int smartFramingPlanHeight = -1;
 
 	public EditorPreviewPanel(EditorStore store, EditorViewActions actions) {
 		this.store = store;
@@ -423,13 +431,40 @@ public final class EditorPreviewPanel extends VBox {
 	/** The compositor scene for the current store state plus any live overlay gesture. */
 	private PreviewFrameMapper.PreviewScene currentScene() {
 		PreviewFrameMapper.PreviewScene scene = PreviewFrameMapper.sceneFor(store.state(),
-				cursorTrack, mediaPath);
+				cursorTrack, mediaPath, smartFramingPlan());
 		AnnotationOverlayController.LiveBox box = liveAnnotationBox;
 		if (box == null || box.position() == null || box.size() == null) {
 			return scene;
 		}
 		return scene.withAnnotationBox(box.id(), box.position().x(), box.position().y(),
 				box.size().width(), box.size().height());
+	}
+
+	/**
+	 * The smart-framing dodge plan for the current state and preview stage, cached until the
+	 * state, the cursor track or the render size changes. Null when smart framing is off (the
+	 * default, and the reason this stays free on every other refresh).
+	 */
+	private SmartFraming.@Nullable Plan smartFramingPlan() {
+		var webcam = store.state().webcam();
+		if (webcam == null || !webcam.smartFraming()) {
+			return null;
+		}
+		int width = Math.max(1, previewView.rendererWidth());
+		int height = Math.max(1, previewView.rendererHeight());
+		if (smartFramingPlanState == store.state() && smartFramingPlanTrack == cursorTrack
+				&& smartFramingPlanWidth == width && smartFramingPlanHeight == height) {
+			return smartFramingPlan;
+		}
+		PlaybackStatus status = lastStatus;
+		double duration = status == null ? 0 : status.durationSeconds();
+		smartFramingPlan = SmartFramingPlans.forState(store.state(), cursorTrack.samples(),
+				mediaPath, null, duration, width, height);
+		smartFramingPlanState = store.state();
+		smartFramingPlanTrack = cursorTrack;
+		smartFramingPlanWidth = width;
+		smartFramingPlanHeight = height;
+		return smartFramingPlan;
 	}
 
 	private void refreshFallback(@Nullable String value) {

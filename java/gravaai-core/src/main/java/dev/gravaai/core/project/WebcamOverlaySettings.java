@@ -24,10 +24,11 @@ public record WebcamOverlaySettings(
 		@Nullable Double cornerRadius,
 		double shadow,
 		double margin,
-		WebcamBackgroundEffect backgroundEffect,
-		boolean highQualityMaskWhilePlaying,
-		double maskPrecision,
-		double maskOffset) {
+	WebcamBackgroundEffect backgroundEffect,
+	boolean highQualityMaskWhilePlaying,
+	double maskPrecision,
+	double maskOffset,
+	boolean smartFraming) {
 
 	public record TimeRange(long startMs, long endMs) {}
 
@@ -54,6 +55,8 @@ public record WebcamOverlaySettings(
 	public static final double DEFAULT_WEBCAM_MASK_PRECISION = 0.5;
 	/** Default edge offset in percent of the card's short side: 0 means no grow/shrink. */
 	public static final double DEFAULT_WEBCAM_MASK_OFFSET = 0;
+	/** Smart framing is opt-in: the camera only dodges the cursor when the project asks for it. */
+	public static final boolean DEFAULT_WEBCAM_SMART_FRAMING = false;
 
 	/** {@code DEFAULT_WEBCAM_OVERLAY}. */
 	public static WebcamOverlaySettings defaults() {
@@ -64,7 +67,7 @@ public record WebcamOverlaySettings(
 				DEFAULT_WEBCAM_ROUNDNESS, null, DEFAULT_WEBCAM_SHADOW, DEFAULT_WEBCAM_MARGIN,
 				DEFAULT_WEBCAM_BACKGROUND_EFFECT,
 				DEFAULT_WEBCAM_HIGH_QUALITY_MASK_WHILE_PLAYING, DEFAULT_WEBCAM_MASK_PRECISION,
-				DEFAULT_WEBCAM_MASK_OFFSET);
+				DEFAULT_WEBCAM_MASK_OFFSET, DEFAULT_WEBCAM_SMART_FRAMING);
 	}
 
 	/** Copy with a different background effect. */
@@ -72,7 +75,7 @@ public record WebcamOverlaySettings(
 		return new WebcamOverlaySettings(visibleRanges, enabled, sourcePath, timeOffsetMs, mirror,
 				cropRegion, corner, positionPreset, positionX, positionY, size, width, height,
 				reactToZoom, roundness, cornerRadius, shadow, margin, effect,
-				highQualityMaskWhilePlaying, maskPrecision, maskOffset);
+				highQualityMaskWhilePlaying, maskPrecision, maskOffset, smartFraming);
 	}
 
 	/** Copy with a different mask edge shape (Webcam → Advanced sliders). */
@@ -80,6 +83,6 @@ public record WebcamOverlaySettings(
 		return new WebcamOverlaySettings(visibleRanges, enabled, sourcePath, timeOffsetMs, mirror,
 				cropRegion, corner, positionPreset, positionX, positionY, size, width, height,
 				reactToZoom, roundness, cornerRadius, shadow, margin, backgroundEffect,
-				highQualityMaskWhilePlaying, precision, offsetPercent);
+				highQualityMaskWhilePlaying, precision, offsetPercent, smartFraming);
 	}
 }

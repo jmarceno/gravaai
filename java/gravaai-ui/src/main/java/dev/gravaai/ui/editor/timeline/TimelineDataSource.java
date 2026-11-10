@@ -30,6 +30,14 @@ public interface TimelineDataSource {
 		return java.util.List.of();
 	}
 
+	/**
+	 * The project's smart-framing dodge schedule, for the move markers on the Camera layout
+	 * track (null when smart framing is off or the adapter has no telemetry for it).
+	 */
+	default dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFramingPlan() {
+		return null;
+	}
+
 	/** Filmstrip thumbnails for the clip row (empty provider keeps the placeholder cells). */
 	default @Nullable FilmstripProvider filmstripProvider() {
 		return FilmstripProvider.empty();

@@ -156,7 +156,9 @@ public final class ProjectExporter {
 			ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 					session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 					cursorSamples, prepared.durationSeconds(), 0,
-					wallpaperRoot, prepared.frameRate(), new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE));
+					wallpaperRoot, prepared.frameRate(),
+					new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
+					prepared.outputWidth(), prepared.outputHeight());
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
 					elementHooks, superResolution);
@@ -399,7 +401,9 @@ public final class ProjectExporter {
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(
 				session.store().state(), prepared.videoPath(), prepared.webcamPath(),
 				cursorSamples, prepared.durationSeconds(), 0,
-				stageWallpapers(session), prepared.frameRate(), new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE));
+				stageWallpapers(session), prepared.frameRate(),
+				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
+				prepared.outputWidth(), prepared.outputHeight());
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 						factory, hooks)) {

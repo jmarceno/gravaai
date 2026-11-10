@@ -99,6 +99,9 @@ class ProjectDocumentTest {
 			if (!webcam.has("maskOffset")) {
 				webcam.put("maskOffset", WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
 			}
+			if (!webcam.has("smartFraming")) {
+				webcam.put("smartFraming", WebcamOverlaySettings.DEFAULT_WEBCAM_SMART_FRAMING);
+			}
 		}
 
 		assertEquals(2, saved.get("version").intValue());

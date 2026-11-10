@@ -45,7 +45,8 @@ public final class PreviewFrameMapper {
 			List<dev.gravaai.media.compose.AnnotationSpec> annotations,
 			dev.gravaai.media.compose.CaptionSpec captions,
 			dev.gravaai.media.compose.@Nullable KeystrokeSpec keystrokes,
-			dev.gravaai.media.compose.FadeSpec fade, ProjectEditorState editor) {
+			dev.gravaai.media.compose.FadeSpec fade, ProjectEditorState editor,
+			dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFraming) {
 
 		/**
 		 * The scene with one annotation's box moved/resized (percent of the recording rect) while
@@ -64,12 +65,12 @@ public final class PreviewFrameMapper {
 								spec.endMs(), spec.type(), spec.content(), spec.imageData(),
 								new dev.gravaai.media.compose.AnnotationSpec.Position(x, y),
 								new dev.gravaai.media.compose.AnnotationSpec.Size(width, height),
-							spec.style(), spec.zIndex(), spec.figure(), spec.blurIntensity(),
-							spec.blurColor(), spec.loupeMagnification()));
+								spec.style(), spec.zIndex(), spec.figure(), spec.blurIntensity(),
+								spec.blurColor(), spec.loupeMagnification()));
 			}
 			return new PreviewScene(background, backgroundBlur, layout, style, zoom, cursor,
 					cursorSpec, webcam, videoWallpaper, List.copyOf(next), captions, keystrokes, fade,
-					editor);
+					editor, smartFraming);
 		}
 	}
 
@@ -133,13 +134,23 @@ public final class PreviewFrameMapper {
 	 */
 	public static PreviewScene sceneFor(ProjectEditorState state, CursorTrack cursor,
 			java.nio.file.@Nullable Path videoPath) {
+		return sceneFor(state, cursor, videoPath, null);
+	}
+
+	/**
+	 * Same as above with the project's {@link SmartFraming} plan, so the preview camera dodges
+	 * exactly like the export's (the plan is resolved against the preview's own stage size).
+	 */
+	public static PreviewScene sceneFor(ProjectEditorState state, CursorTrack cursor,
+			java.nio.file.@Nullable Path videoPath,
+			dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFraming) {
 		return new PreviewScene(PreviewBackgrounds.of(state.wallpaper()),
 				Math.max(0, state.backgroundBlur()), layoutFor(state), styleFor(state), zoomSpecFor(state),
 				cursor == null ? CursorTrack.NONE : cursor, cursorSpecFor(state), webcamSpecFor(state),
 				PreviewBackgrounds.videoPath(state.wallpaper()),
 				ProjectEditorInputs.annotationSpecs(state), ProjectEditorInputs.captionSpec(state),
 				videoPath == null ? null : ProjectEditorInputs.keystrokeSpec(state, videoPath),
-				ProjectEditorInputs.fadeSpec(state), state);
+				ProjectEditorInputs.fadeSpec(state), state, smartFraming);
 	}
 
 	/**
@@ -306,7 +317,7 @@ public final class PreviewFrameMapper {
 						frame.timelineSeconds() * 1000);
 		WebcamSpec webcam = scene.editor() == null ? scene.webcam()
 				: ProjectEditorInputs.webcamSpecAt(scene.webcam(), scene.editor(),
-						frame.timelineSeconds() * 1000);
+						frame.timelineSeconds() * 1000, scene.smartFraming());
 		GradeSpec grade = scene.editor() == null ? GradeSpec.NONE
 				: ProjectEditorInputs.gradeSpec(scene.editor());
 		return new FrameInput(frame.frameIndex(), frame.timelineSeconds(), frame.sourceFrame(),

@@ -1666,10 +1666,18 @@ public final class EditorInspectorPanel extends VBox {
 			Switch react = Switch.xs("React to zoom");
 			react.setChecked(webcam.reactToZoom());
 			react.onCheckedChange(value -> applyWebcam(json -> json.put("reactToZoom", value)));
+			// Smart framing dodges the cursor and zoom focus; a split camera never floats over
+			// the content, so there is nothing for it to do there.
+			Switch smartFraming = Switch.xs("Smart framing");
+			smartFraming.setChecked(webcam.smartFraming());
+			smartFraming.onCheckedChange(value -> {
+				applyWebcam(json -> json.put("smartFraming", value));
+				rebuild();
+			});
 			boolean projectSplit = webcam.positionPreset().isSplit();
 			// React to zoom counter-scales the floating bubble; a split camera has a fixed strip.
 			camera.getChildren().addAll(projectSplit ? List.of(enabled, mirror)
-					: List.of(enabled, mirror, react));
+					: List.of(enabled, mirror, react, smartFraming));
 
 			// What the card does with the room: nothing, blur it, or let the wallpaper show through.
 			// One selector rather than two switches, so blur and remove cannot both be on.

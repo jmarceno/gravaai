@@ -59,6 +59,7 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 - Crop and aspect-ratio presets
 - Rendered cursor with size, smoothing, motion blur, click bounce and loop mode
 - Webcam mirror, size, position, split screen (camera beside or above/below the video), roundness, shadow and zoom-reactive scaling
+- Smart framing (opt-in per project): the camera eases to another corner or shrinks when the cursor or the zoom focus would sit under it, gliding back once the way is clear, with the moves marked on the timeline's Camera track
 - Wallpapers, colors, gradients, padding, rounded corners, blur and shadows
 - Auto-captions with a local Whisper model
 - Projects saved as `.gravaai` files: save while editing with **Ctrl + S** (⌘ S) or the **Save**

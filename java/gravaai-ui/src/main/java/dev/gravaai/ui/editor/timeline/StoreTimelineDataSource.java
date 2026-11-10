@@ -32,6 +32,8 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 	private final DoubleSupplier playheadMs;
 	private final WaveformProvider waveforms;
 	private Supplier<List<ZoomSuggestionUtils.CursorTelemetryPoint>> cursorTelemetry = List::of;
+	private Supplier<dev.gravaai.media.compose.SmartFraming.@Nullable Plan> smartFramingPlan =
+			() -> null;
 	private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
 	private volatile List<TimelineSourceAudioTrack> sourceAudioTracks = List.of();
 
@@ -59,6 +61,18 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 	@Override
 	public List<ZoomSuggestionUtils.CursorTelemetryPoint> cursorTelemetry() {
 		return cursorTelemetry.get();
+	}
+
+	/** Supplies the project's smart-framing dodge plan (the app caches it per state). */
+	public StoreTimelineDataSource smartFramingPlan(
+			Supplier<dev.gravaai.media.compose.SmartFraming.@Nullable Plan> plan) {
+		this.smartFramingPlan = plan == null ? () -> null : plan;
+		return this;
+	}
+
+	@Override
+	public dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFramingPlan() {
+		return smartFramingPlan.get();
 	}
 
 	/** Subscribes to store edits and late-arriving data; marshal to the FX thread before repaint. */

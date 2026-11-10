@@ -96,7 +96,7 @@ final class AgentFrameRenderer {
 				session.elementDiagnostics(), () -> state);
 				ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state, videoPath,
 				webcamPath, cursorSamples, editedMs / 1000.0, 0, wallpaperRoot, FRAME_RATE,
-				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE));
+				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE), width, height);
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(width,
 						height, FRAME_RATE, factory, elements)) {
 			ByteBuffer buffer = ByteBuffer.allocate(width * height * 4);

@@ -179,6 +179,15 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("defaults smart framing to off and round-trips it (opt-in per project)")
+	void webcamSmartFramingDefaultsOff() {
+		// Off by default: the camera only dodges the cursor when the project asks for it.
+		assertFalse(normalize("{\"webcam\":{\"enabled\":true}}").webcam().smartFraming());
+		assertTrue(normalize("{\"webcam\":{\"smartFraming\":true}}").webcam().smartFraming());
+		assertFalse(normalize("{\"webcam\":{\"smartFraming\":\"yes\"}}").webcam().smartFraming());
+	}
+
+	@Test
 	@DisplayName("defaults the webcam blur mask controls and clamps them to their slider ranges")
 	void webcamMaskControlsDefaultAndClamp() {
 		// A project saved before the controls existed keeps the shipped edge shape.

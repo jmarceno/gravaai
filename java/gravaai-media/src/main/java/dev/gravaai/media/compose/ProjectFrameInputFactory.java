@@ -49,6 +49,8 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final long webcamTimeOffsetMs;
 	private final @Nullable Path wallpaperRoot;
 	private final int frameRate;
+	private final int stageWidth;
+	private final int stageHeight;
 	private final MediaFrameReader videoFrames;
 	private final @Nullable MediaFrameReader webcamFrames;
 	private final @Nullable WebcamSegmenter webcamSegmenter;
@@ -72,6 +74,9 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final KeystrokeSpec keystrokes;
 	private final FadeSpec fade;
 	private final GradeSpec grade;
+	/** The smart-framing dodge schedule, resolved once on first use when the project opts in. */
+	private SmartFraming.@Nullable Plan smartFramingPlan;
+	private boolean smartFramingResolved;
 	private @Nullable MediaFrameReader wallpaperFrames;
 	private boolean closed;
 
@@ -94,6 +99,18 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	}
 
 	/**
+	 * Same as above with the compositor's output size, which smart framing needs to plan its
+	 * dodges against the same stage the frames render into.
+	 */
+	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath,
+			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
+			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
+			int frameRate, int stageWidth, int stageHeight) {
+		this(editor, videoPath, webcamPath, cursorSamples, sourceDurationSeconds,
+				webcamTimeOffsetMs, wallpaperRoot, frameRate, null, stageWidth, stageHeight);
+	}
+
+	/**
 	 * @param webcamSegmenter the person segmenter backing the webcam background blur, or null
 	 *        when unavailable (blur then silently renders off even when enabled). The factory
 	 *        takes ownership: {@link #close()} closes it with the decoders.
@@ -102,6 +119,17 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
 			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
 			int frameRate, @Nullable WebcamSegmenter webcamSegmenter) {
+		this(editor, videoPath, webcamPath, cursorSamples, sourceDurationSeconds,
+				webcamTimeOffsetMs, wallpaperRoot, frameRate, webcamSegmenter,
+				WebcamOverlay.REFERENCE_VIEWPORT_WIDTH, WebcamOverlay.referenceViewportHeight());
+	}
+
+	/** Primary: everything above plus the segmenter and the compositor output size. */
+	public ProjectFrameInputFactory(ProjectEditorState editor, Path videoPath,
+			@Nullable Path webcamPath, List<CursorSample> cursorSamples,
+			double sourceDurationSeconds, long webcamTimeOffsetMs, @Nullable Path wallpaperRoot,
+			int frameRate, @Nullable WebcamSegmenter webcamSegmenter, int stageWidth,
+			int stageHeight) {
 		this.editor = Objects.requireNonNull(editor, "editor");
 		this.videoPath = Objects.requireNonNull(videoPath, "videoPath");
 		this.webcamSegmenter = webcamSegmenter;
@@ -113,6 +141,8 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		this.webcamTimeOffsetMs = webcamTimeOffsetMs;
 		this.wallpaperRoot = wallpaperRoot;
 		this.frameRate = frameRate > 0 ? frameRate : 60;
+		this.stageWidth = Math.max(1, stageWidth);
+		this.stageHeight = Math.max(1, stageHeight);
 		this.videoFrames = new MediaFrameReader(videoPath, sourceDurationSeconds, true);
 		this.webcamFrames = webcamPath == null ? null : new MediaFrameReader(webcamPath, 0, false);
 		this.layout = ProjectEditorInputs.layout(editor);
@@ -174,7 +204,7 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				zoom,
 				style,
 				cursorSpec,
-				ProjectEditorInputs.webcamSpecAt(webcamSpec, editor, timelineMs),
+				ProjectEditorInputs.webcamSpecAt(webcamSpec, editor, timelineMs, plan()),
 				annotations,
 				captions,
 				keystrokes,
@@ -182,6 +212,26 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				ProjectEditorInputs.sceneSpec(editor, timelineMs),
 				grade,
 				sourceTime);
+	}
+
+	/**
+	 * The smart-framing dodge schedule for this project, or null when the project does not opt in.
+	 * Resolved once on first use: it probes both media sizes and walks the timeline (the probes
+	 * only run for projects that opt in).
+	 */
+	public SmartFraming.@Nullable Plan plan() {
+		if (!smartFramingResolved) {
+			smartFramingResolved = true;
+			var settings = editor.webcam();
+			if (settings != null && settings.smartFraming() && settings.enabled()) {
+				smartFramingPlan = SmartFraming.plan(editor, cursorSamples, sourceDurationSeconds,
+						videoFrames.frameWidth(), videoFrames.frameHeight(),
+						webcamFrames == null ? 0 : webcamFrames.frameWidth(),
+						webcamFrames == null ? 0 : webcamFrames.frameHeight(), stageWidth,
+						stageHeight);
+			}
+		}
+		return smartFramingPlan;
 	}
 
 	/**

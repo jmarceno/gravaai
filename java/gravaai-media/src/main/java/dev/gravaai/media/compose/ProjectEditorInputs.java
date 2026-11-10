@@ -447,6 +447,17 @@ public final class ProjectEditorInputs {
 	}
 
 	/**
+	 * Same as above with the project's {@link SmartFraming} plan applied on top: the planned dodge
+	 * substitute the camera's position and size wherever the plan is active (it stands down on the
+	 * Camera layout track, so it never fights a pinned segment).
+	 */
+	public static WebcamSpec webcamSpecAt(WebcamSpec base, ProjectEditorState editor,
+			double timelineMs, SmartFraming.@Nullable Plan smartFraming) {
+		WebcamSpec spec = webcamSpecAt(base, editor, timelineMs);
+		return smartFraming == null ? spec : SmartFraming.apply(spec, smartFraming.at(timelineMs));
+	}
+
+	/**
 	 * The first {@link CameraLayoutSegment#SMOOTH_MS} after a block with a smooth switch-out ends
 	 * into a gap: the camera glides from the block's styled spec back to the project's, so the
 	 * compositor slides the split divider back instead of cutting. When another block touches the

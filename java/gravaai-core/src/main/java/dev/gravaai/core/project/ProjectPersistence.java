@@ -1344,7 +1344,9 @@ public final class ProjectPersistence {
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_PRECISION,
 				isFiniteNumber(field(webcamNode, "maskOffset"))
 						? clamp(field(webcamNode, "maskOffset").doubleValue(), -10, 10)
-						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET);
+						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET,
+				booleanOr(field(webcamNode, "smartFraming"),
+						WebcamOverlaySettings.DEFAULT_WEBCAM_SMART_FRAMING));
 	}
 
 	// ---------------------------------------------------------------------

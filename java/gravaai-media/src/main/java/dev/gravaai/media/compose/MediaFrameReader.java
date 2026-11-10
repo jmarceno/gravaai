@@ -12,6 +12,7 @@ import dev.gravaai.media.ffmpeg.FrameConverter;
 import dev.gravaai.media.ffmpeg.MediaInfo;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.media.ffmpeg.VideoDecoder;
+import dev.gravaai.media.ffmpeg.VideoStreamInfo;
 
 /**
  * One lazily opened decoder + converter for a media file; single-threaded by contract. The
@@ -23,6 +24,7 @@ public final class MediaFrameReader implements AutoCloseable {
 	private final Path path;
 	private final boolean video;
 	private double durationSeconds;
+	private @Nullable VideoStreamInfo probedVideo;
 	private @Nullable VideoDecoder decoder;
 	private @Nullable FrameConverter converter;
 	private @Nullable ColourInfo colour;
@@ -55,6 +57,39 @@ public final class MediaFrameReader implements AutoCloseable {
 			}
 		}
 		return durationSeconds > 0 ? durationSeconds : 0;
+	}
+
+	/** The probed display width in pixels (rotation applied), or 0 when the media is unreadable. */
+	public int frameWidth() {
+		VideoStreamInfo stream = probeVideo();
+		return stream.rotationDegrees() % 180 != 0 ? stream.height() : stream.width();
+	}
+
+	/** The probed display height in pixels (rotation applied), or 0 when unreadable. */
+	public int frameHeight() {
+		VideoStreamInfo stream = probeVideo();
+		return stream.rotationDegrees() % 180 != 0 ? stream.width() : stream.height();
+	}
+
+	private VideoStreamInfo probeVideo() {
+		if (probedVideo == null) {
+			try {
+				MediaInfo info = MediaProbe.probe(path);
+				probedVideo = info.video().orElse(null);
+				if (durationSeconds <= 0) {
+					durationSeconds = info.durationSeconds();
+				}
+				if (video && colour == null) {
+					colour = info.video().map(stream -> stream.colour()).orElse(null);
+				}
+			} catch (RuntimeException error) {
+				probedVideo = null;
+			}
+			if (probedVideo == null) {
+				probedVideo = new VideoStreamInfo(0, "", 0, 0, 0, 0, 0, ColourInfo.UNSPECIFIED);
+			}
+		}
+		return probedVideo;
 	}
 
 	/** The frame at {@code seconds}, or null at end of file/unreadable media. */

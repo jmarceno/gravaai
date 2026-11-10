@@ -25,6 +25,7 @@ import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.TrimRegion;
 import dev.gravaai.core.project.ZoomRegion;
+import dev.gravaai.media.compose.SmartFraming;
 import dev.gravaai.media.compose.ZoomSharpen;
 import dev.gravaai.ui.editor.timeline.core.ClipPresentation;
 import dev.gravaai.ui.editor.timeline.core.SourceAudioCleanupBadge;
@@ -190,6 +191,11 @@ public final class TimelineView extends Region {
 	private static final Color SPEED_BORDER = Color.web("#f0b429", 0.45);
 	private static final Color SPEED_TEXT = Color.web("#f0b429");
 	private static final Color PLAYHEAD = Color.web("#2fe6d0");
+	/** Smart-framing dodge markers: the playhead cyan plus its faded glide band. */
+	private static final Color SMART_FRAMING_MOVE = Color.web("#2fe6d0");
+	private static final Color SMART_FRAMING_MOVE_BAND = Color.web("#2fe6d0", 0.22);
+	private static final Color SMART_FRAMING_RETURN = Color.web("#9fb3bd");
+	private static final Color SMART_FRAMING_RETURN_BAND = Color.web("#9fb3bd", 0.18);
 	private static final double PLAYHEAD_CAP_WIDTH = 8;
 	private static final double PLAYHEAD_CAP_HEIGHT = 8;
 	private static final double PLAYHEAD_TAG_HEIGHT = 15;
@@ -2158,6 +2164,7 @@ public final class TimelineView extends Region {
 		drawRows(graphics, width);
 		drawLaneSeparators(graphics, width);
 		drawInteractionOverlays(graphics);
+		drawSmartFramingMoves(graphics, width);
 		graphics.restore();
 		// Track headers (mock .tlheads) live in the fixed gutter and scroll with the lanes.
 		graphics.save();
@@ -2930,6 +2937,50 @@ public final class TimelineView extends Region {
 			double startX, double centerY) {
 		drawSwitchDiamond(graphics, segment.transition(), startX + 7, centerY,
 				cameraSwitchBounds, segment.id());
+	}
+
+	/**
+	 * The project's smart-framing moves, marked on the Camera layout track: a diamond where the
+	 * camera starts to move (cyan for a dodge away, gray for the eased return) over the glide's
+	 * shaded band. Nothing without the plan — smart framing off draws a bare track.
+	 */
+	private void drawSmartFramingMoves(GraphicsContext graphics, double width) {
+		SmartFraming.Plan plan = dataSource.smartFramingPlan();
+		if (plan == null || plan.isEmpty()) {
+			return;
+		}
+		RowLayout row = rowById(TimelineConstants.CAMERA_LAYOUT_ROW_ID);
+		if (row == null) {
+			return;
+		}
+		double top = row.top() + 5;
+		double height = row.height() - 10;
+		for (SmartFraming.Move move : plan.moves()) {
+			double startX = xForTime(move.startMs());
+			if (startX < GUTTER_WIDTH - 8 || startX > width) {
+				continue;
+			}
+			double bandWidth = Math.max(2,
+					xForTime(move.startMs() + SmartFraming.MOVE_MS) - startX);
+			Color diamond = move.returning() ? SMART_FRAMING_RETURN : SMART_FRAMING_MOVE;
+			graphics.setFill(move.returning() ? SMART_FRAMING_RETURN_BAND
+					: SMART_FRAMING_MOVE_BAND);
+			graphics.fillRect(startX, top, Math.min(bandWidth, width - startX), height);
+			double half = 4;
+			double centerY = top + height / 2;
+			double[] xs = {startX, startX + half, startX, startX - half};
+			double[] ys = {centerY - half, centerY, centerY + half, centerY};
+			if (move.returning()) {
+				graphics.setFill(CAMERA_HIDDEN_FILL);
+				graphics.fillPolygon(xs, ys, 4);
+				graphics.setStroke(diamond);
+				graphics.setLineWidth(1.2);
+				graphics.strokePolygon(xs, ys, 4);
+			} else {
+				graphics.setFill(diamond);
+				graphics.fillPolygon(xs, ys, 4);
+			}
+		}
 	}
 
 	/**

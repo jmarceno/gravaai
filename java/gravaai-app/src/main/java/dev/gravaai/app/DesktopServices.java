@@ -187,8 +187,34 @@ final class DesktopServices implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * JVM shutdown-hook path (SIGTERM/SIGINT): the FX toolkit never runs the rest of the app's
+	 * shutdown then, so only the transport pieces are closed here. The tray item is unexported and
+	 * the session bus disconnected while the process still owns its unique name, which is the
+	 * removal a StatusNotifierHost can observe; every field is nulled as it is closed, so a normal
+	 * quit that already ran {@link #close()} leaves nothing for this method to do.
+	 */
+	synchronized void closeForSignal() {
+		Tray currentTray = tray;
+		SessionBus currentBus = bus;
+		if (currentTray == null && currentBus == null) {
+			// The regular shutdown already closed everything (normal quit, or no bus at all).
+			return;
+		}
+		LOG.log(System.Logger.Level.INFO, "shutdown hook: closing the tray and the session bus");
+		closeTrayRecordingSubscription();
+		tray = null;
+		if (currentTray != null) {
+			currentTray.close();
+		}
+		bus = null;
+		if (currentBus != null) {
+			currentBus.close();
+		}
+	}
+
 	@Override
-	public void close() {
+	public synchronized void close() {
 		closeTrayRecordingSubscription();
 		Tray currentTray = tray;
 		tray = null;

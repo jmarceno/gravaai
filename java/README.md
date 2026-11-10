@@ -27,6 +27,7 @@ java/dist/Gravaai-linux-x64.AppImage
 gravaai --ui-kit      # UI kit showcase (P1.3 visual gate)
 gravaai --dashboard   # dashboard screen (P1.10 dev/screenshot entry)
 gravaai --mcp         # MCP bridge over stdio (Phase 3, P3.2)
+gravaai --no-tray     # start without the status tray (GRAVAAI_NO_TRAY=1 is the env form)
 gravaai --toggle-recording   # any gravaai-ctl action; forwarded to a running instance
 ```
 
@@ -40,7 +41,9 @@ There are no UI tests: the UI is checked by hand. `./mvnw -T1 test` runs the uni
 The app is a single-window application: the dashboard, the editor and the meeting view share the
 primary stage; only the HUD overlay/menu, countdown, capture picker and area border are separate
 OS windows.
-Stop the app with `pkill -x gravaai` only.
+Stop the app with `pkill -x gravaai` only. SIGTERM/SIGINT close the tray and the session bus from a
+JVM shutdown hook, so a stopped run unexports its item while the process still owns its bus name;
+use `--no-tray` for the automated start/stop runs that never look at the panel.
 
 ## Layout
 

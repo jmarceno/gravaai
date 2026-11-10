@@ -51,6 +51,9 @@ public final class Main {
 		if (cli.dashboard()) {
 			System.setProperty("gravaai.dashboard", "true");
 		}
+		if (cli.noTray() || devFlag("GRAVAAI_NO_TRAY")) {
+			System.setProperty("gravaai.noTray", "true");
+		}
 		if (cli.launchFile() != null) {
 			launchFile = Path.of(cli.launchFile()).toAbsolutePath().normalize();
 		}
@@ -133,5 +136,12 @@ public final class Main {
 		}
 		String editorOpen = System.getenv("GRAVAAI_EDITOR_OPEN");
 		return editorOpen != null && !editorOpen.isBlank();
+	}
+
+	/** A boolean development flag from the environment; blank, {@code 0} and {@code false} are off. */
+	private static boolean devFlag(String name) {
+		String value = System.getenv(name);
+		return value != null && !value.isBlank()
+				&& !value.equals("0") && !value.equalsIgnoreCase("false");
 	}
 }

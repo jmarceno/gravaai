@@ -27,6 +27,16 @@ class CliArgsTest {
 	}
 
 	@Test
+	@DisplayName("--no-tray turns the tray off without enabling a development mode")
+	void noTray() {
+		CliArgs cli = CliArgs.parse(new String[] {"--no-tray"});
+		assertEquals(true, cli.noTray());
+		assertEquals(false, cli.mcp());
+		assertEquals(false, cli.uiKit());
+		assertEquals(false, cli.dashboard());
+	}
+
+	@Test
 	@DisplayName("a positional argument naming an existing file is the launch file")
 	void launchFile() throws Exception {
 		Path project = tempDir.resolve("my project.gravaai");

@@ -13,20 +13,27 @@ import org.jspecify.annotations.Nullable;
  * <p>A positional argument naming an existing file is a launch file (a {@code .gravaai} project or
  * a raw recording) so double-clicking an associated file in the file manager opens it; a second
  * launch forwards {@code open <path>} over the control socket instead.
+ *
+ * <p>{@code --no-tray} starts the app without the StatusNotifierItem tray; {@code GRAVAAI_NO_TRAY}
+ * is the environment form for scripted runs. A tray item is only dropped by its host when the
+ * process's bus name leaves the bus, and a short-lived run can leave a dead button behind that the
+ * panel never removes, so runs that nobody looks for on the panel skip the tray entirely.
  */
-public record CliArgs(boolean mcp, boolean uiKit, boolean dashboard, @Nullable String launchFile,
-		List<String> raw) {
+public record CliArgs(boolean mcp, boolean uiKit, boolean dashboard, boolean noTray,
+		@Nullable String launchFile, List<String> raw) {
 
 	public static CliArgs parse(String[] args) {
 		boolean mcp = false;
 		boolean uiKit = false;
 		boolean dashboard = false;
+		boolean noTray = false;
 		String launchFile = null;
 		for (String arg : args) {
 			switch (arg) {
 				case "--mcp" -> mcp = true;
 				case "--ui-kit" -> uiKit = true;
 				case "--dashboard" -> dashboard = true;
+				case "--no-tray" -> noTray = true;
 				default -> {
 					// Launch actions (--toggle-recording, ...) are handled by the shortcut dispatch.
 					if (launchFile == null && !arg.startsWith("-") && isExistingFile(arg)) {
@@ -35,7 +42,7 @@ public record CliArgs(boolean mcp, boolean uiKit, boolean dashboard, @Nullable S
 				}
 			}
 		}
-		return new CliArgs(mcp, uiKit, dashboard, launchFile, List.of(args));
+		return new CliArgs(mcp, uiKit, dashboard, noTray, launchFile, List.of(args));
 	}
 
 	/** A positional arg counts as a launch file only when it names a real, readable file. */

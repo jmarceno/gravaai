@@ -990,6 +990,16 @@ public final class AppContext {
 		}
 	}
 
+	/**
+	 * Signal shutdown path (SIGTERM/SIGINT): the JVM shutdown hook runs while the FX toolkit is
+	 * still up, but JavaFX never calls {@link javafx.application.Application#stop()}, so only the
+	 * desktop transports are closed here — the window, editor and recording teardown in
+	 * {@link #shutdown()} belongs on the FX thread.
+	 */
+	void closeDesktopForSignal() {
+		desktopServices.closeForSignal();
+	}
+
 	/** Plan §1.1.3 shutdown order: recording first, then jobs, sockets, GL threads, then the UI. */
 	public void shutdown() {
 		if (shutdown) {
@@ -1901,6 +1911,13 @@ public final class AppContext {
 	}
 
 	private void startTray() {
+		// --no-tray / GRAVAAI_NO_TRAY: the automated runs that start and stop the app within
+		// seconds would leave a dead button on a host that does not drop the item itself, so they
+		// skip the tray entirely instead of racing the panel's first icon fetch.
+		if (Boolean.getBoolean("gravaai.noTray")) {
+			LOG.log(System.Logger.Level.INFO, "tray disabled (--no-tray / GRAVAAI_NO_TRAY)");
+			return;
+		}
 		Path iconPath = icons.load("gravaai-32.png");
 		Path recordingIconPath = icons.loadOrNull("rec-button.png");
 		RecordingWiring wiring = recordingWiring;

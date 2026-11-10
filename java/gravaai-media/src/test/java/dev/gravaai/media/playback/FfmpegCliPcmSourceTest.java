@@ -160,7 +160,7 @@ class FfmpegCliPcmSourceTest {
 						new AudioCleanup(AudioCleanup.NoiseReduction.STRONG, 0, 0))),
 				0, 0, 1, List.of());
 		String graph = command.get(command.indexOf("-filter_complex") + 1);
-		assertTrue(graph.contains("arnndn=m=") || graph.contains("afftdn=nr=20"));
+		assertTrue(graph.contains("afftdn=nr=22:nf=-30"), graph);
 	}
 
 	@Test

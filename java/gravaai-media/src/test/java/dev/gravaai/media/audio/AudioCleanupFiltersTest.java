@@ -52,14 +52,14 @@ class AudioCleanupFiltersTest {
 	}
 
 	@Test
-	@DisplayName("without the model the heavier levels fall back to stronger FFT denoise")
+	@DisplayName("without the model the heavier levels fall back to a static-profile FFT denoise")
 	void fftFallback() {
 		AudioCleanup balanced = new AudioCleanup(AudioCleanup.NoiseReduction.BALANCED, 0, 0);
-		assertEquals(List.of("afftdn=nr=14:nf=-50:tn=1"),
+		assertEquals(List.of("afftdn=nr=12:nf=-30"),
 				AudioCleanupFilters.trackFilters(balanced, null));
 
 		AudioCleanup strong = new AudioCleanup(AudioCleanup.NoiseReduction.STRONG, 0, 0);
-		assertEquals(List.of("afftdn=nr=20:nf=-50:tn=1"),
+		assertEquals(List.of("afftdn=nr=22:nf=-30"),
 				AudioCleanupFilters.trackFilters(strong, null));
 	}
 
@@ -80,6 +80,19 @@ class AudioCleanupFiltersTest {
 		assertEquals("loudnorm=I=-16:TP=-1.5:LRA=11", AudioCleanupFilters.loudnormFilter(-16));
 		assertEquals("loudnorm=I=-14:TP=-1.5:LRA=11", AudioCleanupFilters.loudnormFilter(-14));
 		assertEquals("loudnorm=I=-23:TP=-1.5:LRA=11", AudioCleanupFilters.loudnormFilter(-23));
+	}
+
+	@Test
+	@DisplayName("a measurement turns the loudness stage into the linear two-pass form")
+	void loudnormLinear() {
+		var measured = new AudioCleanupFilters.MeasuredLoudness(-14.23, -8.51, 3.00, -24.77, 0.04);
+		assertEquals("loudnorm=I=-16:TP=-1.5:LRA=11:linear=true"
+						+ ":measured_I=-14.23:measured_TP=-8.51:measured_LRA=3.00"
+						+ ":measured_thresh=-24.77:offset=0.04",
+				AudioCleanupFilters.loudnormFilter(-16, measured));
+		// No target or no measurement: the dynamic single pass (or nothing).
+		assertEquals("loudnorm=I=-16:TP=-1.5:LRA=11", AudioCleanupFilters.loudnormFilter(-16, null));
+		assertNull(AudioCleanupFilters.loudnormFilter(0, measured));
 	}
 
 	@Test

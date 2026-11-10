@@ -78,6 +78,13 @@ public final class FfmpegCliPcmSource implements PcmSource {
 	 * seeked/trimmed to the same source span, cleaned, gained, then {@code amix}ed and optionally
 	 * loudness-normalized, so the preview hears the same stages the export graph applies.
 	 *
+	 * <p>The loudness stage is the known approximation: the export measures the whole programme
+	 * first and normalizes with one linear gain ({@code ExportAudioLoudness}), while a preview
+	 * segment can only normalize dynamically over its own span — the cleanup and gain stages are
+	 * exact, the loudness trajectory is not, and a level step can be heard at segment boundaries
+	 * on dynamic material. The click/key tracks are also layered on top of the normalized mix
+	 * here, while the export normalizes them with the programme.
+	 *
 	 * <p>The output stays {@code pcm_s16le}: the bundled FFmpeg has no {@code f32le} muxer.
 	 */
 	public static List<String> mixCommand(

@@ -31,6 +31,7 @@ import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.export.CaptionSidecars;
 import dev.gravaai.media.export.ClickSoundWav;
 import dev.gravaai.media.export.ExportAudioGraph;
+import dev.gravaai.media.export.ExportAudioLoudness;
 import dev.gravaai.media.export.ExportAudioPlan;
 import dev.gravaai.media.export.ExportAudioRouting;
 import dev.gravaai.media.export.ExportAudioSegments;
@@ -38,6 +39,7 @@ import dev.gravaai.media.export.ExportDimensions;
 import dev.gravaai.media.export.ExportFrameProvider;
 import dev.gravaai.media.export.ExportPublisher;
 import dev.gravaai.media.export.ExportRunner;
+import dev.gravaai.media.export.FfmpegCli;
 import dev.gravaai.media.export.GifExportSettings;
 import dev.gravaai.media.export.Mp4ExportBitrate;
 import dev.gravaai.media.ffmpeg.MediaInfo;
@@ -65,6 +67,8 @@ import tools.jackson.databind.JsonNode;
  * {@code ProjectFrameInputFactory}, reuse it (reset() between GIF passes) and close it afterwards.
  */
 public final class ProjectExport {
+
+	private static final System.Logger LOG = System.getLogger("gravaai.services.export");
 
 	/** Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video. */
 	public record Input(ProjectEditorState editor, Path videoPath, @Nullable Path webcamPath,
@@ -263,18 +267,60 @@ public final class ProjectExport {
 			}
 		}
 		appendClickBus(input, regions);
-		// Loudness is a property of the deliverable, not of one track: the first enabled cleanup in
-		// the export priority order (mic, system, mixed) sets the programme target. The RNNoise
-		// model is resolved once here so the graph builder stays a pure string builder.
+		// Loudness is a property of the deliverable, not of one track: the first enabled cleanup
+		// among the tracks that are actually exported (mic, system, mixed priority; embedded audio
+		// resolves as the mixed lane) sets the programme target. The RNNoise model is resolved once
+		// here so the graph builder stays a pure string builder.
 		SourceAudioTrackSettings typedDefaults =
 				input.editor().defaultSourceAudioTrackSettingsTyped();
+		List<String> exportableTrackIds = new ArrayList<>();
+		for (String trackId : List.of(SourceAudioTrackSettings.MIC, SourceAudioTrackSettings.SYSTEM,
+				SourceAudioTrackSettings.MIXED)) {
+			for (ExportAudioRouting.ResolvedTrack track : resolved.tracks()) {
+				if (track.kind() != ExportAudioRouting.TrackKind.USER
+						&& track.kind().settingsTrackId().equals(trackId)) {
+					exportableTrackIds.add(trackId);
+					break;
+				}
+			}
+		}
 		double loudnessTargetLufs = SourceAudioSettings.resolveProgrammeLoudnessTarget(typedDefaults,
-				List.of(SourceAudioTrackSettings.MIC, SourceAudioTrackSettings.SYSTEM,
-						SourceAudioTrackSettings.MIXED));
+				exportableTrackIds);
 		Path rnnoiseModel = AudioCleanupFilters.rnnoiseModel();
-		return ExportAudioGraph.build(new ExportAudioGraph.GraphInput(tracks, regions, segments,
-				fades, timelineDurationMs, resolved.masterGain(), muted, loudnessTargetLufs,
-				rnnoiseModel == null ? null : rnnoiseModel.toString()));
+		ExportAudioGraph.GraphInput graphInput = new ExportAudioGraph.GraphInput(tracks, regions,
+				segments, fades, timelineDurationMs, resolved.masterGain(), muted,
+				loudnessTargetLufs, rnnoiseModel == null ? null : rnnoiseModel.toString());
+		ExportAudioPlan plan = ExportAudioGraph.build(graphInput);
+		return normalizeProgrammeLoudness(plan, graphInput, loudnessTargetLufs);
+	}
+
+	/**
+	 * Runs the measurement pass for the programme loudness target and rebuilds the plan with the
+	 * linear two-pass stage. A failed measurement (missing ffmpeg, decode error, silent programme)
+	 * keeps the single-pass dynamic stage, which still lands near the target.
+	 */
+	private static ExportAudioPlan normalizeProgrammeLoudness(ExportAudioPlan plan,
+			ExportAudioGraph.GraphInput graphInput, double loudnessTargetLufs) {
+		if (loudnessTargetLufs == 0 || !plan.hasAudio()) {
+			return plan;
+		}
+		Path ffmpeg;
+		try {
+			ffmpeg = FfmpegCli.binary();
+		} catch (IllegalStateException missing) {
+			LOG.log(System.Logger.Level.WARNING,
+					"no ffmpeg for the loudness measurement pass; using the dynamic stage: "
+							+ missing.getMessage());
+			return plan;
+		}
+		AudioCleanupFilters.MeasuredLoudness measured =
+				ExportAudioLoudness.measure(ffmpeg, plan, loudnessTargetLufs);
+		if (measured == null) {
+			LOG.log(System.Logger.Level.WARNING,
+					"the loudness measurement pass failed; using the dynamic stage");
+			return plan;
+		}
+		return ExportAudioGraph.build(graphInput.withMeasured(measured));
 	}
 
 	/**

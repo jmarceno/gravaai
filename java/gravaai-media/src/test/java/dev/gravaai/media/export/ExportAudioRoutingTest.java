@@ -162,4 +162,25 @@ class ExportAudioRoutingTest {
 		// Pre-cleanup project files only carry volume/normalize: the 2-arg shape has no cleanup.
 		assertEquals(AudioCleanup.NONE, new TrackSetting(1, true).cleanup());
 	}
+
+	@Test
+	@DisplayName("embedded audio resolves its settings as the mixed lane")
+	void embeddedResolvesAsMixed() {
+		AudioCleanup cleanup = new AudioCleanup(AudioCleanup.NoiseReduction.BALANCED, 0, -16);
+		Map<String, TrackSetting> settings = Map.of("mixed",
+				new TrackSetting(1.5, true, cleanup));
+		assertEquals(cleanup, ExportAudioRouting.resolveSourceTrackCleanup(settings,
+				TrackKind.EMBEDDED));
+		// The same lane on the timeline is "mixed", so preview and export must agree here.
+		assertEquals(cleanup, ExportAudioRouting.resolveSourceTrackCleanup(settings,
+				TrackKind.MIXED));
+		assertEquals(TrackKind.MIXED.settingsTrackId(), TrackKind.EMBEDDED.settingsTrackId());
+		// The explicit embedded gain still wins over the mixed setting when a caller passes one.
+		assertEquals(2, ExportAudioRouting.resolveSourceTrackGain(settings, TrackKind.EMBEDDED));
+		// And the mixed lane's normalize flows through: 1.0 * 1.35.
+		assertEquals(1.35, ExportAudioRouting.resolveSourceTrackGain(
+				Map.of("mixed", new TrackSetting(1, true, cleanup)), TrackKind.EMBEDDED));
+		assertEquals(AudioCleanup.NONE, ExportAudioRouting.resolveSourceTrackCleanup(Map.of(),
+				TrackKind.EMBEDDED));
+	}
 }

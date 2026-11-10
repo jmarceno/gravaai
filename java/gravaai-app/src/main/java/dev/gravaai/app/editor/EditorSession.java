@@ -155,6 +155,16 @@ public final class EditorSession implements AutoCloseable {
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
+	/**
+	 * Delays a cleanup-driven audio reopen until the edits settle: dragging a control changes the
+	 * defaults many times per second, and every change would otherwise reopen the whole preview
+	 * pipeline (one ffmpeg process per segment). Only the last change in a burst is reopened.
+	 */
+	private final java.util.concurrent.ScheduledExecutorService cleanupSync =
+			java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+					Thread.ofVirtual().name("gravaai-playback-cleanup").factory());
+	/** The pending debounced cleanup reopen, cancelled by a newer change of the same settings. */
+	private volatile java.util.concurrent.@Nullable ScheduledFuture<?> pendingCleanupSync;
 
 	private EditorSession(@Nullable Path projectPath, ProjectDocument document, ProjectDocument mediaSource) {
 		this.projectPath = projectPath;
@@ -573,44 +583,76 @@ public final class EditorSession implements AutoCloseable {
 		return settings == null ? "" : settings.toString();
 	}
 
+	/** How long a cleanup change waits for the next one before the preview audio reopens. */
+	private static final long CLEANUP_SYNC_DELAY_MS = 300;
+
 	/**
 	 * Rebuilds the preview audio when the per-track cleanup changes: the filters live in the
-	 * decoder command, so only a fresh producer picks them up. Runs on the clip-sync executor like
-	 * the other audio reopen paths; {@code setAudioTrack} seeks the new track to the playhead.
+	 * decoder command, so only a fresh producer picks them up. Bursts of changes are coalesced
+	 * into one reopen ({@link #CLEANUP_SYNC_DELAY_MS} after the last change), which then runs on
+	 * the clip-sync executor like the other audio reopen paths; {@code setAudioTrack} seeks the
+	 * new track to the playhead.
 	 */
 	private void syncAudioCleanup() {
 		String signature = audioCleanupSignature();
 		if (signature.equals(appliedAudioCleanup)) {
 			return;
 		}
-		appliedAudioCleanup = signature;
+		java.util.concurrent.ScheduledFuture<?> pending = pendingCleanupSync;
+		if (pending != null) {
+			pending.cancel(false);
+		}
 		long generation = mediaGeneration.get();
-		clipSync.execute(() -> {
-			if (closed || mediaGeneration.get() != generation) {
+		pendingCleanupSync = cleanupSync.schedule(() -> {
+			pendingCleanupSync = null;
+			if (closed) {
 				return;
 			}
-			String video = mediaSource.videoPath();
-			if (video == null || video.isBlank() || audioTrack == null) {
-				return;
-			}
-			PlaybackAudioTrack previous = audioTrack;
-			try {
-				ClickSoundSettings clickSound = store.state().clickSound();
-				KeySoundSettings keySound = store.state().keySound();
-				PlaybackAudioTrack audio = openPreviewAudio(video, store.state().clipRegions(),
-						clickSound, keySound);
-				appliedClickSound = clickSound;
-				appliedKeySound = keySound;
-				if (audio != null) {
+			// The reopen itself must stay ordered with the other audio reopens (attach, replace):
+			// they all run on the clip-sync executor.
+			clipSync.execute(() -> reopenAudioForCleanup(generation));
+		}, CLEANUP_SYNC_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+	}
+
+	/** The debounced reopen body: swap the audio track, or keep the old one on any failure. */
+	private void reopenAudioForCleanup(long generation) {
+		if (closed || mediaGeneration.get() != generation) {
+			// Superseded (a replace or a newer change owns the track now); the replace path
+			// opens with the current settings anyway.
+			return;
+		}
+		String video = mediaSource.videoPath();
+		if (video == null || video.isBlank() || audioTrack == null) {
+			return;
+		}
+		PlaybackAudioTrack previous = audioTrack;
+		PlaybackAudioTrack audio = null;
+		try {
+			ClickSoundSettings clickSound = store.state().clickSound();
+			KeySoundSettings keySound = store.state().keySound();
+			audio = openPreviewAudio(video, store.state().clipRegions(), clickSound, keySound);
+			appliedClickSound = clickSound;
+			appliedKeySound = keySound;
+			if (audio != null) {
+				try {
 					engine.setAudioTrack(audio);
-					audioTrack = audio;
-					closeQuietly(previous);
+				} catch (RuntimeException error) {
+					// The engine never took the new track: release it and keep playing the old one.
+					closeQuietly(audio);
+					audio = null;
+					throw error;
 				}
-			} catch (RuntimeException error) {
-				LOG.log(System.Logger.Level.WARNING,
-						"audio playback not updated after a cleanup change: " + error);
+				audioTrack = audio;
+				closeQuietly(previous);
 			}
-		});
+			// Applied only once the reopen succeeded: a failed open must retry on the next
+			// settings change instead of leaving the preview silently on the old chain.
+			appliedAudioCleanup = audioCleanupSignature();
+		} catch (RuntimeException error) {
+			closeQuietly(audio);
+			LOG.log(System.Logger.Level.WARNING,
+					"audio playback not updated after a cleanup change: " + error);
+		}
 	}
 
 	/** The preview key-sound track, or {@code null} when off / nothing audible was typed. */
@@ -1222,6 +1264,7 @@ public final class EditorSession implements AutoCloseable {
 		}
 		closed = true;
 		cancelPendingAutosave();
+		cleanupSync.shutdownNow();
 		clipSync.shutdownNow();
 		waveforms.close();
 		waveformExecutor.shutdownNow();
@@ -1238,7 +1281,7 @@ public final class EditorSession implements AutoCloseable {
 		}
 	}
 
-	private static void closeQuietly(AutoCloseable handle) {
+	private static void closeQuietly(@Nullable AutoCloseable handle) {
 		if (handle == null) {
 			return;
 		}

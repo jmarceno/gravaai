@@ -132,8 +132,9 @@ public final class SourceAudioSettings {
 	/**
 	 * The programme loudness target requested by the tracks that will be exported, or {@code 0}
 	 * when none asks for normalization. Loudness is a property of the deliverable, so a single
-	 * target is applied to the mix; the first enabled track wins in the given priority order
-	 * (the exporter passes mic, system, mixed).
+	 * target is applied to the mix; the first enabled track wins in the given priority order. Both
+	 * the exporter and the preview pass only the ids of the tracks that are actually in the
+	 * project (mic, system, mixed; embedded audio resolves as mixed), so the two agree.
 	 */
 	public static double resolveProgrammeLoudnessTarget(SourceAudioTrackSettings settings,
 			List<String> priorityTrackIds) {

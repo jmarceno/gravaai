@@ -56,12 +56,15 @@ public final class ExportAudioGraph {
 	 * @param loudnessTargetLufs the EBU R128 programme target for the mix, {@code 0} when off
 	 * @param rnnoiseModelPath the RNNoise model for the cleanup stages, or null when this build
 	 *     lacks it (the heavier noise-reduction levels then fall back to the FFT denoiser)
+	 * @param measuredLoudness the measurement pass of the programme, or null for the single-pass
+	 *     dynamic loudness stage ({@code ExportAudioLoudness.measure})
 	 */
 	public record GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
 			List<ExportAudioSegments.Segment> sourceSegments,
 			List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
 			double masterGain, List<MutedRange> mutedRanges, double loudnessTargetLufs,
-			@Nullable String rnnoiseModelPath) {
+			@Nullable String rnnoiseModelPath,
+			AudioCleanupFilters.@Nullable MeasuredLoudness measuredLoudness) {
 		public GraphInput {
 			tracks = tracks == null ? List.of() : List.copyOf(tracks);
 			regions = regions == null ? List.of() : List.copyOf(regions);
@@ -70,20 +73,35 @@ public final class ExportAudioGraph {
 			mutedRanges = mutedRanges == null ? List.of() : List.copyOf(mutedRanges);
 		}
 
+		/** A copy of this input with the measurement pass applied to its loudness stage. */
+		public GraphInput withMeasured(AudioCleanupFilters.MeasuredLoudness measured) {
+			return new GraphInput(tracks, regions, sourceSegments, fadeWindows, outputDurationMs,
+					masterGain, mutedRanges, loudnessTargetLufs, rnnoiseModelPath, measured);
+		}
+
+		public GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
+				List<ExportAudioSegments.Segment> sourceSegments,
+				List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
+				double masterGain, List<MutedRange> mutedRanges, double loudnessTargetLufs,
+				@Nullable String rnnoiseModelPath) {
+			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain,
+					mutedRanges, loudnessTargetLufs, rnnoiseModelPath, null);
+		}
+
 		public GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
 				List<ExportAudioSegments.Segment> sourceSegments,
 				List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
 				double masterGain, List<MutedRange> mutedRanges) {
 			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain,
-					mutedRanges, 0, null);
+					mutedRanges, 0, null, null);
 		}
 
 		public GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
 				List<ExportAudioSegments.Segment> sourceSegments,
 				List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
 				double masterGain) {
-			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain, List.of(),
-					0, null);
+			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain,
+					List.of(), 0, null, null);
 		}
 	}
 
@@ -139,8 +157,10 @@ public final class ExportAudioGraph {
 		}
 		// The programme loudness stage sits on the mix, after the master gain it corrects for and
 		// before the fade envelope: loudnorm measures what the viewer hears, so the fade must not
-		// be inside its measurement window.
-		String loudnorm = AudioCleanupFilters.loudnormFilter(input.loudnessTargetLufs());
+		// be inside its measurement window. With a measurement pass it is one linear gain; without
+		// one (the preview's per-segment form) it is the dynamic approximation.
+		String loudnorm = AudioCleanupFilters.loudnormFilter(input.loudnessTargetLufs(),
+				input.measuredLoudness());
 		if (loudnorm != null) {
 			finalChain.append(',').append(loudnorm);
 		}

@@ -83,7 +83,7 @@ class ExportAudioCleanupGraphTest {
 		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
 				List.of(new TrackInput("/tmp/mic.wav", 1.0, BALANCED)), List.of(), noSegments,
 				List.of(), 2_000, 1.0, List.of(), 0, null));
-		assertTrue(plan.filterComplex().contains("afftdn=nr=14:nf=-50:tn=1"),
+		assertTrue(plan.filterComplex().contains("afftdn=nr=12:nf=-30"),
 				plan.filterComplex());
 	}
 
@@ -115,6 +115,20 @@ class ExportAudioCleanupGraphTest {
 		int format = graph.indexOf("aformat=sample_fmts=fltp:channel_layouts=stereo[aout]");
 		assertTrue(masterGain >= 0, "master gain then loudness: " + graph);
 		assertTrue(loudnorm < fade && fade < format, graph);
+	}
+
+	@Test
+	@DisplayName("the measured loudness stage is the linear two-pass form")
+	void measuredLoudnormIsLinear() {
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0)), List.of(), List.of(), List.of(),
+				4_000, 1.0, List.of(), -16, null,
+				new AudioCleanupFilters.MeasuredLoudness(-14.23, -8.51, 3.00, -24.77, 0.04)));
+		String graph = plan.filterComplex();
+		assertTrue(graph.contains("loudnorm=I=-16:TP=-1.5:LRA=11:linear=true"
+				+ ":measured_I=-14.23:measured_TP=-8.51:measured_LRA=3.00"
+				+ ":measured_thresh=-24.77:offset=0.04"), graph);
+		assertFalse(graph.contains("print_format"), graph);
 	}
 
 	@Test

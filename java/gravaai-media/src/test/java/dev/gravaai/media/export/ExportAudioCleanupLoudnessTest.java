@@ -1,6 +1,8 @@
 package dev.gravaai.media.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -16,20 +18,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import dev.gravaai.media.audio.AudioCleanupFilters;
 import dev.gravaai.media.export.ExportAudioGraph.GraphInput;
 import dev.gravaai.media.export.ExportAudioGraph.TrackInput;
 import dev.gravaai.platform.process.ProcessResult;
 import dev.gravaai.platform.process.ProcessRunner;
 
 /**
- * Acceptance for the programme loudness stage: the real bundled ffmpeg renders the
- * {@link ExportAudioGraph} filtergraph and the EBU R128 integrated loudness of the written WAV must
+ * Acceptance for the programme loudness stage: the real bundled ffmpeg measures the
+ * {@link ExportAudioGraph} programme ({@code ExportAudioLoudness}), renders the graph with the
+ * measured two-pass linear stage, and the EBU R128 integrated loudness of the written WAV must
  * land within 1 LU of the requested target.
  *
  * <p>The stimulus is three mixed sines ({@code sine} + {@code amix} + {@code volume}), which only
- * needs filters the payload already carries for the export itself and is fully deterministic: a
- * steady programme level is the cleanest case for a single-pass {@code loudnorm} and cannot be
- * confused with a noisy source.
+ * needs filters the payload already carries for the export itself and is fully deterministic.
  */
 class ExportAudioCleanupLoudnessTest {
 
@@ -58,15 +60,49 @@ class ExportAudioCleanupLoudnessTest {
 
 		// One full-length track with the loudness target on the mix; no cleanup stages and no
 		// RNNoise model are involved, so the null model path is the documented "no model" case.
-		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+		GraphInput input = new GraphInput(
 				List.of(new TrackInput(stimulus.toString(), 1.0)), List.of(), List.of(), List.of(),
-				4_000, 1.0, List.of(), TARGET_LUFS, null));
+				4_000, 1.0, List.of(), TARGET_LUFS, null);
+		ExportAudioPlan plan = ExportAudioGraph.build(input);
+		AudioCleanupFilters.MeasuredLoudness measured =
+				ExportAudioLoudness.measure(ffmpeg, plan, TARGET_LUFS);
+		assertNotNull(measured, "the measurement pass returned no loudnorm values");
+		plan = ExportAudioGraph.build(input.withMeasured(measured));
+		assertTrue(plan.filterComplex().contains(":linear=true"),
+				"the measured plan must use the linear two-pass stage");
 		Path rendered = tempDir.resolve("rendered.wav");
 		render(ffmpeg, stimulus, plan, rendered);
 
 		double integratedLufs = measureIntegratedLoudness(ffmpeg, rendered);
 		assertEquals(TARGET_LUFS, integratedLufs, TOLERANCE_LU,
 				"integrated loudness " + integratedLufs + " LUFS, target " + TARGET_LUFS + " LUFS");
+	}
+
+	@Test
+	@DisplayName("the loudnorm measurement JSON parses, and silent or broken output does not")
+	void measurementParsing() {
+		String json = """
+				[Parsed_loudnorm_0 @ 0x55f0e2a5f0c0] {
+					"input_i" : "-14.23",
+					"input_tp" : "-8.51",
+					"input_lra" : "3.00",
+					"input_thresh" : "-24.77",
+					"output_i" : "-16.10",
+					"output_tp" : "-1.54",
+					"output_lra" : "3.00",
+					"output_thresh" : "-26.36",
+					"normalization_type" : "dynamic",
+					"target_offset" : "0.04"
+				}
+				""";
+		AudioCleanupFilters.MeasuredLoudness measured = ExportAudioLoudness.parse(json);
+		assertNotNull(measured);
+		assertEquals(new AudioCleanupFilters.MeasuredLoudness(-14.23, -8.51, 3.00, -24.77, 0.04),
+				measured);
+		// A silent programme reports -inf and cannot be normalized.
+		assertNull(ExportAudioLoudness.parse(json.replace("-14.23", "-inf")));
+		assertNull(ExportAudioLoudness.parse("no json block at all"));
+		assertNull(ExportAudioLoudness.parse(null));
 	}
 
 	/**

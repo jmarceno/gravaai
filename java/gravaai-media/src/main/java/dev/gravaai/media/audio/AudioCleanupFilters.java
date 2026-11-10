@@ -29,10 +29,21 @@ public final class AudioCleanupFilters {
 	public static final double LOUDNORM_TRUE_PEAK_DB = -1.5;
 	public static final double LOUDNORM_RANGE_LU = 11;
 
-	/** The FFT denoise amount (dB) used per strength when the RNNoise model is unavailable. */
+	/**
+	 * The FFT denoise parameters used per strength when the RNNoise model is unavailable. The
+	 * heavier levels drop the adaptive noise tracking ({@code tn=1}): with tracking on, afftdn
+	 * absorbs a steady noise floor into its profile and the requested reduction never engages
+	 * (~2 dB regardless of {@code nr}); with a static profile the reduction is honoured nearly
+	 * one dB per {@code nr} dB. Measured against the shipped bundle: light ~2 dB, balanced ~12 dB
+	 * and strong ~22 dB of white-noise reduction, each at a fraction of a dB of speech loss.
+	 * Non-stationary noise is what the RNNoise path is for; these are the degraded-mode chains.
+	 */
 	private static final int FFT_LIGHT_NR = 10;
-	private static final int FFT_BALANCED_NR = 14;
-	private static final int FFT_STRONG_NR = 20;
+	private static final String FFT_LIGHT_CHAIN = "afftdn=nr=" + FFT_LIGHT_NR + ":nf=-50:tn=1";
+	private static final int FFT_BALANCED_NR = 12;
+	private static final String FFT_BALANCED_CHAIN = "afftdn=nr=" + FFT_BALANCED_NR + ":nf=-30";
+	private static final int FFT_STRONG_NR = 22;
+	private static final String FFT_STRONG_CHAIN = "afftdn=nr=" + FFT_STRONG_NR + ":nf=-30";
 
 	private AudioCleanupFilters() {}
 
@@ -59,12 +70,12 @@ public final class AudioCleanupFilters {
 		String model = rnnoiseModelPath;
 		return switch (resolved.noiseReduction()) {
 			case OFF -> List.of();
-			case LIGHT -> List.of("afftdn=nr=" + FFT_LIGHT_NR + ":nf=-50:tn=1");
+			case LIGHT -> List.of(FFT_LIGHT_CHAIN);
 			case BALANCED -> model == null
-					? List.of("afftdn=nr=" + FFT_BALANCED_NR + ":nf=-50:tn=1")
+					? List.of(FFT_BALANCED_CHAIN)
 					: List.of("arnndn=m=" + escapeFfmpegFilterValue(model) + ":mix=0.85");
 			case STRONG -> model == null
-					? List.of("afftdn=nr=" + FFT_STRONG_NR + ":nf=-50:tn=1")
+					? List.of(FFT_STRONG_CHAIN)
 					: List.of("arnndn=m=" + escapeFfmpegFilterValue(model) + ":mix=1",
 							"afftdn=nr=6:nf=-50");
 		};
@@ -72,8 +83,9 @@ public final class AudioCleanupFilters {
 
 	/**
 	 * The loudness filter for the programme mix, or {@code null} when the target is off. Single-pass
-	 * {@code loudnorm}: the exporter has one graph per run, and one pass lands within a fraction of
-	 * an LU of the target on speech while staying linear enough to keep the fade envelope audible.
+	 * {@code loudnorm} (dynamic): the preview has one ffmpeg process per segment and cannot measure
+	 * the programme first, so each segment approximates the target dynamically. Exports should run
+	 * {@link #loudnormFilter(double, MeasuredLoudness)} with the measurement pass instead.
 	 */
 	public static @Nullable String loudnormFilter(double targetLufs) {
 		if (!Double.isFinite(targetLufs) || targetLufs >= 0) {
@@ -82,6 +94,32 @@ public final class AudioCleanupFilters {
 		return "loudnorm=I=" + number(targetLufs) + ":TP=" + number(LOUDNORM_TRUE_PEAK_DB)
 				+ ":LRA=" + number(LOUDNORM_RANGE_LU);
 	}
+
+	/**
+	 * The loudness filter for a measured programme: the two-pass form. The first pass renders the
+	 * graph with {@code print_format=json} (see {@code ExportAudioLoudness}); this pass replays the
+	 * exact same graph with {@code linear=true} and the measured values, so the stage is one
+	 * constant gain (true-peak limited) instead of dynamic level riding, and the target is hit to
+	 * a fraction of an LU regardless of how dynamic the programme is. When the programme's own
+	 * loudness range exceeds the target range, ffmpeg degrades the stage to dynamic internally.
+	 */
+	public static @Nullable String loudnormFilter(double targetLufs,
+			@Nullable MeasuredLoudness measured) {
+		String dynamic = loudnormFilter(targetLufs);
+		if (dynamic == null || measured == null) {
+			return dynamic;
+		}
+		return dynamic + ":linear=true"
+				+ ":measured_I=" + number2(measured.inputI())
+				+ ":measured_TP=" + number2(measured.inputTp())
+				+ ":measured_LRA=" + number2(measured.inputLra())
+				+ ":measured_thresh=" + number2(measured.inputThresh())
+				+ ":offset=" + number2(measured.targetOffset());
+	}
+
+	/** The {@code print_format=json} measurement values of one loudnorm pass over the programme. */
+	public record MeasuredLoudness(double inputI, double inputTp, double inputLra,
+			double inputThresh, double targetOffset) {}
 
 	/** The RNNoise model in the native payload, or {@code null} when this build lacks it. */
 	public static @Nullable Path rnnoiseModel() {
@@ -120,5 +158,10 @@ public final class AudioCleanupFilters {
 			return Long.toString((long) value);
 		}
 		return String.format(java.util.Locale.ROOT, "%.1f", value);
+	}
+
+	/** A loudness measurement value: loudnorm prints two decimals and expects the same back. */
+	private static String number2(double value) {
+		return String.format(java.util.Locale.ROOT, "%.2f", value);
 	}
 }

@@ -51,6 +51,17 @@ public final class ExportAudioRouting {
 				default -> wire;
 			};
 		}
+
+		/**
+		 * The key a kind resolves its settings under. Embedded audio is the project's mixed lane
+		 * (the timeline shows the recording's own audio as the mixed track when there are no
+		 * dedicated sidecars), so its cleanup, gain and loudness target come from the same
+		 * {@code mixed} entry the preview and the inspector use — never from a settings entry the
+		 * editor cannot write.
+		 */
+		public String settingsTrackId() {
+			return this == EMBEDDED ? MIXED.sourceTrackId() : sourceTrackId();
+		}
 	}
 
 	/** A {@code SourceAudioTrackSetting}: gain plus the edit-time {@link AudioCleanup}. */
@@ -201,7 +212,7 @@ public final class ExportAudioRouting {
 
 	/** {@code resolveSourceTrackGain}. */
 	public static double resolveSourceTrackGain(Map<String, TrackSetting> settings, TrackKind kind) {
-		TrackSetting setting = settings == null ? null : settings.get(kind.sourceTrackId());
+		TrackSetting setting = settings == null ? null : settings.get(kind.settingsTrackId());
 		if (setting == null) {
 			return 1;
 		}
@@ -212,11 +223,12 @@ public final class ExportAudioRouting {
 	/**
 	 * The edit-time cleanup of one source track; a track without a setting is left untouched.
 	 * Cleanup is a per-track decision like {@link #resolveSourceTrackGain}, so it is resolved from
-	 * the same settings map and travels with the resolved track into the graph.
+	 * the same settings map (under {@link TrackKind#settingsTrackId()}) and travels with the
+	 * resolved track into the graph.
 	 */
 	public static AudioCleanup resolveSourceTrackCleanup(Map<String, TrackSetting> settings,
 			TrackKind kind) {
-		TrackSetting setting = settings == null ? null : settings.get(kind.sourceTrackId());
+		TrackSetting setting = settings == null ? null : settings.get(kind.settingsTrackId());
 		return setting == null ? AudioCleanup.NONE : setting.cleanup();
 	}
 
@@ -282,12 +294,12 @@ public final class ExportAudioRouting {
 					Double.POSITIVE_INFINITY));
 		}
 		if (fallback.hasEmbeddedSourceAudio() && videoPath != null) {
+			// Embedded audio is the mixed lane: the explicit embedded gain wins when a caller
+			// passes one, otherwise the mixed setting (volume and normalize) applies exactly as
+			// it does for a mixed sidecar.
 			double gain = embeddedGain != null
 					? embeddedGain
-					: sourceAudioTrackSettings != null
-							&& sourceAudioTrackSettings.containsKey("mixed")
-									? sourceAudioTrackSettings.get("mixed").volume()
-									: 1;
+					: resolveSourceTrackGain(sourceAudioTrackSettings, TrackKind.EMBEDDED);
 			tracks.add(new ResolvedTrack("embedded:" + videoPath, TrackKind.EMBEDDED, videoPath,
 					Math.max(0, Math.min(MAX_TRACK_GAIN, gain)), 0, Double.POSITIVE_INFINITY));
 		}

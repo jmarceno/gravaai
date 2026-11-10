@@ -289,9 +289,13 @@ public final class EditorWindow {
 				}, actions::autoApplyFreshRecordingAutoZooms);
 		}
 		this.timeline = new TimelineView(session.timelineDataSource(), session.timelineCommands());
-		this.timelineSubscription = session.onTimelineChange(
-				() -> Platform.runLater(timeline::refreshData));
 		this.shell = new EditorShellView(session.store(), actions, session.playbackPort());
+		this.timelineSubscription = session.onTimelineChange(() -> Platform.runLater(() -> {
+			timeline.refreshData();
+			// Source-audio lanes land after the recording probe: the Audio section lists them.
+			this.shell.refreshInspectorIfShowing(
+					dev.gravaai.ui.editor.EditorSidebarRail.Section.AUDIO);
+		}));
 		timeline.onItemPressed(() -> shell.setClipsOpen(false));
 		timeline.setOnCameraLayoutShortcut(() -> shell.playbackControls().showCameraLayoutMenu());
 		timeline.setOnSuggestZooms(this::suggestInteractionZooms);

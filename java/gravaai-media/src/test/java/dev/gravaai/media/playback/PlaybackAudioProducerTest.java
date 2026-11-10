@@ -95,6 +95,8 @@ class PlaybackAudioProducerTest {
 		final List<FakeSource> sources = new ArrayList<>();
 		private final int frames;
 		private final float value;
+		double loudnessTargetLufs;
+		List<PreviewAudioTrack> lastTracks = List.of();
 
 		FakeFactory(int frames, float value) {
 			this.frames = frames;
@@ -102,9 +104,12 @@ class PlaybackAudioProducerTest {
 		}
 
 		@Override
-		public PcmSource open(
-				String mediaPath, double sourceStartSeconds, double durationSeconds, List<String> filters) {
-			opens.add(new Open(mediaPath, sourceStartSeconds, durationSeconds, filters));
+		public PcmSource open(List<PreviewAudioTrack> tracks, double loudnessTargetLufs,
+				double sourceStartSeconds, double durationSeconds, List<String> filters) {
+			opens.add(new Open(tracks.get(0).audioPath(), sourceStartSeconds, durationSeconds,
+					filters));
+			this.loudnessTargetLufs = loudnessTargetLufs;
+			this.lastTracks = tracks;
 			FakeSource source = new FakeSource(value, frames);
 			sources.add(source);
 			return source;
@@ -354,5 +359,40 @@ class PlaybackAudioProducerTest {
 		assertTrue(factory.sources.get(0).closed);
 		assertEquals(1, sink.closeCount);
 		assertEquals(1_920, producer.samplesWritten());
+	}
+
+	@Test
+	@DisplayName("hands the whole source mix and the loudness target to the decoder")
+	void passesMixToFactory() {
+		FakeSink sink = new FakeSink();
+		FakeFactory factory = new FakeFactory(48_000, 0.5f);
+		List<PreviewAudioTrack> tracks = List.of(PreviewAudioTrack.plain("/rec/mix.m4a"),
+				new PreviewAudioTrack("/rec/mic.wav", 0.5,
+						new dev.gravaai.core.project.AudioCleanup(
+								dev.gravaai.core.project.AudioCleanup.NoiseReduction.LIGHT, 80, 0)));
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(tracks, -16,
+				List.of(clip("a", 0, 1_000, 0L, 1)), sink, factory, 1_920);
+
+		producer.seek(0);
+		producer.pump();
+
+		assertEquals(tracks, factory.lastTracks);
+		assertEquals(-16, factory.loudnessTargetLufs, 1e-9);
+		assertEquals(1, sink.writes);
+	}
+
+	@Test
+	@DisplayName("the single-file constructor still decodes one plain track")
+	void singleFileConstructorIsOnePlainTrack() {
+		FakeSink sink = new FakeSink();
+		FakeFactory factory = new FakeFactory(48_000, 0.5f);
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(
+				MEDIA, List.of(clip("a", 0, 1_000, 0L, 1)), sink, factory);
+		producer.seek(0);
+		producer.pump();
+
+		assertEquals(1, factory.lastTracks.size());
+		assertEquals(MEDIA, factory.lastTracks.get(0).audioPath());
+		assertEquals(0, factory.loudnessTargetLufs, 1e-9);
 	}
 }

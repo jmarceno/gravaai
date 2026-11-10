@@ -12,14 +12,18 @@ import java.util.Map;
 
 import dev.gravaai.core.editor.ExportPreferences;
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.ClipTransitions;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.SourceAudioSettings;
+import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.ClickSoundStyle;
 import dev.gravaai.core.project.KeySoundSettings;
+import dev.gravaai.media.audio.AudioCleanupFilters;
 import dev.gravaai.media.audio.ClickSoundHits;
 import dev.gravaai.media.audio.ClickSounds;
 import dev.gravaai.media.audio.KeySoundHits;
@@ -48,8 +52,8 @@ import tools.jackson.databind.JsonNode;
  * Assembles one export from an editor project (plan §5.10/P2.9 acceptance): resolves the output
  * format/size/frame rate/bitrate from {@link ExportPreferences}, builds the single-libavfilter
  * {@link ExportAudioPlan} from the project's clips/trim/speed regions/audio regions/source-track
- * settings, maps caption cues to sidecar entries, and hands everything to
- * {@link ExportCoordinator}.
+ * settings (gain, normalize and the edit-time cleanup with its programme loudness target), maps
+ * caption cues to sidecar entries, and hands everything to {@link ExportCoordinator}.
  *
  * <p><b>Contiguous main-source projects are the supported contract</b> (for example the
  * {@code 11-export-2min.gravaai} acceptance fixture: one clip 0–120 s). The audio graph consumes
@@ -243,7 +247,8 @@ public final class ProjectExport {
 				regions.add(new ExportAudioGraph.RegionInput(track.path(), track.timelineStartMs(),
 						track.timelineEndMs(), track.gain()));
 			} else {
-				tracks.add(new ExportAudioGraph.TrackInput(track.path(), track.gain()));
+				tracks.add(new ExportAudioGraph.TrackInput(track.path(), track.gain(),
+						ExportAudioRouting.resolveSourceTrackCleanup(trackSettings, track.kind())));
 			}
 		}
 		List<ExportAudioSegments.Segment> segments = buildSegments(input.editor(), sourceDurationMs);
@@ -258,8 +263,18 @@ public final class ProjectExport {
 			}
 		}
 		appendClickBus(input, regions);
+		// Loudness is a property of the deliverable, not of one track: the first enabled cleanup in
+		// the export priority order (mic, system, mixed) sets the programme target. The RNNoise
+		// model is resolved once here so the graph builder stays a pure string builder.
+		SourceAudioTrackSettings typedDefaults =
+				input.editor().defaultSourceAudioTrackSettingsTyped();
+		double loudnessTargetLufs = SourceAudioSettings.resolveProgrammeLoudnessTarget(typedDefaults,
+				List.of(SourceAudioTrackSettings.MIC, SourceAudioTrackSettings.SYSTEM,
+						SourceAudioTrackSettings.MIXED));
+		Path rnnoiseModel = AudioCleanupFilters.rnnoiseModel();
 		return ExportAudioGraph.build(new ExportAudioGraph.GraphInput(tracks, regions, segments,
-				fades, timelineDurationMs, resolved.masterGain(), muted));
+				fades, timelineDurationMs, resolved.masterGain(), muted, loudnessTargetLufs,
+				rnnoiseModel == null ? null : rnnoiseModel.toString()));
 	}
 
 	/**
@@ -362,7 +377,8 @@ public final class ProjectExport {
 			double volume = track.path("volume").isNumber() ? track.path("volume").asDouble() : 1;
 			boolean normalize = track.path("normalize").isBoolean()
 					&& track.path("normalize").asBoolean();
-			settings.put(key, new ExportAudioRouting.TrackSetting(volume, normalize));
+			settings.put(key, new ExportAudioRouting.TrackSetting(volume, normalize,
+					AudioCleanup.parse(track)));
 		}
 		return settings;
 	}

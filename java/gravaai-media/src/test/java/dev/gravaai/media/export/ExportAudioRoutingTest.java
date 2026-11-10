@@ -10,6 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.media.export.ExportAudioRouting.FallbackPaths;
 import dev.gravaai.media.export.ExportAudioRouting.ResolvedPlan;
@@ -144,5 +145,21 @@ class ExportAudioRoutingTest {
 		assertEquals(1.0, plan.masterGain(), 1e-9);
 		assertEquals(0.675, ExportAudioRouting.resolveSourceTrackGain(
 				Map.of("mic", new TrackSetting(0.5, true)), TrackKind.MIC), 1e-9);
+	}
+
+	@Test
+	@DisplayName("resolves the per-track cleanup and defaults to no cleanup")
+	void trackCleanupResolution() {
+		AudioCleanup cleanup = new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 80, -16);
+		Map<String, TrackSetting> settings = Map.of("mic", new TrackSetting(1, false, cleanup));
+		assertEquals(cleanup, ExportAudioRouting.resolveSourceTrackCleanup(settings, TrackKind.MIC));
+		assertEquals(AudioCleanup.NONE,
+				ExportAudioRouting.resolveSourceTrackCleanup(settings, TrackKind.SYSTEM));
+		assertEquals(AudioCleanup.NONE,
+				ExportAudioRouting.resolveSourceTrackCleanup(Map.of(), TrackKind.MIC));
+		assertEquals(AudioCleanup.NONE, ExportAudioRouting.resolveSourceTrackCleanup(null,
+				TrackKind.MIXED));
+		// Pre-cleanup project files only carry volume/normalize: the 2-arg shape has no cleanup.
+		assertEquals(AudioCleanup.NONE, new TrackSetting(1, true).cleanup());
 	}
 }

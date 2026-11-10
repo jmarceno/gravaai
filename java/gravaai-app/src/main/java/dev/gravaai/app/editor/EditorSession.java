@@ -43,6 +43,8 @@ import dev.gravaai.core.project.KeystrokeOverlaySettings;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectFileNaming;
+import dev.gravaai.core.project.SourceAudioSettings;
+import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.media.audio.AudioPeaks;
@@ -54,6 +56,7 @@ import dev.gravaai.media.playback.ClickSoundTrack;
 import dev.gravaai.media.playback.DecoderFrameSourceProvider;
 import dev.gravaai.media.playback.PlaybackAudioProducer;
 import dev.gravaai.media.playback.PlaybackAudioTrack;
+import dev.gravaai.media.playback.PreviewAudioTrack;
 import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.platform.nativehelpers.NativeHelpers;
@@ -147,6 +150,8 @@ public final class EditorSession implements AutoCloseable {
 	private volatile @Nullable ClickSoundSettings appliedClickSound;
 	/** The key-sound settings the audio track was last given (change detection). */
 	private volatile @Nullable KeySoundSettings appliedKeySound;
+	/** The source-audio cleanup/mix settings the audio track was last opened with. */
+	private volatile @Nullable String appliedAudioCleanup;
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
@@ -181,6 +186,7 @@ public final class EditorSession implements AutoCloseable {
 			syncPlaybackClips();
 			syncClickSound();
 			syncKeySound();
+			syncAudioCleanup();
 		});
 		this.waveformExecutor = Threads.daemon("gravaai-waveforms");
 		this.waveforms = new CachingWaveformProvider(this::waveformCachePath,
@@ -331,13 +337,11 @@ public final class EditorSession implements AutoCloseable {
 			LOG.log(System.Logger.Level.INFO, "editor audio attach start");
 			ClickSoundSettings clickSound = store.state().clickSound();
 			KeySoundSettings keySound = store.state().keySound();
-			PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
-					media.clips(),
-					AppBinaries.ffmpeg(),
-					clickTrackFor(clickSound, media.videoPath(), media.clips()),
-					keyTrackFor(keySound, media.videoPath(), media.clips()));
+			PlaybackAudioTrack audio = openPreviewAudio(media.videoPath(), media.clips(),
+					clickSound, keySound);
 			appliedClickSound = clickSound;
 			appliedKeySound = keySound;
+			appliedAudioCleanup = audioCleanupSignature();
 			if (mediaGeneration.get() != generation) {
 				// Superseded while the audio producer opened: keep the replacement's track.
 				closeQuietly(audio);
@@ -391,13 +395,10 @@ public final class EditorSession implements AutoCloseable {
 		try {
 			ClickSoundSettings clickSound = store.state().clickSound();
 			KeySoundSettings keySound = store.state().keySound();
-			audio = PlaybackAudioProducer.openWithPulse(media.videoPath(),
-					media.clips(),
-					AppBinaries.ffmpeg(),
-					clickTrackFor(clickSound, media.videoPath(), media.clips()),
-					keyTrackFor(keySound, media.videoPath(), media.clips()));
+			audio = openPreviewAudio(media.videoPath(), media.clips(), clickSound, keySound);
 			appliedClickSound = clickSound;
 			appliedKeySound = keySound;
+			appliedAudioCleanup = audioCleanupSignature();
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "audio playback unavailable after replace: " + error);
 		}
@@ -449,12 +450,10 @@ public final class EditorSession implements AutoCloseable {
 			try {
 				ClickSoundSettings clickSound = store.state().clickSound();
 				KeySoundSettings keySound = store.state().keySound();
-				PlaybackAudioTrack audio = PlaybackAudioProducer.openWithPulse(video, clips,
-						AppBinaries.ffmpeg(),
-						clickTrackFor(clickSound, video, clips),
-						keyTrackFor(keySound, video, clips));
+				PlaybackAudioTrack audio = openPreviewAudio(video, clips, clickSound, keySound);
 				appliedClickSound = clickSound;
 				appliedKeySound = keySound;
+				appliedAudioCleanup = audioCleanupSignature();
 				if (audio != null) {
 					// setAudioTrack seeks the new track to the playhead; the engine tick pumps it.
 					engine.setAudioTrack(audio);
@@ -508,6 +507,109 @@ public final class EditorSession implements AutoCloseable {
 				return;
 			}
 			track.setKeyTrack(keyTrackFor(keySound, video, store.state().clipRegions()));
+		});
+	}
+
+	/**
+	 * Opens the preview audio for one media/clip snapshot: every source-audio track of the project
+	 * with its gain and edit-time cleanup, so the preview hears what the export will write.
+	 */
+	private PlaybackAudioTrack openPreviewAudio(String video, List<ClipRegion> clips,
+			ClickSoundSettings clickSound, KeySoundSettings keySound) {
+		return PlaybackAudioProducer.openWithPulse(previewTracks(video), programmeLoudnessTarget(),
+				clips, AppBinaries.ffmpeg(), clickTrackFor(clickSound, video, clips),
+				keyTrackFor(keySound, video, clips));
+	}
+
+	/**
+	 * The source tracks the preview plays. The timeline resolves sidecars/embedded audio (and the
+	 * inspector's Audio section lists the same lanes); before they land the recording itself is the
+	 * only track, which is exactly the pre-cleanup behaviour.
+	 */
+	private List<PreviewAudioTrack> previewTracks(@Nullable String videoPath) {
+		SourceAudioTrackSettings defaults = store.state().defaultSourceAudioTrackSettingsTyped();
+		List<PreviewAudioTrack> tracks = new ArrayList<>();
+		for (dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack track
+				: dataSource.sourceAudioTracks()) {
+			if (track.audioPath() == null || track.audioPath().isBlank()) {
+				continue;
+			}
+			tracks.add(new PreviewAudioTrack(track.audioPath(),
+					SourceAudioSettings.resolveGain(defaults, track.id()),
+					SourceAudioSettings.resolveCleanup(defaults, track.id())));
+		}
+		if (tracks.isEmpty() && videoPath != null && !videoPath.isBlank()) {
+			tracks.add(PreviewAudioTrack.plain(videoPath));
+		}
+		return List.copyOf(tracks);
+	}
+
+	/**
+	 * The programme loudness target the preview normalizes to, or 0 when off. Loudness belongs to
+	 * the mix, so the first enabled lane in the exporter's priority order (mic, system, mixed) wins
+	 * — but only for lanes that are actually in the preview.
+	 */
+	private double programmeLoudnessTarget() {
+		SourceAudioTrackSettings defaults = store.state().defaultSourceAudioTrackSettingsTyped();
+		List<dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack> sourceTracks =
+				dataSource.sourceAudioTracks();
+		List<String> present = new ArrayList<>();
+		for (String trackId : List.of(SourceAudioTrackSettings.MIC,
+				SourceAudioTrackSettings.SYSTEM, SourceAudioTrackSettings.MIXED)) {
+			for (var track : sourceTracks) {
+				if (track.id().equals(trackId)) {
+					present.add(trackId);
+					break;
+				}
+			}
+		}
+		return SourceAudioSettings.resolveProgrammeLoudnessTarget(defaults, present);
+	}
+
+	/** Signature of the cleanup/mix settings the running audio track was built from. */
+	private String audioCleanupSignature() {
+		tools.jackson.databind.node.ObjectNode settings =
+				store.state().defaultSourceAudioTrackSettings();
+		return settings == null ? "" : settings.toString();
+	}
+
+	/**
+	 * Rebuilds the preview audio when the per-track cleanup changes: the filters live in the
+	 * decoder command, so only a fresh producer picks them up. Runs on the clip-sync executor like
+	 * the other audio reopen paths; {@code setAudioTrack} seeks the new track to the playhead.
+	 */
+	private void syncAudioCleanup() {
+		String signature = audioCleanupSignature();
+		if (signature.equals(appliedAudioCleanup)) {
+			return;
+		}
+		appliedAudioCleanup = signature;
+		long generation = mediaGeneration.get();
+		clipSync.execute(() -> {
+			if (closed || mediaGeneration.get() != generation) {
+				return;
+			}
+			String video = mediaSource.videoPath();
+			if (video == null || video.isBlank() || audioTrack == null) {
+				return;
+			}
+			PlaybackAudioTrack previous = audioTrack;
+			try {
+				ClickSoundSettings clickSound = store.state().clickSound();
+				KeySoundSettings keySound = store.state().keySound();
+				PlaybackAudioTrack audio = openPreviewAudio(video, store.state().clipRegions(),
+						clickSound, keySound);
+				appliedClickSound = clickSound;
+				appliedKeySound = keySound;
+				if (audio != null) {
+					engine.setAudioTrack(audio);
+					audioTrack = audio;
+					closeQuietly(previous);
+				}
+			} catch (RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"audio playback not updated after a cleanup change: " + error);
+			}
 		});
 	}
 

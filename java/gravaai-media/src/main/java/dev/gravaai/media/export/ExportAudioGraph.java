@@ -1,5 +1,7 @@
 package dev.gravaai.media.export;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -7,13 +9,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.ClipTransitions;
 import dev.gravaai.media.audio.AtempoChain;
+import dev.gravaai.media.audio.AudioCleanupFilters;
 
 /**
  * Builds the single libavfilter graph of an export (plan §5.10): per-source timeline segments with
- * trims/speed ({@code atrim}/{@code atempo}), audio regions ({@code adelay}/{@code volume}), the
- * {@code amix normalize=0} mix, the fade-black gain envelope and the final 48 kHz stereo format.
+ * trims/speed ({@code atrim}/{@code atempo}), the per-track edit-time cleanup
+ * ({@link AudioCleanupFilters}), audio regions ({@code adelay}/{@code volume}), the
+ * {@code amix normalize=0} mix, the programme loudness stage, the fade-black gain envelope and the
+ * final 48 kHz stereo format.
  *
  * <p>Graph input convention used by {@link Mp4Encoder}: input 0 is the raw RGBA video stream, so
  * every audio file used here starts at input index 1. The builder de-duplicates paths and returns
@@ -21,8 +27,22 @@ import dev.gravaai.media.audio.AtempoChain;
  */
 public final class ExportAudioGraph {
 
-	/** One full-length timeline-bound audio track (system/mic/mixed/embedded). */
-	public record TrackInput(String audioPath, double gain) {}
+	/**
+	 * One full-length timeline-bound audio track (system/mic/mixed/embedded).
+	 *
+	 * @param cleanup the track's edit-time cleanup; {@link AudioCleanup#NONE} leaves it untouched
+	 */
+	public record TrackInput(String audioPath, double gain, AudioCleanup cleanup) {
+
+		/** A track without cleanup: the shape every pre-cleanup call site has. */
+		public TrackInput(String audioPath, double gain) {
+			this(audioPath, gain, AudioCleanup.NONE);
+		}
+
+		public TrackInput {
+			cleanup = cleanup == null ? AudioCleanup.NONE : cleanup;
+		}
+	}
 
 	/** One additional audio region placed at {@code startMs} on the output timeline. */
 	public record RegionInput(String audioPath, double startMs, double endMs, double gain) {}
@@ -30,11 +50,18 @@ public final class ExportAudioGraph {
 	/** An output-timeline range (ms) where the recording's own audio is silent: a muted clip. */
 	public record MutedRange(double startMs, double endMs) {}
 
-	/** Everything the graph needs. */
+	/**
+	 * Everything the graph needs.
+	 *
+	 * @param loudnessTargetLufs the EBU R128 programme target for the mix, {@code 0} when off
+	 * @param rnnoiseModelPath the RNNoise model for the cleanup stages, or null when this build
+	 *     lacks it (the heavier noise-reduction levels then fall back to the FFT denoiser)
+	 */
 	public record GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
 			List<ExportAudioSegments.Segment> sourceSegments,
 			List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
-			double masterGain, List<MutedRange> mutedRanges) {
+			double masterGain, List<MutedRange> mutedRanges, double loudnessTargetLufs,
+			@Nullable String rnnoiseModelPath) {
 		public GraphInput {
 			tracks = tracks == null ? List.of() : List.copyOf(tracks);
 			regions = regions == null ? List.of() : List.copyOf(regions);
@@ -46,8 +73,17 @@ public final class ExportAudioGraph {
 		public GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
 				List<ExportAudioSegments.Segment> sourceSegments,
 				List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
+				double masterGain, List<MutedRange> mutedRanges) {
+			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain,
+					mutedRanges, 0, null);
+		}
+
+		public GraphInput(List<TrackInput> tracks, List<RegionInput> regions,
+				List<ExportAudioSegments.Segment> sourceSegments,
+				List<ClipTransitions.FadeWindow> fadeWindows, double outputDurationMs,
 				double masterGain) {
-			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain, List.of());
+			this(tracks, regions, sourceSegments, fadeWindows, outputDurationMs, masterGain, List.of(),
+					0, null);
 		}
 	}
 
@@ -71,8 +107,8 @@ public final class ExportAudioGraph {
 		for (TrackInput track : input.tracks()) {
 			int inputIndex = inputIndex(inputIndexByPath, inputs, track.audioPath());
 			String label = "track" + mixLabels.size();
-			parts.add(buildTrackChain(inputIndex, label, input.sourceSegments(), duration,
-					track.gain(), input.mutedRanges()));
+			parts.add(buildTrackChain(inputIndex, label, input.sourceSegments(), duration, track,
+					input.mutedRanges(), input.rnnoiseModelPath()));
 			mixLabels.add("[" + label + "]");
 		}
 		for (RegionInput region : input.regions()) {
@@ -101,6 +137,13 @@ public final class ExportAudioGraph {
 		if (needsVolume(input.masterGain())) {
 			finalChain.append(",volume=").append(number(input.masterGain()));
 		}
+		// The programme loudness stage sits on the mix, after the master gain it corrects for and
+		// before the fade envelope: loudnorm measures what the viewer hears, so the fade must not
+		// be inside its measurement window.
+		String loudnorm = AudioCleanupFilters.loudnormFilter(input.loudnessTargetLufs());
+		if (loudnorm != null) {
+			finalChain.append(',').append(loudnorm);
+		}
 		if (!input.fadeWindows().isEmpty()) {
 			finalChain.append(",volume=eval=frame:volume='").append(fadeGainExpression(input))
 					.append('\'');
@@ -114,11 +157,14 @@ public final class ExportAudioGraph {
 	}
 
 	private static String buildTrackChain(int inputIndex, String label,
-			List<ExportAudioSegments.Segment> segments, String duration, double gain,
-			List<MutedRange> muted) {
+			List<ExportAudioSegments.Segment> segments, String duration, TrackInput track,
+			List<MutedRange> muted, @Nullable String rnnoiseModelPath) {
 		// offlineAudioProcessor mutedSourceOutputRangesSec: the recording's audio (not imported
 		// regions) is silent over muted clips, on the output timeline.
-		String gainSuffix = (needsVolume(gain) ? ",volume=" + number(gain) : "") + muteSuffix(muted);
+		String cleanup = cleanupSuffix(track.cleanup(), rnnoiseModelPath);
+		String gainSuffix = cleanup
+				+ (needsVolume(track.gain()) ? ",volume=" + number(track.gain()) : "")
+				+ muteSuffix(muted);
 		StringBuilder builder = new StringBuilder();
 		if (segments.isEmpty()) {
 			builder.append('[').append(inputIndex).append(":a]")
@@ -151,6 +197,17 @@ public final class ExportAudioGraph {
 				.append("apad,atrim=duration=").append(duration).append(",asetpts=PTS-STARTPTS")
 				.append(gainSuffix).append('[').append(label).append(']');
 		return builder.toString();
+	}
+
+	/**
+	 * The edit-time cleanup stages of one track, comma-joined, or an empty string when the track has
+	 * none. Denoising runs before the gain/mute volume because both are programme decisions: the
+	 * denoiser must see the recorder's levels, and a muted or boosted track must not change how much
+	 * noise it removes. Imported regions are not source tracks and never get this suffix.
+	 */
+	private static String cleanupSuffix(AudioCleanup cleanup, @Nullable String rnnoiseModelPath) {
+		List<String> filters = AudioCleanupFilters.trackFilters(cleanup, rnnoiseModelPath);
+		return filters.isEmpty() ? "" : "," + String.join(",", filters);
 	}
 
 	private static String muteSuffix(List<MutedRange> muted) {

@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import dev.gravaai.core.project.AudioCleanup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -110,5 +111,88 @@ class FfmpegCliPcmSourceTest {
 		List<String> notFinite = FfmpegCliPcmSource.pcmCommand(
 				FFMPEG, "/media/screen.mp4", Double.NaN, 1, List.of());
 		assertEquals("0.000000", notFinite.get(notFinite.indexOf("-ss") + 1));
+	}
+
+	@Test
+	@DisplayName("mixes every source track through its cleanup and gain into one s16le pipe")
+	void buildsMixCommand() {
+		List<String> command = FfmpegCliPcmSource.mixCommand(
+				FFMPEG,
+				List.of(new PreviewAudioTrack("/rec/system.wav", 0.5, AudioCleanup.NONE),
+						new PreviewAudioTrack("/rec/mic.wav", 1,
+								new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 80, 0))),
+				0, 1.5, 2.0, List.of("atempo=2"));
+		assertEquals("/opt/gravaai/ffmpeg", command.get(0));
+		assertEquals(2, command.stream().filter("-i"::equals).count());
+		// Every input is seeked/trimmed to the same source span before its own chain.
+		assertEquals("1.500000",
+				command.get(command.indexOf("-ss") + 1));
+		String graph = command.get(command.indexOf("-filter_complex") + 1);
+		assertTrue(graph.startsWith(
+				"[0:a]atempo=2,volume=0.500,aresample=48000,aformat=sample_fmts=fltp:"
+						+ "channel_layouts=stereo[ain0];"));
+		assertTrue(graph.contains(
+				"[1:a]atempo=2,highpass=f=80,afftdn=nr=10:nf=-50:tn=1,aresample=48000,"
+						+ "aformat=sample_fmts=fltp:channel_layouts=stereo[ain1];"));
+		assertTrue(graph.contains("[ain0][ain1]amix=inputs=2:duration=longest:normalize=0[aout]"));
+		assertFalse(graph.contains("loudnorm"));
+		assertEquals("[aout]", command.get(command.indexOf("-map") + 1));
+		assertTrue(command.contains("-vn"));
+		assertEquals("s16le", command.get(command.indexOf("-f") + 1));
+		assertEquals("pipe:1", command.get(command.size() - 1));
+	}
+
+	@Test
+	@DisplayName("adds the programme loudness stage to the mix when a target is set")
+	void mixAppliesLoudnorm() {
+		List<String> command = FfmpegCliPcmSource.mixCommand(FFMPEG,
+				List.of(PreviewAudioTrack.plain("/rec/mix.m4a")), -16, 0, 1, List.of());
+		String graph = command.get(command.indexOf("-filter_complex") + 1);
+		assertTrue(graph.contains("amix=inputs=1:duration=longest:normalize=0,"
+				+ "loudnorm=I=-16:TP=-1.5:LRA=11[aout]"));
+	}
+
+	@Test
+	@DisplayName("degrades the heavier cleanup levels when the RNNoise model is absent")
+	void mixUsesFftFallback() {
+		List<String> command = FfmpegCliPcmSource.mixCommand(FFMPEG,
+				List.of(new PreviewAudioTrack("/rec/mic.wav", 1,
+						new AudioCleanup(AudioCleanup.NoiseReduction.STRONG, 0, 0))),
+				0, 0, 1, List.of());
+		String graph = command.get(command.indexOf("-filter_complex") + 1);
+		assertTrue(graph.contains("arnndn=m=") || graph.contains("afftdn=nr=20"));
+	}
+
+	@Test
+	@DisplayName("the real bundled ffmpeg accepts the mix graph (two tracks, cleanup and loudness)")
+	void decodesRealMix() {
+		Path ffmpeg = bundledFfmpeg();
+		Path fixture = null;
+		for (Path candidate : List.of(
+				Path.of("parity", "fixtures", "media", "av-sync-2min.mp4"),
+				Path.of("..", "parity", "fixtures", "media", "av-sync-2min.mp4"),
+				Path.of("..", "..", "parity", "fixtures", "media", "av-sync-2min.mp4"))) {
+			if (Files.isRegularFile(candidate)) {
+				fixture = candidate.toAbsolutePath().normalize();
+				break;
+			}
+		}
+		assumeTrue(Files.isExecutable(ffmpeg), "bundled ffmpeg not built: " + ffmpeg);
+		assumeTrue(fixture != null, "av-sync-2min.mp4 fixture not found");
+		List<PreviewAudioTrack> tracks = List.of(
+				new PreviewAudioTrack(fixture.toString(), 0.7,
+						new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 80, 0)),
+				new PreviewAudioTrack(fixture.toString(), 0.5, AudioCleanup.NONE));
+		try (PcmSource source = FfmpegCliPcmSource.openMix(ffmpeg, tracks, -16, 1.0, 1.0,
+				List.of())) {
+			float[] buffer = new float[1_920 * 2];
+			int frames = source.read(buffer, 1_920);
+			assertTrue(frames > 0, "the mixed decoder must return audio frames");
+			float peak = 0;
+			for (int index = 0; index < frames * 2; index++) {
+				peak = Math.max(peak, Math.abs(buffer[index]));
+			}
+			assertTrue(peak > 0.01f, "mixed preview audio must not be silent (peak=" + peak + ")");
+		}
 	}
 }

@@ -1,11 +1,15 @@
 package dev.gravaai.media.playback;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.gravaai.core.project.AudioCleanup;
+import dev.gravaai.media.audio.AudioCleanupFilters;
 import dev.gravaai.platform.process.RunningProcess;
 
 /**
@@ -22,10 +26,18 @@ import dev.gravaai.platform.process.RunningProcess;
  * <p>The pipeline is software-only (libavfilter {@code atempo}); the CLI is used so the preview
  * audio can land before the in-process AVFilterGraph wrapper (plan §5.7 remainder) exists. The
  * command builder is pure and tested; the live decode is covered by a fixture-backed test.
+ *
+ * <p>The edit-time cleanup and the source-track mix ride the same CLI: {@link #mixCommand} builds
+ * one {@code -filter_complex} graph that cleans/gains each source track, mixes them with
+ * {@code amix} and optionally normalizes the programme, so the preview cannot drift from the
+ * export graph.
  */
 public final class FfmpegCliPcmSource implements PcmSource {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.media.playback");
+
+	/** The preview pipeline's fixed rate: the sink, the plan and the click tracks all assume it. */
+	private static final int SAMPLE_RATE = 48_000;
 
 	private final InputStream stdout;
 	private final RunningProcess process;
@@ -59,6 +71,109 @@ public final class FfmpegCliPcmSource implements PcmSource {
 		}
 		command.add("pipe:1");
 		return List.copyOf(command);
+	}
+
+	/**
+	 * The ffmpeg argument list for one preview segment of a whole source-audio mix: every track is
+	 * seeked/trimmed to the same source span, cleaned, gained, then {@code amix}ed and optionally
+	 * loudness-normalized, so the preview hears the same stages the export graph applies.
+	 *
+	 * <p>The output stays {@code pcm_s16le}: the bundled FFmpeg has no {@code f32le} muxer.
+	 */
+	public static List<String> mixCommand(
+			Path ffmpeg,
+			List<PreviewAudioTrack> tracks,
+			double loudnessTargetLufs,
+			double sourceStartSeconds,
+			double durationSeconds,
+			List<String> atempoFilters) {
+		if (tracks == null || tracks.isEmpty()) {
+			throw new IllegalArgumentException("at least one preview track is required");
+		}
+		List<String> command = new ArrayList<>();
+		command.add(ffmpeg.toString());
+		command.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostdin"));
+		for (PreviewAudioTrack track : tracks) {
+			command.addAll(List.of("-ss", formatSeconds(sourceStartSeconds)));
+			if (durationSeconds > 0) {
+				command.addAll(List.of("-t", formatSeconds(durationSeconds)));
+			}
+			command.addAll(List.of("-i", track.audioPath()));
+		}
+		List<String> chains = new ArrayList<>();
+		List<String> mixInputs = new ArrayList<>();
+		String peakModel = rnnoiseModelPath();
+		for (int index = 0; index < tracks.size(); index++) {
+			PreviewAudioTrack track = tracks.get(index);
+			List<String> filters = new ArrayList<>();
+			if (atempoFilters != null) {
+				filters.addAll(atempoFilters);
+			}
+			filters.addAll(AudioCleanupFilters.trackFilters(track.cleanup(), peakModel));
+			if (Math.abs(track.gain() - 1) > 0.0005) {
+				filters.add("volume=" + number(track.gain()));
+			}
+			StringBuilder chain = new StringBuilder();
+			chain.append('[').append(index).append(":a]");
+			if (!filters.isEmpty()) {
+				chain.append(String.join(",", filters)).append(',');
+			}
+			chain.append("aresample=").append(SAMPLE_RATE)
+					.append(",aformat=sample_fmts=fltp:channel_layouts=stereo")
+					.append("[ain").append(index).append(']');
+			chains.add(chain.toString());
+			mixInputs.add("[ain" + index + "]");
+		}
+		StringBuilder graph = new StringBuilder();
+		for (String chain : chains) {
+			graph.append(chain).append(';');
+		}
+		graph.append(mixInputs.stream().reduce("", String::concat))
+				.append("amix=inputs=").append(tracks.size())
+				.append(":duration=longest:normalize=0");
+		String loudnorm = AudioCleanupFilters.loudnormFilter(loudnessTargetLufs);
+		if (loudnorm != null) {
+			graph.append(',').append(loudnorm);
+		}
+		graph.append("[aout]");
+		command.addAll(List.of("-filter_complex", graph.toString(), "-map", "[aout]", "-vn"));
+		command.addAll(List.of("-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"));
+		return List.copyOf(command);
+	}
+
+	/** The RNNoise model of this build, or null when the payload lacks it. */
+	private static @Nullable String rnnoiseModelPath() {
+		java.nio.file.Path model = AudioCleanupFilters.rnnoiseModel();
+		return model == null ? null : model.toString();
+	}
+
+	private static String number(double value) {
+		if (value == Math.rint(value) && Math.abs(value) < 1e15) {
+			return Long.toString((long) value);
+		}
+		return String.format(java.util.Locale.ROOT, "%.3f", value);
+	}
+
+	/** Opens the mixed preview source; call from the audio pump thread. */
+	public static PcmSource openMix(
+			Path ffmpeg,
+			List<PreviewAudioTrack> tracks,
+			double loudnessTargetLufs,
+			double sourceStartSeconds,
+			double durationSeconds,
+			List<String> atempoFilters) {
+		List<String> command = mixCommand(
+				ffmpeg, tracks, loudnessTargetLufs, sourceStartSeconds, durationSeconds,
+				atempoFilters);
+		try {
+			RunningProcess process = dev.gravaai.platform.process.ProcessRunner.of(command)
+					.rawStdout()
+					.onStderrLine(line -> LOG.log(System.Logger.Level.DEBUG, "audio ffmpeg: " + line))
+					.start();
+			return new FfmpegCliPcmSource(process);
+		} catch (IOException error) {
+			throw new IllegalStateException("could not start the preview audio mixer", error);
+		}
 	}
 
 	private static String formatSeconds(double seconds) {

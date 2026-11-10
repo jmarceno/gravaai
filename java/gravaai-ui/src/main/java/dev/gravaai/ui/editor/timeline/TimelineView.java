@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import dev.gravaai.core.os.HostOs;
 import dev.gravaai.core.project.AnnotationRegion;
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.CameraLayout;
 import dev.gravaai.core.project.CameraLayoutSegment;
@@ -20,11 +21,13 @@ import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClipTransition;
 import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.ProjectEditorState;
+import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.TrimRegion;
 import dev.gravaai.core.project.ZoomRegion;
 import dev.gravaai.media.compose.ZoomSharpen;
 import dev.gravaai.ui.editor.timeline.core.ClipPresentation;
+import dev.gravaai.ui.editor.timeline.core.SourceAudioCleanupBadge;
 import dev.gravaai.ui.editor.timeline.core.Span;
 import dev.gravaai.ui.editor.timeline.core.TimelineDndEngine;
 import dev.gravaai.ui.editor.timeline.core.TimelineRangeMath;
@@ -157,6 +160,10 @@ public final class TimelineView extends Region {
 	private static final Color AUDIO_SELECTED = Color.web("#2fe6d0");
 	private static final Color WAVEFORM_COLOR = Color.web("#8fa3b0", 0.55);
 	private static final Color SOURCE_AUDIO_FILL = Color.web("#12171d");
+	/** Edit-time cleanup indicator: amber, the same family as grades and speed blocks. */
+	private static final Color CLEANUP_ACCENT = Color.web("#f0b429");
+	private static final Color CLEANUP_BADGE_FILL = Color.web("#f0b429", 0.18);
+	private static final Color CLEANUP_BADGE_TEXT = Color.web("#f7d77a");
 	private static final Color KEYSTROKE_FILL = Color.web("#241d38");
 	private static final Color KEYSTROKE_BORDER = Color.web("#8b5cf6", 0.55);
 	private static final Color KEYSTROKE_SELECTED = Color.web("#a78bfa");
@@ -299,6 +306,8 @@ public final class TimelineView extends Region {
 	private double minItemDurationMs = 100;
 	private List<CaptionTimeline.Fragment> captionFragments = List.of();
 	private List<TimelineSourceAudioTrack> sourceAudioTracks = List.of();
+	/** Per-track cleanup of the project defaults; drives the source lane indicator. */
+	private SourceAudioTrackSettings defaultTrackSettings = SourceAudioTrackSettings.EMPTY;
 	private FilmstripProvider filmstripProvider = FilmstripProvider.empty();
 	private static final int FILMSTRIP_THUMB_WIDTH = 160;
 	private static final int FILMSTRIP_THUMB_HEIGHT = 90;
@@ -586,6 +595,7 @@ public final class TimelineView extends Region {
 		currentTimeMs = Math.max(0, Math.min(dataSource.currentTimeMs(), total));
 		// Tracks first: the items below include one block per track per source-audio clip.
 		sourceAudioTracks = dataSource.sourceAudioTracks();
+		defaultTrackSettings = project.defaultSourceAudioTrackSettingsTyped();
 		items = TimelineModel.buildTimelineItems(new TimelineModel.ItemsRequest(
 				project.zoomRegions(), project.clipRegions(), project.annotationRegions(),
 				project.audioRegions(), project.autoCaptions(),
@@ -3090,6 +3100,19 @@ public final class TimelineView extends Region {
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, AUDIO_TEXT);
+		AudioCleanup cleanup = cleanupForSourceTrack(item.rowId());
+		String cleanupBadge = SourceAudioCleanupBadge.blockBadge(cleanup);
+		if (!cleanupBadge.isEmpty()) {
+			double cleanupWidth = textWidth(cleanupBadge, SMALL_FONT) + 10;
+			if (blockWidth > cleanupWidth + 8) {
+				graphics.setFill(CLEANUP_BADGE_FILL);
+				graphics.fillRoundRect(x + blockWidth - cleanupWidth - 4, y + 2, cleanupWidth,
+						13, 2, 2);
+				graphics.setFont(SMALL_FONT);
+				graphics.setFill(CLEANUP_BADGE_TEXT);
+				graphics.fillText(cleanupBadge, x + blockWidth - cleanupWidth + 1, y + 12);
+			}
+		}
 		double volume = item.audioGain() == null ? 1 : item.audioGain();
 		String badge = String.format(java.util.Locale.ROOT, "%.1fx", volume);
 		if (Boolean.TRUE.equals(item.audioNormalize())) {
@@ -3115,6 +3138,41 @@ public final class TimelineView extends Region {
 			graphics.setGlobalAlpha(1);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
+	/**
+	 * The lane marker for a cleaned source track: a dot plus the short NR marker right of the row
+	 * name, so a cleaned lane reads at a glance without opening the inspector.
+	 */
+	private void drawCleanupMarker(GraphicsContext graphics, String rowId, String label,
+			double centerY) {
+		AudioCleanup cleanup = cleanupForSourceTrack(rowId);
+		String marker = SourceAudioCleanupBadge.laneMarker(cleanup);
+		if (marker.isEmpty()) {
+			return;
+		}
+		double markerX = 8 + 18 + textWidth(label, ROW_LABEL_FONT) + 6;
+		graphics.setFill(CLEANUP_ACCENT);
+		graphics.fillOval(markerX, centerY - 2.5, 5, 5);
+		if (markerX + 12 < GUTTER_WIDTH - 4) {
+			graphics.setFont(SMALL_FONT);
+			graphics.setFill(CLEANUP_ACCENT);
+			graphics.fillText(marker, markerX + 8, centerY + 3);
+		}
+	}
+
+	/** The project-defaults cleanup of the source track behind a lane row. */
+	private AudioCleanup cleanupForSourceTrack(String rowId) {
+		if (!TimelineRows.isSourceAudioTrackRowId(rowId)) {
+			return AudioCleanup.NONE;
+		}
+		return defaultTrackSettings
+				.trackOrDefault(TimelineRows.getSourceAudioTrackId(rowId)).cleanup();
+	}
+
+	/** The source-audio tracks currently rendered (the inspector's Audio section reads this). */
+	public List<TimelineSourceAudioTrack> sourceAudioTracks() {
+		return sourceAudioTracks;
 	}
 
 	private java.util.Optional<TimelineSourceAudioTrack> sourceAudioTrackFor(String rowId) {
@@ -3281,6 +3339,9 @@ public final class TimelineView extends Region {
 				graphics.setFont(ROW_LABEL_FONT);
 				graphics.setFill(GUTTER_TEXT);
 				graphics.fillText(label, 8 + 18, centerY + 3.5);
+			}
+			if (TimelineRows.isSourceAudioTrackRowId(row.id())) {
+				drawCleanupMarker(graphics, row.id(), label, centerY);
 			}
 		}
 	}

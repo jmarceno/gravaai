@@ -132,6 +132,34 @@ public record ProjectEditorState(
 				elementComponents, elements, elementAssets);
 	}
 
+	/**
+	 * Copy with a new raw default source-audio settings map (per-track gains and cleanup; unknown
+	 * keys preserved). Absence is modelled as an empty object, matching
+	 * {@code ProjectPersistence.objectOrEmpty}.
+	 */
+	public ProjectEditorState withDefaultSourceAudioTrackSettings(
+			@Nullable ObjectNode nextDefaultSourceAudioTrackSettings) {
+		ObjectNode normalized = nextDefaultSourceAudioTrackSettings != null
+				? nextDefaultSourceAudioTrackSettings : Json.nodeFactory().objectNode();
+		return new ProjectEditorState(wallpaper, shadowIntensity, backgroundBlur, zoomMotionBlur,
+				zoomMotionBlurTuning, connectZooms, zoomInDurationMs, zoomInOverlapMs,
+				zoomOutDurationMs, connectedZoomGapMs, connectedZoomDurationMs, zoomInEasing,
+				zoomOutEasing, connectedZoomEasing, showCursor, loopCursor, cursorStyle,
+				cursorClickEffect, cursorClickEffectColor, cursorClickEffectScale,
+				cursorClickEffectOpacity, cursorClickEffectDurationMs, cursorSize, cursorSmoothing,
+				cursorSpringStiffnessMultiplier, cursorSpringDampingMultiplier,
+				cursorSpringMassMultiplier, cameraSpringStiffnessMultiplier,
+				cameraSpringDampingMultiplier, cameraSpringMassMultiplier, zoomSmoothness,
+				zoomClassicMode, cursorMotionBlur, cursorClickBounce, cursorClickBounceDuration,
+				cursorSway, borderRadius, padding, cropRegion, zoomRegions, trimRegions,
+				clipRegions, autoFullTrackClipId, autoFullTrackClipEndMs, speedRegions,
+				gradeRegions,
+				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
+				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio,
+				sourceAudioTrackSettingsByClip, normalized, keystrokeElements,
+				cameraLayoutSegments, elementComponents, elements, elementAssets);
+	}
+
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
 	public java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings() {
 		return SourceAudioSettings.parseAll(sourceAudioTrackSettingsByClip);

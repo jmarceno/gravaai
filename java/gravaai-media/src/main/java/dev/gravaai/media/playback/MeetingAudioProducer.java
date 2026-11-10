@@ -29,7 +29,7 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 	private final List<String> audioPaths;
 	private final double durationSeconds;
 	private final PlaybackAudioSink sink;
-	private final PlaybackAudioProducer.PcmSourceFactory sourceFactory;
+	private final SourceFactory sourceFactory;
 	private final int chunkFrames;
 	private final float[] chunk;
 	/** Per-source decode buffers, parallel to {@link #sources}. */
@@ -47,11 +47,18 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 	private volatile boolean closed;
 	private volatile boolean paused;
 
+	/** Opens one meeting track's PCM source; injectable so tests avoid processes. */
+	@FunctionalInterface
+	public interface SourceFactory {
+		PcmSource open(String mediaPath, double sourceStartSeconds, double durationSeconds,
+				List<String> filters);
+	}
+
 	public MeetingAudioProducer(
 			List<String> audioPaths,
 			double durationSeconds,
 			PlaybackAudioSink sink,
-			PlaybackAudioProducer.PcmSourceFactory sourceFactory,
+			SourceFactory sourceFactory,
 			int chunkFrames) {
 		if (audioPaths == null || audioPaths.isEmpty()) {
 			throw new IllegalArgumentException("audioPaths must not be empty");

@@ -188,6 +188,15 @@ public final class EditorStore {
 		state = state.withSourceAudioTrackSettingsByClip(next);
 	}
 
+	/**
+	 * Replaces the canonical raw default source-audio settings (the per-track gains and cleanup the
+	 * exporter resolves); unknown keys are preserved by the caller's merge.
+	 */
+	public void setDefaultSourceAudioTrackSettings(
+			tools.jackson.databind.node.@Nullable ObjectNode next) {
+		state = state.withDefaultSourceAudioTrackSettings(next);
+	}
+
 	public void setAutoCaptions(List<CaptionCue> cues) {
 		// Raw list: a just-added cue has empty text, which only load-time normalisation drops.
 		state = state.withAutoCaptions(List.copyOf(cues));
@@ -223,7 +232,9 @@ public final class EditorStore {
 				List.copyOf(multiSelection), state.keystrokeElements(), selectedKeystrokeId,
 				state.gradeRegions(), selectedGradeId,
 				state.cameraLayoutSegments(), selectedCameraLayoutId, state.elementComponents(),
-				state.elements(), state.elementAssets(), selectedElementId);
+				state.elements(), state.elementAssets(), selectedElementId,
+				state.defaultSourceAudioTrackSettings() == null ? null
+						: state.defaultSourceAudioTrackSettings().deepCopy());
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -252,6 +263,8 @@ public final class EditorStore {
 		multiSelection.addAll(snapshot.multiSelectedIds());
 		setSourceAudioTrackSettingsByClip(snapshot.sourceAudioTrackSettingsByClip() == null
 				? null : snapshot.sourceAudioTrackSettingsByClip().deepCopy());
+		setDefaultSourceAudioTrackSettings(snapshot.defaultSourceAudioTrackSettings() == null
+				? null : snapshot.defaultSourceAudioTrackSettings().deepCopy());
 	}
 
 	public boolean undo() {

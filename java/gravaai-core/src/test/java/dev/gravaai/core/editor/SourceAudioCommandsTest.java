@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.ProjectPersistence;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 
@@ -49,5 +50,29 @@ class SourceAudioCommandsTest {
 		assertFalse(store.apply(new SourceAudioCommands.SetTrackSettings(null, "mic", 1, false)));
 		assertFalse(store.apply(new SourceAudioCommands.SetTrackSettings("clip-1", "", 1, false)));
 
+	}
+
+	@Test
+	@DisplayName("sets a default track cleanup, preserves unknown keys and undoes")
+	void setsDefaultCleanup() {
+		EditorStore store = store();
+		assertTrue(store.apply(new SourceAudioCommands.SetDefaultTrackCleanup(
+				SourceAudioTrackSettings.MIC,
+				new AudioCleanup(AudioCleanup.NoiseReduction.BALANCED, 120, -16))));
+		AudioCleanup mic = store.state().defaultSourceAudioTrackSettingsTyped().track("mic")
+				.cleanup();
+		assertEquals(AudioCleanup.NoiseReduction.BALANCED, mic.noiseReduction());
+		assertEquals(120, mic.highPassHz());
+		assertEquals(-16, mic.loudnessTargetLufs(), 0.001);
+		assertEquals(EditorStore.SECTION_AUDIO, store.activeEffectSection());
+
+		assertFalse(store.apply(new SourceAudioCommands.SetDefaultTrackCleanup(null,
+				AudioCleanup.NONE)));
+		assertFalse(store.apply(new SourceAudioCommands.SetDefaultTrackCleanup(" ",
+				AudioCleanup.NONE)));
+
+		assertTrue(store.undo());
+		assertEquals(AudioCleanup.NONE,
+				store.state().defaultSourceAudioTrackSettingsTyped().trackOrDefault("mic").cleanup());
 	}
 }

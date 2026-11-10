@@ -22,10 +22,23 @@ public record SourceAudioTrackSettings(Map<String, Track> tracks) {
 	public static final String SYSTEM = "system";
 	public static final String MIC = "mic";
 
-	/** One {@code {volume, normalize}} entry. */
-	public record Track(double volume, boolean normalize) {
+	/** One {@code {volume, normalize, cleanup}} entry. */
+	public record Track(double volume, boolean normalize, AudioCleanup cleanup) {
 
-		public static final Track DEFAULT = new Track(1.0, false);
+		public static final Track DEFAULT = new Track(1.0, false, AudioCleanup.NONE);
+
+		/** A track without cleanup: the shape every pre-cleanup project file has. */
+		public Track(double volume, boolean normalize) {
+			this(volume, normalize, AudioCleanup.NONE);
+		}
+
+		public Track {
+			cleanup = cleanup == null ? AudioCleanup.NONE : cleanup;
+		}
+
+		public Track withCleanup(AudioCleanup next) {
+			return new Track(volume, normalize, next == null ? AudioCleanup.NONE : next);
+		}
 	}
 
 	public static final SourceAudioTrackSettings EMPTY =

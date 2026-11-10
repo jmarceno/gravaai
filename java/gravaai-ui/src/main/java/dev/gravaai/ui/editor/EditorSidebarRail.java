@@ -26,6 +26,7 @@ public final class EditorSidebarRail extends VBox {
 		KEYSTROKES("Keystrokes", "Keys", Icons.Keyboard),
 		WEBCAM("Webcam", "Webcam", Icons.Camera),
 		CAPTIONS("Captions", "Captions", Icons.ClosedCaptioning),
+		AUDIO("Audio cleanup", "Audio", Icons.SpeakerHigh),
 		AUTO_MASK("Auto mask", "Mask", Icons.EyeSlash),
 		TRANSCRIPT("Transcript editing", "Transcript", Icons.TextT),
 		MEETING("Transcript & notes", "Notes", Icons.DocumentText),

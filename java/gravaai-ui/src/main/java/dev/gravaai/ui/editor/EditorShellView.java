@@ -201,6 +201,9 @@ public final class EditorShellView extends VBox {
 			if (inspector != null) {
 				inspector.showSelectionSettings();
 			}
+			// Cleanup edits (and undo of them) land in the project defaults, which the Audio
+			// section renders; the selection-driven editors above never rebuild on their own.
+			refreshInspectorIfShowing(EditorSidebarRail.Section.AUDIO);
 			header.refresh();
 			preview.refresh();
 			playbackControls.refresh();
@@ -325,6 +328,8 @@ public final class EditorShellView extends VBox {
 		inspector.onSectionTab(rail::select);
 		if (timelineContent instanceof dev.gravaai.ui.editor.timeline.TimelineView timelineView) {
 			inspector.setTrackCount(timelineView::rowCount);
+			// The Audio section lists the recording's source lanes; the timeline owns that list.
+			inspector.setSourceAudioTracks(timelineView::sourceAudioTracks);
 		}
 		if (autoMask != null) {
 			inspector.setAutoMaskService(autoMask);
@@ -341,6 +346,18 @@ public final class EditorShellView extends VBox {
 		}
 		if (body != null) {
 			body.getChildren().set(1, inspector);
+		}
+	}
+
+	/**
+	 * Re-renders the open inspector section when it is {@code section} and no timeline selection
+	 * owns the panel. Used for late-arriving data (source-audio tracks) and cleanup edits.
+	 */
+	public void refreshInspectorIfShowing(EditorSidebarRail.Section section) {
+		EditorInspectorPanel current = inspector;
+		if (current != null && current.section() == section
+				&& current.selectionEditor() == EditorInspectorPanel.SelectionEditor.NONE) {
+			current.refresh();
 		}
 	}
 

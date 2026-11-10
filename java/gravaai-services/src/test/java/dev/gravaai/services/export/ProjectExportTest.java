@@ -230,6 +230,51 @@ class ProjectExportTest {
 	}
 
 	@Test
+	@DisplayName("maps per-track cleanup and the programme loudness target into the track graph")
+	void mapsCleanupAndLoudnessIntoTrackGraph() {
+		// The inspector stores cleanup on the track's settings entry; the exporter must apply the
+		// track stages before the gain and the single programme loudness stage on the mix.
+		Path video = media("h264-1080p60.mp4");
+		ObjectNode editor = twoSecondEditor();
+		ObjectNode mixed = editor.putObject("defaultSourceAudioTrackSettings").putObject("mixed");
+		mixed.put("volume", 1);
+		mixed.put("noiseReduction", "balanced");
+		mixed.put("highPassHz", 80);
+		mixed.put("loudnessLufs", -16);
+		ProjectExport.Input input = new ProjectExport.Input(
+				ProjectPersistence.normalizeProjectEditor(editor), video, null,
+				List.of(media("aac-48k-stereo.m4a")),
+				preferences(ExportQuality.MEDIUM, ExportEncodingMode.FAST, ExportFormat.MP4, false),
+				tempDir.resolve("cleanup.mp4"), false, false, 0, List.of());
+		String graph = ProjectExport.prepare(input).audioPlan().filterComplex();
+		assertTrue(graph.contains("highpass=f=80"), graph);
+		// Balanced needs the RNNoise model only when this build ships it; otherwise it degrades to
+		// the FFT denoiser, as the recording path does.
+		assertTrue(graph.contains("afftdn=") || graph.contains("arnndn="), graph);
+		int cleanup = graph.indexOf("highpass=f=80");
+		int loudnorm = graph.indexOf("loudnorm=I=-16:TP=-1.5:LRA=11");
+		assertTrue(loudnorm > cleanup, "the loudness stage belongs to the mix: " + graph);
+		assertEquals(1, graph.split("loudnorm=", -1).length - 1,
+				"exactly one programme loudness stage: " + graph);
+	}
+
+	@Test
+	@DisplayName("leaves the graph clean for a project that never used cleanup")
+	void noCleanupKeepsTheGraphClean() {
+		Path video = media("h264-1080p60.mp4");
+		ProjectExport.Input input = new ProjectExport.Input(
+				twoSecondProject(video.toString()), video, null,
+				List.of(media("aac-48k-stereo.m4a")),
+				preferences(ExportQuality.MEDIUM, ExportEncodingMode.FAST, ExportFormat.MP4, false),
+				tempDir.resolve("no-cleanup.mp4"), false, false, 0, List.of());
+		String graph = ProjectExport.prepare(input).audioPlan().filterComplex();
+		assertFalse(graph.contains("highpass="), graph);
+		assertFalse(graph.contains("afftdn="), graph);
+		assertFalse(graph.contains("arnndn="), graph);
+		assertFalse(graph.contains("loudnorm="), graph);
+	}
+
+	@Test
 	@DisplayName("prepares the 2-minute acceptance fixture with its embedded main audio")
 	void preparesAcceptanceFixture() throws Exception {
 		Path projectFile = fixturesDirectory().resolve("..").resolve("projects")

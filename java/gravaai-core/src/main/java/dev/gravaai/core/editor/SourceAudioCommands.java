@@ -1,6 +1,7 @@
 package dev.gravaai.core.editor;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.SourceAudioSettings;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import tools.jackson.databind.JsonNode;
@@ -11,7 +12,7 @@ public final class SourceAudioCommands {
 
 	private SourceAudioCommands() {}
 
-	/** Sets one track's {@code volume}/{@code normalize} for a clip, preserving unknown raw keys. */
+	/** Sets one clip track's {@code volume}/{@code normalize}, preserving unknown raw keys. */
 	public static final class SetTrackSettings implements EditorCommand {
 		private final String clipId;
 		private final String trackId;
@@ -42,10 +43,38 @@ public final class SourceAudioCommands {
 			SourceAudioTrackSettings current = clipSettings == null
 					? SourceAudioTrackSettings.EMPTY
 					: SourceAudioSettings.parse(clipSettings);
+			// Keep the track's cleanup when only the level changes.
+			AudioCleanup cleanup = current.trackOrDefault(trackId).cleanup();
 			SourceAudioTrackSettings next = current.withTrack(trackId,
 					new SourceAudioTrackSettings.Track(SourceAudioSettings.clampVolume(volume),
-							normalize));
+							normalize, cleanup));
 			store.setSourceAudioTrackSettingsByClip(SourceAudioSettings.merge(byClip, clipId, next));
+			return true;
+		}
+	}
+
+	/**
+	 * Sets one source track's cleanup in the project's {@code defaultSourceAudioTrackSettings} (the
+	 * node the exporter resolves per-track gains and cleanup from). Track ids are {@code mic},
+	 * {@code system} or {@code mixed}; unknown extra keys of the track entry are preserved.
+	 */
+	public static final class SetDefaultTrackCleanup implements EditorCommand {
+		private final String trackId;
+		private final AudioCleanup cleanup;
+
+		public SetDefaultTrackCleanup(String trackId, AudioCleanup cleanup) {
+			this.trackId = trackId;
+			this.cleanup = cleanup == null ? AudioCleanup.NONE : cleanup;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			if (trackId == null || trackId.isBlank()) {
+				return false;
+			}
+			store.setDefaultSourceAudioTrackSettings(SourceAudioSettings.mergeDefaultCleanup(
+					store.state().defaultSourceAudioTrackSettings(), trackId, cleanup));
+			store.setActiveEffectSection(EditorStore.SECTION_AUDIO);
 			return true;
 		}
 	}

@@ -83,7 +83,7 @@ class MeetingAudioProducerTest {
 	private record Open(String mediaPath, double start, double duration, List<String> filters) {
 	}
 
-	private static final class FakeFactory implements PlaybackAudioProducer.PcmSourceFactory {
+	private static final class FakeFactory implements MeetingAudioProducer.SourceFactory {
 
 		final List<Open> opens = new ArrayList<>();
 		final List<FakeSource> sources = new ArrayList<>();
@@ -107,8 +107,7 @@ class MeetingAudioProducerTest {
 		}
 
 		@Override
-		public PcmSource open(
-				String mediaPath, double sourceStartSeconds, double durationSeconds,
+		public PcmSource open(String mediaPath, double sourceStartSeconds, double durationSeconds,
 				List<String> filters) {
 			int index = opens.size();
 			opens.add(new Open(mediaPath, sourceStartSeconds, durationSeconds, filters));
@@ -121,7 +120,7 @@ class MeetingAudioProducerTest {
 	}
 
 	private static MeetingAudioProducer producer(
-			PlaybackAudioSink sink, PlaybackAudioProducer.PcmSourceFactory factory,
+			PlaybackAudioSink sink, MeetingAudioProducer.SourceFactory factory,
 			String... paths) {
 		return new MeetingAudioProducer(
 				List.of(paths), DURATION, sink, factory, PlaybackAudioProducer.DEFAULT_CHUNK_FRAMES);

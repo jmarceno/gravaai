@@ -3,6 +3,7 @@ package dev.gravaai.core.project;
 import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import tools.jackson.databind.JsonNode;
@@ -49,7 +50,8 @@ public final class SourceAudioSettings {
 			}
 			boolean normalize = rawTrack.path("normalize").isBoolean()
 					&& rawTrack.get("normalize").booleanValue();
-			tracks.put(trackId, new SourceAudioTrackSettings.Track(volume, normalize));
+			tracks.put(trackId, new SourceAudioTrackSettings.Track(volume, normalize,
+					AudioCleanup.parse(rawTrack)));
 		});
 		return new SourceAudioTrackSettings(tracks);
 	}
@@ -89,6 +91,7 @@ public final class SourceAudioSettings {
 						? (ObjectNode) rawClip.get(trackId) : Json.nodeFactory().objectNode();
 				rawTrack.put("volume", clampVolume(track.volume()));
 				rawTrack.put("normalize", track.normalize());
+				track.cleanup().writeTo(rawTrack);
 				rawClip.set(trackId, rawTrack);
 			}
 		}
@@ -115,5 +118,59 @@ public final class SourceAudioSettings {
 			return SourceAudioTrackSettings.Track.DEFAULT.volume();
 		}
 		return Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, volume));
+	}
+
+	/** The cleanup of one track id; a clip without the track inherits the defaults. */
+	public static AudioCleanup resolveCleanup(SourceAudioTrackSettings settings, String trackId) {
+		if (settings == null || trackId == null) {
+			return AudioCleanup.NONE;
+		}
+		SourceAudioTrackSettings.Track track = settings.track(trackId);
+		return track == null ? AudioCleanup.NONE : track.cleanup();
+	}
+
+	/**
+	 * The programme loudness target requested by the tracks that will be exported, or {@code 0}
+	 * when none asks for normalization. Loudness is a property of the deliverable, so a single
+	 * target is applied to the mix; the first enabled track wins in the given priority order
+	 * (the exporter passes mic, system, mixed).
+	 */
+	public static double resolveProgrammeLoudnessTarget(SourceAudioTrackSettings settings,
+			List<String> priorityTrackIds) {
+		if (settings == null || priorityTrackIds == null) {
+			return 0;
+		}
+		for (String trackId : priorityTrackIds) {
+			AudioCleanup cleanup = resolveCleanup(settings, trackId);
+			if (cleanup.hasLoudnessTarget()) {
+				return cleanup.loudnessTargetLufs();
+			}
+		}
+		return 0;
+	}
+
+	/** A copy of {@code settings} with one track's cleanup replaced. */
+	public static SourceAudioTrackSettings withCleanup(SourceAudioTrackSettings settings,
+			String trackId, AudioCleanup cleanup) {
+		SourceAudioTrackSettings current = settings == null
+				? SourceAudioTrackSettings.EMPTY : settings;
+		SourceAudioTrackSettings.Track track = current.trackOrDefault(trackId);
+		return current.withTrack(trackId, track.withCleanup(cleanup));
+	}
+
+	/** Writes one track's cleanup into the canonical {@code defaultSourceAudioTrackSettings} node. */
+	public static ObjectNode mergeDefaultCleanup(@Nullable ObjectNode rawDefaults, String trackId,
+			AudioCleanup cleanup) {
+		if (trackId == null || trackId.isBlank()) {
+			return rawDefaults == null ? Json.nodeFactory().objectNode() : rawDefaults.deepCopy();
+		}
+		ObjectNode next = rawDefaults == null ? Json.nodeFactory().objectNode()
+				: rawDefaults.deepCopy();
+		ObjectNode rawTrack = next.path(trackId).isObject()
+				? (ObjectNode) next.get(trackId) : Json.nodeFactory().objectNode();
+		AudioCleanup resolved = cleanup == null ? AudioCleanup.NONE : cleanup;
+		resolved.writeTo(rawTrack);
+		next.set(trackId, rawTrack);
+		return next;
 	}
 }

@@ -5,15 +5,22 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.gravaai.core.project.AudioCleanup;
+import dev.gravaai.media.audio.AudioCleanupFilters;
+
 /**
  * Microphone noise-reduction filter chains, ported from
- * {@code electron/ipc/recording/micNoiseReduction.ts}.
+ * {@code electron/ipc/recording/micNoiseReduction.ts}. The chains themselves live in
+ * {@link AudioCleanupFilters} so record-time and edit-time cleanup names cannot drift; this class
+ * keeps the record-time policy: an 80 Hz high-pass always rides along, and levels that need the
+ * RNNoise model degrade to the light FFT chain when the model is missing.
  */
 public final class MicNoiseReductionFilters {
 
 	public static final String MIC_NOISE_REDUCTION_SETTING = "micNoiseReduction";
 
-	private static final List<String> LIGHT_FILTERS = List.of("highpass=f=80", "afftdn=nr=10:nf=-50:tn=1");
+	/** The record-time high-pass, applied before the denoiser. */
+	public static final String RECORDING_HIGH_PASS = "highpass=f=80";
 
 	private MicNoiseReductionFilters() {
 	}
@@ -29,51 +36,37 @@ public final class MicNoiseReductionFilters {
 	}
 
 	/**
-	 * Escapes a value for an unquoted filter option inside a filtergraph. ffmpeg unescapes twice:
-	 * once for the option value (backslash, quote, colon) and once for the graph (backslash, quote,
-	 * brackets, comma, semicolon), so both levels are applied. Quoting with '...' cannot hold a
-	 * literal quote, which breaks paths that contain one.
+	 * Escapes a value for an unquoted filter option inside a filtergraph; see
+	 * {@link AudioCleanupFilters#escapeFfmpegFilterValue(String)}.
 	 */
 	public static String escapeFfmpegFilterValue(String value) {
-		StringBuilder optionLevel = new StringBuilder(value.length());
-		for (int index = 0; index < value.length(); index++) {
-			char ch = value.charAt(index);
-			if (ch == '\\' || ch == '\'' || ch == ':') {
-				optionLevel.append('\\');
-			}
-			optionLevel.append(ch);
-		}
-		StringBuilder graphLevel = new StringBuilder(optionLevel.length());
-		for (int index = 0; index < optionLevel.length(); index++) {
-			char ch = optionLevel.charAt(index);
-			if (ch == '\\' || ch == '\'' || ch == '[' || ch == ']' || ch == ',' || ch == ';') {
-				graphLevel.append('\\');
-			}
-			graphLevel.append(ch);
-		}
-		return graphLevel.toString();
+		return AudioCleanupFilters.escapeFfmpegFilterValue(value);
 	}
 
 	/**
 	 * Filters applied to the microphone track after its alignment filter. Balanced and strong need
 	 * the RNNoise model; without it they fall back to the light chain.
 	 */
-	public static List<String> buildMicNoiseFilters(MicNoiseReduction level, @Nullable String modelPath) {
+	public static List<String> buildMicNoiseFilters(MicNoiseReduction level,
+			@Nullable String modelPath) {
 		if (level == MicNoiseReduction.OFF) {
 			return List.of();
 		}
-		if (level == MicNoiseReduction.LIGHT || modelPath == null) {
-			return List.copyOf(LIGHT_FILTERS);
-		}
-		String model = escapeFfmpegFilterValue(modelPath);
+		AudioCleanup.NoiseReduction strength = switch (level) {
+			case OFF -> AudioCleanup.NoiseReduction.OFF;
+			case LIGHT -> AudioCleanup.NoiseReduction.LIGHT;
+			case BALANCED -> AudioCleanup.NoiseReduction.BALANCED;
+			case STRONG -> AudioCleanup.NoiseReduction.STRONG;
+		};
 		List<String> filters = new ArrayList<>();
-		filters.add("highpass=f=80");
-		if (level == MicNoiseReduction.BALANCED) {
-			filters.add("arnndn=m=" + model + ":mix=0.85");
-		} else {
-			filters.add("arnndn=m=" + model + ":mix=1");
-			filters.add("afftdn=nr=6:nf=-50");
+		filters.add(RECORDING_HIGH_PASS);
+		if (level == MicNoiseReduction.LIGHT || modelPath == null) {
+			filters.addAll(AudioCleanupFilters.noiseReductionFilters(
+					new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 0, 0), null));
+			return List.copyOf(filters);
 		}
+		filters.addAll(AudioCleanupFilters.noiseReductionFilters(
+				new AudioCleanup(strength, 0, 0), modelPath));
 		return List.copyOf(filters);
 	}
 }

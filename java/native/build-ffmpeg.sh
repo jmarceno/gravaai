@@ -282,6 +282,8 @@ build_deps() {
 # Notes:
 #   * WebM has no demuxer of its own: the matroska demuxer handles WebM, so the §5.7 "webm"
 #     demuxer entry is satisfied by matroska. The webm MUXER is a separate component.
+#   * loudnorm/ebur128 are the edit-time loudness stage and its measurement; anoisesrc is the
+#     deterministic stimulus of the export loudness acceptance test.
 #   * PCM: the plain PCM family needed by user audio imports (§5.7 "pcm_*").
 #   * x11grab (xcbgrab) stays as today; the Java recorder captures through the Wayland helper
 #     but the bundled CLI keeps the old capability. It is software only, no GPU path.
@@ -296,7 +298,7 @@ DECODERS_ADD="hevc,av1,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32be,pcm_f64
 ENCODERS_TODAY="libx264,libmp3lame,libopus,aac,pcm_s16le,png,mjpeg"
 ENCODERS_ADD="gif"
 FILTERS_TODAY="concat,crop,format,fps,gblur,lut,overlay,pad,scale,setpts,setsar,transpose,tpad,trim,adeclick,adeclip,afftdn,aformat,alimiter,amerge,amix,anullsrc,apad,aresample,arnndn,asetpts,atempo,atrim,highpass,lowpass,speechnorm,silencedetect,anull,color,sine"
-FILTERS_ADD="palettegen,paletteuse,afade,volume,adelay"
+FILTERS_ADD="palettegen,paletteuse,afade,volume,adelay,loudnorm,ebur128,anoisesrc"
 INDEVS_TODAY="lavfi,xcbgrab"
 INDEVS_ADD="v4l2"
 PROTOCOLS="file,pipe"
@@ -466,6 +468,9 @@ REQUIRED_FEATURES=(
 	"-filters:adeclick"
 	"-filters:adeclip"
 	"-filters:speechnorm"
+	"-filters:loudnorm"
+	"-filters:ebur128"
+	"-filters:anoisesrc"
 	"-filters:highpass"
 	"-filters:lowpass"
 	"-filters:tpad"

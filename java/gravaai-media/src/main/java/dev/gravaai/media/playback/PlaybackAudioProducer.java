@@ -17,6 +17,10 @@ import dev.gravaai.media.audio.PulseAudio;
  * writes silence over timeline gaps, applies the volume gain and writes to the
  * {@link PlaybackAudioSink}. Its sample/latency counters feed the engine's {@link AudioMediaClock}.
  *
+ * <p>The decoded segment is the project's whole source-audio mix ({@link PreviewAudioTrack}s with
+ * their gains and edit-time cleanup), so what the editor previews is what the exporter writes; the
+ * click/key tracks are still summed on top per chunk.
+ *
  * <p>The audio thread is the engine render tick: every method is called from there except
  * {@code seek}/{@code setRate}/{@code setVolume}/{@code close}, which the engine calls on transport
  * changes. The producer owns the sink and closes it in {@link #close()}.
@@ -27,17 +31,32 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	public static final int CHANNELS = 2;
 	public static final int DEFAULT_CHUNK_FRAMES = 1_920;
 
-	/** Opens one segment's PCM source; injectable so tests avoid processes. */
+	/**
+	 * Opens one segment's PCM source; injectable so tests avoid processes. The mix form takes the
+	 * whole source-track list (plus the programme loudness target), which is what the preview needs
+	 * to hear the same gain/cleanup stages the export applies.
+	 */
 	@FunctionalInterface
 	public interface PcmSourceFactory {
 		PcmSource open(
-				String mediaPath,
+				List<PreviewAudioTrack> tracks,
+				double loudnessTargetLufs,
 				double sourceStartSeconds,
 				double durationSeconds,
 				List<String> atempoFilters);
+
+		/** Single plain track: the shape the preview had before the source mix landed. */
+		default PcmSource open(String mediaPath, double sourceStartSeconds, double durationSeconds,
+				List<String> atempoFilters) {
+			return open(List.of(PreviewAudioTrack.plain(mediaPath)), 0, sourceStartSeconds,
+					durationSeconds, atempoFilters);
+		}
 	}
 
-	private final String mediaPath;
+	/** The source tracks this producer plays (at least one); gains/cleanup live in the tracks. */
+	private final List<PreviewAudioTrack> tracks;
+	/** Programme loudness target in LUFS, 0 when off (matches the export's mix stage). */
+	private final double loudnessTargetLufs;
 	private final PlaybackAudioSink sink;
 	private final PcmSourceFactory sourceFactory;
 	private final List<PlaybackAudioPlan.AudioSegment> plan;
@@ -64,7 +83,8 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 			List<ClipRegion> clips,
 			PlaybackAudioSink sink,
 			PcmSourceFactory sourceFactory) {
-		this(mediaPath, clips, sink, sourceFactory, DEFAULT_CHUNK_FRAMES);
+		this(List.of(PreviewAudioTrack.plain(mediaPath)), 0, clips, sink, sourceFactory,
+				DEFAULT_CHUNK_FRAMES);
 	}
 
 	public PlaybackAudioProducer(
@@ -73,8 +93,23 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 			PlaybackAudioSink sink,
 			PcmSourceFactory sourceFactory,
 			int chunkFrames) {
-		if (mediaPath == null || mediaPath.isBlank()) {
-			throw new IllegalArgumentException("mediaPath must not be blank");
+		this(List.of(PreviewAudioTrack.plain(mediaPath)), 0, clips, sink, sourceFactory,
+				chunkFrames);
+	}
+
+	/**
+	 * The source-mix producer: plays every track of the project's source audio, with the cleanup
+	 * and gains the export resolves, and normalizes the mix when a loudness target is set.
+	 */
+	public PlaybackAudioProducer(
+			List<PreviewAudioTrack> tracks,
+			double loudnessTargetLufs,
+			List<ClipRegion> clips,
+			PlaybackAudioSink sink,
+			PcmSourceFactory sourceFactory,
+			int chunkFrames) {
+		if (tracks == null || tracks.isEmpty()) {
+			throw new IllegalArgumentException("at least one preview track is required");
 		}
 		if (sink == null || sourceFactory == null) {
 			throw new IllegalArgumentException("sink and sourceFactory are required");
@@ -82,7 +117,9 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 		if (chunkFrames <= 0) {
 			throw new IllegalArgumentException("chunkFrames must be positive: " + chunkFrames);
 		}
-		this.mediaPath = mediaPath;
+		this.tracks = List.copyOf(tracks);
+		this.loudnessTargetLufs = Double.isFinite(loudnessTargetLufs) && loudnessTargetLufs < 0
+				? loudnessTargetLufs : 0;
 		this.plan = PlaybackAudioPlan.plan(clips);
 		this.fadeGain = PlaybackFadeGain.forClips(clips);
 		this.sink = sink;
@@ -98,6 +135,28 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 		return openWithPulse(mediaPath, clips, ffmpegPath, null);
 	}
 
+	/**
+	 * Production factory for the source-audio mix: one ffmpeg process per segment decodes, cleans,
+	 * gains and mixes the tracks; the click/key tracks ride on top as before.
+	 */
+	public static PlaybackAudioProducer openWithPulse(
+			List<PreviewAudioTrack> tracks, double loudnessTargetLufs, List<ClipRegion> clips,
+			Path ffmpegPath, @Nullable ClickSoundTrack clickTrack,
+			@Nullable ClickSoundTrack keyTrack) {
+		if (ffmpegPath == null) {
+			throw new IllegalArgumentException("ffmpegPath must not be null");
+		}
+		Path ffmpeg = ffmpegPath;
+		PlaybackAudioProducer producer = new PlaybackAudioProducer(tracks, loudnessTargetLufs,
+				clips, PulseAudio.openPlayback(),
+				(mixTracks, targetLufs, start, duration, filters) -> FfmpegCliPcmSource.openMix(
+						ffmpeg, mixTracks, targetLufs, start, duration, filters),
+				DEFAULT_CHUNK_FRAMES);
+		producer.setClickTrack(clickTrack);
+		producer.setKeyTrack(keyTrack);
+		return producer;
+	}
+
 	/** Production factory with a click-sound track mixed into every chunk. */
 	public static PlaybackAudioProducer openWithPulse(
 			String mediaPath, List<ClipRegion> clips, Path ffmpegPath,
@@ -109,19 +168,8 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 	public static PlaybackAudioProducer openWithPulse(
 			String mediaPath, List<ClipRegion> clips, Path ffmpegPath,
 			@Nullable ClickSoundTrack clickTrack, @Nullable ClickSoundTrack keyTrack) {
-		if (ffmpegPath == null) {
-			throw new IllegalArgumentException("ffmpegPath must not be null");
-		}
-		Path ffmpeg = ffmpegPath;
-		PlaybackAudioProducer producer = new PlaybackAudioProducer(
-				mediaPath,
-				clips,
-				PulseAudio.openPlayback(),
-				(path, start, duration, filters) -> FfmpegCliPcmSource.open(
-						ffmpeg, path, start, duration, filters));
-		producer.setClickTrack(clickTrack);
-		producer.setKeyTrack(keyTrack);
-		return producer;
+		return openWithPulse(List.of(PreviewAudioTrack.plain(mediaPath)), 0, clips, ffmpegPath,
+				clickTrack, keyTrack);
 	}
 
 	/** Swaps the click-sound track in/out at once (no decoder reopen); {@code null} removes it. */
@@ -234,7 +282,8 @@ public final class PlaybackAudioProducer implements PlaybackAudioTrack {
 		if (Math.abs(rate - 1) > 1e-9) {
 			filters.addAll(AtempoChain.filters(rate));
 		}
-		source = sourceFactory.open(mediaPath, sourceStart, duration, List.copyOf(filters));
+		source = sourceFactory.open(tracks, loudnessTargetLufs, sourceStart, duration,
+				List.copyOf(filters));
 		// atempo (clip speed and preview rate) shortens the audio to timeline time.
 		double coveredTimeline = duration / (sourceSpan / timelineSpan) / rate;
 		segmentTimelineEnd = Math.min(

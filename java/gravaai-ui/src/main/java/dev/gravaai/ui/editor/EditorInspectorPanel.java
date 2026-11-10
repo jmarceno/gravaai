@@ -18,7 +18,9 @@ import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.GradeCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
 import dev.gravaai.core.editor.SelectionCommands;
+import dev.gravaai.core.editor.SourceAudioCommands;
 import dev.gravaai.core.editor.ZoomCommands;
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.AutoCaptionAnimation;
 import dev.gravaai.core.project.AutoCaptionSettings;
@@ -50,6 +52,7 @@ import dev.gravaai.ui.kit.Label;
 import dev.gravaai.ui.kit.Select;
 import dev.gravaai.ui.kit.Slider;
 import dev.gravaai.ui.kit.Switch;
+import dev.gravaai.ui.editor.timeline.core.TimelineSourceAudioTrack;
 import dev.gravaai.ui.kit.TextArea;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -99,6 +102,8 @@ public final class EditorInspectorPanel extends VBox {
 	private EditorSidebarRail.Section section = EditorSidebarRail.Section.SCENE;
 	private boolean advanced;
 	private java.util.function.Supplier<java.nio.file.Path> recordingPath = () -> null;
+	/** The project's source-audio lanes; the Audio section lists one cleanup group per track. */
+	private java.util.function.Supplier<List<TimelineSourceAudioTrack>> sourceAudioTracks = List::of;
 	private final java.util.Map<EditorSidebarRail.Section, Boolean> advancedSections =
 			new java.util.EnumMap<>(EditorSidebarRail.Section.class);
 	private final Switch advancedSwitch = Switch.xs();
@@ -374,7 +379,7 @@ public final class EditorInspectorPanel extends VBox {
 			// Only sections with controls rendered behind the Advanced switch. Cursor and
 			// Settings currently have no advanced-only rows, so showing the toggle there is inert.
 			case SCENE, WEBCAM, CAPTIONS, KEYSTROKES, AUTO_MASK -> true;
-			case COLOR, CURSOR, TRANSCRIPT, MEETING, SETTINGS -> false;
+			case COLOR, CURSOR, AUDIO, TRANSCRIPT, MEETING, SETTINGS -> false;
 		};
 	}
 
@@ -646,6 +651,7 @@ public final class EditorInspectorPanel extends VBox {
 			case KEYSTROKES -> keystrokesSection();
 			case WEBCAM -> webcamSection();
 			case CAPTIONS -> captionsSection();
+			case AUDIO -> audioSection();
 			case AUTO_MASK -> autoMaskSection();
 			case TRANSCRIPT -> transcriptSection();
 			case MEETING -> meetingSection();
@@ -2067,6 +2073,136 @@ public final class EditorInspectorPanel extends VBox {
 	private void resetAutoMaskDetectors() {
 		autoMaskFaces = true;
 		autoMaskText = true;
+	}
+
+	// ---------------------------------------------------------------------
+	// Audio cleanup
+	// ---------------------------------------------------------------------
+
+	/** The high-pass frequencies the inspector offers (0 is off, the rest are real options). */
+	private static final List<Integer> HIGH_PASS_OPTIONS = List.of(0, 80, 120, 180);
+
+	/** The loudness targets the inspector offers; 0 is off, the rest come from the core model. */
+	private static final List<Double> LOUDNESS_OPTIONS = List.of(0.0,
+			AudioCleanup.LOUDNESS_PODCAST_LUFS, AudioCleanup.LOUDNESS_STREAMING_LUFS,
+			AudioCleanup.LOUDNESS_BROADCAST_LUFS);
+
+	/** The source tracks the Audio section edits (the shell points this at the timeline). */
+	public void setSourceAudioTracks(
+			java.util.function.Supplier<List<TimelineSourceAudioTrack>> tracks) {
+		this.sourceAudioTracks = tracks == null ? List::of : tracks;
+		rebuild();
+	}
+
+	/**
+	 * Edit-time cleanup of the recording's source audio: one group per lane with the three
+	 * non-destructive stages. The loudness target is a property of the deliverable, so its row says
+	 * that the exported mix is normalized rather than the lane alone.
+	 */
+	private VBox audioSection() {
+		VBox root = new VBox(14);
+		List<TimelineSourceAudioTrack> tracks = sourceAudioTracks.get();
+		if (tracks == null || tracks.isEmpty()) {
+			Label hint = new Label("Open a recording with audio to clean up its source tracks.");
+			hint.setWrapText(true);
+			hint.setStyle("-fx-font-size: 13px; -fx-text-fill: -g-muted;");
+			root.getChildren().add(group("Source audio", null, hint));
+			return root;
+		}
+		for (TimelineSourceAudioTrack track : tracks) {
+			root.getChildren().add(cleanupGroup(track));
+		}
+		Label note = new Label("Cleanup is applied to the preview and again on export; the"
+				+ " recording files are never rewritten. The loudness target normalizes the exported"
+				+ " mix, not the lane.");
+		note.setWrapText(true);
+		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		root.getChildren().add(note);
+		return root;
+	}
+
+	/** One lane's cleanup group: noise reduction, high-pass and the programme loudness target. */
+	private VBox cleanupGroup(TimelineSourceAudioTrack track) {
+		AudioCleanup cleanup = currentCleanup(track.id());
+
+		ChoiceGroup noise = choice("off", "Off", "light", "Light", "balanced", "Balanced",
+				"strong", "Strong");
+		noise.setValue(cleanup.noiseReduction().wire());
+		noise.onValueChange(value -> setCleanup(track.id(), current -> current
+				.withNoiseReduction(AudioCleanup.NoiseReduction.fromText(value))));
+
+		ChoiceGroup highPass = highPassChoice(cleanup.highPassHz());
+		highPass.onValueChange(value -> setCleanup(track.id(),
+				current -> current.withHighPassHz(Integer.parseInt(value))));
+
+		ChoiceGroup loudness = loudnessChoice(cleanup.loudnessTargetLufs());
+		loudness.onValueChange(value -> setCleanup(track.id(),
+				current -> current.withLoudnessTargetLufs(Double.parseDouble(value))));
+
+		// The chip rows stack under their captions rather than sitting at a row's right edge: four
+		// reduction levels plus the caption overflow the inspector's width in one HBox.
+		VBox body = new VBox(12, labeledChoice("Noise reduction", noise),
+				labeledChoice("High-pass", highPass),
+				labeledChoice("Loudness target", loudness));
+		return group(track.label(), () -> resetCleanup(track.id()), body);
+	}
+
+	/** A caption above a chip row (the inspector's row layout for wide ChoiceGroups). */
+	private VBox labeledChoice(String caption, ChoiceGroup choices) {
+		Label label = new Label(caption);
+		label.getStyleClass().add("row-label");
+		return new VBox(6, label, choices);
+	}
+
+	private ChoiceGroup highPassChoice(int currentHz) {
+		ChoiceGroup group = choice("0", "Off", "80", "80 Hz", "120", "120 Hz", "180", "180 Hz");
+		int clamped = AudioCleanup.clampHighPass(currentHz);
+		if (clamped > 0 && !HIGH_PASS_OPTIONS.contains(clamped)) {
+			// A project (or an agent) may carry a filter the inspector does not offer; show it
+			// instead of silently lying about the value.
+			group.item(Integer.toString(clamped), clamped + " Hz");
+		}
+		group.setValue(Integer.toString(clamped));
+		return group;
+	}
+
+	private ChoiceGroup loudnessChoice(double currentLufs) {
+		ChoiceGroup group = choice("0", "Off", "-16", "-16 LUFS", "-14", "-14 LUFS",
+				"-23", "-23 LUFS");
+		String wire = loudnessWire(currentLufs);
+		boolean known = wire.equals("0") || LOUDNESS_OPTIONS.stream()
+				.map(EditorInspectorPanel::loudnessWire).anyMatch(wire::equals);
+		if (!known) {
+			group.item(wire, wire + " LUFS");
+		}
+		group.setValue(wire);
+		return group;
+	}
+
+	/** The chip value of a loudness target: {@code 0} when off, else the LUFS number. */
+	private static String loudnessWire(double lufs) {
+		if (!(lufs < 0)) {
+			return "0";
+		}
+		double rounded = Math.rint(lufs * 10) / 10;
+		return rounded == Math.rint(rounded) ? Long.toString((long) rounded)
+				: String.format(java.util.Locale.ROOT, "%.1f", rounded);
+	}
+
+	private AudioCleanup currentCleanup(String trackId) {
+		return store.state().defaultSourceAudioTrackSettingsTyped().trackOrDefault(trackId)
+				.cleanup();
+	}
+
+	/** Writes one stage of a lane's cleanup, keeping the other stages. */
+	private void setCleanup(String trackId,
+			java.util.function.UnaryOperator<AudioCleanup> change) {
+		AudioCleanup next = change.apply(currentCleanup(trackId));
+		store.apply(new SourceAudioCommands.SetDefaultTrackCleanup(trackId, next));
+	}
+
+	private void resetCleanup(String trackId) {
+		store.apply(new SourceAudioCommands.SetDefaultTrackCleanup(trackId, AudioCleanup.NONE));
 	}
 
 	/** Port of {@code captionsSectionContent} in SettingsPanel.tsx. */

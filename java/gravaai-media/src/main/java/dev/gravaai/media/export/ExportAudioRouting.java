@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 
 /**
@@ -52,9 +53,19 @@ public final class ExportAudioRouting {
 		}
 	}
 
-	/** A {@code SourceAudioTrackSetting}. */
-	public record TrackSetting(double volume, boolean normalize) {
-		public static final TrackSetting DEFAULT = new TrackSetting(1, false);
+	/** A {@code SourceAudioTrackSetting}: gain plus the edit-time {@link AudioCleanup}. */
+	public record TrackSetting(double volume, boolean normalize, AudioCleanup cleanup) {
+
+		public static final TrackSetting DEFAULT = new TrackSetting(1, false, AudioCleanup.NONE);
+
+		/** A setting without cleanup: the shape every pre-cleanup project file and call site has. */
+		public TrackSetting(double volume, boolean normalize) {
+			this(volume, normalize, AudioCleanup.NONE);
+		}
+
+		public TrackSetting {
+			cleanup = cleanup == null ? AudioCleanup.NONE : cleanup;
+		}
 	}
 
 	/** {@code ResolvedAudioTrack}; every resolved track has an audio file. */
@@ -196,6 +207,17 @@ public final class ExportAudioRouting {
 		}
 		double normalizeGain = setting.normalize() ? SOURCE_AUDIO_NORMALIZE_GAIN : 1;
 		return clamp(setting.volume() * normalizeGain, MAX_TRACK_GAIN);
+	}
+
+	/**
+	 * The edit-time cleanup of one source track; a track without a setting is left untouched.
+	 * Cleanup is a per-track decision like {@link #resolveSourceTrackGain}, so it is resolved from
+	 * the same settings map and travels with the resolved track into the graph.
+	 */
+	public static AudioCleanup resolveSourceTrackCleanup(Map<String, TrackSetting> settings,
+			TrackKind kind) {
+		TrackSetting setting = settings == null ? null : settings.get(kind.sourceTrackId());
+		return setting == null ? AudioCleanup.NONE : setting.cleanup();
 	}
 
 	/** {@code clampGain}. */

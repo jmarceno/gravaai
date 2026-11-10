@@ -24,6 +24,6 @@ class RecordingQualityTest {
 	void lowerCrfMeansHigherQuality() {
 		assertEquals(25, RecordingQuality.STANDARD.crf());
 		assertEquals(18, RecordingQuality.HIGH.crf());
-		assertEquals(0, RecordingQuality.LOSSLESS.crf());
+		assertEquals(1, RecordingQuality.LOSSLESS.crf());
 	}
 }

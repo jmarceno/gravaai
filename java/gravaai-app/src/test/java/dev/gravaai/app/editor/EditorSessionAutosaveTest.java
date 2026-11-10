@@ -150,6 +150,41 @@ class EditorSessionAutosaveTest {
 	}
 
 	@Test
+	@DisplayName("a Save As that beats the first autosave leaves no stray project behind")
+	void saveAsDuringTheFirstAutosaveLeavesNoStray(@TempDir Path directory) throws Exception {
+		Path video = writeRecording(directory, "recording-1793184468126.mp4");
+		Path projects = Files.createDirectories(directory.resolve("Projects"));
+		Path chosen = directory.resolve("Chosen.gravaai");
+		// The UI executor holds every second hand-off: the snapshot runs, the write result waits
+		// until the test has done its Save As, exactly like a result queued behind a dialog.
+		List<Runnable> held = new CopyOnWriteArrayList<>();
+		java.util.concurrent.atomic.AtomicInteger handOffs =
+				new java.util.concurrent.atomic.AtomicInteger();
+		try (EditorSession session = EditorSession.openRecording(video, null, 0)) {
+			session.setAutosaveDelayMs(50);
+			session.enableAutosave(new EditorSession.AutosaveHooks(() -> projects, () -> false,
+					task -> {
+						if (handOffs.incrementAndGet() == 2) {
+							held.add(task);
+						} else {
+							task.run();
+						}
+					}, saved::add, failures::add));
+			session.store().apply(new ZoomCommands.Add(1000, 2500));
+			awaitUntil(() -> !held.isEmpty(), "the first autosave to finish writing");
+			assertEquals(1, projectFileCount(projects), "the untitled file is on disk");
+
+			session.saveAs(chosen);
+			held.getFirst().run();
+
+			assertEquals(chosen, session.projectPath(), "the user's choice stays the project");
+			assertEquals(0, projectFileCount(projects), "the superseded autosave is removed");
+			assertTrue(saved.isEmpty(), "no second project is announced to the dashboard");
+			assertTrue(failures.isEmpty(), "no failure: " + failures);
+		}
+	}
+
+	@Test
 	@DisplayName("an existing project is picked up without overwriting it")
 	void collisionGetsTheNumberedName(@TempDir Path directory) throws Exception {
 		Path video = writeRecording(directory, "recording-take.mp4");

@@ -181,14 +181,24 @@ public final class ExportAudioGraph {
 			List<MutedRange> muted, @Nullable String rnnoiseModelPath) {
 		// offlineAudioProcessor mutedSourceOutputRangesSec: the recording's audio (not imported
 		// regions) is silent over muted clips, on the output timeline.
-		String cleanup = cleanupSuffix(track.cleanup(), rnnoiseModelPath);
-		String gainSuffix = cleanup
-				+ (needsVolume(track.gain()) ? ",volume=" + number(track.gain()) : "")
+		String gainSuffix = (needsVolume(track.gain()) ? ",volume=" + number(track.gain()) : "")
 				+ muteSuffix(muted);
+		// The cleanup runs on the recording as it was captured: before the clip speed (a denoiser
+		// fed sped-up speech hears something it was never trained on) and before the gain and
+		// mute, which are programme decisions that must not change how much noise is removed.
+		AudioCleanup cleanup = track.cleanup();
+		List<String> highPass = cleanup.hasHighPass()
+				? List.of("highpass=f=" + cleanup.highPassHz()) : List.of();
+		List<String> noiseReduction =
+				AudioCleanupFilters.noiseReductionFilters(cleanup, rnnoiseModelPath);
+		int delaySamples = AudioCleanupFilters.delaySamples(cleanup, rnnoiseModelPath);
 		StringBuilder builder = new StringBuilder();
 		if (segments.isEmpty()) {
 			builder.append('[').append(inputIndex).append(":a]")
-					.append("asetpts=PTS-STARTPTS,apad,atrim=duration=").append(duration)
+					.append("asetpts=PTS-STARTPTS")
+					.append(joined(AudioCleanupFilters.alignDelay(highPass, noiseReduction,
+							delaySamples)))
+					.append(",apad,atrim=duration=").append(duration)
 					.append(",asetpts=PTS-STARTPTS").append(gainSuffix);
 			return builder.append('[').append(label).append(']').toString();
 		}
@@ -196,11 +206,25 @@ public final class ExportAudioGraph {
 		for (int index = 0; index < segments.size(); index++) {
 			ExportAudioSegments.Segment segment = segments.get(index);
 			String segmentLabel = label + "_seg" + index;
+			// A denoised segment is cut with a warm-up lead-in (the denoiser has converged by
+			// the time the cut starts) and a tail as long as its latency; the lead-in and the
+			// latency are dropped again afterwards, so the segment keeps its exact length and
+			// position however many cuts the timeline has.
+			double leadInMs = noiseReduction.isEmpty() ? 0
+					: Math.min(DENOISE_LEAD_IN_MS, Math.max(0, segment.startMs()));
+			double tailMs = delaySamples * 1000.0 / AudioCleanupFilters.NOISE_REDUCTION_SAMPLE_RATE;
+			int dropSamples = delaySamples + (int) Math.round(
+					leadInMs * AudioCleanupFilters.NOISE_REDUCTION_SAMPLE_RATE / 1000.0);
 			StringBuilder chain = new StringBuilder();
 			chain.append('[').append(inputIndex).append(":a]")
-					.append("atrim=start=").append(seconds(segment.startMs()))
-					.append(":end=").append(seconds(segment.endMs()))
-					.append(",asetpts=PTS-STARTPTS");
+					.append("atrim=start=").append(seconds(segment.startMs() - leadInMs))
+					.append(":end=").append(seconds(segment.endMs() + tailMs))
+					.append(",asetpts=PTS-STARTPTS")
+					.append(joined(AudioCleanupFilters.alignDelay(highPass, noiseReduction,
+							dropSamples, Math.round(
+									Math.max(0, segment.endMs() - segment.startMs())
+											* AudioCleanupFilters.NOISE_REDUCTION_SAMPLE_RATE
+											/ 1000.0))));
 			String atempo = AtempoChain.filterChain(segment.speed());
 			if (!atempo.isEmpty()) {
 				chain.append(',').append(atempo);
@@ -220,13 +244,14 @@ public final class ExportAudioGraph {
 	}
 
 	/**
-	 * The edit-time cleanup stages of one track, comma-joined, or an empty string when the track has
-	 * none. Denoising runs before the gain/mute volume because both are programme decisions: the
-	 * denoiser must see the recorder's levels, and a muted or boosted track must not change how much
-	 * noise it removes. Imported regions are not source tracks and never get this suffix.
+	 * How much audio before a cut a denoised segment decodes so the denoiser has settled when the
+	 * cut starts. RNNoise converges within a few frames; half a second also covers the FFT
+	 * denoiser's noise tracking.
 	 */
-	private static String cleanupSuffix(AudioCleanup cleanup, @Nullable String rnnoiseModelPath) {
-		List<String> filters = AudioCleanupFilters.trackFilters(cleanup, rnnoiseModelPath);
+	private static final double DENOISE_LEAD_IN_MS = 500;
+
+	/** The filters as a chain suffix ({@code ",a,b"}), or an empty string when there are none. */
+	private static String joined(List<String> filters) {
 		return filters.isEmpty() ? "" : "," + String.join(",", filters);
 	}
 

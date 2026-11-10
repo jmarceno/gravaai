@@ -139,6 +139,9 @@ public final class EditorSession implements AutoCloseable {
 	private final StoreTimelineDataSource dataSource;
 	/** The smart-framing dodge plan and the state it was walked for (Camera-track markers). */
 	private @Nullable ProjectEditorState smartFramingPlanState;
+	private dev.gravaai.media.compose.SmartFraming.@Nullable Inputs smartFramingPlanInputs;
+	/** The media generation the cached plan was walked for (a replaced source re-plans). */
+	private long smartFramingPlanGeneration = -1;
 	private dev.gravaai.media.compose.SmartFraming.@Nullable Plan smartFramingPlan;
 	private final TimelineCommands timelineCommands;
 	/** Serializes the background peak decodes; closed with the session. */
@@ -242,6 +245,15 @@ public final class EditorSession implements AutoCloseable {
 		}
 		if (smartFramingPlanState != state) {
 			smartFramingPlanState = state;
+			// Most edits do not touch what the plan is made from: compare its inputs before
+			// reloading the telemetry and walking the whole timeline on the FX thread.
+			var inputs = dev.gravaai.media.compose.SmartFraming.Inputs.of(state);
+			if (inputs.equals(smartFramingPlanInputs)
+					&& mediaGeneration.get() == smartFramingPlanGeneration) {
+				return smartFramingPlan;
+			}
+			smartFramingPlanInputs = inputs;
+			smartFramingPlanGeneration = mediaGeneration.get();
 			Path video = Path.of(videoPath());
 			smartFramingPlan = dev.gravaai.ui.editor.SmartFramingPlans.forState(state,
 					CursorTelemetryLoader.load(videoPath()), video, webcamPath(),
@@ -1239,6 +1251,17 @@ public final class EditorSession implements AutoCloseable {
 			hooks.saveFailed().accept(failure);
 			return;
 		}
+		Path current = projectPath;
+		if (snapshot.targetIsNew() && current != null && !current.equals(snapshot.target())) {
+			// The user saved the project somewhere else while this first autosave was writing:
+			// the file it created is nobody's project. Remove it (and its backup generation)
+			// instead of announcing a second copy to the dashboard.
+			deleteStrayAutosave(snapshot.target());
+			if (dirty.get()) {
+				scheduleAutosave();
+			}
+			return;
+		}
 		boolean unchanged = changeSequence.get() == snapshot.sequence();
 		autosaveFailure = null;
 		if (unchanged) {
@@ -1254,6 +1277,18 @@ public final class EditorSession implements AutoCloseable {
 			// Edited (or explicitly saved) while the file was being written: that state is not on
 			// disk yet.
 			scheduleAutosave();
+		}
+	}
+
+	/** Removes an autosave file that lost the race to an explicit Save As. Best effort. */
+	private static void deleteStrayAutosave(Path file) {
+		for (Path stray : List.of(file, file.resolveSibling(file.getFileName() + ".bak"))) {
+			try {
+				Files.deleteIfExists(stray);
+			} catch (IOException error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"could not remove the superseded autosave " + stray + ": " + error);
+			}
 		}
 	}
 

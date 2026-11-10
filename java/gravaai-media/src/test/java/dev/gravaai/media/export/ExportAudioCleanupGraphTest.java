@@ -39,8 +39,11 @@ class ExportAudioCleanupGraphTest {
 		String graph = plan.filterComplex();
 		// The denoiser must see the recorder's levels, so both stages sit between the output
 		// duration bound and the track gain; the mute envelope follows the gain.
-		assertTrue(graph.contains("atrim=duration=2.000,asetpts=PTS-STARTPTS,highpass=f=120,"
-				+ "afftdn=nr=10:nf=-50:tn=1,volume=1.500,volume=eval=frame:volume='if(between("),
+		// The 25 ms the FFT denoiser holds back is dropped again, so the track stays aligned.
+		assertTrue(graph.contains("asetpts=PTS-STARTPTS,highpass=f=120,aresample=48000,"
+				+ "afftdn=nr=10:nf=-50:tn=1,atrim=start_sample=1200,asetpts=PTS-1200/SR/TB,"
+				+ "apad,atrim=duration=2.000,asetpts=PTS-STARTPTS,volume=1.500,"
+				+ "volume=eval=frame:volume='if(between("),
 				graph);
 	}
 
@@ -54,11 +57,34 @@ class ExportAudioCleanupGraphTest {
 				List.of(new TrackInput("/tmp/mic.wav", 1.25, cleanup)), List.of(), segments,
 				List.of(), 1_000, 1.0));
 		String graph = plan.filterComplex();
-		assertTrue(graph.contains("atempo=1.5"), graph);
+		// The cleanup sees the recording as captured: it runs before the clip speed.
+		assertTrue(graph.contains(":a]atrim=start=0.000:end=1.000,asetpts=PTS-STARTPTS,"
+				+ "highpass=f=80,atempo=1.5[track0_seg0]"), graph);
 		assertTrue(graph.contains("concat=n=1:v=0:a=1[track0_concat]"), graph);
 		assertTrue(graph.contains(
-				"[track0_concat]apad,atrim=duration=1.000,asetpts=PTS-STARTPTS,highpass=f=80,"
+				"[track0_concat]apad,atrim=duration=1.000,asetpts=PTS-STARTPTS,"
 						+ "volume=1.250[track0]"), graph);
+	}
+
+	@Test
+	@DisplayName("a denoised segment keeps its exact length: lead-in and latency are dropped")
+	void denoisedSegmentKeepsItsLength() {
+		List<ExportAudioSegments.Segment> segments = List.of(
+				new ExportAudioSegments.Segment(0, 1_000, 1),
+				new ExportAudioSegments.Segment(3_000, 4_000, 2));
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0, BALANCED)), List.of(), segments,
+				List.of(), 1_500, 1.0, List.of(), 0, "/m/voice.rnnn"));
+		String graph = plan.filterComplex();
+		// The first cut starts at the head of the file: no lead-in, 10 ms of tail and drop.
+		assertTrue(graph.contains(":a]atrim=start=0.000:end=1.010,asetpts=PTS-STARTPTS,"
+				+ "aresample=48000,arnndn=m=/m/voice.rnnn:mix=0.85,atrim=start_sample=480:end_sample=48480,"
+				+ "asetpts=PTS-480/SR/TB[track0_seg0]"), graph);
+		// The second cut decodes 500 ms of lead-in (24000 samples) to warm the denoiser up,
+		// drops it with the latency, and only then takes the 2x speed.
+		assertTrue(graph.contains(":a]atrim=start=2.500:end=4.010,asetpts=PTS-STARTPTS,"
+				+ "aresample=48000,arnndn=m=/m/voice.rnnn:mix=0.85,atrim=start_sample=24480:end_sample=72480,"
+				+ "asetpts=PTS-24480/SR/TB,atempo=2[track0_seg1]"), graph);
 	}
 
 	@Test

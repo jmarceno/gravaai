@@ -132,7 +132,9 @@ class FfmpegCliPcmSourceTest {
 				"[0:a]atempo=2,volume=0.500,aresample=48000,aformat=sample_fmts=fltp:"
 						+ "channel_layouts=stereo[ain0];"));
 		assertTrue(graph.contains(
-				"[1:a]atempo=2,highpass=f=80,afftdn=nr=10:nf=-50:tn=1,aresample=48000,"
+				// Cleanup first, delay-compensated, then the speed.
+				"[1:a]highpass=f=80,aresample=48000,afftdn=nr=10:nf=-50:tn=1,"
+						+ "atrim=start_sample=1200,asetpts=PTS-1200/SR/TB,atempo=2,aresample=48000,"
 						+ "aformat=sample_fmts=fltp:channel_layouts=stereo[ain1];"));
 		assertTrue(graph.contains("[ain0][ain1]amix=inputs=2:duration=longest:normalize=0[aout]"));
 		assertFalse(graph.contains("loudnorm"));

@@ -100,23 +100,28 @@ public final class FfmpegCliPcmSource implements PcmSource {
 		List<String> command = new ArrayList<>();
 		command.add(ffmpeg.toString());
 		command.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostdin"));
+		String peakModel = rnnoiseModelPath();
 		for (PreviewAudioTrack track : tracks) {
 			command.addAll(List.of("-ss", formatSeconds(sourceStartSeconds)));
 			if (durationSeconds > 0) {
-				command.addAll(List.of("-t", formatSeconds(durationSeconds)));
+				// A denoised track gives back its latency at the head (see alignedTrackFilters),
+				// so it reads that much more input to still cover the whole span.
+				command.addAll(List.of("-t", formatSeconds(durationSeconds
+						+ AudioCleanupFilters.delaySeconds(track.cleanup(), peakModel))));
 			}
 			command.addAll(List.of("-i", track.audioPath()));
 		}
 		List<String> chains = new ArrayList<>();
 		List<String> mixInputs = new ArrayList<>();
-		String peakModel = rnnoiseModelPath();
 		for (int index = 0; index < tracks.size(); index++) {
 			PreviewAudioTrack track = tracks.get(index);
-			List<String> filters = new ArrayList<>();
+			// Cleanup first, on the recording as it was captured: a denoiser fed sped-up speech
+			// hears something it was never trained on. The speed change follows.
+			List<String> filters = new ArrayList<>(
+					AudioCleanupFilters.alignedTrackFilters(track.cleanup(), peakModel));
 			if (atempoFilters != null) {
 				filters.addAll(atempoFilters);
 			}
-			filters.addAll(AudioCleanupFilters.trackFilters(track.cleanup(), peakModel));
 			if (Math.abs(track.gain() - 1) > 0.0005) {
 				filters.add("volume=" + number(track.gain()));
 			}

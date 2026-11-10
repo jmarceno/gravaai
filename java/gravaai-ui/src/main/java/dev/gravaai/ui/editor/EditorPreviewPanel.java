@@ -84,6 +84,7 @@ public final class EditorPreviewPanel extends VBox {
 	/** The smart-framing plan cache: state, track, and stage size the plan was walked for. */
 	private SmartFraming.@Nullable Plan smartFramingPlan;
 	private @Nullable ProjectEditorState smartFramingPlanState;
+	private SmartFraming.@Nullable Inputs smartFramingPlanInputs;
 	private PreviewFrameMapper.@Nullable CursorTrack smartFramingPlanTrack;
 	private int smartFramingPlanWidth = -1;
 	private int smartFramingPlanHeight = -1;
@@ -456,10 +457,19 @@ public final class EditorPreviewPanel extends VBox {
 				&& smartFramingPlanWidth == width && smartFramingPlanHeight == height) {
 			return smartFramingPlan;
 		}
+		// Most edits do not touch what the plan is made from: compare its inputs before paying
+		// for a walk of the whole timeline on the FX thread.
+		SmartFraming.Inputs inputs = SmartFraming.Inputs.of(store.state());
+		if (inputs.equals(smartFramingPlanInputs) && smartFramingPlanTrack == cursorTrack
+				&& smartFramingPlanWidth == width && smartFramingPlanHeight == height) {
+			smartFramingPlanState = store.state();
+			return smartFramingPlan;
+		}
 		PlaybackStatus status = lastStatus;
 		double duration = status == null ? 0 : status.durationSeconds();
 		smartFramingPlan = SmartFramingPlans.forState(store.state(), cursorTrack.samples(),
 				mediaPath, null, duration, width, height);
+		smartFramingPlanInputs = inputs;
 		smartFramingPlanState = store.state();
 		smartFramingPlanTrack = cursorTrack;
 		smartFramingPlanWidth = width;

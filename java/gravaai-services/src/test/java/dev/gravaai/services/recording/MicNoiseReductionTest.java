@@ -52,13 +52,17 @@ class MicNoiseReductionTest {
 		String model = "/models/voice.rnnn";
 		assertEquals(List.of(), MicNoiseReductionFilters.buildMicNoiseFilters(MicNoiseReduction.OFF, model));
 		assertEquals(
-				List.of("highpass=f=80", "afftdn=nr=10:nf=-50:tn=1"),
+				List.of("highpass=f=80", "aresample=48000", "afftdn=nr=10:nf=-50:tn=1",
+						"atrim=start_sample=1200", "asetpts=PTS-1200/SR/TB"),
 				MicNoiseReductionFilters.buildMicNoiseFilters(MicNoiseReduction.LIGHT, model));
 		assertEquals(
-				List.of("highpass=f=80", "arnndn=m=/models/voice.rnnn:mix=0.85"),
+				List.of("highpass=f=80", "aresample=48000", "arnndn=m=/models/voice.rnnn:mix=0.85",
+						"atrim=start_sample=480", "asetpts=PTS-480/SR/TB"),
 				MicNoiseReductionFilters.buildMicNoiseFilters(MicNoiseReduction.BALANCED, model));
+		// Both denoisers in series: 10 ms + 25 ms of latency taken back out.
 		assertEquals(
-				List.of("highpass=f=80", "arnndn=m=/models/voice.rnnn:mix=1", "afftdn=nr=6:nf=-50"),
+				List.of("highpass=f=80", "aresample=48000", "arnndn=m=/models/voice.rnnn:mix=1",
+						"afftdn=nr=6:nf=-50", "atrim=start_sample=1680", "asetpts=PTS-1680/SR/TB"),
 				MicNoiseReductionFilters.buildMicNoiseFilters(MicNoiseReduction.STRONG, model));
 	}
 
@@ -76,6 +80,6 @@ class MicNoiseReductionTest {
 		assertEquals(
 				"arnndn=m=/My Files\\\\:x/v.rnnn:mix=0.85",
 				MicNoiseReductionFilters.buildMicNoiseFilters(
-						MicNoiseReduction.BALANCED, "/My Files:x/v.rnnn").get(1));
+						MicNoiseReduction.BALANCED, "/My Files:x/v.rnnn").get(2));
 	}
 }

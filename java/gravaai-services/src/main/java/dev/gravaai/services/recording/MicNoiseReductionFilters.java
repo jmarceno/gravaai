@@ -2,7 +2,6 @@ package dev.gravaai.services.recording;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import dev.gravaai.core.project.AudioCleanup;
@@ -58,15 +57,14 @@ public final class MicNoiseReductionFilters {
 			case BALANCED -> AudioCleanup.NoiseReduction.BALANCED;
 			case STRONG -> AudioCleanup.NoiseReduction.STRONG;
 		};
-		List<String> filters = new ArrayList<>();
-		filters.add(RECORDING_HIGH_PASS);
-		if (level == MicNoiseReduction.LIGHT || modelPath == null) {
-			filters.addAll(AudioCleanupFilters.noiseReductionFilters(
-					new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 0, 0), null));
-			return List.copyOf(filters);
-		}
-		filters.addAll(AudioCleanupFilters.noiseReductionFilters(
-				new AudioCleanup(strength, 0, 0), modelPath));
-		return List.copyOf(filters);
+		boolean light = level == MicNoiseReduction.LIGHT || modelPath == null;
+		AudioCleanup cleanup = new AudioCleanup(
+				light ? AudioCleanup.NoiseReduction.LIGHT : strength, 0, 0);
+		String model = light ? null : modelPath;
+		// The denoisers hold the audio back by 10-35 ms; the latency is taken out again so the
+		// microphone stays aligned with the screen and the system track it was just lined up to.
+		return AudioCleanupFilters.alignDelay(List.of(RECORDING_HIGH_PASS),
+				AudioCleanupFilters.noiseReductionFilters(cleanup, model),
+				AudioCleanupFilters.delaySamples(cleanup, model));
 	}
 }

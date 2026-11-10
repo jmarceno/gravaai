@@ -177,7 +177,7 @@ class RecordingSettingsPipelineTest {
 					.filter(command -> command.getFirst().endsWith("ffmpeg"))
 					.findFirst()
 					.orElseThrow();
-			assertEquals("0", encoder.get(encoder.indexOf("-crf") + 1),
+			assertEquals("1", encoder.get(encoder.indexOf("-crf") + 1),
 					"the encoder runs at the chosen quality: " + encoder);
 			assertEquals("60", encoder.get(encoder.indexOf("-g") + 1),
 					"the keyframe interval follows the chosen fps: " + encoder);

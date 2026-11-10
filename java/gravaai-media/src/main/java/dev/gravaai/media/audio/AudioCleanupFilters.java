@@ -63,6 +63,84 @@ public final class AudioCleanupFilters {
 		return List.copyOf(filters);
 	}
 
+	/** The rate the noise-reduction stage runs at: RNNoise is 48 kHz only, and the delays below
+	 *  are sample counts at this rate. */
+	public static final int NOISE_REDUCTION_SAMPLE_RATE = 48_000;
+
+	/**
+	 * The latency of each denoiser at {@link #NOISE_REDUCTION_SAMPLE_RATE}, measured against the
+	 * shipped ffmpeg by cross-correlating a clean signal with its filtered copy: {@code arnndn}
+	 * holds back one 10 ms frame, {@code afftdn} 25 ms of overlap. Neither filter corrects its
+	 * timestamps, so an uncompensated track plays late against the video and the other tracks.
+	 */
+	static final int ARNNDN_DELAY_SAMPLES = 480;
+	static final int AFFTDN_DELAY_SAMPLES = 1200;
+
+	/** How many samples (at 48 kHz) the noise-reduction stage of this cleanup delays the audio. */
+	public static int delaySamples(AudioCleanup cleanup, @Nullable String rnnoiseModelPath) {
+		int delay = 0;
+		for (String filter : noiseReductionFilters(cleanup, rnnoiseModelPath)) {
+			if (filter.startsWith("arnndn=")) {
+				delay += ARNNDN_DELAY_SAMPLES;
+			} else if (filter.startsWith("afftdn=")) {
+				delay += AFFTDN_DELAY_SAMPLES;
+			}
+		}
+		return delay;
+	}
+
+	/** {@link #delaySamples} in seconds: the extra input a trimmed span needs to stay full length. */
+	public static double delaySeconds(AudioCleanup cleanup, @Nullable String rnnoiseModelPath) {
+		return delaySamples(cleanup, rnnoiseModelPath) / (double) NOISE_REDUCTION_SAMPLE_RATE;
+	}
+
+	/**
+	 * {@link #trackFilters} with the denoiser latency taken back out, so the cleaned track stays
+	 * sample-aligned with the video and the other tracks: the audio is resampled to 48 kHz before
+	 * the denoiser (which pins the latency to a known sample count), the delayed head is dropped
+	 * and the timestamps are moved back by the same amount. The output is the input's length minus
+	 * the latency; callers that need the full span feed {@link #delaySeconds} of extra input.
+	 */
+	public static List<String> alignedTrackFilters(AudioCleanup cleanup,
+			@Nullable String rnnoiseModelPath) {
+		AudioCleanup resolved = cleanup == null ? AudioCleanup.NONE : cleanup;
+		return alignDelay(
+				resolved.hasHighPass() ? List.of("highpass=f=" + resolved.highPassHz()) : List.of(),
+				noiseReductionFilters(resolved, rnnoiseModelPath),
+				delaySamples(resolved, rnnoiseModelPath));
+	}
+
+	/**
+	 * Joins the stages before the denoiser, the denoiser and its latency compensation. Shared with
+	 * the record-time mic chain, which has its own fixed high-pass.
+	 */
+	public static List<String> alignDelay(List<String> before, List<String> noiseReduction,
+			int delaySamples) {
+		return alignDelay(before, noiseReduction, delaySamples, 0);
+	}
+
+	/**
+	 * {@link #alignDelay(List, List, int)} that also bounds the output to {@code keepSamples}
+	 * (at 48 kHz) when positive. A span that is concatenated with others needs the bound: the FFT
+	 * denoiser flushes a few milliseconds of extra tail at the end of its input, and every extra
+	 * sample would push all later spans late.
+	 */
+	public static List<String> alignDelay(List<String> before, List<String> noiseReduction,
+			int delaySamples, long keepSamples) {
+		List<String> filters = new ArrayList<>(before);
+		if (noiseReduction.isEmpty()) {
+			return List.copyOf(filters);
+		}
+		filters.add("aresample=" + NOISE_REDUCTION_SAMPLE_RATE);
+		filters.addAll(noiseReduction);
+		if (delaySamples > 0 || keepSamples > 0) {
+			filters.add("atrim=start_sample=" + delaySamples
+					+ (keepSamples > 0 ? ":end_sample=" + (delaySamples + keepSamples) : ""));
+			filters.add("asetpts=PTS-" + delaySamples + "/SR/TB");
+		}
+		return List.copyOf(filters);
+	}
+
 	/** The noise-reduction stage alone (empty for {@link AudioCleanup.NoiseReduction#OFF}). */
 	public static List<String> noiseReductionFilters(AudioCleanup cleanup,
 			@Nullable String rnnoiseModelPath) {

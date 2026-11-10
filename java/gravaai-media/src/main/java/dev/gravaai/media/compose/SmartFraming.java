@@ -135,6 +135,24 @@ public final class SmartFraming {
 	}
 
 	/**
+	 * Everything of the project state a plan is computed from (the telemetry, the media sizes and
+	 * the stage size are the caller's). Two states with equal inputs have the same plan, so the
+	 * editor compares these instead of re-walking the timeline on every unrelated edit — a
+	 * caption tweak or a slider drag elsewhere must not cost a full plan.
+	 */
+	public record Inputs(WebcamSpec webcam, List<ClipRegion> clips,
+			List<CameraLayoutSegment> segments, LayoutSpec layout, ZoomSpec zoom) {
+
+		public static Inputs of(ProjectEditorState editor) {
+			return new Inputs(ProjectEditorInputs.webcamSpec(editor),
+					editor.clipRegions() == null ? List.of() : List.copyOf(editor.clipRegions()),
+					editor.cameraLayoutSegments() == null ? List.of()
+							: List.copyOf(editor.cameraLayoutSegments()),
+					ProjectEditorInputs.layout(editor), ProjectEditorInputs.zoomSpec(editor));
+		}
+	}
+
+	/**
 	 * Plans the dodge schedule for a project, or null when smart framing is off or there is no
 	 * webcam overlay to move. Deterministic: the same editor state, telemetry, media sizes and
 	 * output size always yield the same plan.

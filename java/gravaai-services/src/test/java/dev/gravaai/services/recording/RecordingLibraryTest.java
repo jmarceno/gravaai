@@ -187,6 +187,10 @@ class RecordingLibraryTest {
 		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.mp4.keys.json", "recording-1.mp4"));
 		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.webcam.mp4", "recording-1.mp4"));
 		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.mic.wav", "recording-1.mp4"));
+		// The editor's waveform caches follow the recording and its audio sidecars.
+		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.mp4.peaks", "recording-1.mp4"));
+		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.mic.wav.peaks", "recording-1.mp4"));
+		assertEquals(false, RecordingLibrary.belongsToRecording("recording-10.mp4.peaks", "recording-1.mp4"));
 		assertEquals(true, RecordingLibrary.belongsToRecording("recording-1.gravaai-session.json", "recording-1.mp4"));
 		assertEquals(false, RecordingLibrary.belongsToRecording("recording-10.mp4", "recording-1.mp4"));
 		assertEquals(false, RecordingLibrary.belongsToRecording("recording-2.mp4", "recording-1.mp4"));

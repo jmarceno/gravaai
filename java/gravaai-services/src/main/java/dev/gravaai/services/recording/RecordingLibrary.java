@@ -59,6 +59,8 @@ public final class RecordingLibrary {
 	private static final Pattern COMPANION_NAME = Pattern.compile(
 			"\\.(?:system|mic|microphone|audio|webcam)\\.(?:wav|webm|mp4|m4a)(?:\\.json)?$",
 			Pattern.CASE_INSENSITIVE);
+	/** The waveform peaks cache the editor writes next to a recording and its audio sidecars. */
+	private static final String PEAKS_SUFFIX = ".peaks";
 	private static final Pattern WEBCAM_TRACK_NAME =
 			Pattern.compile("\\.(?:mp4|webm|mov|mkv|avi)$", Pattern.CASE_INSENSITIVE);
 
@@ -120,6 +122,11 @@ public final class RecordingLibrary {
 
 	// Only capture sidecars belonging to this exact recording, never adjacent recordings or projects.
 	static boolean belongsToRecording(String name, String video) {
+		if (name.endsWith(PEAKS_SUFFIX)) {
+			// The timeline's waveform cache of the recording or of one of its audio sidecars.
+			return belongsToRecording(
+					name.substring(0, name.length() - PEAKS_SUFFIX.length()), video);
+		}
 		int extensionStart = video.lastIndexOf('.');
 		String stem = extensionStart > 0 ? video.substring(0, extensionStart) : video;
 		return name.equals(video)

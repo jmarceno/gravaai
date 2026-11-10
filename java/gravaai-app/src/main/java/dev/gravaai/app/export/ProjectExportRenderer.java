@@ -70,6 +70,12 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 	private final FramePipelineFactory pipelineFactory;
 	/** Extension render hooks (plan §5.18); null keeps queued exports extension-free. */
 	private volatile @Nullable ExtensionHost extensionHost;
+	/**
+	 * Opens the deep-zoom upscaler for one export, or answers null when the preference is off or
+	 * the model is not installed. Queued exports honour the same setting as the editor's export.
+	 */
+	private volatile Supplier<dev.gravaai.media.superres.@Nullable SuperResolutionEngine>
+			superResolution = () -> null;
 
 	/**
 	 * Production renderer: every queued export is rendered through the compositor pipeline with the
@@ -104,6 +110,16 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 	 */
 	public void setExtensionHost(@Nullable ExtensionHost host) {
 		this.extensionHost = host;
+	}
+
+	/**
+	 * Installs the deep-zoom upscaler source ("Upscale deep zooms in exports"). The supplier is
+	 * asked once per queued export, on the render thread; the engine it returns is owned by that
+	 * export's frame provider, which closes it with the GL context.
+	 */
+	public void setSuperResolution(
+			Supplier<dev.gravaai.media.superres.@Nullable SuperResolutionEngine> source) {
+		this.superResolution = Objects.requireNonNull(source, "source");
 	}
 
 	/**
@@ -150,9 +166,27 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 				prepared.durationSeconds(), 0, wallpaperRoot, prepared.frameRate(),
 				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
 				prepared.outputWidth(), prepared.outputHeight());
-		CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
-				prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), inputFactory,
-				elementHooks);
+		dev.gravaai.media.superres.@Nullable SuperResolutionEngine engine = null;
+		try {
+			engine = superResolution.get();
+		} catch (RuntimeException error) {
+			// The upscaler is optional: a queued export never fails because it is unusable.
+			LOG.log(System.Logger.Level.WARNING,
+					"super-resolution unavailable for the queued export: " + error);
+		}
+		CompositorExportFrameProvider provider;
+		try {
+			provider = new CompositorExportFrameProvider(
+					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
+					inputFactory, elementHooks, engine);
+		} catch (RuntimeException error) {
+			// No provider took ownership: release what this method opened.
+			closeQuietly(engine);
+			closeQuietly(inputFactory);
+			closeQuietly(elementHooks);
+			deleteRecursively(wallpaperRoot);
+			throw error;
+		}
 		return new FramePipeline(provider, elementHooks::failureMessage,
 				List.of(inputFactory, provider, elementHooks), wallpaperRoot);
 	}
@@ -302,26 +336,26 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 					}
 					pendingIdle = idle;
 				}
+				// The subscription must outlive the wait: the export that beat us usually runs for
+				// minutes, and its idle notification is the only thing that wakes this job up.
 				AutoCloseable idleSubscription = coordinator.addIdleListener(idle::countDown);
-				boolean started;
 				try {
 					if (isCancelled()) {
 						return false;
 					}
-					started = coordinator.start(prepared.request(), frames.frames(), this);
+					if (coordinator.start(prepared.request(), frames.frames(), this)) {
+						boolean abort = markOwned();
+						if (abort) {
+							// Cancelled while starting: stop the render we just handed over.
+							coordinator.cancel();
+						}
+						return true;
+					}
+					awaitIdle(idle);
 				} finally {
 					closeQuietly(idleSubscription);
+					clearPendingIdle(idle);
 				}
-				if (started) {
-					boolean abort = markOwned();
-					if (abort) {
-						// Cancelled while starting: stop the render we just handed over.
-						coordinator.cancel();
-					}
-					return true;
-				}
-				awaitIdle(idle);
-				clearPendingIdle(idle);
 			}
 		}
 

@@ -234,6 +234,17 @@ public final class MeetingLibrary {
 				trashed.add(candidate);
 			}
 		}
+		// The player's waveform caches are derived data: drop them with the meeting instead of
+		// leaving orphans in the recordings folder (or cluttering the trash).
+		for (Path audio : List.of(mediaPath,
+				SpeakerTracks.speakerTrackPath(mediaPath, SpeakerRole.MIC),
+				SpeakerTracks.speakerTrackPath(mediaPath, SpeakerRole.SYSTEM))) {
+			try {
+				Files.deleteIfExists(Path.of(audio + ".peaks"));
+			} catch (java.io.IOException ignored) {
+				// A cache that cannot be removed is only a stray file.
+			}
+		}
 		return List.copyOf(trashed);
 	}
 }

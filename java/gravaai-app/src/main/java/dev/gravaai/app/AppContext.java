@@ -518,6 +518,15 @@ public final class AppContext {
 		}
 		ProjectExportRenderer renderer = new ProjectExportRenderer(coordinator);
 		renderer.setExtensionHost(extensionHost());
+		// Queued exports follow the same "Upscale deep zooms in exports" setting as the editor's
+		// own export: the setting and the model are read fresh for every job.
+		renderer.setSuperResolution(() -> {
+			dev.gravaai.app.editor.SuperResolutionController upscaler =
+					dev.gravaai.app.editor.SuperResolutionController.create(
+							appSettings(), userData.dir());
+			upscaler.refresh();
+			return upscaler.openEngineForExport(upscaler.installedModelPath());
+		});
 		ExportQueue queue = new ExportQueue(renderer);
 		ExportQueueController controller = new ExportQueueController(queue, publisher,
 				this::exportQueuePreferences);

@@ -59,6 +59,8 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	// The cached upscaled window: the padded source crop it covers, and the pixels at 4x.
 	private @Nullable Crop cachedCrop;
 	private @Nullable RgbaFrame cachedUpscaled;
+	/** The source pixels the cached window was inferred from, to tell a held frame from a new one. */
+	private @Nullable ByteBuffer cachedWindow;
 	private long inferenceCount;
 	private long cacheHits;
 	private long totalInferenceNanos;
@@ -138,18 +140,23 @@ public final class SuperResolutionEngine implements AutoCloseable {
 		if (visible == null) {
 			return null;
 		}
-		Crop fetch = SuperResolution.padded(visible, source);
-		RgbaFrame upscaled;
-		if (cachedCrop != null && cachedUpscaled != null && cachedCrop.contains(visible)) {
+		Crop cached = cachedCrop;
+		RgbaFrame cachedPixels = cachedUpscaled;
+		ByteBuffer cachedSource = cachedWindow;
+		// A hit needs the same pixels, not just the same place: the video keeps playing under a
+		// held zoom, and a window inferred from an earlier frame would freeze it. The hit also
+		// reports the window the cached pixels were inferred from (not this frame's padded one),
+		// because that is where they belong on screen.
+		if (cached != null && cachedPixels != null && cachedSource != null
+				&& cached.contains(visible)
+				&& SuperResolution.windowMatches(frame.pixelsTopFirstRgba(), frame.width(),
+						frame.height(), cached, cachedSource)) {
 			cacheHits++;
-			upscaled = cachedUpscaled;
-		} else {
-			upscaled = infer(frame, fetch);
-			if (upscaled == null) {
-				return null;
-			}
+			return new Upscaled(cached, cachedPixels);
 		}
-		return new Upscaled(fetch, upscaled);
+		Crop fetch = SuperResolution.padded(visible, source);
+		RgbaFrame upscaled = infer(frame, fetch);
+		return upscaled == null ? null : new Upscaled(fetch, upscaled);
 	}
 
 	/**
@@ -192,6 +199,7 @@ public final class SuperResolutionEngine implements AutoCloseable {
 						SuperResolution.fromChw(out, upWidth, upHeight));
 				cachedCrop = crop;
 				cachedUpscaled = result;
+				cachedWindow = window;
 				inferenceCount++;
 				totalInferenceNanos += System.nanoTime() - started;
 				LOG.log(System.Logger.Level.DEBUG, () -> "SR " + crop.width() + "x"
@@ -206,6 +214,7 @@ public final class SuperResolutionEngine implements AutoCloseable {
 			// the source, exactly like an uninstalled model.
 			cachedCrop = null;
 			cachedUpscaled = null;
+			cachedWindow = null;
 			LOG.log(System.Logger.Level.WARNING,
 					"super-resolution inference failed, drawing the source: " + error);
 			return null;
@@ -225,6 +234,7 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	public void reset() {
 		cachedCrop = null;
 		cachedUpscaled = null;
+		cachedWindow = null;
 		inferenceCount = 0;
 		cacheHits = 0;
 		totalInferenceNanos = 0;
@@ -252,6 +262,7 @@ public final class SuperResolutionEngine implements AutoCloseable {
 		closed = true;
 		cachedCrop = null;
 		cachedUpscaled = null;
+		cachedWindow = null;
 		api.releaseMemoryInfo(memoryInfo);
 		api.releaseSession(session);
 		api.close();

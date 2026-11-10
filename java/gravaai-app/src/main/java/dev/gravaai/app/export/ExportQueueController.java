@@ -59,6 +59,7 @@ public final class ExportQueueController implements AutoCloseable {
 	 * (a project that cannot even load) is still reported exactly once.
 	 */
 	private final Set<Long> reported = new LinkedHashSet<>();
+	private final Object namingLock = new Object();
 	private @Nullable Path lastFolder;
 	private @Nullable Listener listener;
 	private int lastActive;
@@ -150,9 +151,24 @@ public final class ExportQueueController implements AutoCloseable {
 		Objects.requireNonNull(settings, "settings");
 		Objects.requireNonNull(folder, "folder");
 		Path source = project.toAbsolutePath().normalize();
-		Path destination = destinationFor(source, settings, folder);
 		String label = projectName(source);
-		return queue.enqueue(label, detail(settings), source, destination, settings);
+		// Naming and enqueueing are one step: two jobs named at the same moment (the same project
+		// queued twice, or two projects with one name) must not be handed the same file.
+		synchronized (namingLock) {
+			Path destination = destinationFor(source, settings, folder, pendingDestinations());
+			return queue.enqueue(label, detail(settings), source, destination, settings);
+		}
+	}
+
+	/** The files the queued and running exports are going to write. */
+	private Set<Path> pendingDestinations() {
+		Set<Path> taken = new LinkedHashSet<>();
+		for (ExportQueue.Entry entry : queue.entries()) {
+			if (entry.isPending()) {
+				taken.add(entry.destination());
+			}
+		}
+		return taken;
 	}
 
 	/** Reveals a published export in the file manager. */
@@ -241,7 +257,8 @@ public final class ExportQueueController implements AutoCloseable {
 	}
 
 	/** The file name: project name plus the format/quality/frame-rate tag, deduplicated. */
-	private static Path destinationFor(Path project, ExportPreferences settings, Path folder) {
+	private static Path destinationFor(Path project, ExportPreferences settings, Path folder,
+			Set<Path> taken) {
 		ExportFormat format = settings.exportFormat() == null ? ExportFormat.MP4
 				: settings.exportFormat();
 		String extension = format == ExportFormat.GIF ? ".gif" : ".mp4";
@@ -250,7 +267,8 @@ public final class ExportQueueController implements AutoCloseable {
 		String tag = qualityLabel(settings.exportQuality()) + " " + frameRate + "fps";
 		String base = sanitize(projectName(project)) + " (" + sanitize(tag) + ")";
 		Path candidate = folder.resolve(base + extension);
-		for (int suffix = 2; Files.exists(candidate); suffix++) {
+		// A name is taken by a file on disk or by an export still waiting to write it.
+		for (int suffix = 2; Files.exists(candidate) || taken.contains(candidate); suffix++) {
 			candidate = folder.resolve(base + " " + suffix + extension);
 		}
 		return candidate;

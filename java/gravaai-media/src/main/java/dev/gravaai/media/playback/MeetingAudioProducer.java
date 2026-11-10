@@ -38,7 +38,9 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 	/** True once {@code read} returned end-of-file for the matching source. */
 	private final List<Boolean> drained = new ArrayList<>();
 
+	/** The media position at {@link #baseSamples}: the last seek or rate change. */
 	private double baseSeconds;
+	private long baseSamples;
 	private long samplesWritten;
 	private int latencyMicros;
 	private double volume = 1;
@@ -100,6 +102,7 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 			return;
 		}
 		baseSeconds = clampPosition(positionSeconds);
+		baseSamples = 0;
 		samplesWritten = 0;
 		latencyMicros = 0;
 		ended = false;
@@ -169,13 +172,13 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 
 	private void openSourcesLocked() {
 		double position = writePositionLocked();
-		double remainingTimeline = durationSeconds - position;
-		if (remainingTimeline <= 1e-9) {
+		// The position is a media position, so the span left to decode is plain source time: the
+		// atempo chain only changes how long it takes to play.
+		double sourceSpan = durationSeconds - position;
+		if (sourceSpan <= 1e-9) {
 			ended = true;
 			return;
 		}
-		// atempo shortens the source to timeline time, so the span to decode scales with the rate.
-		double sourceSpan = remainingTimeline * rate;
 		List<String> filters = Math.abs(rate - 1) > 1e-9
 				? AtempoChain.filters(rate)
 				: List.of();
@@ -219,7 +222,9 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 
 	/** Where the next decode starts: what has been handed to the sink since the last seek. */
 	private double writePositionLocked() {
-		return baseSeconds + samplesWritten / (double) PlaybackAudioProducer.SAMPLE_RATE;
+		// One second handed to the sink covers `rate` seconds of the meeting (atempo).
+		return baseSeconds + (samplesWritten - baseSamples) * rate
+				/ PlaybackAudioProducer.SAMPLE_RATE;
 	}
 
 	/** The play position: what has been handed to the sink minus its latency. */
@@ -270,6 +275,9 @@ public final class MeetingAudioProducer implements MeetingAudioTrack {
 		if (!Double.isFinite(rate) || rate <= 0 || Math.abs(this.rate - rate) < 1e-9) {
 			return;
 		}
+		// What was written so far was written at the old rate: fold it into the base position.
+		baseSeconds = writePositionLocked();
+		baseSamples = samplesWritten;
 		this.rate = rate;
 		// The atempo chain depends on the rate; reopen from the current position on the next pump.
 		closeSourcesLocked();

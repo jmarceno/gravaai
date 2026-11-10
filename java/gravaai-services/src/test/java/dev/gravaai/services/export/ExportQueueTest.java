@@ -86,6 +86,29 @@ class ExportQueueTest {
 	}
 
 	@Test
+	@DisplayName("a pump that arrives while the renderer answers busy is replayed, not lost")
+	void pumpDuringABusyAnswerIsReplayed() {
+		// The pipeline goes idle while the renderer is still answering "busy": the idle hook's
+		// pump lands mid-start and must not be swallowed, or the job would wait forever.
+		AtomicInteger attempts = new AtomicInteger();
+		ExportQueue[] holder = new ExportQueue[1];
+		ExportQueue queue = new ExportQueue((job, callbacks) -> {
+			if (attempts.incrementAndGet() == 1) {
+				holder[0].pump();
+				return Optional.empty();
+			}
+			return Optional.of(() -> { });
+		});
+		holder[0] = queue;
+
+		enqueue(queue, "a");
+
+		assertEquals(2, attempts.get(), "the idle pump must trigger a second start");
+		assertEquals(List.of(State.RUNNING), states(queue));
+		queue.close();
+	}
+
+	@Test
 	@DisplayName("queued exports run one after another without user action")
 	void runsSequentially() {
 		ManualRenderer renderer = new ManualRenderer();

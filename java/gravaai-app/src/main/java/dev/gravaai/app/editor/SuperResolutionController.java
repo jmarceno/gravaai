@@ -160,9 +160,12 @@ public final class SuperResolutionController {
 			// The downloader reports every 64 KB read (~75 times for this file), so publishing per
 			// callback would flood the FX thread. Publish when the whole percent changes instead.
 			java.util.concurrent.atomic.AtomicInteger lastPercent = new java.util.concurrent.atomic.AtomicInteger(-1);
+			// Set when Remove stopped this install: that is the user's choice, not a failure.
+			AtomicBoolean cancelledByUser = new AtomicBoolean();
 			try {
 				installer.ensure(percent -> {
 					if (!installing.get()) {
+						cancelledByUser.set(true);
 						throw new IllegalStateException("super-resolution install cancelled");
 					}
 					if (percent == lastPercent.getAndSet(percent)) {
@@ -176,9 +179,14 @@ public final class SuperResolutionController {
 				});
 				state = newState(100, null, false, state.enabled());
 			} catch (RuntimeException error) {
-				LOG.log(System.Logger.Level.WARNING,
-						"super-resolution model install failed: " + error);
-				state = newState(state.percent(), errorMessage(error), true, state.enabled());
+				if (cancelledByUser.get()) {
+					// Remove already published "not installed, off"; do not paint it as an error.
+					state = newState(0, null, false, state.enabled());
+				} else {
+					LOG.log(System.Logger.Level.WARNING,
+							"super-resolution model install failed: " + error);
+					state = newState(state.percent(), errorMessage(error), true, state.enabled());
+				}
 			} finally {
 				installing.set(false);
 				publish();

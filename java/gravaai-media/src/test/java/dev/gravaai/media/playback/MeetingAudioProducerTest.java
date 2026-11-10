@@ -179,8 +179,8 @@ class MeetingAudioProducerTest {
 
 		for (Open open : factory.opens) {
 			assertEquals(List.of("atempo=2"), open.filters());
-			// The source span scales with the rate so the timeline still covers the remaining time.
-			assertEquals((DURATION - 1) * 2, open.duration(), 1e-9);
+			// The span is source time: the rate changes how fast it plays, not how much is left.
+			assertEquals(DURATION - 1, open.duration(), 1e-9);
 		}
 	}
 

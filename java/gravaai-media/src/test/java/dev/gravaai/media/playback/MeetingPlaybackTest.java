@@ -171,6 +171,27 @@ class MeetingPlaybackTest {
 	}
 
 	@Test
+	@DisplayName("the playhead is a media position: output played at 2x covers twice the meeting")
+	void playheadFollowsTheRate() {
+		FakeTrack track = new FakeTrack();
+		MeetingPlayback playback = new MeetingPlayback(mediaValue -> track);
+		playback.setMedia(media("/m/a.opus"));
+		playback.seek(0.1);
+
+		// 0.2 s of output at 1x, then the rate doubles and another 0.2 s is written.
+		long fifth = PlaybackAudioProducer.SAMPLE_RATE / 5;
+		track.samples = fifth;
+		assertEquals(0.3, playback.status().timelineSeconds(), 1e-9);
+		playback.setRate(2);
+		assertEquals(0.3, playback.status().timelineSeconds(), 1e-9,
+				"a rate change must not move the playhead");
+		track.samples = 2 * fifth;
+		assertEquals(0.7, playback.status().timelineSeconds(), 1e-9,
+				"0.2 s of output at 2x is 0.4 s of the meeting");
+		playback.close();
+	}
+
+	@Test
 	@DisplayName("a rate change forwards to the track and publishes the status")
 	void rateChangeForwardsToTrack() {
 		FakeTrack track = new FakeTrack();

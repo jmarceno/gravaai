@@ -146,6 +146,8 @@ public final class ExportQueue implements AutoCloseable {
 	private @Nullable Slot running;
 	private Renderer.@Nullable Handle runningHandle;
 	private boolean pumping;
+	/** A {@link #pump()} that arrived while another one was starting a job; replayed afterwards. */
+	private boolean pumpRequested;
 	private boolean closed;
 
 	/** @param renderer the app-side render half; the queue never renders anything itself */
@@ -313,9 +315,16 @@ public final class ExportQueue implements AutoCloseable {
 			Slot slot;
 			long token;
 			synchronized (this) {
-				if (closed || pumping || running != null) {
+				if (pumping) {
+					// Another thread is mid-start. If it is about to hear "busy", this call (the
+					// coordinator's idle hook, typically) is the retry it would otherwise miss.
+					pumpRequested = true;
 					return;
 				}
+				if (closed || running != null) {
+					return;
+				}
+				pumpRequested = false;
 				slot = firstQueued();
 				if (slot == null) {
 					return;
@@ -350,8 +359,11 @@ public final class ExportQueue implements AutoCloseable {
 			}
 			boolean started = startedResult.isPresent();
 			boolean retry;
+			boolean pumpAgain;
 			synchronized (this) {
 				pumping = false;
+				pumpAgain = pumpRequested;
+				pumpRequested = false;
 				if (started) {
 					if (running == slot) {
 						runningHandle = startedResult.orElseThrow();
@@ -376,6 +388,11 @@ public final class ExportQueue implements AutoCloseable {
 			}
 			if (retry) {
 				notifyChanged();
+			}
+			if (pumpAgain) {
+				// A pump arrived while the renderer was answering (the pipeline went idle in
+				// between): nobody else will retry, so do it now.
+				continue;
 			}
 			return;
 		}

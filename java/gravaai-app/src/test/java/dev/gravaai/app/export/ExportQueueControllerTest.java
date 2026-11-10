@@ -110,6 +110,23 @@ class ExportQueueControllerTest {
 	}
 
 	@Test
+	@DisplayName("two exports queued before either has written its file get different names")
+	void deduplicatesAgainstPendingExports() throws Exception {
+		Path project = project(tempDir, "Twice");
+		Path exports = Files.createDirectories(tempDir.resolve("exports"));
+		// Nothing reaches the disk while the jobs wait: the queue is the only record of the name.
+		ExportQueue queue = new ExportQueue((job, callbacks) -> Optional.of(() -> { }));
+		try (ExportQueueController controller = controller(queue)) {
+			controller.enqueue(project, preferences("mp4"), exports);
+			controller.enqueue(project, preferences("mp4"), exports);
+
+			List<Path> destinations = queue.entries().stream().map(ExportQueue.Entry::destination)
+					.toList();
+			assertEquals(2, destinations.stream().distinct().count(), destinations.toString());
+		}
+	}
+
+	@Test
 	@DisplayName("a second export of the same project never overwrites the first file")
 	void deduplicatesDestinations() throws Exception {
 		Path project = project(tempDir, "Twice");

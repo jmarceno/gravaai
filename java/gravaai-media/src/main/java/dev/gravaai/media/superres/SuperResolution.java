@@ -233,6 +233,37 @@ public final class SuperResolution {
 		return out;
 	}
 
+	/**
+	 * Whether {@code crop} of a decoded frame still holds exactly the pixels of {@code window} (a
+	 * {@link #copyWindow} result for the same crop). This is what lets the upscaler reuse a window
+	 * across frames only while the picture under it has not changed.
+	 *
+	 * @return {@code false} when any pixel differs or the crop does not fit the frame
+	 */
+	public static boolean windowMatches(ByteBuffer pixelsTopFirstRgba, int frameWidth,
+			int frameHeight, Crop crop, ByteBuffer window) {
+		if (crop.right() > frameWidth || crop.bottom() > frameHeight
+				|| window.remaining() != crop.pixels() * 4) {
+			return false;
+		}
+		int stride = frameWidth * 4;
+		int rowBytes = crop.width() * 4;
+		int base = pixelsTopFirstRgba.position();
+		int windowBase = window.position();
+		for (int row = 0; row < crop.height(); row++) {
+			int start = base + (crop.y() + row) * stride + crop.x() * 4;
+			if (start + rowBytes > pixelsTopFirstRgba.limit()) {
+				return false;
+			}
+			ByteBuffer frameRow = pixelsTopFirstRgba.slice(start, rowBytes);
+			ByteBuffer windowRow = window.slice(windowBase + row * rowBytes, rowBytes);
+			if (frameRow.mismatch(windowRow) != -1) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	/** Packs an RGBA window into the network's NCHW float input (0-1, RGB). */
 	public static float[] toChw(ByteBuffer rgbaWindow, int width, int height) {
 		if (rgbaWindow.remaining() < width * height * 4) {

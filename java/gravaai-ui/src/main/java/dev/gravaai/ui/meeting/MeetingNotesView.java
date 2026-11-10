@@ -78,6 +78,8 @@ public final class MeetingNotesView extends VBox {
 	/** The template id the metadata last showed, so a picker change survives a refresh. */
 	private @Nullable String lastStoredTemplate;
 	private @Nullable String defaultTemplateId;
+	/** True while the settings carry a custom notes prompt (the picker then offers "Custom"). */
+	private boolean customPromptSet;
 	private @Nullable Subscription jobSubscription;
 	/** Last time the user scrolled by wheel or scrollbar (auto-follow stays off for a while). */
 	private volatile long lastUserScrollAt;
@@ -251,7 +253,7 @@ public final class MeetingNotesView extends VBox {
 	}
 
 	private record FilesLoad(Result<MeetingService.FilesView> files,
-			@Nullable String defaultTemplateId) {
+			@Nullable String defaultTemplateId, boolean customPromptSet) {
 	}
 
 	private void refresh() {
@@ -259,14 +261,14 @@ public final class MeetingNotesView extends VBox {
 		if (current == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> new FilesLoad(service.getFiles(current),
-				defaultTemplateId()), UiThreads.background())
+		CompletableFuture.supplyAsync(() -> loadFiles(current), UiThreads.background())
 				.thenAcceptAsync(loaded -> {
 					if (!current.equals(mediaPath)) {
 						return;
 					}
 					loading = false;
 					defaultTemplateId = loaded.defaultTemplateId();
+					customPromptSet = loaded.customPromptSet();
 					if (loaded.files().isErr()) {
 						showError(loaded.files().errorMessage());
 					} else {
@@ -280,12 +282,19 @@ public final class MeetingNotesView extends VBox {
 				}, Platform::runLater);
 	}
 
-	/** The settings' default template id, or null when the settings could not be read. */
-	private @Nullable String defaultTemplateId() {
+	/**
+	 * The meeting files plus what the settings say about templates: the default id and whether a
+	 * custom notes prompt is set (both absent when the settings could not be read).
+	 */
+	private FilesLoad loadFiles(Path media) {
+		Result<MeetingService.FilesView> loaded = service.getFiles(media);
 		try {
-			return service.settings().settings().notesTemplate();
+			var settings = service.settings().settings();
+			String custom = settings.summaryPrompt();
+			return new FilesLoad(loaded, settings.notesTemplate(),
+					custom != null && !custom.strip().isEmpty());
 		} catch (RuntimeException error) {
-			return null;
+			return new FilesLoad(loaded, null, false);
 		}
 	}
 
@@ -298,17 +307,27 @@ public final class MeetingNotesView extends VBox {
 		String stored = currentFiles != null && currentFiles.meta() != null
 				? currentFiles.meta().notesTemplate()
 				: null;
-		if (selectedTemplateId != null && java.util.Objects.equals(stored, lastStoredTemplate)) {
+		// A "Custom" selection only stands while the settings still carry a custom prompt.
+		boolean selectionValid = selectedTemplateId != null
+				&& (customPromptSet || !NoteTemplates.CUSTOM_ID.equals(selectedTemplateId));
+		if (selectionValid && java.util.Objects.equals(stored, lastStoredTemplate)) {
 			return;
 		}
 		lastStoredTemplate = stored;
 		selectedTemplateId = resolveTemplateId(stored, defaultTemplateId);
 	}
 
-	/** The stored id when it exists, then the settings default, then General. */
+	/**
+	 * The stored id when it exists, then the custom notes prompt when the settings carry one (it
+	 * overrides the default template), then the settings default, then General. The picker shows
+	 * exactly what the next run uses.
+	 */
 	private String resolveTemplateId(@Nullable String stored, @Nullable String fallback) {
 		if (stored != null && hasTemplate(stored)) {
 			return stored;
+		}
+		if (customPromptSet) {
+			return NoteTemplates.CUSTOM_ID;
 		}
 		if (fallback != null && hasTemplate(fallback)) {
 			return fallback;
@@ -547,6 +566,11 @@ public final class MeetingNotesView extends VBox {
 		ChoiceGroup picker = new ChoiceGroup();
 		for (NoteTemplates.Template template : templates) {
 			picker.item(template.id(), template.label());
+		}
+		if (customPromptSet) {
+			// The custom notes prompt from the settings: resolves to no template, so the pipeline
+			// falls through to the prompt itself.
+			picker.item(NoteTemplates.CUSTOM_ID, "Custom");
 		}
 		picker.setValue(selectedTemplateId == null ? NoteTemplates.GENERAL_ID
 				: selectedTemplateId);

@@ -191,6 +191,35 @@ class SuperResolutionTest {
 	}
 
 	@Test
+	@DisplayName("a cached window only matches a frame whose pixels under it are unchanged")
+	void windowMatchesDetectsAChangedFrame() {
+		int width = 4;
+		ByteBuffer frame = ByteBuffer.allocateDirect(width * 3 * 4);
+		for (int y = 0; y < 3; y++) {
+			for (int x = 0; x < width; x++) {
+				frame.put((byte) (x + 10 * y)).put((byte) 0).put((byte) 0).put((byte) 255);
+			}
+		}
+		frame.flip();
+		Crop crop = new Crop(1, 1, 2, 2);
+		ByteBuffer window = SuperResolution.copyWindow(frame, width, crop);
+		assertTrue(SuperResolution.windowMatches(frame, width, 3, crop, window),
+				"the frame the window was copied from matches it");
+
+		// A pixel outside the window changing is still a hit: only the window is redrawn.
+		frame.put(0, (byte) 99);
+		assertTrue(SuperResolution.windowMatches(frame, width, 3, crop, window));
+
+		// The video moved on under the zoom: (2,2) changed, so the cached upscale is stale.
+		frame.put((2 * width + 2) * 4, (byte) 99);
+		assertFalse(SuperResolution.windowMatches(frame, width, 3, crop, window),
+				"a changed pixel inside the window must force a new inference");
+
+		// A crop that no longer fits the frame (a different source size) never matches.
+		assertFalse(SuperResolution.windowMatches(frame, width, 2, crop, window));
+	}
+
+	@Test
 	@DisplayName("the network input overshoot is clamped, not wrapped")
 	void outputClampsInsteadOfWrapping() {
 		float[] chw = {2.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.5f, 1.0f, 0.0f, 0.5f, 0.5f, 0.25f, 0.75f};

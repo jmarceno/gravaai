@@ -54,8 +54,10 @@ public final class MeetingPlayback implements AutoCloseable {
 	private @Nullable Media media;
 	private @Nullable MeetingAudioTrack track;
 	private PlaybackState state = PlaybackState.IDLE;
-	/** The play position the current {@code samplesWritten} count is relative to. */
+	/** The media position at {@link #baseSamples}: the last seek or rate change. */
 	private double baseSeconds;
+	/** The track's sample count at {@link #baseSeconds}. */
+	private long baseSamples;
 	private double rate = 1;
 	private double volume = 1;
 	private volatile boolean closed;
@@ -86,6 +88,7 @@ public final class MeetingPlayback implements AutoCloseable {
 			track = next;
 			media = nextMedia;
 			baseSeconds = 0;
+			baseSamples = 0;
 			state = PlaybackState.PAUSED;
 		}
 		closeQuietly(previous);
@@ -164,6 +167,8 @@ public final class MeetingPlayback implements AutoCloseable {
 		if (current != null) {
 			current.seek(target);
 		}
+		// The track restarts its sample count at every seek.
+		baseSamples = 0;
 	}
 
 	public void setRate(double rate) {
@@ -171,9 +176,15 @@ public final class MeetingPlayback implements AutoCloseable {
 			if (!Double.isFinite(rate) || rate <= 0) {
 				return;
 			}
+			MeetingAudioTrack current = track;
+			if (current != null) {
+				// What was played so far was played at the old rate: fold it into the base.
+				baseSeconds = positionLocked(current);
+				baseSamples = current.samplesWritten();
+			}
 			this.rate = rate;
-			if (track != null) {
-				track.setRate(rate);
+			if (current != null) {
+				current.setRate(rate);
 			}
 		}
 		publishStatus(status());
@@ -297,6 +308,7 @@ public final class MeetingPlayback implements AutoCloseable {
 					if (current.ended() || position >= durationLocked() - END_EPSILON_SECONDS) {
 						state = PlaybackState.ENDED;
 						baseSeconds = durationLocked();
+						baseSamples = current.samplesWritten();
 						status = statusLocked();
 						finished = true;
 					}
@@ -333,9 +345,11 @@ public final class MeetingPlayback implements AutoCloseable {
 	}
 
 	private double positionLocked(MeetingAudioTrack current) {
-		// samplesWritten restarts at every seek; baseSeconds is what it is relative to.
-		return baseSeconds
-				+ Math.max(0, current.samplesWritten()) / (double) PlaybackAudioProducer.SAMPLE_RATE;
+		// One second of output covers `rate` seconds of the meeting (atempo): the playhead is a
+		// media position, so the transcript highlight and a later seek/resume stay on the audio.
+		double played = Math.max(0, current.samplesWritten() - baseSamples)
+				/ (double) PlaybackAudioProducer.SAMPLE_RATE;
+		return Math.min(durationLocked(), baseSeconds + played * rate);
 	}
 
 	private PlaybackStatus statusLocked() {

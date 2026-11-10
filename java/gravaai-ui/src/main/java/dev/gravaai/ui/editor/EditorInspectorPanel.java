@@ -2120,9 +2120,11 @@ public final class EditorInspectorPanel extends VBox {
 		for (TimelineSourceAudioTrack track : tracks) {
 			root.getChildren().add(cleanupGroup(track));
 		}
-		Label note = new Label("Cleanup is applied to the preview and again on export; the"
-				+ " recording files are never rewritten. The loudness target normalizes the exported"
-				+ " mix, not the lane.");
+		Label note = new Label("Noise reduction renders a cleaned copy of the lane once (the"
+				+ " lane's CLEAN badge on the timeline shows the progress); the preview and the"
+				+ " export then play it, and changing the level needs no new render. The recording"
+				+ " files are never rewritten. The loudness target normalizes the exported mix, not"
+				+ " the lane.");
 		note.setWrapText(true);
 		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(note);

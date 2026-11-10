@@ -145,6 +145,36 @@ class FfmpegCliPcmSourceTest {
 	}
 
 	@Test
+	@DisplayName("a track with a rendered denoised copy plays it, mixed with the original by level")
+	void mixPlaysTheRenderedCopy() {
+		List<String> command = FfmpegCliPcmSource.mixCommand(FFMPEG,
+				List.of(new PreviewAudioTrack("/rec/mic.wav", 1,
+								new AudioCleanup(AudioCleanup.NoiseReduction.STRONG, 0, 0),
+								"/cache/mic-clean.wav"),
+						new PreviewAudioTrack("/rec/system.wav", 1,
+								new AudioCleanup(AudioCleanup.NoiseReduction.LIGHT, 0, 0),
+								"/cache/system-clean.wav")),
+				0, 3, 2.0, List.of());
+		// Strong reads only the copy; Light reads the copy and the original.
+		assertEquals(List.of("/cache/mic-clean.wav", "/cache/system-clean.wav", "/rec/system.wav"),
+				java.util.stream.IntStream.range(0, command.size())
+						.filter(i -> command.get(i).equals("-i"))
+						.mapToObj(i -> command.get(i + 1)).toList());
+		// No denoiser latency to read past: every input covers exactly the span.
+		assertTrue(java.util.stream.IntStream.range(0, command.size())
+				.filter(i -> command.get(i).equals("-t"))
+				.allMatch(i -> command.get(i + 1).equals("2.000000")), command.toString());
+		String graph = command.get(command.indexOf("-filter_complex") + 1);
+		assertTrue(graph.contains("[0:a]aresample=48000,aformat="), graph);
+		assertTrue(graph.contains("[2:a]aresample=48000,volume=0.251[dry1];"
+				+ "[1:a]volume=0.749[wet1];"
+				+ "[dry1][wet1]amix=inputs=2:duration=longest:normalize=0,aresample=48000"), graph);
+		assertFalse(graph.contains("afftdn"), graph);
+		assertFalse(graph.contains("arnndn"), graph);
+		assertTrue(graph.contains("[ain0][ain1]amix=inputs=2"), graph);
+	}
+
+	@Test
 	@DisplayName("adds the programme loudness stage to the mix when a target is set")
 	void mixAppliesLoudnorm() {
 		List<String> command = FfmpegCliPcmSource.mixCommand(FFMPEG,

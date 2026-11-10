@@ -13,6 +13,7 @@ import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.ClipTransitions;
 import dev.gravaai.media.audio.AtempoChain;
 import dev.gravaai.media.audio.AudioCleanupFilters;
+import dev.gravaai.media.denoise.DenoisedAudio;
 
 /**
  * Builds the single libavfilter graph of an export (plan §5.10): per-source timeline segments with
@@ -31,16 +32,37 @@ public final class ExportAudioGraph {
 	 * One full-length timeline-bound audio track (system/mic/mixed/embedded).
 	 *
 	 * @param cleanup the track's edit-time cleanup; {@link AudioCleanup#NONE} leaves it untouched
+	 * @param denoisedPath the pre-rendered denoised copy of {@code audioPath}
+	 *     ({@link dev.gravaai.media.denoise.DenoisedAudio}), or null when there is none: the
+	 *     noise reduction then runs through the ffmpeg fallback chain
 	 */
-	public record TrackInput(String audioPath, double gain, AudioCleanup cleanup) {
+	public record TrackInput(String audioPath, double gain, AudioCleanup cleanup,
+			@Nullable String denoisedPath) {
 
 		/** A track without cleanup: the shape every pre-cleanup call site has. */
 		public TrackInput(String audioPath, double gain) {
-			this(audioPath, gain, AudioCleanup.NONE);
+			this(audioPath, gain, AudioCleanup.NONE, null);
+		}
+
+		/** A track without a rendered denoised copy. */
+		public TrackInput(String audioPath, double gain, AudioCleanup cleanup) {
+			this(audioPath, gain, cleanup, null);
 		}
 
 		public TrackInput {
 			cleanup = cleanup == null ? AudioCleanup.NONE : cleanup;
+			denoisedPath = denoisedPath == null || denoisedPath.isBlank() ? null : denoisedPath;
+		}
+
+		/** The same track playing its noise reduction from a rendered copy. */
+		public TrackInput withDenoised(@Nullable String path) {
+			return new TrackInput(audioPath, gain, cleanup, path);
+		}
+
+		/** True when the noise reduction of this track plays from its rendered copy. */
+		public boolean usesDenoisedCopy() {
+			return denoisedPath != null
+					&& cleanup.noiseReduction() != AudioCleanup.NoiseReduction.OFF;
 		}
 	}
 
@@ -125,8 +147,13 @@ public final class ExportAudioGraph {
 		for (TrackInput track : input.tracks()) {
 			int inputIndex = inputIndex(inputIndexByPath, inputs, track.audioPath());
 			String label = "track" + mixLabels.size();
-			parts.add(buildTrackChain(inputIndex, label, input.sourceSegments(), duration, track,
-					input.mutedRanges(), input.rnnoiseModelPath()));
+			String denoisedPath = track.usesDenoisedCopy() ? track.denoisedPath() : null;
+			parts.add(denoisedPath != null
+					? buildDenoisedTrackChain(inputIndex,
+							inputIndex(inputIndexByPath, inputs, denoisedPath), label,
+							input.sourceSegments(), duration, track, input.mutedRanges())
+					: buildTrackChain(inputIndex, label, input.sourceSegments(), duration, track,
+							input.mutedRanges(), input.rnnoiseModelPath()));
 			mixLabels.add("[" + label + "]");
 		}
 		for (RegionInput region : input.regions()) {
@@ -174,6 +201,73 @@ public final class ExportAudioGraph {
 				+ "amix=inputs=" + mixLabels.size() + ":duration=longest:normalize=0[mix]");
 		parts.add(finalChain.toString());
 		return new ExportAudioPlan(inputs, String.join(";", parts));
+	}
+
+	/**
+	 * The chain of a track whose noise reduction plays from its rendered copy
+	 * ({@link dev.gravaai.media.denoise.DenoisedAudio}). The copy replaces the ffmpeg denoisers, so
+	 * there is no latency or warm-up to manage; the level is how much of the original is mixed
+	 * back in. Both are read on the container's timeline (the copy starts at time zero), cut per
+	 * segment, then take the high-pass and the clip speed like any other track.
+	 */
+	private static String buildDenoisedTrackChain(int originalIndex, int denoisedIndex,
+			String label, List<ExportAudioSegments.Segment> segments, String duration,
+			TrackInput track, List<MutedRange> muted) {
+		double dry = DenoisedAudio.dryGain(track.cleanup().noiseReduction());
+		String highPass = track.cleanup().hasHighPass()
+				? ",highpass=f=" + track.cleanup().highPassHz() : "";
+		String gainSuffix = (needsVolume(track.gain()) ? ",volume=" + number(track.gain()) : "")
+				+ muteSuffix(muted);
+		StringBuilder builder = new StringBuilder();
+		if (segments.isEmpty()) {
+			builder.append(denoisedSource(originalIndex, denoisedIndex, label, dry,
+							"asetpts=PTS-STARTPTS"))
+					.append(highPass)
+					.append(",apad,atrim=duration=").append(duration)
+					.append(",asetpts=PTS-STARTPTS").append(gainSuffix);
+			return builder.append('[').append(label).append(']').toString();
+		}
+		List<String> segmentLabels = new ArrayList<>();
+		for (int index = 0; index < segments.size(); index++) {
+			ExportAudioSegments.Segment segment = segments.get(index);
+			String segmentLabel = label + "_seg" + index;
+			String cut = "atrim=start=" + seconds(segment.startMs()) + ":end="
+					+ seconds(segment.endMs()) + ",asetpts=PTS-STARTPTS";
+			builder.append(denoisedSource(originalIndex, denoisedIndex, segmentLabel, dry, cut))
+					.append(highPass);
+			String atempo = AtempoChain.filterChain(segment.speed());
+			if (!atempo.isEmpty()) {
+				builder.append(',').append(atempo);
+			}
+			builder.append('[').append(segmentLabel).append("];");
+			segmentLabels.add("[" + segmentLabel + "]");
+		}
+		builder.append(segmentLabels.stream().reduce("", String::concat))
+				.append("concat=n=").append(segmentLabels.size()).append(":v=0:a=1[")
+				.append(label).append("_concat]")
+				.append(';')
+				.append('[').append(label).append("_concat]")
+				.append("apad,atrim=duration=").append(duration).append(",asetpts=PTS-STARTPTS")
+				.append(gainSuffix).append('[').append(label).append(']');
+		return builder.toString();
+	}
+
+	/**
+	 * The start of a denoised chain: the rendered copy alone at full strength, or the original
+	 * and the copy mixed at the level's share. The original is padded from container time zero
+	 * first, exactly like the copy was when it was rendered, so the two line up sample for sample.
+	 */
+	private static String denoisedSource(int originalIndex, int denoisedIndex, String label,
+			double dry, String cut) {
+		if (dry <= 0) {
+			return "[" + denoisedIndex + ":a]" + cut;
+		}
+		return "[" + originalIndex + ":a]aresample=" + SAMPLE_RATE + ":first_pts=0," + cut
+				+ ",volume=" + number(dry) + "[" + label + "_dry];"
+				+ "[" + denoisedIndex + ":a]" + cut + ",volume=" + number(1 - dry)
+				+ "[" + label + "_wet];"
+				+ "[" + label + "_dry][" + label + "_wet]"
+				+ "amix=inputs=2:duration=longest:normalize=0";
 	}
 
 	private static String buildTrackChain(int inputIndex, String label,

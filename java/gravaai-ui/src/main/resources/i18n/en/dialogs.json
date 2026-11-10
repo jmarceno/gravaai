@@ -46,6 +46,7 @@
 		"filterGif": "GIF",
 		"filterVideo": "MP4 video",
 		"alreadyRunning": "An export is already running.",
+		"preparingNoiseReduction": "Preparing noise reduction… the export starts when it is ready.",
 		"exportedTo": "Exported successfully to {{path}}",
 		"pipelineUnavailable": "The export pipeline is not available.",
 		"queue": {

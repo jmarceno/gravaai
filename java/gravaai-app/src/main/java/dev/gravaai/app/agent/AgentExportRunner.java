@@ -116,7 +116,8 @@ final class AgentExportRunner {
 			}
 			ProjectExport.Input input = new ProjectExport.Input(state, videoPath, webcamPath,
 					List.of(), preferences, destination, false, true, durationSeconds,
-					cursorSamples);
+					cursorSamples)
+					.withDenoised(dev.gravaai.services.denoise.DenoiseCache.shared()::ensureBlocking);
 			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			try (ElementOverlayHooks elements = new ElementOverlayHooks(FrameOverlayHooks.NONE,
 					session.elementDiagnostics(), () -> state);

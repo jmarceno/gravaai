@@ -70,20 +70,56 @@ public final class ProjectExport {
 
 	private static final System.Logger LOG = System.getLogger("gravaai.services.export");
 
-	/** Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video. */
+	/**
+	 * Resolves the rendered denoised copy of a source audio file for a track whose noise reduction
+	 * is on ({@link dev.gravaai.services.denoise.DenoiseCache}). Answering null keeps the track on
+	 * the ffmpeg fallback chain. An export on a background thread passes a resolver that renders
+	 * and waits; callers that only need the export's geometry pass {@link #NONE}.
+	 */
+	@FunctionalInterface
+	public interface DenoisedSources {
+
+		/** No rendered copies: every denoised track uses the fallback chain. */
+		DenoisedSources NONE = source -> null;
+
+		@Nullable Path forSource(Path source);
+	}
+
+	/**
+	 * Everything one project export needs; {@code sourceDurationSeconds == 0} probes the video.
+	 *
+	 * @param denoised where the rendered denoised copies of the source tracks come from
+	 */
 	public record Input(ProjectEditorState editor, Path videoPath, @Nullable Path webcamPath,
 			List<Path> companionAudioPaths, ExportPreferences preferences, Path destination,
 			boolean reveal, boolean overwrite, double sourceDurationSeconds,
-			List<CursorSample> cursorSamples) {
+			List<CursorSample> cursorSamples, DenoisedSources denoised) {
+
+		/** An input without rendered denoised copies (geometry probes, tests). */
+		public Input(ProjectEditorState editor, Path videoPath, @Nullable Path webcamPath,
+				List<Path> companionAudioPaths, ExportPreferences preferences, Path destination,
+				boolean reveal, boolean overwrite, double sourceDurationSeconds,
+				List<CursorSample> cursorSamples) {
+			this(editor, videoPath, webcamPath, companionAudioPaths, preferences, destination,
+					reveal, overwrite, sourceDurationSeconds, cursorSamples, DenoisedSources.NONE);
+		}
+
 		public Input {
 			companionAudioPaths = companionAudioPaths == null ? List.of()
 					: List.copyOf(companionAudioPaths);
 			cursorSamples = cursorSamples == null ? List.of() : List.copyOf(cursorSamples);
+			denoised = denoised == null ? DenoisedSources.NONE : denoised;
 			if (editor == null || videoPath == null || preferences == null
 					|| destination == null) {
 				throw new IllegalArgumentException(
 						"editor, videoPath, preferences and destination are required");
 			}
+		}
+
+		/** The same export reading its denoised tracks from {@code sources}. */
+		public Input withDenoised(DenoisedSources sources) {
+			return new Input(editor, videoPath, webcamPath, companionAudioPaths, preferences,
+					destination, reveal, overwrite, sourceDurationSeconds, cursorSamples, sources);
 		}
 
 		public static Input of(ProjectEditorState editor, Path videoPath,
@@ -251,8 +287,14 @@ public final class ProjectExport {
 				regions.add(new ExportAudioGraph.RegionInput(track.path(), track.timelineStartMs(),
 						track.timelineEndMs(), track.gain()));
 			} else {
-				tracks.add(new ExportAudioGraph.TrackInput(track.path(), track.gain(),
-						ExportAudioRouting.resolveSourceTrackCleanup(trackSettings, track.kind())));
+				AudioCleanup cleanup =
+						ExportAudioRouting.resolveSourceTrackCleanup(trackSettings, track.kind());
+				// Noise reduction plays from the rendered DeepFilterNet copy when the caller
+				// can supply one; without it the track stays on the ffmpeg fallback chain.
+				Path denoised = cleanup.noiseReduction() == AudioCleanup.NoiseReduction.OFF
+						? null : denoisedCopy(input, Path.of(track.path()));
+				tracks.add(new ExportAudioGraph.TrackInput(track.path(), track.gain(), cleanup,
+						denoised == null ? null : denoised.toString()));
 			}
 		}
 		List<ExportAudioSegments.Segment> segments = buildSegments(input.editor(), sourceDurationMs);
@@ -292,6 +334,58 @@ public final class ProjectExport {
 				loudnessTargetLufs, rnnoiseModel == null ? null : rnnoiseModel.toString());
 		ExportAudioPlan plan = ExportAudioGraph.build(graphInput);
 		return normalizeProgrammeLoudness(plan, graphInput, loudnessTargetLufs);
+	}
+
+	/**
+	 * The source audio files this export would denoise: the exported source tracks whose noise
+	 * reduction is on. The editor renders these before it starts an export on the UI thread, so
+	 * the export itself never waits for a render there.
+	 */
+	public static List<Path> noiseReducedSources(Input input) {
+		Path videoPath = input.videoPath().toAbsolutePath().normalize();
+		if (!Files.isRegularFile(videoPath)) {
+			return List.of();
+		}
+		Map<String, ExportAudioRouting.TrackSetting> trackSettings = parseTrackSettings(
+				input.editor().defaultSourceAudioTrackSettings());
+		boolean anyNoiseReduction = trackSettings.values().stream().anyMatch(setting ->
+				setting.cleanup().noiseReduction() != AudioCleanup.NoiseReduction.OFF);
+		if (!anyNoiseReduction) {
+			// The common case: no probe, no routing.
+			return List.of();
+		}
+		List<String> fallbacks = new ArrayList<>();
+		if (MediaProbe.probe(videoPath).hasAudio()) {
+			fallbacks.add(videoPath.toString());
+		}
+		for (Path companion : input.companionAudioPaths()) {
+			if (companion != null && !companion.toString().isBlank()) {
+				fallbacks.add(companion.toAbsolutePath().normalize().toString());
+			}
+		}
+		ExportAudioRouting.ResolvedPlan resolved = ExportAudioRouting.buildResolvedPlan(
+				videoPath.toString(), fallbacks, input.editor().audioRegions(), trackSettings, null,
+				null);
+		List<Path> sources = new ArrayList<>();
+		for (ExportAudioRouting.ResolvedTrack track : resolved.tracks()) {
+			if (track.kind() != ExportAudioRouting.TrackKind.USER
+					&& ExportAudioRouting.resolveSourceTrackCleanup(trackSettings, track.kind())
+							.noiseReduction() != AudioCleanup.NoiseReduction.OFF) {
+				sources.add(Path.of(track.path()));
+			}
+		}
+		return List.copyOf(sources);
+	}
+
+	/** The rendered denoised copy of one source track, or null (resolver failures included). */
+	private static @Nullable Path denoisedCopy(Input input, Path source) {
+		try {
+			return input.denoised().forSource(source);
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "no denoised copy of " + source.getFileName()
+					+ "; using the fallback noise reduction: " + error);
+			return null;
+		}
 	}
 
 	/**

@@ -158,6 +158,9 @@ public final class EditorSession implements AutoCloseable {
 	private volatile @Nullable KeySoundSettings appliedKeySound;
 	/** The source-audio cleanup/mix settings the audio track was last opened with. */
 	private volatile @Nullable String appliedAudioCleanup;
+	/** Renders and serves the denoised copies of the cleaned source tracks. */
+	private final dev.gravaai.services.denoise.DenoiseCache denoiseCache =
+			dev.gravaai.services.denoise.DenoiseCache.shared();
 	private final java.util.concurrent.ExecutorService clipSync =
 			java.util.concurrent.Executors.newSingleThreadExecutor(
 					Thread.ofVirtual().name("gravaai-playback-clips").factory());
@@ -230,6 +233,17 @@ public final class EditorSession implements AutoCloseable {
 		// Smart-framing dodge markers on the Camera layout track: the same plan the preview and
 		// the export render with, cached per project state.
 		this.dataSource.smartFramingPlan(this::smartFramingPlan);
+		// The cleanup badge of a lane shows where its denoised copy stands.
+		this.dataSource.cleanupRenderStatus(this::cleanupRenderStatus);
+		// A cleaned track's rendered copy lands some time after the user switches noise
+		// reduction on: the badge follows the render, and the preview reopens its audio on the
+		// copy when it is there.
+		ownedResources.add(denoiseCache.addListener(() -> {
+			if (!closed) {
+				syncAudioCleanup();
+				this.dataSource.notifyChanged();
+			}
+		}));
 	}
 
 	/**
@@ -585,9 +599,11 @@ public final class EditorSession implements AutoCloseable {
 			if (track.audioPath() == null || track.audioPath().isBlank()) {
 				continue;
 			}
+			dev.gravaai.core.project.AudioCleanup cleanup =
+					SourceAudioSettings.resolveCleanup(defaults, track.id());
 			tracks.add(new PreviewAudioTrack(track.audioPath(),
-					SourceAudioSettings.resolveGain(defaults, track.id()),
-					SourceAudioSettings.resolveCleanup(defaults, track.id())));
+					SourceAudioSettings.resolveGain(defaults, track.id()), cleanup,
+					denoisedCopy(track.audioPath(), cleanup)));
 		}
 		if (tracks.isEmpty() && videoPath != null && !videoPath.isBlank()) {
 			tracks.add(PreviewAudioTrack.plain(videoPath));
@@ -617,11 +633,76 @@ public final class EditorSession implements AutoCloseable {
 		return SourceAudioSettings.resolveProgrammeLoudnessTarget(defaults, present);
 	}
 
-	/** Signature of the cleanup/mix settings the running audio track was built from. */
+	/**
+	 * The rendered denoised copy of a track with noise reduction on, or null while there is none.
+	 * A missing copy is requested here: the render runs in the background, the track plays the
+	 * fallback chain meanwhile, and the cache listener reopens the audio when the copy lands.
+	 */
+	private @Nullable String denoisedCopy(String audioPath,
+			dev.gravaai.core.project.AudioCleanup cleanup) {
+		if (cleanup.noiseReduction() == dev.gravaai.core.project.AudioCleanup.NoiseReduction.OFF
+				|| !denoiseCache.isAvailable()) {
+			return null;
+		}
+		Path source = Path.of(audioPath);
+		Optional<Path> ready = denoiseCache.ready(source);
+		if (ready.isPresent()) {
+			return ready.get().toString();
+		}
+		if (denoiseCache.status(source).phase()
+				!= dev.gravaai.services.denoise.DenoiseCache.Phase.FAILED) {
+			// A failed render is not retried on every preview refresh; the next export asks
+			// for it again.
+			denoiseCache.ensure(source);
+		}
+		return null;
+	}
+
+	/**
+	 * What a source-audio lane's cleanup badge adds: the render percentage of its denoised copy,
+	 * {@code "!"} when the render failed (the basic denoiser plays instead), nothing when the copy
+	 * is ready or the lane has no noise reduction.
+	 */
+	private String cleanupRenderStatus(String sourceTrackId) {
+		SourceAudioTrackSettings defaults = store.state().defaultSourceAudioTrackSettingsTyped();
+		if (SourceAudioSettings.resolveCleanup(defaults, sourceTrackId).noiseReduction()
+				== dev.gravaai.core.project.AudioCleanup.NoiseReduction.OFF) {
+			return "";
+		}
+		for (var track : dataSource.sourceAudioTracks()) {
+			if (!track.id().equals(sourceTrackId) || track.audioPath() == null
+					|| track.audioPath().isBlank()) {
+				continue;
+			}
+			var status = denoiseCache.status(Path.of(track.audioPath()));
+			return switch (status.phase()) {
+				case RENDERING -> (int) Math.floor(status.progress() * 100) + "%";
+				case FAILED -> "!";
+				case READY, IDLE -> "";
+			};
+		}
+		return "";
+	}
+
+	/**
+	 * Signature of the cleanup/mix settings the running audio track was built from, including
+	 * which cleaned tracks have their rendered copy: the audio reopens when a copy lands.
+	 */
 	private String audioCleanupSignature() {
 		tools.jackson.databind.node.ObjectNode settings =
 				store.state().defaultSourceAudioTrackSettings();
-		return settings == null ? "" : settings.toString();
+		StringBuilder signature = new StringBuilder(settings == null ? "" : settings.toString());
+		SourceAudioTrackSettings defaults = store.state().defaultSourceAudioTrackSettingsTyped();
+		for (var track : dataSource.sourceAudioTracks()) {
+			if (track.audioPath() == null || track.audioPath().isBlank()
+					|| SourceAudioSettings.resolveCleanup(defaults, track.id()).noiseReduction()
+							== dev.gravaai.core.project.AudioCleanup.NoiseReduction.OFF) {
+				continue;
+			}
+			signature.append('|').append(track.id()).append(
+					denoiseCache.ready(Path.of(track.audioPath())).isPresent() ? "=ready" : "=wait");
+		}
+		return signature.toString();
 	}
 
 	/** How long a cleanup change waits for the next one before the preview audio reopens. */

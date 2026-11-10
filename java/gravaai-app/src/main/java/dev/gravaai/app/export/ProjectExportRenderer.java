@@ -307,7 +307,9 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 				@Nullable Path webcamPath = EditorSession.webcamPathFor(document).orElse(null);
 				ProjectExport.Prepared prepared = ProjectExport.prepare(new ProjectExport.Input(
 						state, Path.of(videoPath), webcamPath, List.of(),
-						job.preferences(), job.destination(), false, false, 0, cursorSamples));
+						job.preferences(), job.destination(), false, false, 0, cursorSamples)
+						// On this background thread a missing denoised track is rendered and awaited.
+						.withDenoised(dev.gravaai.services.denoise.DenoiseCache.shared()::ensureBlocking));
 				FramePipeline frames = pipelineFactory.create(prepared, state, cursorSamples);
 				if (!adopt(frames)) {
 					return;

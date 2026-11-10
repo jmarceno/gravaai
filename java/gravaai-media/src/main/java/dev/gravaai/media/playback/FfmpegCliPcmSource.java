@@ -10,6 +10,7 @@ import java.util.List;
 
 import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.media.audio.AudioCleanupFilters;
+import dev.gravaai.media.denoise.DenoisedAudio;
 import dev.gravaai.platform.process.RunningProcess;
 
 /**
@@ -101,32 +102,53 @@ public final class FfmpegCliPcmSource implements PcmSource {
 		command.add(ffmpeg.toString());
 		command.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostdin"));
 		String peakModel = rnnoiseModelPath();
-		for (PreviewAudioTrack track : tracks) {
-			command.addAll(List.of("-ss", formatSeconds(sourceStartSeconds)));
-			if (durationSeconds > 0) {
-				// A denoised track gives back its latency at the head (see alignedTrackFilters),
-				// so it reads that much more input to still cover the whole span.
-				command.addAll(List.of("-t", formatSeconds(durationSeconds
-						+ AudioCleanupFilters.delaySeconds(track.cleanup(), peakModel))));
-			}
-			command.addAll(List.of("-i", track.audioPath()));
-		}
 		List<String> chains = new ArrayList<>();
 		List<String> mixInputs = new ArrayList<>();
+		int inputCount = 0;
 		for (int index = 0; index < tracks.size(); index++) {
 			PreviewAudioTrack track = tracks.get(index);
 			// Cleanup first, on the recording as it was captured: a denoiser fed sped-up speech
 			// hears something it was never trained on. The speed change follows.
-			List<String> filters = new ArrayList<>(
-					AudioCleanupFilters.alignedTrackFilters(track.cleanup(), peakModel));
+			List<String> filters = new ArrayList<>();
+			StringBuilder chain = new StringBuilder();
+			if (track.usesDenoisedCopy()) {
+				// The rendered copy replaces the ffmpeg denoisers: no latency to give back, and
+				// the level is the share of the original mixed back in.
+				double dry = DenoisedAudio.dryGain(track.cleanup().noiseReduction());
+				int denoisedInput = inputCount++;
+				addInput(command, sourceStartSeconds, durationSeconds,
+						java.util.Objects.requireNonNull(track.denoisedPath()));
+				if (dry > 0) {
+					int originalInput = inputCount++;
+					addInput(command, sourceStartSeconds, durationSeconds, track.audioPath());
+					chains.add("[" + originalInput + ":a]aresample=" + SAMPLE_RATE + ",volume="
+							+ number(dry) + "[dry" + index + "]");
+					chains.add("[" + denoisedInput + ":a]volume=" + number(1 - dry) + "[wet"
+							+ index + "]");
+					chain.append("[dry").append(index).append("][wet").append(index)
+							.append("]amix=inputs=2:duration=longest:normalize=0,");
+				} else {
+					chain.append('[').append(denoisedInput).append(":a]");
+				}
+				if (track.cleanup().hasHighPass()) {
+					filters.add("highpass=f=" + track.cleanup().highPassHz());
+				}
+			} else {
+				int input = inputCount++;
+				// A track on the fallback denoisers gives back their latency at the head (see
+				// alignedTrackFilters), so it reads that much more input to cover the span.
+				addInput(command, sourceStartSeconds, durationSeconds <= 0 ? 0 : durationSeconds
+						+ AudioCleanupFilters.delaySeconds(track.cleanup(), peakModel),
+						track.audioPath());
+				chain.append('[').append(input).append(":a]");
+				filters.addAll(AudioCleanupFilters.alignedTrackFilters(track.cleanup(), peakModel));
+			}
 			if (atempoFilters != null) {
 				filters.addAll(atempoFilters);
 			}
 			if (Math.abs(track.gain() - 1) > 0.0005) {
 				filters.add("volume=" + number(track.gain()));
 			}
-			StringBuilder chain = new StringBuilder();
-			chain.append('[').append(index).append(":a]");
 			if (!filters.isEmpty()) {
 				chain.append(String.join(",", filters)).append(',');
 			}
@@ -151,6 +173,16 @@ public final class FfmpegCliPcmSource implements PcmSource {
 		command.addAll(List.of("-filter_complex", graph.toString(), "-map", "[aout]", "-vn"));
 		command.addAll(List.of("-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"));
 		return List.copyOf(command);
+	}
+
+	/** Adds one seeked (and, with a positive duration, bounded) input to the command. */
+	private static void addInput(List<String> command, double startSeconds, double durationSeconds,
+			String path) {
+		command.addAll(List.of("-ss", formatSeconds(startSeconds)));
+		if (durationSeconds > 0) {
+			command.addAll(List.of("-t", formatSeconds(durationSeconds)));
+		}
+		command.addAll(List.of("-i", path));
 	}
 
 	/** The RNNoise model of this build, or null when the payload lacks it. */

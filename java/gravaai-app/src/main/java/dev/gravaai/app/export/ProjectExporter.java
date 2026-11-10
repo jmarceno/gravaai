@@ -124,6 +124,69 @@ public final class ProjectExporter {
 	public boolean startExport(EditorSession session, ExportPreferences preferences,
 			ExportSessionModel model, Window owner,
 			dev.gravaai.media.superres.@Nullable SuperResolutionEngine superResolution) {
+		// Noise reduction plays from a pre-rendered copy of each cleaned track. The preview has
+		// usually rendered it already; when it has not, render first and start the export when
+		// the copies are there, instead of blocking this (UI) thread inside the export set-up.
+		dev.gravaai.services.denoise.DenoiseCache denoise =
+				dev.gravaai.services.denoise.DenoiseCache.shared();
+		List<Path> pending = pendingDenoise(session, preferences, denoise);
+		if (pending.isEmpty()) {
+			return startExportNow(session, preferences, model, owner, superResolution);
+		}
+		int waitRun = model.beginExportRun();
+		model.setDropdownOpen(true);
+		model.setExporting(true);
+		model.setProgress(null);
+		model.setError(null);
+		Toast preparing = showToast(owner,
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.preparingNoiseReduction"));
+		if (preparing != null) {
+			preparing.variant(Toast.Variant.DEFAULT);
+		}
+		java.util.concurrent.CompletableFuture<?>[] renders = pending.stream()
+				.map(denoise::ensure).toArray(java.util.concurrent.CompletableFuture<?>[]::new);
+		java.util.concurrent.CompletableFuture.allOf(renders).whenComplete((done, error) ->
+				javafx.application.Platform.runLater(() -> {
+					if (!model.isCurrentRun(waitRun) || !model.isExporting()) {
+						// Cancelled while the tracks were rendering.
+						if (superResolution != null) {
+							superResolution.close();
+						}
+						return;
+					}
+					// A failed render is not a failed export: that track uses the fallback chain.
+					startExportNow(session, preferences, model, owner, superResolution);
+				}));
+		return true;
+	}
+
+	/** The cleaned source tracks of this export that have no rendered copy yet. */
+	private static List<Path> pendingDenoise(EditorSession session, ExportPreferences preferences,
+			dev.gravaai.services.denoise.DenoiseCache denoise) {
+		try {
+			if (!denoise.isAvailable()) {
+				return List.of();
+			}
+			ProjectExport.Input probe = new ProjectExport.Input(session.store().state(),
+					Path.of(session.videoPath()), session.webcamPath(), List.of(), preferences,
+					Path.of("export"), false, true, 0, List.of());
+			List<Path> pending = new java.util.ArrayList<>();
+			for (Path source : ProjectExport.noiseReducedSources(probe)) {
+				if (denoise.ready(source).isEmpty()) {
+					pending.add(source);
+				}
+			}
+			return pending;
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING,
+					"could not check the denoised tracks before the export: " + error);
+			return List.of();
+		}
+	}
+
+	private boolean startExportNow(EditorSession session, ExportPreferences preferences,
+			ExportSessionModel model, Window owner,
+			dev.gravaai.media.superres.@Nullable SuperResolutionEngine superResolution) {
 		int runId = model.beginExportRun();
 		model.setDropdownOpen(true);
 		model.setExporting(true);
@@ -149,7 +212,10 @@ public final class ProjectExporter {
 			ProjectExport.Input input = new ProjectExport.Input(session.store().state(),
 					Path.of(session.videoPath()), session.webcamPath(), List.of(), preferences,
 					staged, false, true,
-					session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
+					session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples)
+					// Already rendered by the gate in startExport; never renders on this thread.
+					.withDenoised(source -> dev.gravaai.services.denoise.DenoiseCache.shared()
+							.ready(source).orElse(null));
 			ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 			Path wallpaperRoot = stageWallpapers(session);
 			ElementOverlayHooks elementHooks = elementHooks(session, prepared.durationSeconds());
@@ -395,7 +461,8 @@ public final class ProjectExporter {
 		ProjectExport.Input input = new ProjectExport.Input(session.store().state(),
 				Path.of(session.videoPath()), session.webcamPath(), List.of(), preferences,
 				destination, false, false,
-				session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples);
+				session.timelineDataSource().totalDurationMs() / 1000.0, cursorSamples)
+				.withDenoised(dev.gravaai.services.denoise.DenoiseCache.shared()::ensureBlocking);
 		ProjectExport.Prepared prepared = ProjectExport.prepare(input);
 		ElementOverlayHooks hooks = elementHooks(session, prepared.durationSeconds());
 		try (ProjectFrameInputFactory factory = new ProjectFrameInputFactory(

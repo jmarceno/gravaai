@@ -67,6 +67,52 @@ class ExportAudioCleanupGraphTest {
 	}
 
 	@Test
+	@DisplayName("Strong plays the rendered denoised copy in place of the track")
+	void strongPlaysTheRenderedCopy() {
+		AudioCleanup strong = new AudioCleanup(AudioCleanup.NoiseReduction.STRONG, 80, 0);
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0, strong, "/cache/mic-clean.wav")),
+				List.of(), List.of(new ExportAudioSegments.Segment(1_000, 2_000, 2)), List.of(),
+				500, 1.0, List.of(), 0, "/m/voice.rnnn"));
+		String graph = plan.filterComplex();
+		assertTrue(plan.inputs().stream().anyMatch(p -> p.toString().equals("/cache/mic-clean.wav")),
+				plan.inputs().toString());
+		// The copy is cut like the track, then takes the high-pass and the clip speed; the
+		// ffmpeg denoisers and their latency handling are gone.
+		assertTrue(graph.contains(":a]atrim=start=1.000:end=2.000,asetpts=PTS-STARTPTS,"
+				+ "highpass=f=80,atempo=2[track0_seg0]"), graph);
+		assertFalse(graph.contains("arnndn="), graph);
+		assertFalse(graph.contains("afftdn="), graph);
+		assertFalse(graph.contains("start_sample"), graph);
+	}
+
+	@Test
+	@DisplayName("Balanced mixes the original back in at its attenuation limit")
+	void balancedMixesTheOriginalBackIn() {
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0, BALANCED, "/cache/mic-clean.wav")),
+				List.of(), List.of(), List.of(), 2_000, 1.0));
+		String graph = plan.filterComplex();
+		// 24 dB limit: 6.3 % of the original, padded from container zero like the copy was.
+		assertTrue(graph.contains(":a]aresample=48000:first_pts=0,asetpts=PTS-STARTPTS,"
+				+ "volume=0.063[track0_dry];"), graph);
+		assertTrue(graph.contains(":a]asetpts=PTS-STARTPTS,volume=0.937[track0_wet];"), graph);
+		assertTrue(graph.contains("[track0_dry][track0_wet]amix=inputs=2:duration=longest:"
+				+ "normalize=0,apad,atrim=duration=2.000"), graph);
+	}
+
+	@Test
+	@DisplayName("a rendered copy is ignored while noise reduction is off")
+	void copyIgnoredWithoutNoiseReduction() {
+		AudioCleanup highPassOnly = new AudioCleanup(AudioCleanup.NoiseReduction.OFF, 80, 0);
+		ExportAudioPlan plan = ExportAudioGraph.build(new GraphInput(
+				List.of(new TrackInput("/tmp/mic.wav", 1.0, highPassOnly, "/cache/mic-clean.wav")),
+				List.of(), List.of(), List.of(), 2_000, 1.0));
+		assertFalse(plan.inputs().stream().anyMatch(p -> p.toString().contains("mic-clean")),
+				plan.inputs().toString());
+	}
+
+	@Test
 	@DisplayName("a denoised segment keeps its exact length: lead-in and latency are dropped")
 	void denoisedSegmentKeepsItsLength() {
 		List<ExportAudioSegments.Segment> segments = List.of(

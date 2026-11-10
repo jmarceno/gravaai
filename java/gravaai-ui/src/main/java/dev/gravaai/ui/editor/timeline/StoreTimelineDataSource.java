@@ -75,6 +75,29 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return smartFramingPlan.get();
 	}
 
+	private volatile java.util.function.Function<String, String> cleanupRenderStatus = id -> "";
+
+	/** Supplies the render state of each cleaned lane's denoised copy (the app owns the cache). */
+	public StoreTimelineDataSource cleanupRenderStatus(
+			java.util.function.Function<String, String> status) {
+		this.cleanupRenderStatus = status == null ? id -> "" : status;
+		return this;
+	}
+
+	@Override
+	public String cleanupRenderStatus(String sourceTrackId) {
+		String status = cleanupRenderStatus.apply(sourceTrackId);
+		return status == null ? "" : status;
+	}
+
+	/**
+	 * Tells the view that late-arriving data changed (a denoise render progressed); the listeners
+	 * marshal to the FX thread before repainting.
+	 */
+	public void notifyChanged() {
+		changeListeners.forEach(Runnable::run);
+	}
+
 	/** Subscribes to store edits and late-arriving data; marshal to the FX thread before repaint. */
 	public Subscription onChange(Runnable listener) {
 		changeListeners.add(listener);

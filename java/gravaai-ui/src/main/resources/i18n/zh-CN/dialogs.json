@@ -46,6 +46,7 @@
 		"filterGif": "GIF",
 		"filterVideo": "MP4 视频",
 		"alreadyRunning": "已有导出正在进行。",
+		"preparingNoiseReduction": "正在准备降噪… 准备好后开始导出。",
 		"exportedTo": "已成功导出到 {{path}}",
 		"pipelineUnavailable": "导出管线不可用。",
 		"queue": {

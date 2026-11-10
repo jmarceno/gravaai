@@ -46,6 +46,7 @@
 		"filterGif": "GIF",
 		"filterVideo": "MP4 동영상",
 		"alreadyRunning": "이미 내보내기가 진행 중입니다.",
+		"preparingNoiseReduction": "노이즈 제거 준비 중… 준비되면 내보내기가 시작됩니다.",
 		"exportedTo": "{{path}}(으)로 내보냈습니다",
 		"pipelineUnavailable": "내보내기 파이프라인을 사용할 수 없습니다.",
 		"queue": {

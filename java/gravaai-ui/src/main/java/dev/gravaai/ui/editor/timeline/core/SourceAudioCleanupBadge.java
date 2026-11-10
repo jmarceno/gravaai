@@ -31,6 +31,17 @@ public final class SourceAudioCleanupBadge {
 		return visible(cleanup) ? BLOCK_BADGE : "";
 	}
 
+	/**
+	 * The block pill with the render state of the lane's denoised copy: {@code "CLEAN 42%"} while
+	 * it renders, {@code "CLEAN !"} when the render failed and the basic denoiser plays instead,
+	 * plain {@code "CLEAN"} once it is ready.
+	 */
+	public static String blockBadge(AudioCleanup cleanup, String renderStatus) {
+		String badge = blockBadge(cleanup);
+		return badge.isEmpty() || renderStatus == null || renderStatus.isBlank() ? badge
+				: badge + " " + renderStatus.strip();
+	}
+
 	/** The lane-header marker, or the empty string when the track has no cleanup. */
 	public static String laneMarker(AudioCleanup cleanup) {
 		return visible(cleanup) ? LANE_MARKER : "";

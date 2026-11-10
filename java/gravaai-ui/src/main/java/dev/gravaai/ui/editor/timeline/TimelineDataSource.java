@@ -38,6 +38,15 @@ public interface TimelineDataSource {
 		return null;
 	}
 
+	/**
+	 * What the cleanup badge of a source-audio lane adds while its denoised copy is not ready:
+	 * a percentage while it renders, a warning mark when it failed, the empty string otherwise
+	 * (ready, or no noise reduction on the lane).
+	 */
+	default String cleanupRenderStatus(String sourceTrackId) {
+		return "";
+	}
+
 	/** Filmstrip thumbnails for the clip row (empty provider keeps the placeholder cells). */
 	default @Nullable FilmstripProvider filmstripProvider() {
 		return FilmstripProvider.empty();

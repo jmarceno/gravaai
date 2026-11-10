@@ -3152,7 +3152,11 @@ public final class TimelineView extends Region {
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		drawBlockLabel(graphics, item.label(), x + 6, y + height / 2, blockWidth - 12, AUDIO_TEXT);
 		AudioCleanup cleanup = cleanupForSourceTrack(item.rowId());
-		String cleanupBadge = SourceAudioCleanupBadge.blockBadge(cleanup);
+		String cleanupBadge = SourceAudioCleanupBadge.blockBadge(cleanup,
+				TimelineRows.isSourceAudioTrackRowId(item.rowId())
+						? dataSource.cleanupRenderStatus(
+								TimelineRows.getSourceAudioTrackId(item.rowId()))
+						: "");
 		if (!cleanupBadge.isEmpty()) {
 			double cleanupWidth = textWidth(cleanupBadge, SMALL_FONT) + 10;
 			if (blockWidth > cleanupWidth + 8) {

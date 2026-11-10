@@ -23,6 +23,7 @@ import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.SpeedRegion;
 import dev.gravaai.core.project.TrimRegion;
 import dev.gravaai.core.project.ZoomRegion;
+import dev.gravaai.media.compose.ZoomSharpen;
 import dev.gravaai.ui.editor.timeline.core.ClipPresentation;
 import dev.gravaai.ui.editor.timeline.core.Span;
 import dev.gravaai.ui.editor.timeline.core.TimelineDndEngine;
@@ -135,6 +136,8 @@ public final class TimelineView extends Region {
 	private static final Color ZOOM_FILL = Color.web("#2fe6d0", 0.10);
 	private static final Color ZOOM_BORDER = Color.web("#2fe6d0", 0.26);
 	private static final Color ZOOM_SELECTED = Color.web("#2fe6d0");
+	/** The sparkle marking zoom stages that run the deep-zoom sharpening pass ({@link ZoomSharpen}). */
+	private static final Color ZOOM_SHARPEN_GLYPH = Color.web("#a5ecff");
 	private static final Color GRADE_FILL = Color.web("#f0b429", 0.10);
 	private static final Color GRADE_BORDER = Color.web("#f0b429", 0.35);
 	private static final Color GRADE_SELECTED = Color.web("#f0b429");
@@ -2581,11 +2584,33 @@ public final class TimelineView extends Region {
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		String label = zoomLabel(item);
-		drawBlockLabel(graphics, label, x + 6, y + height / 2, blockWidth - 12, CYAN);
+		double labelX = x + 6;
+		double labelWidth = blockWidth - 12;
+		// Deep-zoom stages run the sharpening pass; a sparkle before the scale marks them.
+		if (item.zoomDepth() != null && ZoomSharpen.isSharpened(item.zoomDepth().scale())) {
+			drawSharpenSparkle(graphics, x + 12, y + height / 2);
+			labelX = x + 19;
+			labelWidth = blockWidth - 25;
+		}
+		drawBlockLabel(graphics, label, labelX, y + height / 2, labelWidth, CYAN);
 		if (isSelected(TimelineSelection.ZOOM, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height, ZOOM_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
+	/** The 4-point sparkle marking zoom stages that run the deep-zoom sharpening pass. */
+	private void drawSharpenSparkle(GraphicsContext graphics, double cx, double cy) {
+		double r = 4;
+		double pull = r * 0.22;
+		graphics.setFill(ZOOM_SHARPEN_GLYPH);
+		graphics.beginPath();
+		graphics.moveTo(cx, cy - r);
+		graphics.quadraticCurveTo(cx + pull, cy - pull, cx + r, cy);
+		graphics.quadraticCurveTo(cx + pull, cy + pull, cx, cy + r);
+		graphics.quadraticCurveTo(cx - pull, cy + pull, cx - r, cy);
+		graphics.quadraticCurveTo(cx - pull, cy - pull, cx, cy - r);
+		graphics.fill();
 	}
 
 	/** The Color-track grade block: a warm-edged card whose label names the applied sliders. */

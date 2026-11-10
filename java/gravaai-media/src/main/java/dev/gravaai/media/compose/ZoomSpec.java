@@ -20,6 +20,7 @@ import java.util.List;
  * @param cameraSpringDampingMultiplier camera spring tuning damping multiplier
  * @param cameraSpringMassMultiplier camera spring tuning mass multiplier
  * @param motionBlurAmount the zoom motion-blur amount (editor {@code zoomMotionBlur}, 0 = off)
+ * @param sharpenZooms whether deep zoom stages run the quality pass ({@link ZoomSharpen})
  */
 public record ZoomSpec(
 		List<ZoomRegionSpec> regions,
@@ -31,11 +32,12 @@ public record ZoomSpec(
 		double cameraSpringStiffnessMultiplier,
 		double cameraSpringDampingMultiplier,
 		double cameraSpringMassMultiplier,
-		double motionBlurAmount) {
+		double motionBlurAmount,
+		boolean sharpenZooms) {
 
 	/** No zoom regions: the compositor renders the untransformed video layer. */
 	public static final ZoomSpec NONE = new ZoomSpec(List.of(), 0.5, false, false, null, null,
-			1, 1, 1, 0);
+			1, 1, 1, 0, true);
 
 	public ZoomSpec {
 		regions = regions == null ? List.of() : List.copyOf(regions);
@@ -51,6 +53,19 @@ public record ZoomSpec(
 			throw new IllegalArgumentException(
 					"motionBlurAmount must be a finite non-negative number: " + motionBlurAmount);
 		}
+	}
+
+	/**
+	 * Backwards-compatible constructor for callers that feed motion blur but not the sharpening
+	 * toggle (the production editor mapping, tests): sharpening defaults on.
+	 */
+	public ZoomSpec(List<ZoomRegionSpec> regions, double zoomSmoothness, boolean connectZooms,
+			boolean zoomClassicMode, Double zoomInDurationMs, Double zoomOutDurationMs,
+			double cameraSpringStiffnessMultiplier, double cameraSpringDampingMultiplier,
+			double cameraSpringMassMultiplier, double motionBlurAmount) {
+		this(regions, zoomSmoothness, connectZooms, zoomClassicMode, zoomInDurationMs,
+				zoomOutDurationMs, cameraSpringStiffnessMultiplier,
+				cameraSpringDampingMultiplier, cameraSpringMassMultiplier, motionBlurAmount, true);
 	}
 
 	/**

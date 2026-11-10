@@ -178,7 +178,8 @@ public final class MotionBlurShaders {
 		}
 	}
 
-	private static Data uniformData(float[] values) {
+	/** Packs float uniforms little-endian for {@link RuntimeEffect#makeShader}; shared shaders reuse it. */
+	static Data uniformData(float[] values) {
 		ByteBuffer buffer = ByteBuffer.allocate(values.length * Float.BYTES)
 				.order(ByteOrder.LITTLE_ENDIAN);
 		for (float value : values) {

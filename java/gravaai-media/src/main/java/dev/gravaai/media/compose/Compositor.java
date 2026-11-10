@@ -100,6 +100,8 @@ public final class Compositor implements AutoCloseable {
 	// Stage 8: the video mask rect is the annotation coordinate rect (TS layoutCache.maskRect).
 	private volatile @Nullable Rect lastMaskRect;
 	private @Nullable Surface blurSurface;
+	// Deep-zoom quality pass: the offscreen capture of the magnified video layer (ZoomSharpen).
+	private @Nullable Surface sharpenSurface;
 	// Persistent GL textures for the screen and webcam frames (no per-frame copies or allocations).
 	private final GpuFrameTextures frameTextures = new GpuFrameTextures();
 	private @Nullable SkiaGlSurface currentTarget;
@@ -953,14 +955,15 @@ public final class Compositor implements AutoCloseable {
 		GradeSpec.Window grade = input.grade()
 				.at(input.timeSeconds() * 1000, GradeTarget.MAIN).orElse(null);
 		SkiaGlSurface target = currentTarget();
+		ZoomSharpen.Pass sharpen = resolveZoomSharpen(input.zoom(), transform, source, baseMask);
 		try (Image image = frameTextures.image(target, GpuFrameTextures.Slot.SOURCE, frame,
 				colorSpace)) {
 			if (motionBlur.path() == MotionBlur.Path.NONE) {
 				drawVideoScene(canvas, image, source, baseMask, maskRadius, style, transform,
-						grade);
+						grade, sharpen);
 			} else {
 				drawMotionBlurredScene(canvas, image, source, baseMask, maskRadius, style,
-						transform, motionBlur, grade);
+						transform, motionBlur, grade, sharpen);
 			}
 		}
 		// Stage 6: the cursor overlay is a sibling of the video layer inside the camera
@@ -1024,14 +1027,16 @@ public final class Compositor implements AutoCloseable {
 
 	private void drawMotionBlurredScene(Canvas canvas, Image image, Rect source, Rect baseMask,
 			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform,
-			MotionBlur.Effect motionBlur, GradeSpec.@Nullable Window grade) {
+			MotionBlur.Effect motionBlur, GradeSpec.@Nullable Window grade,
+			ZoomSharpen.Pass sharpen) {
 		// Stage 5: the pixi filters run on the whole camera container, so capture the
 		// video layer (shadow stack + squircle-masked video) offscreen and blit the blurred
 		// result over the background.
 		Surface blurTarget = ensureBlurSurface();
 		Canvas blurCanvas = blurTarget.getCanvas();
 		blurCanvas.clear(0);
-		drawVideoScene(blurCanvas, image, source, baseMask, maskRadius, style, transform, grade);
+		drawVideoScene(blurCanvas, image, source, baseMask, maskRadius, style, transform, grade,
+				sharpen);
 		Image blurredLayer = blurTarget.makeImageSnapshot();
 		try {
 			Shader shader = motionBlur.path() == MotionBlur.Path.DIRECTIONAL
@@ -1048,10 +1053,23 @@ public final class Compositor implements AutoCloseable {
 		}
 	}
 
-	/** Draws the camera-transformed video layer (shadow stack + masked video) onto a canvas. */
+	/**
+	 * Draws the camera-transformed video layer (shadow stack + masked video) onto a canvas. Deep
+	 * zoom stages ({@link ZoomSharpen#MIN_MAGNIFICATION} and up) take the sharpening pass; every
+	 * other frame draws the plain bilinear layer exactly as before it existed.
+	 */
 	private void drawVideoScene(Canvas canvas, Image image, Rect source, Rect baseMask,
 			double maskRadius, FrameStyle style, ZoomTransform.AppliedTransform transform,
-			GradeSpec.@Nullable Window grade) {
+			GradeSpec.@Nullable Window grade, ZoomSharpen.Pass sharpen) {
+		if (sharpen.enabled()) {
+			Surface capture = ensureSharpenSurfaceOrNull();
+			if (capture != null) {
+				drawSharpenedScene(canvas, capture, image, source, baseMask, maskRadius, style,
+						transform, grade, sharpen);
+				return;
+			}
+			// No GPU offscreen on this surface: keep the plain draw rather than fail the frame.
+		}
 		canvas.save();
 		canvas.translate((float) transform.x(), (float) transform.y());
 		canvas.scale((float) transform.scale(), (float) transform.scale());
@@ -1059,6 +1077,54 @@ public final class Compositor implements AutoCloseable {
 		fillImage(canvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
 				SamplingMode.LINEAR, null, screenGrade.filter(grade));
 		canvas.restore();
+	}
+
+	/**
+	 * The deep-zoom pass for this frame: the camera magnification (baseMask/source width &times;
+	 * camera scale) gated by the zoom spec's sharpening toggle.
+	 */
+	private static ZoomSharpen.Pass resolveZoomSharpen(@Nullable ZoomSpec zoom,
+			ZoomTransform.AppliedTransform transform, Rect source, Rect baseMask) {
+		if (zoom == null || !zoom.sharpenZooms()) {
+			return ZoomSharpen.Pass.NONE;
+		}
+		double magnification = transform.scale() * baseMask.getWidth()
+				/ Math.max(1.0, source.getWidth());
+		return ZoomSharpen.passFor(magnification);
+	}
+
+	/**
+	 * The deep-zoom quality pass: the drop shadows stay under the camera transform (they are
+	 * smooth gradients the unsharp mask must not ring on), the masked video layer is captured
+	 * magnified with the cubic resampler, and the capture is blitted 1:1 through the unsharp
+	 * shader — the magnification happens once, in the capture, and sharpening sees the layer at
+	 * its final size.
+	 */
+	private void drawSharpenedScene(Canvas canvas, Surface capture, Image image, Rect source,
+			Rect baseMask, double maskRadius, FrameStyle style,
+			ZoomTransform.AppliedTransform transform, GradeSpec.@Nullable Window grade,
+			ZoomSharpen.Pass pass) {
+		canvas.save();
+		canvas.translate((float) transform.x(), (float) transform.y());
+		canvas.scale((float) transform.scale(), (float) transform.scale());
+		drawVideoShadowLayers(canvas, baseMask, maskRadius, style);
+		canvas.restore();
+		Canvas captureCanvas = capture.getCanvas();
+		captureCanvas.clear(0);
+		captureCanvas.save();
+		captureCanvas.translate((float) transform.x(), (float) transform.y());
+		captureCanvas.scale((float) transform.scale(), (float) transform.scale());
+		fillImage(captureCanvas, image, rectToRectMatrix(source, baseMask), baseMask, maskRadius,
+				SamplingMode.CATMULL_ROM, null, screenGrade.filter(grade));
+		captureCanvas.restore();
+		Image layer = capture.makeImageSnapshot();
+		try (Shader shader = ZoomSharpenShaders.unsharp(layer, pass.amount(), pass.radiusPx());
+				Paint paint = new Paint()) {
+			paint.setShader(shader);
+			canvas.drawRect(Rect.makeWH(width, height), paint);
+		} finally {
+			layer.close();
+		}
 	}
 
 	/**
@@ -1141,6 +1207,25 @@ public final class Compositor implements AutoCloseable {
 		return current;
 	}
 
+	/**
+	 * The deep-zoom capture surface, or null when Skia cannot give one (the sharpening pass then
+	 * degrades to the plain draw instead of failing the frame).
+	 */
+	private @Nullable Surface ensureSharpenSurfaceOrNull() {
+		Surface current = sharpenSurface;
+		if (current == null) {
+			Surface created = currentTarget().makeOffscreen(width, height);
+			if (created == null) {
+				LOG.log(System.Logger.Level.WARNING,
+						"zoom sharpening needs a GPU offscreen surface; rendering without it");
+				return null;
+			}
+			sharpenSurface = created;
+			return created;
+		}
+		return current;
+	}
+
 	/** The render target of the frame in flight; render() sets it before any drawing stage. */
 	private SkiaGlSurface currentTarget() {
 		return Objects.requireNonNull(currentTarget, "render target (render() not in progress)");
@@ -1152,6 +1237,15 @@ public final class Compositor implements AutoCloseable {
 		if (blurSurface != null) {
 			blurSurface.close();
 			blurSurface = null;
+		}
+		releaseSharpenSurface();
+	}
+
+	/** Releases the deep-zoom capture surface (a fresh one is made on the next deep-zoom frame). */
+	private void releaseSharpenSurface() {
+		if (sharpenSurface != null) {
+			sharpenSurface.close();
+			sharpenSurface = null;
 		}
 	}
 
@@ -1313,6 +1407,7 @@ public final class Compositor implements AutoCloseable {
 				blurSurface.close();
 				blurSurface = null;
 			}
+			releaseSharpenSurface();
 		}
 		colorSpace.close();
 		LOG.log(System.Logger.Level.DEBUG, () -> "compositor closed (" + width + "x" + height + ")");

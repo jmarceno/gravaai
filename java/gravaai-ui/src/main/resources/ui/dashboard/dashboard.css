@@ -526,6 +526,12 @@
 	-fx-max-width: 820;
 }
 
+/* Settings -> Recording: the resolved recordings folder under the folder row. */
+.recording-settings__folder {
+	-fx-font-size: 11.5px;
+	-fx-text-fill: -g-muted;
+}
+
 .recording-permissions__hint {
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-muted;

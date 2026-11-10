@@ -4,7 +4,9 @@ import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.app.editor.EditorSkeletonWindow;
 import dev.gravaai.app.agent.AgentWiring;
+import dev.gravaai.app.export.ExportQueueController;
 import dev.gravaai.app.export.ProjectExporter;
+import dev.gravaai.app.export.ProjectExportRenderer;
 import dev.gravaai.app.editor.EditorSession;
 import dev.gravaai.app.editor.EditorWindow;
 import dev.gravaai.app.editor.ProjectPoster;
@@ -30,6 +32,7 @@ import dev.gravaai.platform.trash.Trash;
 import dev.gravaai.services.automations.AutomationService;
 import dev.gravaai.media.export.ExportPublisher;
 import dev.gravaai.services.export.ExportCoordinator;
+import dev.gravaai.services.export.ExportQueue;
 import dev.gravaai.services.extensions.ExtensionFrameOverlayHooks;
 import dev.gravaai.services.extensions.ExtensionHost;
 import dev.gravaai.services.automations.AutomationTriggers;
@@ -53,6 +56,7 @@ import dev.gravaai.ui.dashboard.DashboardDependencies;
 import dev.gravaai.ui.dashboard.DashboardLibraryStore;
 import dev.gravaai.ui.dashboard.DashboardSection;
 import dev.gravaai.ui.dashboard.DashboardView;
+import dev.gravaai.ui.export.ExportQueuePanel;
 import dev.gravaai.ui.kit.KitRoot;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.launch.HudOverlayWindow;
@@ -121,6 +125,12 @@ public final class AppContext {
 	private @Nullable AgentWiring agentWiring;
 	private volatile @Nullable ProjectExporter exporter;
 	private @Nullable ExportCoordinator exportCoordinator;
+	/** The batch export queue controller (card "Batch export queue"), created with the export pipeline. */
+	private @Nullable ExportQueueController exportQueueController;
+	/** Registration of the queue's pump on the shared coordinator's idle hook. */
+	private @Nullable AutoCloseable exportQueueIdleHook;
+	/** The dashboard's queue popover, re-created with the dashboard scene. */
+	private @Nullable ExportQueuePanel dashboardQueuePanel;
 	// P3.3 extension host (plan §5.18): userData/extensions drives the render hooks of the editor
 	// preview and the exporter. Created off the startup path; a failure disables extensions only.
 	private @Nullable ExtensionHost extensionHost;
@@ -493,6 +503,187 @@ public final class AppContext {
 		EditorPreferencesStore preferencesStore = new EditorPreferencesStore(appSettings());
 		exporter = new ProjectExporter(exportCoordinator, publisher, preferencesStore);
 		exporter.setExtensionHost(extensionHost());
+		initializeExportQueue(exportCoordinator, publisher);
+	}
+
+	/**
+	 * Creates the batch export queue (card "Batch export queue") on top of the shared export
+	 * pipeline: one renderer, one queue, the app controller around it and the coordinator's idle
+	 * hook that starts the next job. The queue lives in the app, not in an editor window, so
+	 * closing the editor keeps queued exports running.
+	 */
+	private void initializeExportQueue(ExportCoordinator coordinator, ExportPublisher publisher) {
+		if (exportQueueController != null) {
+			return;
+		}
+		ProjectExportRenderer renderer = new ProjectExportRenderer(coordinator);
+		renderer.setExtensionHost(extensionHost());
+		ExportQueue queue = new ExportQueue(renderer);
+		ExportQueueController controller = new ExportQueueController(queue, publisher,
+				this::exportQueuePreferences);
+		controller.setListener(new ExportQueueController.Listener() {
+			@Override
+			public void onQueueChanged() {
+				Platform.runLater(AppContext.this::refreshExportQueueUi);
+			}
+
+			@Override
+			public void onBatchFinished(int completed, int failed) {
+				Platform.runLater(() -> notifyExportBatchFinished(completed, failed));
+			}
+		});
+		AutoCloseable idle = coordinator.addIdleListener(queue::pump);
+		exportQueueIdleHook = idle;
+		exportQueueController = controller;
+		LOG.log(System.Logger.Level.INFO, "batch export queue ready");
+		// The pipeline is created off the FX thread on the normal startup path; the popover is not.
+		if (Platform.isFxApplicationThread()) {
+			installDashboardExportQueue();
+			refreshExportQueueUi();
+		} else {
+			Platform.runLater(() -> {
+				installDashboardExportQueue();
+				refreshExportQueueUi();
+			});
+		}
+	}
+
+	/** The export settings dashboard jobs use: the editor's persisted export preferences. */
+	private dev.gravaai.core.editor.ExportPreferences exportQueuePreferences() {
+		ProjectExporter current = exporter;
+		return current == null ? dev.gravaai.core.editor.ExportPreferences.defaults()
+				: current.exportPreferences();
+	}
+
+	/**
+	 * Installs the queue popover on the current dashboard (called when the queue is created and
+	 * every time the dashboard scene is rebuilt, for example after a language change).
+	 */
+	private void installDashboardExportQueue() {
+		DashboardView view = dashboardView;
+		if (view == null) {
+			return;
+		}
+		ExportQueueController controller = exportQueueController;
+		if (controller == null) {
+			// The export pipeline is unavailable (no automations service): keep the button honest
+			// instead of leaving a dead control in the toolbar.
+			view.toolbar().setOnOpenQueue(() -> toast(
+					dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.pipelineUnavailable"), null,
+					dev.gravaai.ui.kit.Toast.Variant.DANGER));
+			view.toolbar().setQueueCount(0);
+			return;
+		}
+		ExportQueuePanel previous = dashboardQueuePanel;
+		if (previous != null) {
+			previous.close();
+		}
+		ExportQueuePanel panel = new ExportQueuePanel(view.exportQueueButton(), controller.queue(),
+				new ExportQueuePanel.Callbacks() {
+					@Override
+					public void addProjects() {
+						chooseProjectsToQueue();
+					}
+
+					@Override
+					public void revealFile(java.nio.file.Path file) {
+						controller.reveal(file);
+					}
+				});
+		dashboardQueuePanel = panel;
+		view.toolbar().setOnOpenQueue(panel::toggle);
+		view.toolbar().setQueueCount(controller.activeCount());
+	}
+
+	/** The dashboard queue panel's "Add project": a multi-file chooser for project files. */
+	private void chooseProjectsToQueue() {
+		ExportQueueController controller = exportQueueController;
+		javafx.stage.Stage stage = primaryStage;
+		if (controller == null || stage == null) {
+			return;
+		}
+		javafx.stage.Window owner = stage;
+		javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+		chooser.setTitle(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.addProject"));
+		chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.addProject"),
+				"*.gravaai", "*.openscreen"));
+		java.util.List<java.io.File> chosen = chooser.showOpenMultipleDialog(owner);
+		if (chosen == null || chosen.isEmpty()) {
+			return;
+		}
+		java.util.List<String> paths = chosen.stream().map(java.io.File::toString).toList();
+		int queued = controller.enqueueProjects(paths, owner);
+		if (queued == 0) {
+			toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.nothingExported"),
+					null, dev.gravaai.ui.kit.Toast.Variant.WARNING);
+		} else {
+			toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.addedCount",
+					java.util.Map.of("count", queued)), null,
+					dev.gravaai.ui.kit.Toast.Variant.SUCCESS);
+		}
+	}
+
+	/** Badge + panel refresh after any queue change (FX thread). */
+	private void refreshExportQueueUi() {
+		ExportQueueController controller = exportQueueController;
+		if (controller == null) {
+			return;
+		}
+		int count = controller.activeCount();
+		EditorWindow editor = activeEditor;
+		if (editor != null) {
+			editor.setExportQueueCount(count);
+		}
+		DashboardView view = dashboardView;
+		if (view != null) {
+			view.toolbar().setQueueCount(count);
+		}
+		ExportQueuePanel panel = dashboardQueuePanel;
+		if (panel != null) {
+			panel.refresh();
+		}
+	}
+
+	/**
+	 * The end of a batch: a desktop notification (the user may be in another app) and an in-window
+	 * toast (the app may run without a notification server).
+	 */
+	private void notifyExportBatchFinished(int completed, int failed) {
+		String title = dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.finishedTitle");
+		String body = dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.finishedBody",
+				java.util.Map.of("completed", completed, "failed", failed));
+		dev.gravaai.platform.notification.Notifications notifications =
+				desktopServices.notifications();
+		if (notifications != null) {
+			Thread.ofVirtual().name("gravaai-export-notify").start(() -> {
+				try {
+					notifications.notify(title, body);
+				} catch (RuntimeException error) {
+					LOG.log(System.Logger.Level.DEBUG,
+							"export notification unavailable: " + error);
+				}
+			});
+		}
+		toast(title, body, failed > 0 ? dev.gravaai.ui.kit.Toast.Variant.WARNING
+				: dev.gravaai.ui.kit.Toast.Variant.SUCCESS);
+	}
+
+	/** A toast in the visible window (dashboard or editor); silently logged when there is none. */
+	private void toast(String title, @Nullable String description,
+			dev.gravaai.ui.kit.Toast.Variant variant) {
+		javafx.stage.Stage stage = primaryStage;
+		javafx.scene.@Nullable Scene scene = stage == null ? null : stage.getScene();
+		javafx.scene.@Nullable Node root = scene == null ? null : scene.getRoot();
+		if (root == null) {
+			LOG.log(System.Logger.Level.INFO, title
+					+ (description == null ? "" : ": " + description));
+			return;
+		}
+		dev.gravaai.ui.kit.Toast shown = dev.gravaai.ui.kit.Toast.show(root, title).variant(variant);
+		if (description != null && !description.isBlank()) {
+			shown.description(description);
+		}
 	}
 
 	/**
@@ -544,6 +735,11 @@ public final class AppContext {
 		return exporter;
 	}
 
+	/** The batch export queue controller, or empty while the export pipeline is unavailable. */
+	private java.util.Optional<ExportQueueController> exportQueueController() {
+		return java.util.Optional.ofNullable(exportQueueController);
+	}
+
 	/** Headless acceptance hook: GRAVAAI_EXPORT_TO=/path/out.mp4 exports on open. */
 	private void runEnvExport(EditorWindow window) {
 		String target = System.getenv("GRAVAAI_EXPORT_TO");
@@ -579,6 +775,29 @@ public final class AppContext {
 
 	/** Releases the export pipeline (app shutdown only; navigation keeps it for the next editor). */
 	private void closeExportPipeline() {
+		ExportQueueController controller = exportQueueController;
+		exportQueueController = null;
+		if (controller != null) {
+			try {
+				controller.close();
+			} catch (RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING, "export queue shutdown failed: " + error);
+			}
+		}
+		AutoCloseable idle = exportQueueIdleHook;
+		exportQueueIdleHook = null;
+		if (idle != null) {
+			try {
+				idle.close();
+			} catch (Exception error) {
+				LOG.log(System.Logger.Level.DEBUG, "export queue idle hook: " + error);
+			}
+		}
+		ExportQueuePanel panel = dashboardQueuePanel;
+		dashboardQueuePanel = null;
+		if (panel != null) {
+			panel.close();
+		}
 		ExportCoordinator coordinator = exportCoordinator;
 		if (coordinator != null) {
 			try {
@@ -1199,6 +1418,26 @@ public final class AppContext {
 				}
 
 				@Override
+				public void exportProjectsToQueue(java.util.List<String> paths) {
+					ExportQueueController controller = exportQueueController;
+					javafx.stage.Stage stage = primaryStage;
+					if (controller == null || stage == null) {
+						toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.pipelineUnavailable"),
+								null, dev.gravaai.ui.kit.Toast.Variant.DANGER);
+						return;
+					}
+					int queued = controller.enqueueProjects(paths, stage);
+					if (queued == 0) {
+						toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.nothingExported"),
+								null, dev.gravaai.ui.kit.Toast.Variant.WARNING);
+						return;
+					}
+					toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.addedCount",
+							java.util.Map.of("count", queued)), null,
+							dev.gravaai.ui.kit.Toast.Variant.SUCCESS);
+				}
+
+				@Override
 				public java.util.concurrent.CompletableFuture<String> recordingThumbnail(String videoPath) {
 					RecordingWiring wiring = recordingWiring;
 					if (wiring == null) {
@@ -1280,6 +1519,7 @@ public final class AppContext {
 			view.addSettingsSection("motion",
 					dev.gravaai.ui.dashboard.EditorDefaultsSettingsView.motion(editorDefaults));
 			dashboardView = view;
+			installDashboardExportQueue();
 			Scene scene = new Scene(new KitRoot(view.ui()), 1280, 800);
 			Theme.install(scene);
 			DashboardView.installStyles(scene);
@@ -1416,7 +1656,8 @@ public final class AppContext {
 				null,
 				this::exporter,
 				this::recordingService,
-				this::openRecordingsFolder);
+				this::openRecordingsFolder,
+				this::exportQueueController);
 	}
 
 	/** Shows {@code window} as the main window content; {@code path} is null for an unsaved recording. */
@@ -1713,8 +1954,47 @@ public final class AppContext {
 			}, () -> switchingViews = false);
 			return;
 		}
+		ExportQueueController queue = exportQueueController;
+		if (queue != null && queue.hasActive()) {
+			// Never cancel queued or running exports silently: confirm first.
+			revealMainWindow();
+			confirmQuitWithExportQueue(queue);
+			return;
+		}
 		shutdown();
 		Platform.exit();
+	}
+
+	/** "Quit and cancel": the queue is still exporting, so quitting needs an explicit answer. */
+	private void confirmQuitWithExportQueue(ExportQueueController queue) {
+		javafx.stage.Stage stage = primaryStage;
+		javafx.scene.@Nullable Scene scene = stage == null ? null : stage.getScene();
+		javafx.scene.@Nullable Node owner = scene == null ? null : scene.getRoot();
+		if (owner == null) {
+			shutdown();
+			Platform.exit();
+			return;
+		}
+		dev.gravaai.ui.kit.Dialog dialog = new dev.gravaai.ui.kit.Dialog(
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.quitTitle"));
+		dialog.description(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.quitMessage",
+				java.util.Map.of("count", queue.activeCount())));
+		dev.gravaai.ui.kit.Button stay = new dev.gravaai.ui.kit.Button(
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.quitStay"),
+				dev.gravaai.ui.kit.Button.Variant.OUTLINE,
+				dev.gravaai.ui.kit.Button.Size.SM);
+		stay.setOnAction(event -> dialog.close());
+		dev.gravaai.ui.kit.Button leave = new dev.gravaai.ui.kit.Button(
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.quitConfirm"),
+				dev.gravaai.ui.kit.Button.Variant.DESTRUCTIVE,
+				dev.gravaai.ui.kit.Button.Size.SM);
+		leave.setOnAction(event -> {
+			dialog.close();
+			shutdown();
+			Platform.exit();
+		});
+		dialog.footer(stay, new javafx.scene.layout.Region(), leave);
+		dialog.show(owner);
 	}
 
 	private void scheduleExitIfRequested() {

@@ -215,6 +215,16 @@ public final class DashboardView {
 		return model;
 	}
 
+	/** The search row, which owns the export-queue button and its count badge. */
+	public DashboardToolbar toolbar() {
+		return toolbar;
+	}
+
+	/** The export-queue button the app anchors the queue popover to. */
+	public javafx.scene.control.Button exportQueueButton() {
+		return toolbar.queueButton();
+	}
+
 	/** Switches the dashboard to Settings and selects one category (for the app and screenshots). */
 	public void showSettingsSection(String category) {
 		activeSettingsCategory = category == null || category.isBlank() ? "general" : category;

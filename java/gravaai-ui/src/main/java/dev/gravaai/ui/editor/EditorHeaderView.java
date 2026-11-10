@@ -8,6 +8,7 @@ import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.Input;
 import dev.gravaai.ui.kit.Label;
 import dev.gravaai.ui.kit.Separator;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.layout.HBox;
@@ -34,6 +35,9 @@ public final class EditorHeaderView extends HBox {
 	private final Button home;
 	private final Button save;
 	private final Button export;
+	private final Button queueButton;
+	private final javafx.scene.control.Label queueCountBadge = new javafx.scene.control.Label();
+	private final StackPane queueButtonHost = new StackPane();
 	private String projectNameValue = "Untitled Project";
 
 	public EditorHeaderView(EditorStore store, EditorViewActions actions) {
@@ -122,6 +126,19 @@ public final class EditorHeaderView extends HBox {
 		// mock, and keeps the shortcut discoverable.
 		dev.gravaai.ui.kit.Tooltip.install(save, "Save (Ctrl + S)");
 
+		queueButton = new Button("", Button.Variant.GHOST, Button.Size.ICON);
+		queueButton.getStyleClass().add("editor-header__queue");
+		queueButton.icon(Icons.FilmSlate);
+		queueButton.setAccessibleText(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.title"));
+		dev.gravaai.ui.kit.Tooltip.install(queueButton,
+				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.title"));
+		queueCountBadge.getStyleClass().add("export-queue-badge");
+		queueCountBadge.setMouseTransparent(true);
+		queueCountBadge.setVisible(false);
+		queueButtonHost.getChildren().addAll(queueButton, queueCountBadge);
+		StackPane.setAlignment(queueCountBadge, Pos.TOP_RIGHT);
+		StackPane.setMargin(queueCountBadge, new Insets(-5, -5, 0, 0));
+
 		export = new Button(dev.gravaai.ui.i18n.UiI18n.t("settings:export.title"),
 				Button.Variant.DEFAULT, Button.Size.MD);
 		export.getStyleClass().add("editor-header__export");
@@ -140,7 +157,7 @@ public final class EditorHeaderView extends HBox {
 		browser.setOnAction(event -> openProjectBrowser());
 
 		getChildren().addAll(mark, home, slash, titleHost, saveState, browser, divider, clips,
-				spacer, undo, redo, save, export);
+				spacer, undo, redo, save, queueButtonHost, export);
 		refresh();
 		refreshSaveState();
 	}
@@ -162,6 +179,7 @@ public final class EditorHeaderView extends HBox {
 	/** Why a save could not write, kept in the badge until a save succeeds; {@code null} when clean. */
 	private @Nullable String saveWarning;
 	private @Nullable Runnable openExportMenu;
+	private @Nullable Runnable openQueuePanel;
 	private @Nullable Runnable onSave;
 	private @Nullable Runnable projectBrowserOpener;
 	private Button browser;
@@ -232,6 +250,32 @@ public final class EditorHeaderView extends HBox {
 	/** The Export button: the shell anchors the export popover to it. */
 	public Button exportButton() {
 		return export;
+	}
+
+	/**
+	 * The export-queue button, immediately before Export: the app anchors the queue popover to it
+	 * and shows the pending count as its badge.
+	 */
+	public javafx.scene.control.Button queueButton() {
+		return queueButton;
+	}
+
+	/** Replaces the queue button action (the app owns the queue panel). */
+	public void setOnOpenQueue(Runnable onOpenQueue) {
+		openQueuePanel = onOpenQueue;
+		queueButton.setOnAction(event -> {
+			Runnable open = openQueuePanel;
+			if (open != null) {
+				open.run();
+			}
+		});
+	}
+
+	/** Shows how many exports are queued or running; 0 hides the badge. */
+	public void setQueueCount(int count) {
+		int shown = Math.max(0, count);
+		queueCountBadge.setText(shown > 99 ? "99+" : String.valueOf(shown));
+		queueCountBadge.setVisible(shown > 0);
 	}
 
 	/** Replaces the Export button action (the shell owns the export popover). */

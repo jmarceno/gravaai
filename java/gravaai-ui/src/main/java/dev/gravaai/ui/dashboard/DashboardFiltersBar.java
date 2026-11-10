@@ -39,6 +39,7 @@ public final class DashboardFiltersBar extends VBox {
 			Button.Variant.GHOST, Button.Size.SM);
 	private final VBox selectionRow = new VBox();
 	private final Label selectedCount = new Label();
+	private final Button exportSelected;
 	private final Button deleteSelected;
 
 	public DashboardFiltersBar(DashboardModel model, DashboardDependencies dependencies) {
@@ -89,10 +90,20 @@ public final class DashboardFiltersBar extends VBox {
 		Button cancel = new Button(UiI18n.t("common:actions.cancel"),
 				Button.Variant.GHOST, Button.Size.SM);
 		cancel.setOnAction(event -> model.setSelecting(false));
+		exportSelected = new Button(UiI18n.t("dashboard:filters.exportSelected"),
+				Button.Variant.SECONDARY, Button.Size.SM);
+		exportSelected.getStyleClass().add("dashboard-export-selected");
+		exportSelected.setOnAction(event -> {
+			List<String> paths = List.copyOf(model.selectedPaths());
+			if (!paths.isEmpty()) {
+				dependencies.actions().exportProjectsToQueue(paths);
+			}
+		});
 		deleteSelected = new Button(UiI18n.t("common:actions.delete"),
 				Button.Variant.DESTRUCTIVE, Button.Size.SM);
 		deleteSelected.setOnAction(event -> deleteSelection(model));
-		HBox selectionControls = new HBox(12, selectAll, selectedCount, deleteSelected, cancel);
+		HBox selectionControls = new HBox(12, selectAll, selectedCount, exportSelected,
+				deleteSelected, cancel);
 		selectionControls.setAlignment(Pos.CENTER_LEFT);
 		selectionRow.getChildren().add(selectionControls);
 		selectionRow.setVisible(false);
@@ -188,6 +199,8 @@ public final class DashboardFiltersBar extends VBox {
 	private void updateSelectionControls(DashboardModel model) {
 		int count = model.selectedPaths().size();
 		selectedCount.setText(UiI18n.t("dashboard:filters.selectedCount", java.util.Map.of("count", count)));
-		deleteSelected.setDisable(count == 0 || model.busyProperty().get());
+		boolean disabled = count == 0 || model.busyProperty().get();
+		exportSelected.setDisable(disabled);
+		deleteSelected.setDisable(disabled);
 	}
 }

@@ -436,6 +436,11 @@ final class ProjectCardView extends VBox {
 		menu.item(UiI18n.t("dashboard:cards.rename"), this::startRename);
 		menu.item(UiI18n.t("dashboard:cards.showInFolder"),
 				() -> dependencies.actions().revealInFolder(entry.path()));
+		if (isProjectEntry()) {
+			// Raw files and meetings have no export pipeline; only projects queue for batch export.
+			menu.item(UiI18n.t("dashboard:cards.exportToQueue"),
+					() -> dependencies.actions().exportProjectsToQueue(List.of(entry.path())));
+		}
 		menu.separator();
 		menu.dangerItem(meetingSource() != null ? UiI18n.t("dashboard:cards.moveToTrash")
 				: rawSource() ? UiI18n.t("dashboard:cards.removeFromLibrary")

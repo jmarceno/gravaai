@@ -44,6 +44,12 @@ public interface EditorViewActions {
 	/** Export button: starts the export with the popover settings. */
 	default void startExport(ExportPreferences preferences) {}
 
+	/**
+	 * Export popover's "Add this project to the queue": queues this project with the settings
+	 * currently shown (the app flushes the autosave first and renders from the saved project).
+	 */
+	default void exportToQueue(ExportPreferences preferences) {}
+
 	/** Progress pane: cancels the running export. */
 	default void cancelExport() {}
 

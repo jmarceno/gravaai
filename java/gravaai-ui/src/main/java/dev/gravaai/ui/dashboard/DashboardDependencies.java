@@ -140,6 +140,12 @@ public record DashboardDependencies(
 		/** {@code shell.showItemInFolder} (portal FileManager1, plan §5.5). */
 		void revealInFolder(String path);
 
+		/**
+		 * Queues the given project paths for batch export (the "Add to export queue" card action
+		 * and the selection row's "Export selected"). Non-project paths are skipped by the app.
+		 * The default no-op keeps implementations without an export pipeline working.
+		 */
+		default void exportProjectsToQueue(java.util.List<String> paths) {}
 
 		/** Opens the recording HUD (the "Record new" buttons). */
 		void showRecordingHud();

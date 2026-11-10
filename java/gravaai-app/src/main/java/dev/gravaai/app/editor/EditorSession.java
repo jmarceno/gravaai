@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -545,6 +546,20 @@ public final class EditorSession implements AutoCloseable {
 	}
 
 	/**
+	 * Loads a project without opening an editor window or starting the playback engine: the
+	 * headless load used by the batch export queue's renderer. The Keystrokes track is seeded from
+	 * the recording sidecar exactly like {@link #open(Path)}, so a queued export renders the same
+	 * elements as the editor would.
+	 *
+	 * @param projectPath the project file to load
+	 * @return the project document with the seeded Keystrokes elements
+	 * @throws IOException when the project file cannot be read
+	 */
+	public static ProjectDocument loadDocumentForExport(Path projectPath) throws IOException {
+		return seedKeystrokeElements(ProjectDocument.load(projectPath));
+	}
+
+	/**
 	 * A recording as a new, unsaved project ({@code useInitialEditorSource}: the recording session
 	 * loads with {@code currentProjectPath = null}; the first save asks where to put the project).
 	 * The webcam track of the session is enabled with its measured offset.
@@ -712,6 +727,18 @@ public final class EditorSession implements AutoCloseable {
 	/** The current document's webcam recording (export input), or {@code null} when it has none. */
 	public @Nullable Path webcamPath() {
 		return resolveWebcamPath(document);
+	}
+
+	/**
+	 * The project's webcam recording resolved through its media sources, or empty when the project
+	 * has no (resolvable) webcam track. Headless counterpart of {@link #webcamPath()}, for the batch
+	 * export queue's renderer.
+	 *
+	 * @param document the project document to inspect
+	 * @return the webcam recording path, or empty
+	 */
+	public static Optional<Path> webcamPathFor(ProjectDocument document) {
+		return Optional.ofNullable(resolveWebcamPath(document));
 	}
 
 	/** The project file, or {@code null} for an unsaved recording. */

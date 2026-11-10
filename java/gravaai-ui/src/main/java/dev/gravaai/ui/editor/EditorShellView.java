@@ -134,6 +134,11 @@ public final class EditorShellView extends VBox {
 					}
 
 					@Override
+					public void addToQueue(dev.gravaai.core.editor.ExportPreferences preferences) {
+						actions.exportToQueue(preferences);
+					}
+
+					@Override
 					public void cancelExport() {
 						actions.cancelExport();
 					}

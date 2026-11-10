@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,6 +76,11 @@ public final class ExportCoordinator implements AutoCloseable {
 	private final ExecutorService executor;
 	private final AtomicBoolean busy = new AtomicBoolean();
 	private final AtomicReference<@Nullable Cancellation> active = new AtomicReference<>();
+	/**
+	 * Callbacks fired on the export thread once a run has released the pipeline. The batch queue
+	 * uses them to start its next job without polling.
+	 */
+	private final CopyOnWriteArrayList<Runnable> idleListeners = new CopyOnWriteArrayList<>();
 
 	/** @param publisher save/reveal policy; @param triggers automations hooks (may be null in tests) */
 	public ExportCoordinator(ExportPublisher publisher, AutomationTriggers triggers) {
@@ -86,6 +92,19 @@ public final class ExportCoordinator implements AutoCloseable {
 	/** {@code true} while an export is running. */
 	public boolean isBusy() {
 		return busy.get();
+	}
+
+	/**
+	 * Subscribes a callback fired on the export thread every time a run releases the pipeline
+	 * (success, failure or cancellation). The callback runs after {@link #isBusy()} is already
+	 * {@code false}, so it can start the next export immediately.
+	 *
+	 * @return a handle that removes the listener when closed
+	 */
+	public AutoCloseable addIdleListener(Runnable listener) {
+		Objects.requireNonNull(listener, "listener");
+		idleListeners.add(listener);
+		return () -> idleListeners.remove(listener);
 	}
 
 	/**
@@ -142,6 +161,18 @@ public final class ExportCoordinator implements AutoCloseable {
 			}
 			active.set(null);
 			busy.set(false);
+			notifyIdle();
+		}
+	}
+
+	/** Runs the idle callbacks (the queue starts its next job from here). */
+	private void notifyIdle() {
+		for (Runnable listener : idleListeners) {
+			try {
+				listener.run();
+			} catch (RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING, "export idle listener failed: " + error);
+			}
 		}
 	}
 

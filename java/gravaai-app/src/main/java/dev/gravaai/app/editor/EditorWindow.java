@@ -18,6 +18,7 @@ import dev.gravaai.core.editor.ClipCommands;
 import dev.gravaai.core.editor.ZoomCommands;
 import dev.gravaai.app.StageScenes;
 import dev.gravaai.app.Startup;
+import dev.gravaai.app.export.ExportQueueController;
 import dev.gravaai.app.export.ProjectExporter;
 import dev.gravaai.core.editor.ExportPreferences;
 import dev.gravaai.core.event.Subscription;
@@ -43,6 +44,7 @@ import dev.gravaai.ui.editor.ProjectBrowserDialog;
 import dev.gravaai.ui.editor.Shortcuts;
 import dev.gravaai.ui.editor.TutorialHelpDialog;
 import dev.gravaai.ui.editor.export.ExportSessionModel;
+import dev.gravaai.ui.export.ExportQueuePanel;
 import dev.gravaai.ui.editor.preview.PreviewFrameMapper;
 import dev.gravaai.ui.editor.timeline.core.TimelineAudioPlacement;
 import dev.gravaai.ui.kit.Toast;
@@ -95,6 +97,8 @@ public final class EditorWindow {
 	 *     startup so it is looked up on use; may be {@code null}
 	 * @param recordings the recording service for the Clips panel imports; may be {@code null}
 	 * @param openRecordingsFolder reveals the recordings folder in the system file manager
+	 * @param exportQueue the batch export queue controller, created after startup like the export
+	 *     controller so it is looked up on use; empty while export support is unavailable
 	 */
 	public record Services(
 			@Nullable ProjectManager projects,
@@ -106,11 +110,17 @@ public final class EditorWindow {
 			@Nullable Function<String, Optional<Path>> chooseSaveFile,
 			java.util.function.@Nullable Supplier<@Nullable ProjectExporter> exporters,
 			java.util.function.@Nullable Supplier<@Nullable RecordingService> recordings,
-			@Nullable Runnable openRecordingsFolder) {
+			@Nullable Runnable openRecordingsFolder,
+			java.util.function.@Nullable Supplier<Optional<ExportQueueController>> exportQueue) {
 
 		/** The export controller, once the app has created it (it starts after the editor can open). */
 		public @Nullable ProjectExporter exporter() {
 			return exporters == null ? null : exporters.get();
+		}
+
+		/** The batch export queue controller, or empty while the export pipeline is unavailable. */
+		public Optional<ExportQueueController> exportQueueController() {
+			return exportQueue == null ? Optional.empty() : exportQueue.get();
 		}
 
 		/** Backwards-compatible constructor without the export controller. */
@@ -119,7 +129,7 @@ public final class EditorWindow {
 				Function<String, Optional<Path>> chooseOpenFile,
 				Function<String, Optional<Path>> chooseSaveFile) {
 			this(projects, settings, openProject, projectUpdated, onClosed, chooseOpenFile,
-					chooseSaveFile, null, null, null);
+					chooseSaveFile, null, null, null, null);
 		}
 
 		/** Backwards-compatible constructor without the Clips panel services. */
@@ -129,12 +139,12 @@ public final class EditorWindow {
 				Function<String, Optional<Path>> chooseSaveFile,
 				ProjectExporter exporter) {
 			this(projects, settings, openProject, projectUpdated, onClosed, chooseOpenFile,
-					chooseSaveFile, () -> exporter, null, null);
+					chooseSaveFile, () -> exporter, null, null, null);
 		}
 
 		public static Services bare() {
 			return new Services(null, null, path -> { }, path -> { }, () -> { }, null, null,
-					null, null, null);
+					null, null, null, null);
 		}
 	}
 
@@ -170,6 +180,8 @@ public final class EditorWindow {
 	private @Nullable AutoCaptionController captions;
 	private @Nullable AutoMaskController autoMask;
 	private @Nullable SuperResolutionController superResolution;
+	/** The batch export queue popover, created on first use while export support exists. */
+	private @Nullable ExportQueuePanel exportQueuePanel;
 	/** Webcam background-blur segmenter handed to the preview; closed with the window. */
 	private @Nullable WebcamSegmenter webcamSegmenter;
 	/** Engine->timeline playhead subscription (coalesced onto the FX thread). */
@@ -333,6 +345,9 @@ public final class EditorWindow {
 		// Saving while editing (user report 2026-10-28): the header Save button and Ctrl+S (⌘S on
 		// macOS) run the same save as the "Unsaved changes" prompt, without leaving the editor.
 		shell.header().setOnSave(this::saveProject);
+		// The batch queue panel lives app-side (the queue outlives the editor); the header button
+		// only anchors it.
+		shell.header().setOnOpenQueue(this::toggleExportQueuePanel);
 		scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 			if (SAVE_SHORTCUT.match(event)) {
 				event.consume();
@@ -457,6 +472,80 @@ public final class EditorWindow {
 		}
 	}
 
+	/** The Export button's neighbour: opens (or closes) the batch export queue panel. */
+	private void toggleExportQueuePanel() {
+		Optional<ExportQueueController> queue = services.exportQueueController();
+		if (queue.isEmpty()) {
+			errorDialog(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.title"),
+					dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.pipelineUnavailable"));
+			return;
+		}
+		ExportQueueController controller = queue.orElseThrow();
+		ExportQueuePanel panel = exportQueuePanel;
+		if (panel == null) {
+			panel = new ExportQueuePanel(shell.header().queueButton(), controller.queue(),
+					new ExportQueuePanel.Callbacks() {
+						@Override
+						public void addProjects() {
+							addCurrentProjectToQueue();
+						}
+
+						@Override
+						public void revealFile(Path file) {
+							controller.reveal(file);
+						}
+					});
+			exportQueuePanel = panel;
+			controller.queue().addChangeListener(() -> Platform.runLater(this::refreshQueueBadge));
+			refreshQueueBadge();
+		}
+		panel.toggle();
+	}
+
+	/** The queue panel's "Add project": the project open here, with the saved export settings. */
+	private void addCurrentProjectToQueue() {
+		ProjectExporter exporter = services.exporter();
+		enqueueProjectToQueue(exporter == null ? ExportPreferences.defaults()
+				: exporter.exportPreferences());
+	}
+
+	/**
+	 * Queues this project with {@code preferences} (the export menu's "Add to queue" and the queue
+	 * panel's add button). The editor's own render does not stop: the queue renders from the saved
+	 * project file, so the file is flushed first and an unsaved recording is saved before queueing.
+	 */
+	private void enqueueProjectToQueue(ExportPreferences preferences) {
+		Optional<ExportQueueController> queue = services.exportQueueController();
+		if (queue.isEmpty()) {
+			errorDialog(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.title"),
+					dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.pipelineUnavailable"));
+			return;
+		}
+		session.flushAutosave();
+		if (session.projectPath() == null) {
+			saveProject();
+			if (session.projectPath() == null) {
+				return;
+			}
+		}
+		ExportQueueController controller = queue.orElseThrow();
+		Optional<Path> project = Optional.ofNullable(session.projectPath());
+		project.flatMap(path -> controller.enqueueProject(path, preferences, stage))
+				.ifPresent(id -> toast(dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.queue.added",
+						java.util.Map.of("name", session.displayName())), null, Toast.Variant.SUCCESS));
+	}
+
+	/** The header badge count, driven by the app on every queue change. */
+	public void setExportQueueCount(int count) {
+		shell.header().setQueueCount(count);
+	}
+
+	/** Re-reads the badge from the controller (queue changes reach the shell through the app too). */
+	private void refreshQueueBadge() {
+		services.exportQueueController()
+				.ifPresent(controller -> shell.header().setQueueCount(controller.activeCount()));
+	}
+
 	/** Releases the editor resources (subscriptions, shell, engine, session); idempotent. */
 	public void dispose() {
 		if (disposed) {
@@ -485,6 +574,13 @@ public final class EditorWindow {
 			if (webcamSegmenter != null) {
 				webcamSegmenter.close();
 				webcamSegmenter = null;
+			}
+			ExportQueuePanel queuePanel = exportQueuePanel;
+			exportQueuePanel = null;
+			if (queuePanel != null) {
+				// Closing the editor never cancels queued exports: the panel and its popover go, the
+				// app-owned queue keeps running.
+				queuePanel.close();
 			}
 			shell.dispose();
 			session.close();
@@ -1343,6 +1439,11 @@ public final class EditorWindow {
 			var engine = superRes == null ? null
 					: superRes.openEngineForExport(superRes.installedModelPath());
 			exporter.startExport(session, preferences, shell.exportSession(), stage, engine);
+		}
+
+		@Override
+		public void exportToQueue(ExportPreferences preferences) {
+			enqueueProjectToQueue(preferences);
 		}
 
 		@Override

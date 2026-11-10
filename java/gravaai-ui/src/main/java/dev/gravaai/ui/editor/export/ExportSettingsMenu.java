@@ -40,13 +40,15 @@ public final class ExportSettingsMenu extends VBox {
 	private final BooleanSupplier hasCaptionsForSidecar;
 	private final OutputDimensions dimensions;
 	private final Runnable onExport;
+	private final Runnable onQueue;
 
 	public ExportSettingsMenu(ExportSettingsState settings, BooleanSupplier hasCaptionsForSidecar,
-			OutputDimensions dimensions, Runnable onExport) {
+			OutputDimensions dimensions, Runnable onExport, Runnable onQueue) {
 		this.settings = settings;
 		this.hasCaptionsForSidecar = hasCaptionsForSidecar == null ? () -> false : hasCaptionsForSidecar;
 		this.dimensions = dimensions;
 		this.onExport = onExport;
+		this.onQueue = onQueue;
 		getStyleClass().add("export-settings");
 		setSpacing(16);
 		setPrefWidth(360);
@@ -92,6 +94,7 @@ public final class ExportSettingsMenu extends VBox {
 			children.add(loop);
 		}
 		children.add(exportButton());
+		children.add(queueButton());
 		return children;
 	}
 
@@ -172,6 +175,14 @@ public final class ExportSettingsMenu extends VBox {
 		export.setMaxWidth(Double.MAX_VALUE);
 		export.setOnAction(event -> onExport.run());
 		return export;
+	}
+
+	private Node queueButton() {
+		Button queue = new Button(UiI18n.t("dialogs:export.queue.addCurrentProject"),
+				Button.Variant.OUTLINE, Button.Size.LG);
+		queue.setMaxWidth(Double.MAX_VALUE);
+		queue.setOnAction(event -> onQueue.run());
+		return queue;
 	}
 
 	private Node choices(String label, @Nullable String selected, List<Choice> options,

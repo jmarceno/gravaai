@@ -1,5 +1,7 @@
 package dev.gravaai.ui.dashboard;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.ui.i18n.UiI18n;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.Icon;
@@ -21,6 +23,10 @@ import javafx.scene.layout.StackPane;
 public final class DashboardToolbar extends HBox {
 
 	private final Input search = new Input();
+	private final Button queueButton;
+	private final javafx.scene.control.Label queueCountBadge = new javafx.scene.control.Label();
+	private final StackPane queueButtonHost = new StackPane();
+	private @Nullable Runnable openQueuePanel;
 
 	public DashboardToolbar(DashboardModel model, DashboardDependencies dependencies) {
 		getStyleClass().add("dashboard-toolbar");
@@ -42,6 +48,18 @@ public final class DashboardToolbar extends HBox {
 		StackPane.setMargin(magnifier, new Insets(0, 0, 0, 14));
 		HBox.setHgrow(searchHost, Priority.ALWAYS);
 
+		queueButton = new Button("", Button.Variant.GHOST, Button.Size.ICON);
+		queueButton.getStyleClass().add("dashboard-queue");
+		queueButton.icon(Icons.FilmSlate);
+		queueButton.setAccessibleText(UiI18n.t("dialogs:export.queue.title"));
+		dev.gravaai.ui.kit.Tooltip.install(queueButton, UiI18n.t("dialogs:export.queue.title"));
+		queueCountBadge.getStyleClass().add("export-queue-badge");
+		queueCountBadge.setMouseTransparent(true);
+		queueCountBadge.setVisible(false);
+		queueButtonHost.getChildren().addAll(queueButton, queueCountBadge);
+		StackPane.setAlignment(queueCountBadge, Pos.TOP_RIGHT);
+		StackPane.setMargin(queueCountBadge, new Insets(-5, -5, 0, 0));
+
 		Button importButton = new Button(UiI18n.t("dashboard:toolbar.import"),
 				Button.Variant.SECONDARY, Button.Size.SM);
 		importButton.setGraphic(Icon.of(Icons.UploadSimple, 16));
@@ -58,10 +76,33 @@ public final class DashboardToolbar extends HBox {
 			}
 		});
 
-		getChildren().addAll(searchHost, importButton);
+		getChildren().addAll(searchHost, queueButtonHost, importButton);
 
 		model.sectionProperty().addListener((observable, oldValue, newValue) -> updatePrompt(model));
 		updatePrompt(model);
+	}
+
+	/** The export-queue button, left of Import: the app anchors the queue popover to it. */
+	public javafx.scene.control.Button queueButton() {
+		return queueButton;
+	}
+
+	/** Replaces the queue button action (the app owns the queue panel). */
+	public void setOnOpenQueue(Runnable onOpenQueue) {
+		openQueuePanel = onOpenQueue;
+		queueButton.setOnAction(event -> {
+			Runnable open = openQueuePanel;
+			if (open != null) {
+				open.run();
+			}
+		});
+	}
+
+	/** Shows how many exports are queued or running; 0 hides the badge. */
+	public void setQueueCount(int count) {
+		int shown = Math.max(0, count);
+		queueCountBadge.setText(shown > 99 ? "99+" : String.valueOf(shown));
+		queueCountBadge.setVisible(shown > 0);
 	}
 
 	private void updatePrompt(DashboardModel model) {

@@ -171,6 +171,11 @@
 	-fx-pref-height: 40;
 }
 
+.dashboard-queue {
+	-fx-pref-height: 40;
+	-fx-min-height: 40;
+}
+
 /* ---- Filters (DashboardFilters.tsx) ---- */
 .dashboard-filters {
 	-fx-padding: 0 40 28 40;
@@ -752,4 +757,145 @@
 .automations-settings__name:hover,
 .automations-settings__name:focused {
 	-fx-background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* ---- Batch export queue panel + badge (ExportQueuePanel.java) ---- */
+/* The panel opens over the dashboard window; the same block lives in ui/editor/editor.css so the
+   editor window styles it too. Keep the two copies in sync. */
+
+.export-queue {
+	-fx-padding: 0;
+}
+
+.export-queue__header {
+	-fx-padding: 16 16 8 16;
+}
+
+.export-queue__heading {
+	-fx-font-size: 14px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.export-queue__count {
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-muted;
+}
+
+.export-queue__list {
+	-fx-spacing: 8;
+	-fx-padding: 0 16 4 16;
+}
+
+.export-queue__empty {
+	-fx-font-size: 12px;
+	-fx-text-fill: -g-muted;
+	-fx-padding: 4 16 12 16;
+}
+
+.export-queue__row {
+	-fx-background-color: -g-default-soft;
+	-fx-background-radius: 8;
+	-fx-padding: 10 12 10 12;
+	-fx-spacing: 6;
+}
+
+.export-queue__row--running {
+	-fx-background-color: -g-accent-soft;
+}
+
+.export-queue__row-title {
+	-fx-font-size: 12px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-fg;
+}
+
+.export-queue__row-detail {
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-muted;
+}
+
+.export-queue__row-destination {
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-muted;
+	-fx-opacity: 0.75;
+}
+
+.export-queue__row-state {
+	-fx-font-size: 10px;
+	-fx-font-weight: 600;
+	-fx-text-fill: -g-muted;
+}
+
+.export-queue__row-state--running {
+	-fx-text-fill: -g-accent;
+}
+
+.export-queue__row-state--completed {
+	-fx-text-fill: -g-success;
+}
+
+.export-queue__row-state--failed {
+	-fx-text-fill: -g-danger;
+}
+
+.export-queue__row-state--cancelled {
+	-fx-text-fill: -g-muted;
+	-fx-opacity: 0.7;
+}
+
+.export-queue__track {
+	-fx-background-color: -g-surface-secondary;
+	-fx-background-radius: 3;
+}
+
+.export-queue__fill {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 3;
+}
+
+.export-queue__percent {
+	-fx-font-size: 10px;
+	-fx-text-fill: -g-muted;
+}
+
+.export-queue__row-error {
+	-fx-font-size: 11px;
+	-fx-text-fill: -g-danger;
+}
+
+.export-queue__actions {
+	-fx-spacing: 6;
+	-fx-padding: 4 0 0 0;
+}
+
+.export-queue__action.button {
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
+	-fx-font-size: 11px;
+	-fx-padding: 0 8px;
+}
+
+.export-queue__icon-button.button {
+	-fx-min-width: 26px;
+	-fx-pref-width: 26px;
+	-fx-min-height: 26px;
+	-fx-pref-height: 26px;
+	-fx-padding: 0;
+}
+
+.export-queue__footer {
+	-fx-padding: 8 16 16 16;
+}
+
+/* Count badge on the toolbar queue button (same block in editor.css). */
+.export-queue-badge {
+	-fx-background-color: -g-accent;
+	-fx-background-radius: 9;
+	-fx-text-fill: -g-accent-foreground;
+	-fx-font-size: 9px;
+	-fx-font-weight: 600;
+	-fx-padding: 1 5 1 5;
+	-fx-min-width: 16px;
+	-fx-alignment: center;
 }

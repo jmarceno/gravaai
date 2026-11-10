@@ -43,6 +43,12 @@ public final class ExportMenu {
 		/** Starts the export with the settings currently shown in the form. */
 		void startExport(ExportPreferences preferences);
 
+		/**
+		 * Queues this project for batch export with the settings currently shown in the form
+		 * ("Add this project to the queue").
+		 */
+		void addToQueue(ExportPreferences preferences);
+
 		/** Cancels the running export. */
 		void cancelExport();
 
@@ -278,7 +284,8 @@ public final class ExportMenu {
 	private void showSettings() {
 		stopTips();
 		stateHost.getChildren().setAll(new ExportSettingsMenu(settings, hasCaptionsForSidecar,
-				dimensions.get(), () -> callbacks.startExport(settings.preferences())));
+				dimensions.get(), () -> callbacks.startExport(settings.preferences()),
+				() -> callbacks.addToQueue(settings.preferences())));
 	}
 
 	private void showProgress() {

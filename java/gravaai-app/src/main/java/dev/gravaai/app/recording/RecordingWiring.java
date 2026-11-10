@@ -36,8 +36,10 @@ import dev.gravaai.services.recording.MicLevelMeterService;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.MicNoiseReductionFilters;
 import dev.gravaai.services.recording.RecordingEvents;
+import dev.gravaai.services.recording.RecordingFrameRate;
 import dev.gravaai.services.recording.RecordingImportService;
 import dev.gravaai.services.recording.RecordingLibrary;
+import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.RecordingService;
 import dev.gravaai.services.recording.RecordingThumbnails;
 import dev.gravaai.services.recording.ports.CompositorRecordingEnvironment;
@@ -207,11 +209,22 @@ public final class RecordingWiring implements AutoCloseable {
 			return MicNoiseReductionFilters.normalizeMicNoiseReduction(
 					value != null && value.isString() ? value.asString() : null);
 		};
+		Supplier<RecordingFrameRate> frameRate = () -> {
+			JsonNode value = settings.readSetting(RecordingFrameRate.CAPTURE_FPS_SETTING);
+			return RecordingFrameRate.normalize(
+					value != null && value.isString() ? value.asString() : null);
+		};
+		Supplier<RecordingQuality> videoQuality = () -> {
+			JsonNode value = settings.readSetting(RecordingQuality.VIDEO_QUALITY_SETTING);
+			return RecordingQuality.normalize(
+					value != null && value.isString() ? value.asString() : null);
+		};
 
 		CursorCaptureSession cursorSession = new CursorCaptureSession(
 				processes, environment, cursorScreen, selectedSource, () -> null, keystrokeMode);
 		CosmicRecorder cosmic = new CosmicRecorder(
-				recordingsDir, processes, environment, events, cursorSession, cursorSession, micNoiseReduction);
+				recordingsDir, processes, environment, events, cursorSession, cursorSession,
+				micNoiseReduction, frameRate, videoQuality);
 		CaptureSelection captureSelection = new CaptureSelection(() -> {
 			try {
 				return cosmic.listCosmicOutputs();

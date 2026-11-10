@@ -1517,10 +1517,11 @@ public final class AppContext {
 							: new dev.gravaai.ui.meeting.ServiceMeetingUiService(
 									meeting.service()));
 			DashboardView view = new DashboardView(dependencies);
-			// Settings -> Recording: key-press capture and mic noise reduction, read by the
-			// recorder at each recording start.
+			// Settings -> Recording: key-press capture, mic noise reduction, frame rate, quality
+			// and the recordings folder, read by the recorder at each recording start.
 			view.addSettingsSection("recording", new dev.gravaai.ui.dashboard.RecordingSettingsView(
-					new AppSettingsStore(userData.appSettingsFile())));
+					new AppSettingsStore(userData.appSettingsFile()),
+					new RecordingsDirectory(userData)));
 			// Settings -> General / Motion: the editor defaults new projects start from.
 			EditorPreferencesStore editorDefaults =
 					new EditorPreferencesStore(new AppSettingsStore(userData.appSettingsFile()));

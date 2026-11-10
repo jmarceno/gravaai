@@ -19,7 +19,6 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import dev.gravaai.services.recording.CosmicSources;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
@@ -54,11 +53,10 @@ final class CosmicVideoPipeline {
 		this.processIo = processIo;
 	}
 
-	/** Starts the capture helper; its FORMAT line decides the encoder's input geometry. */
-	SpawnedProcess startCapture(String outputName) throws IOException {
+	/** Starts the capture helper at the chosen frame rate; its FORMAT line decides the encoder's input geometry. */
+	SpawnedProcess startCapture(String outputName, int fps) throws IOException {
 		return processes.spawn(
-				List.of(environment.captureHelper().toString(), outputName,
-						String.valueOf(CosmicSources.CAPTURE_FPS)),
+				List.of(environment.captureHelper().toString(), outputName, String.valueOf(fps)),
 				new SpawnOptions(true, true, true));
 	}
 
@@ -88,10 +86,11 @@ final class CosmicVideoPipeline {
 		throw new IOException(text.isEmpty() ? "The screen capture helper exited early." : text);
 	}
 
-	/** Starts ffmpeg on the raw frames and on the helper's stdout. */
-	SpawnedProcess startEncoder(CaptureFormat format, Path videoPath) throws IOException {
+	/** Starts ffmpeg on the raw frames and on the helper's stdout, at the chosen quality. */
+	SpawnedProcess startEncoder(CaptureFormat format, Path videoPath, int fps, int crf)
+			throws IOException {
 		return processes.spawn(
-				encoderCommand(format, filtersFor(format), videoPath),
+				encoderCommand(format, filtersFor(format), videoPath, fps, crf),
 				new SpawnOptions(true, false, true));
 	}
 
@@ -119,7 +118,7 @@ final class CosmicVideoPipeline {
 
 	/** Visible for {@code RecordingTimestampContractTest}: the encoder arguments are the contract
 	 *  that keeps a recording the same length as the time it took. */
-	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath) {
+	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath, int fps, int crf) {
 		return List.of(
 				environment.ffmpeg().toString(),
 				"-hide_banner",
@@ -133,7 +132,7 @@ final class CosmicVideoPipeline {
 				"-s",
 				format.width() + "x" + format.height(),
 				// Stamp each frame with its arrival time instead of assuming a fixed rate. The
-				// helper writes at CAPTURE_FPS, but encoding 1080p can fall behind on a busy or
+				// helper writes at the chosen fps, but encoding 1080p can fall behind on a busy or
 				// virtual machine. With a fixed "-r" those late frames were still labelled as if
 				// they had arrived on time, so a 15 s capture came out as a ~2.5 s clip that
 				// played at several times the real speed. Wall-clock timestamps keep the video
@@ -148,12 +147,14 @@ final class CosmicVideoPipeline {
 				"vfr",
 				"-c:v",
 				"libx264",
+				// ultrafast at every quality level: the encoder must keep up with the capture, the
+				// constant-rate factor carries the quality choice on its own.
 				"-preset",
 				"ultrafast",
 				"-crf",
-				"18",
+				String.valueOf(crf),
 				"-g",
-				String.valueOf(CosmicSources.CAPTURE_FPS * 2),
+				String.valueOf(fps * 2),
 				// Short clusters: a crash or power loss loses at most ~2 s of video.
 				"-cluster_time_limit",
 				"2000",

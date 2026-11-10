@@ -21,9 +21,6 @@ public final class CosmicSources {
 	/** Source ids for direct COSMIC output capture. */
 	public static final String COSMIC_SOURCE_PREFIX = "screen:cosmic:";
 
-	/** Frames per second the native helper captures. */
-	public static final int CAPTURE_FPS = 60;
-
 	private static final Pattern OUTPUT_LINE = Pattern.compile("^OUTPUT (\\S+) (-?\\d+) (-?\\d+) (\\d+) (\\d+)$");
 
 	private CosmicSources() {

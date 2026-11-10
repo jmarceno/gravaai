@@ -35,9 +35,13 @@ class RecordingTimestampContractTest {
 	}
 
 	private static List<String> encoderArguments() {
+		return encoderArguments(60, 18);
+	}
+
+	private static List<String> encoderArguments(int fps, int crf) {
 		return pipeline().encoderCommand(
 				new CaptureFormat(1920, 1080, "bgra", 0), "format=yuv420p",
-				Path.of("/tmp/out.mkv"));
+				Path.of("/tmp/out.mkv"), fps, crf);
 	}
 
 	@Test
@@ -67,5 +71,18 @@ class RecordingTimestampContractTest {
 		int index = arguments.indexOf("-fps_mode");
 		assertTrue(index >= 0, "want -fps_mode vfr: " + arguments);
 		assertEquals("vfr", arguments.get(index + 1), arguments.toString());
+	}
+
+	@Test
+	@DisplayName("the chosen frame rate drives the keyframe interval and the crf carries the quality")
+	void honoursFrameRateAndQuality() {
+		List<String> arguments = encoderArguments(30, 0);
+
+		int g = arguments.indexOf("-g");
+		assertTrue(g >= 0, "want a keyframe interval: " + arguments);
+		assertEquals("60", arguments.get(g + 1), "two seconds of keyframes at 30 fps");
+		int crf = arguments.indexOf("-crf");
+		assertTrue(crf >= 0, "want a constant-rate factor: " + arguments);
+		assertEquals("0", arguments.get(crf + 1), arguments.toString());
 	}
 }

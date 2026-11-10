@@ -27,6 +27,8 @@ import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.RecordingEvents;
+import dev.gravaai.services.recording.RecordingFrameRate;
+import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.AudioTrack;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.PauseState;
@@ -99,6 +101,8 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 	private final Supplier<Path> recordingsDir;
 	private final RecordingProcesses processes;
 	private final Supplier<MicNoiseReduction> micNoiseReductionSetting;
+	private final Supplier<RecordingFrameRate> frameRateSetting;
+	private final Supplier<RecordingQuality> videoQualitySetting;
 
 	private final CosmicProcessIo processIo;
 	private final CosmicVideoPipeline video;
@@ -118,10 +122,14 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 			RecordingEvents events,
 			CursorTelemetrySource cursorTelemetry,
 			KeystrokeSource keystrokes,
-			Supplier<MicNoiseReduction> micNoiseReductionSetting) {
+			Supplier<MicNoiseReduction> micNoiseReductionSetting,
+			Supplier<RecordingFrameRate> frameRateSetting,
+			Supplier<RecordingQuality> videoQualitySetting) {
 		this.recordingsDir = recordingsDir;
 		this.processes = processes;
 		this.micNoiseReductionSetting = micNoiseReductionSetting;
+		this.frameRateSetting = frameRateSetting;
+		this.videoQualitySetting = videoQualitySetting;
 		this.processIo = new CosmicProcessIo(processes);
 		PulseAudioSources pulseSources = new PulseAudioSources(environment, processIo);
 		this.video = new CosmicVideoPipeline(processes, environment, processIo);
@@ -174,9 +182,10 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 						options.capturesSystemAudio(), options.capturesMicrophone(),
 						options.microphoneLabel()),
 				pauseState);
+		int fps = currentCaptureFps();
 		SpawnedProcess capture;
 		try {
-			capture = video.startCapture(outputName);
+			capture = video.startCapture(outputName, fps);
 		} catch (IOException error) {
 			audioTracks.killAll(audio);
 			return StartResult.failed(String.valueOf(error));
@@ -196,7 +205,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 
 		SpawnedProcess encoder;
 		try {
-			encoder = video.startEncoder(format, videoPath);
+			encoder = video.startEncoder(format, videoPath, fps, currentVideoQuality().crf());
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);
@@ -482,14 +491,21 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 
 	// ── Internals ──────────────────────────────────────────────────────────
 
-	/** Encoder arguments, exposed for {@code RecordingTimestampContractTest}. */
-	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath) {
-		return video.encoderCommand(format, filters, videoPath);
-	}
-
 	private MicNoiseReduction currentMicNoiseReduction() {
 		MicNoiseReduction level = micNoiseReductionSetting.get();
 		return level == null ? MicNoiseReduction.DEFAULT : level;
+	}
+
+	/** The frame rate the capture helper and encoder run at, read at each start. */
+	private int currentCaptureFps() {
+		RecordingFrameRate rate = frameRateSetting.get();
+		return (rate == null ? RecordingFrameRate.DEFAULT : rate).fps();
+	}
+
+	/** The encoder quality, read at each start. */
+	private RecordingQuality currentVideoQuality() {
+		RecordingQuality quality = videoQualitySetting.get();
+		return quality == null ? RecordingQuality.DEFAULT : quality;
 	}
 
 	/** Stops the watchdog and the process executors (app shutdown). */

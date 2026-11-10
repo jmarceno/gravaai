@@ -27,6 +27,8 @@ import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.RecordingEvents;
+import dev.gravaai.services.recording.RecordingFrameRate;
+import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.SpawnedProcess;
 import dev.gravaai.services.sources.SelectedSource;
@@ -151,7 +153,9 @@ class CaptureEndedStopTest {
 				events,
 				noTelemetry,
 				() -> List.<KeystrokeTypes.KeystrokeEvent>of(),
-				() -> MicNoiseReduction.OFF);
+				() -> MicNoiseReduction.OFF,
+				() -> RecordingFrameRate.DEFAULT,
+				() -> RecordingQuality.DEFAULT);
 		CosmicRecorder.StartResult result = recorder.startCosmicRecording(
 				SelectedSource.screen("cosmic:Virtual-1", "Screen", null),
 				new CosmicRecorder.RecordingOptions(false, false, null, null, false));

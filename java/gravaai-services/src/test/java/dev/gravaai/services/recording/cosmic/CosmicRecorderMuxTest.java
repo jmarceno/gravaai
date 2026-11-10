@@ -24,6 +24,8 @@ import dev.gravaai.services.recording.CosmicSession.CosmicMuxInput;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.RecordingEvents;
+import dev.gravaai.services.recording.RecordingFrameRate;
+import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingProcesses;
 
@@ -90,7 +92,8 @@ class CosmicRecorderMuxTest {
 
 		CosmicProcessIo processIo = new CosmicProcessIo(new PlatformRecordingProcesses());
 		CosmicRecorder recorder = new CosmicRecorder(() -> dir, new PlatformRecordingProcesses(),
-				environment, new RecordingEvents(), null, null, () -> MicNoiseReduction.OFF);
+				environment, new RecordingEvents(), null, null, () -> MicNoiseReduction.OFF,
+				() -> RecordingFrameRate.DEFAULT, () -> RecordingQuality.DEFAULT);
 		CosmicMuxResult result;
 		try {
 			result = recorder.mux(new CosmicMuxInput(

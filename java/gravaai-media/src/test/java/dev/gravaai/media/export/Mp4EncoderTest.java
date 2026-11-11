@@ -52,6 +52,40 @@ class Mp4EncoderTest {
 	}
 
 	@Test
+	@DisplayName("an exported MP4 carries the chapter list in its container metadata")
+	void embedsChapters() throws Exception {
+		Path output = tempDir.resolve("chaptered.mp4");
+		List<dev.gravaai.core.project.Chapters.Chapter> chapters = List.of(
+				new dev.gravaai.core.project.Chapters.Chapter(0, "Intro"),
+				new dev.gravaai.core.project.Chapters.Chapter(500, "Demo = fun; #1"));
+		Mp4ExportRequest request = new Mp4ExportRequest(160, 90, 24, 1_000_000,
+				ExportEncodingMode.FAST, 1.0, output, ExportAudioPlan.NONE, chapters);
+		Mp4Encoder.encode(request, new SyntheticFrameProvider(160, 90, 24),
+				ExportProgressListener.NONE, ExportCancellation.NONE);
+		String probe = ffprobeChapters(output);
+		assertTrue(probe.contains("tag:title=Intro"), probe);
+		// The escaped title reaches the container verbatim, with ffmpeg's escaping undone.
+		assertTrue(probe.contains("tag:title=Demo = fun; #1"), probe);
+		assertTrue(probe.contains("start_time=0.500000"), probe);
+		// The metadata document is an input only; it never becomes a stream of the output.
+		assertEquals(1, MediaProbe.probe(output).videoStreams().size());
+	}
+
+	/** {@code ffprobe -show_chapters} compact output for a written file. */
+	private static String ffprobeChapters(Path file) throws Exception {
+		var process = new ProcessBuilder(FfmpegCli.ffprobe().toString(), "-hide_banner",
+				"-loglevel", "error", "-show_chapters", "-of", "compact", file.toString())
+				.redirectErrorStream(true)
+				.start();
+		String output = new String(process.getInputStream().readAllBytes(),
+				java.nio.charset.StandardCharsets.UTF_8);
+		if (process.waitFor() != 0) {
+			throw new IllegalStateException("ffprobe failed: " + output);
+		}
+		return output;
+	}
+
+	@Test
 	@DisplayName("encodes H.264 video plus one aac audio input from a single filter graph")
 	void encodesVideoAndAudio() throws Exception {
 		Path output = tempDir.resolve("export-with-audio.mp4");

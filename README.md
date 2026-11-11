@@ -62,6 +62,9 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 - Smart framing (opt-in per project): the camera eases to another corner or shrinks when the cursor or the zoom focus would sit under it, gliding back once the way is clear, with the moves marked on the timeline's Camera track
 - Wallpapers, colors, gradients, padding, rounded corners, blur and shadows
 - Auto-captions with a local Whisper model
+- Chapters and markers: press **M** to drop a named marker at the playhead, drag it on the ruler,
+  and promote it to a chapter from its right-click menu. Markers are stored in source time, so
+  trims, cuts and reorders move them with the footage they were placed on
 - Projects saved as `.gravaai` files: save while editing with **Ctrl + S** (⌘ S) or the **Save**
   button in the header, next to Export — a recording that just opened can be named and saved right
   away
@@ -69,6 +72,8 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 ### Export
 
 - MP4 and GIF to a local file, with quality, frame-rate and size presets
+- Chapter markers in the MP4 metadata, plus a YouTube-ready `00:00 Title` `chapters.txt` sidecar
+  (an `Intro` entry is added at 00:00 when the first chapter starts later, as YouTube requires)
 
 ## Meeting mode
 

@@ -41,7 +41,7 @@ public final class ProjectDocument {
 			"annotationRegions", "audioRegions", "autoCaptions", "autoCaptionSettings",
 			"keystrokeOverlay", "webcam", "clickSound", "keySound", "aspectRatio", "sourceAudioTrackSettingsByClip",
 			"defaultSourceAudioTrackSettings", "keystrokeElements", "cameraLayoutSegments",
-			"elementComponents", "elements", "elementAssets");
+			"elementComponents", "elements", "elementAssets", "markers");
 
 	private final ObjectNode raw;
 	private final String videoPath;
@@ -207,6 +207,10 @@ public final class ProjectDocument {
 		}
 		if (!state.elementAssets().isEmpty()) {
 			editor.set("elementAssets", writeElementAssets(state.elementAssets()));
+		}
+		// Only projects with markers carry the key (older files round-trip as-is).
+		if (!state.markers().isEmpty()) {
+			editor.set("markers", writeMarkers(state.markers()));
 		}
 
 		// Keep the fields this build does not know; drop retired preferences and dev-only tuning.
@@ -598,6 +602,20 @@ public final class ProjectDocument {
 			for (String modifier : element.orderedModifiers()) {
 				modifiers.add(modifier);
 			}
+			array.add(node);
+		}
+		return array;
+	}
+
+	/** Serialises the timeline markers ({@code startMs} is source time, like caption cues). */
+	public static ArrayNode writeMarkers(List<TimelineMarker> markers) {
+		ArrayNode array = Json.nodeFactory().arrayNode();
+		for (TimelineMarker marker : markers == null ? List.<TimelineMarker>of() : markers) {
+			ObjectNode node = Json.nodeFactory().objectNode();
+			node.put("id", marker.id());
+			node.put("startMs", marker.startMs());
+			node.put("name", marker.name());
+			node.put("chapter", marker.chapter());
 			array.add(node);
 		}
 		return array;

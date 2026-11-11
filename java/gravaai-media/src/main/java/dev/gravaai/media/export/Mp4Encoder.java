@@ -177,7 +177,35 @@ public final class Mp4Encoder {
 			boolean yuvInput, Path outputPath) {
 		long totalFrames = request.totalFrames();
 		String encoderName = VideoEncoderArguments.label(spec, yuvInput);
-		List<String> arguments = buildArguments(request, yuvInput, spec);
+		// ffmpeg reads the chapters from an ffmetadata input document; the bundled build has the
+		// demuxer, so the MP4 stays a single encode and faststart is applied once.
+		Path metadataFile;
+		try {
+			metadataFile = ChapterSidecars.writeMetadataFile(outputPath, request.chapters(),
+					Math.round(request.durationSeconds() * 1000));
+		} catch (IOException error) {
+			throw new ExportException("could not write the export chapter metadata", error);
+		}
+		try {
+			return runEncode(request, frames, listener, cancellation, spec, yuvInput, outputPath,
+					encoderName, metadataFile);
+		} finally {
+			if (metadataFile != null) {
+				try {
+					Files.deleteIfExists(metadataFile);
+				} catch (IOException ignored) {
+					// Best effort; the export itself already succeeded or failed on its own.
+				}
+			}
+		}
+	}
+
+	private static ExportResult runEncode(Mp4ExportRequest request, ExportFrameProvider frames,
+			ExportProgressListener listener, ExportCancellation cancellation, VideoEncoderSpec spec,
+			boolean yuvInput, Path outputPath, String encoderName,
+			@Nullable Path metadataFile) {
+		long totalFrames = request.totalFrames();
+		List<String> arguments = buildArguments(request, yuvInput, spec, metadataFile);
 		StringBuilder stderr = new StringBuilder();
 		AtomicLong encodedTimeUs = new AtomicLong(-1);
 		RunningProcess process;
@@ -255,6 +283,16 @@ public final class Mp4Encoder {
 	 */
 	public static List<String> buildArguments(Mp4ExportRequest request, boolean yuv420pInput,
 			VideoEncoderSpec spec) {
+		return buildArguments(request, yuv420pInput, spec, null);
+	}
+
+	/**
+	 * The ffmpeg arguments, embedding the chapters of {@code metadataFile} when it is not null.
+	 * The document is an extra {@code ffmetadata} input; {@code -map_chapters 1} attaches its
+	 * chapters to the output, and {@code -map 0} keeps the rest of the streams out of it.
+	 */
+	public static List<String> buildArguments(Mp4ExportRequest request, boolean yuv420pInput,
+			VideoEncoderSpec spec, @Nullable Path metadataFile) {
 		List<String> arguments = new ArrayList<>();
 		arguments.add(FfmpegCli.binary().toString());
 		arguments.addAll(List.of("-y", "-hide_banner", "-loglevel", "error", "-stats_period", "0.5",
@@ -265,10 +303,22 @@ public final class Mp4Encoder {
 				String.valueOf(request.frameRate()), "-i", "pipe:0"));
 		if (request.audioPlan().hasAudio()) {
 			arguments.addAll(request.audioPlan().inputArguments());
+		}
+		boolean chapters = metadataFile != null;
+		if (chapters) {
+			arguments.addAll(List.of("-f", "ffmetadata", "-i",
+					java.util.Objects.requireNonNull(metadataFile).toString()));
+		}
+		if (request.audioPlan().hasAudio()) {
 			arguments.addAll(List.of("-filter_complex", request.audioPlan().filterComplex(),
 					"-map", "0:v:0", "-map", "[aout]"));
 		} else {
 			arguments.addAll(List.of("-map", "0:v:0", "-an"));
+		}
+		if (chapters) {
+			// The metadata input is the last one: one video input + one audio input per file.
+			int metadataIndex = request.audioPlan().inputs().size() + 1;
+			arguments.addAll(List.of("-map_chapters", String.valueOf(metadataIndex)));
 		}
 		List<String> filters = new ArrayList<>();
 		if (!yuv420pInput) {

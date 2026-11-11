@@ -38,8 +38,10 @@ import dev.gravaai.core.project.ClipTransition;
 import dev.gravaai.core.project.ClipTransitionKind;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.FigureData;
+import dev.gravaai.core.project.MarkerTimeline;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.SpeedRegion;
+import dev.gravaai.core.project.TimelineMarker;
 import dev.gravaai.core.project.ZoomDepth;
 import dev.gravaai.core.project.ZoomFocus;
 import dev.gravaai.core.project.ZoomMode;
@@ -80,7 +82,7 @@ public final class AgentPlanner {
 	/** Region kinds that can be created by an op; each has its own id counter. */
 	public enum IdKind {
 		ZOOM("zoom"), CLIP("clip"), ANNOTATION("annotation"), AUDIO("audio"), SPEED("speed"),
-		CAMERA("camera"), ELEMENT("element"), GRADE("grade");
+		CAMERA("camera"), ELEMENT("element"), GRADE("grade"), MARKER("marker");
 
 		private final String wire;
 
@@ -140,7 +142,7 @@ public final class AgentPlanner {
 	private static final Set<String> HISTORY_OPS = Set.of("undo", "redo", "revert_ai");
 	private static final Set<String> ARRAY_SETTING_KEYS = Set.of("zoomRegions", "trimRegions",
 			"clipRegions", "speedRegions", "annotationRegions", "audioRegions", "autoCaptions",
-			"sourceAudioTrackSettingsByClip", "defaultSourceAudioTrackSettings");
+			"markers", "sourceAudioTrackSettingsByClip", "defaultSourceAudioTrackSettings");
 
 	/** Applies a batch of raw ops; the returned failure carries the first failing op index. */
 	public static Result apply(ProjectEditorState state, JsonNode opsInput, Context context) {
@@ -877,13 +879,14 @@ public final class AgentPlanner {
 		for (Map.Entry<String, String> entry : AgentIds.elementShortById(state).entrySet()) {
 			result = result.replace("{{e:" + entry.getKey() + "}}", entry.getValue());
 		}
-		for (String kind : List.of("z", "s", "a", "m", "q", "g")) {
+		for (String kind : List.of("z", "s", "a", "m", "q", "g", "k")) {
 				Map<String, String> lookup = switch (kind) {
 					case "z" -> map.zoomShortById();
 					case "s" -> map.speedShortById();
 					case "a" -> map.annotationShortById();
 					case "m" -> map.audioShortById();
 					case "g" -> map.gradeShortById();
+					case "k" -> map.markerShortById();
 					default -> map.cueShortById();
 				};
 			for (Map.Entry<String, String> entry : lookup.entrySet()) {
@@ -901,6 +904,7 @@ public final class AgentPlanner {
 			case "a" -> draft.ids.annotationShortById();
 			case "m" -> draft.ids.audioShortById();
 			case "g" -> draft.ids.gradeShortById();
+			case "k" -> draft.ids.markerShortById();
 			default -> draft.ids.cueShortById();
 		};
 	}
@@ -954,6 +958,9 @@ public final class AgentPlanner {
 			case "merge_captions" -> mergeCaptions(draft, raw);
 			case "delete_caption" -> deleteCaption(draft, raw);
 			case "captions_style" -> captionsStyle(draft, raw);
+			case "marker" -> addMarker(draft, raw);
+			case "update_marker" -> updateMarker(draft, raw);
+			case "delete_marker" -> deleteMarker(draft, raw);
 			case "set" -> setSettings(draft, raw);
 			default -> throw fail("unknown op \"" + op + "\"; call inspect help for the op list");
 		}
@@ -2052,5 +2059,91 @@ public final class AgentPlanner {
 		Map<String, JsonNode> values = AgentOpReader.readValues(raw);
 		draft.state = AgentSettings.applySettingPatch(draft.state, values);
 		draft.summary.add("set " + String.join(", ", values.keySet()));
+	}
+
+	// Marker ops ----------------------------------------------------------------------------
+
+	private static TimelineMarker findMarker(Draft draft, String shortId) {
+		String id = draft.ids.markerIdByShort().get(shortId.trim());
+		if (id == null) {
+			throw fail(shortId + " not found; markers: "
+					+ AgentIds.describeShorts(draft.ids.markerIds(), "k"));
+		}
+		return draft.state.markers().stream()
+				.filter(candidate -> candidate.id().equals(id)).findFirst()
+				.orElseThrow(() -> fail(shortId + " not found"));
+	}
+
+	/**
+	 * {@code marker {at, name?, chapter?}}: places a marker at a SOURCE time, like caption cues.
+	 * Markers ride the footage, so the op speaks the recording's own clock; {@code inspect
+	 * timeline} shows them mapped onto the edited timeline.
+	 */
+	private static void addMarker(Draft draft, ObjectNode raw) {
+		double at = AgentOpReader.number(raw, "at");
+		long sourceMs = Math.max(0, Math.min(toMs(at), sourceDurationMs(draft)));
+		String name = AgentOpReader.optionalString(raw, "name");
+		boolean chapter = Boolean.TRUE.equals(AgentOpReader.optionalBoolean(raw, "chapter"));
+		String id = draft.ctx.createId().apply(IdKind.MARKER);
+		List<TimelineMarker> markers = new ArrayList<>(draft.state.markers());
+		markers.add(new TimelineMarker(id, sourceMs,
+				name == null ? TimelineMarker.defaultName(markers.size() + 1)
+						: TimelineMarker.cleanName(name),
+				chapter));
+		markers.sort(Comparator.comparingLong(TimelineMarker::startMs));
+		draft.state = draft.state.toBuilder().markers(markers).build();
+		draft.summary.add("marker " + shortRef("k", id) + " at "
+				+ AgentIds.formatSeconds(sourceMs) + "s src" + (chapter ? " (chapter)" : ""));
+		TimelineMarker added = markers.stream().filter(marker -> marker.id().equals(id))
+				.findFirst().orElseThrow();
+		Long addedTimelineMs = MarkerTimeline.timelineMs(added, draft.state.clipRegions());
+		long timelineMs = addedTimelineMs == null ? sourceMs : addedTimelineMs;
+		push(draft, Highlight.Kind.ADDED, timelineMs, timelineMs + 1, "marker");
+	}
+
+	/**
+	 * {@code update_marker {id, at?, name?, chapter?}}: retimes (source seconds), renames, or
+	 * promotes the marker to a chapter / demotes it.
+	 */
+	private static void updateMarker(Draft draft, ObjectNode raw) {
+		String shortId = AgentOpReader.string(raw, "id");
+		TimelineMarker marker = findMarker(draft, shortId);
+		Double at = AgentOpReader.optionalNumber(raw, "at");
+		String name = AgentOpReader.optionalString(raw, "name");
+		Boolean chapter = AgentOpReader.optionalBoolean(raw, "chapter");
+		long sourceMs = at == null ? marker.startMs()
+				: Math.max(0, Math.min(toMs(at), sourceDurationMs(draft)));
+		TimelineMarker next = new TimelineMarker(marker.id(), sourceMs,
+				name == null ? marker.name() : TimelineMarker.cleanName(name),
+				chapter == null ? marker.chapter() : chapter);
+		List<TimelineMarker> markers = new ArrayList<>();
+		for (TimelineMarker candidate : draft.state.markers()) {
+			markers.add(candidate.id().equals(marker.id()) ? next : candidate);
+		}
+		markers.sort(Comparator.comparingLong(TimelineMarker::startMs));
+		draft.state = draft.state.toBuilder().markers(markers).build();
+		draft.summary.add("updated " + shortId);
+		Long timelineMs = MarkerTimeline.timelineMs(next, draft.state.clipRegions());
+		push(draft, Highlight.Kind.CHANGED, timelineMs == null ? sourceMs : timelineMs,
+				(timelineMs == null ? sourceMs : timelineMs) + 1, "marker");
+	}
+
+	/** {@code delete_marker {id}} or {@code {all:true}}. */
+	private static void deleteMarker(Draft draft, ObjectNode raw) {
+		Boolean all = AgentOpReader.optionalBoolean(raw, "all");
+		if (Boolean.TRUE.equals(all)) {
+			int count = draft.state.markers().size();
+			draft.state = draft.state.toBuilder().markers(List.of()).build();
+			draft.summary.add("deleted " + count + (count == 1 ? " marker" : " markers"));
+			return;
+		}
+		String shortId = AgentOpReader.optionalString(raw, "id");
+		if (shortId == null || shortId.isBlank()) {
+			throw fail("delete_marker needs \"id\" or \"all\": true");
+		}
+		TimelineMarker marker = findMarker(draft, shortId);
+		draft.state = draft.state.toBuilder().markers(draft.state.markers().stream()
+				.filter(candidate -> !candidate.id().equals(marker.id())).toList()).build();
+		draft.summary.add("deleted " + shortId);
 	}
 }

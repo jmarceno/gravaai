@@ -78,6 +78,7 @@ public final class SelectionCommands {
 					|| store.selectedKeystrokeId() != null
 					|| store.selectedGradeId() != null
 					|| store.selectedCameraLayoutId() != null
+					|| store.selectedMarkerId() != null
 					|| store.selectedElementId().isPresent()
 					|| !store.multiSelection().isEmpty();
 			store.clearSelectionsExcept(null, null, null, null, null);

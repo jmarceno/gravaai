@@ -462,7 +462,9 @@ public final class ProjectPersistence {
 						? ClipSequence.rippleRegions(normalizeElements(field(editor, "elements")),
 								normalizedClipRegions, sequenceClips, ClipSequence.ELEMENT_SPAN)
 						: normalizeElements(field(editor, "elements")),
-				normalizeElementAssets(field(editor, "elementAssets"))));
+				normalizeElementAssets(field(editor, "elementAssets")),
+				// Markers are source-time anchors like caption cues: a ripple edit cannot move them.
+				normalizeMarkers(field(editor, "markers"))));
 	}
 
 	/**
@@ -674,6 +676,37 @@ public final class ProjectPersistence {
 			regions.add(new SpeedRegion(id, span.startMs(), span.endMs(), speed));
 		}
 		return List.copyOf(regions);
+	}
+
+	/**
+	 * Normalizes the marker list: drops malformed entries, de-duplicates ids, keeps the list in
+	 * source order. Names are trimmed and clamped; a marker with no name still gets the generic
+	 * one, because a nameless chapter would export as a blank line.
+	 */
+	private static List<TimelineMarker> normalizeMarkers(JsonNode rawMarkers) {
+		if (rawMarkers == null || !rawMarkers.isArray()) {
+			return List.of();
+		}
+		List<TimelineMarker> markers = new ArrayList<>();
+		java.util.Set<String> seenIds = new java.util.HashSet<>();
+		for (JsonNode marker : rawMarkers) {
+			if (marker == null || !marker.isObject()) {
+				continue;
+			}
+			String id = text(field(marker, "id"));
+			if (id == null || id.isBlank() || !seenIds.add(id)) {
+				continue;
+			}
+			if (!isFiniteNumber(field(marker, "startMs"))) {
+				continue;
+			}
+			long startMs = Math.max(0, Math.round(field(marker, "startMs").doubleValue()));
+			String name = TimelineMarker.cleanName(text(field(marker, "name")));
+			boolean chapter = booleanOr(field(marker, "chapter"), false);
+			markers.add(new TimelineMarker(id, startMs, name, chapter));
+		}
+		markers.sort(java.util.Comparator.comparingLong(TimelineMarker::startMs));
+		return List.copyOf(markers);
 	}
 
 	/**

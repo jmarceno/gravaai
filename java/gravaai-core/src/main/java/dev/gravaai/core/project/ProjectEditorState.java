@@ -78,7 +78,8 @@ public record ProjectEditorState(
 		List<CameraLayoutSegment> cameraLayoutSegments,
 		List<ElementComponent> elementComponents,
 		List<SceneElement> elements,
-		List<ElementAsset> elementAssets) {
+		List<ElementAsset> elementAssets,
+		List<TimelineMarker> markers) {
 
 	/**
 	 * Copy with a new caption list, without re-normalising the rest of the state. The editor needs
@@ -102,7 +103,7 @@ public record ProjectEditorState(
 				annotationRegions, audioRegions, nextAutoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, sourceAudioTrackSettingsByClip,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
-				elementComponents, elements, elementAssets);
+				elementComponents, elements, elementAssets, markers);
 	}
 
 	/**
@@ -129,7 +130,7 @@ public record ProjectEditorState(
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio, normalized,
 				defaultSourceAudioTrackSettings, keystrokeElements, cameraLayoutSegments,
-				elementComponents, elements, elementAssets);
+				elementComponents, elements, elementAssets, markers);
 	}
 
 	/**
@@ -157,7 +158,7 @@ public record ProjectEditorState(
 				annotationRegions, audioRegions, autoCaptions, autoCaptionSettings,
 				keystrokeOverlay, webcam, clickSound, keySound, aspectRatio,
 				sourceAudioTrackSettingsByClip, normalized, keystrokeElements,
-				cameraLayoutSegments, elementComponents, elements, elementAssets);
+				cameraLayoutSegments, elementComponents, elements, elementAssets, markers);
 	}
 
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
@@ -240,6 +241,7 @@ public record ProjectEditorState(
 		private List<ElementComponent> elementComponents;
 		private List<SceneElement> elements;
 		private List<ElementAsset> elementAssets;
+		private List<TimelineMarker> markers;
 
 		private Builder(ProjectEditorState state) {
 			wallpaper = state.wallpaper;
@@ -304,6 +306,7 @@ public record ProjectEditorState(
 			elementComponents = state.elementComponents;
 			elements = state.elements;
 			elementAssets = state.elementAssets;
+			markers = state.markers;
 		}
 
 		public Builder wallpaper(String value) {
@@ -616,6 +619,11 @@ public record ProjectEditorState(
 			return this;
 		}
 
+		public Builder markers(List<TimelineMarker> value) {
+			markers = List.copyOf(value);
+			return this;
+		}
+
 		/**
 		 * Copies one component, named as in the project JSON, from another state. Agent settings
 		 * paths name components at run time; the switch keeps every copy type-checked.
@@ -684,6 +692,7 @@ public record ProjectEditorState(
 				case "elementComponents" -> elementComponents = from.elementComponents;
 				case "elements" -> elements = from.elements;
 				case "elementAssets" -> elementAssets = from.elementAssets;
+				case "markers" -> markers = from.markers;
 				default -> throw new IllegalArgumentException("unknown editor component " + component);
 			}
 			return this;
@@ -752,7 +761,8 @@ public record ProjectEditorState(
 					cameraLayoutSegments,
 					elementComponents,
 					elements,
-					elementAssets);
+					elementAssets,
+					markers);
 		}
 	}
 }

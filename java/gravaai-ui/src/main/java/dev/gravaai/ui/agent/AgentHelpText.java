@@ -18,8 +18,9 @@ public final class AgentHelpText {
 
 	/** {@code HELP_TOPICS}: the topic names in help order. */
 	public static final List<String> TOPICS = List.of("clips", "zoom", "transcript", "speed",
-			"color", "annotations", "elements", "audio", "captions", "settings", "sources", "history",
-			"inspect", "project", "export", "meeting", "frames", "jobs", "conventions");
+			"color", "annotations", "elements", "audio", "captions", "markers", "settings",
+			"sources", "history", "inspect", "project", "export", "meeting", "frames", "jobs",
+			"conventions");
 
 	/** {@code HELP_INDEX}. */
 	public static final String INDEX = """
@@ -35,6 +36,7 @@ public final class AgentHelpText {
 			elements     component delete_component element update_element delete_element asset delete_asset — animated JS components (title cards, lower thirds, Lottie, shaders, 3D, anything you can draw)
 			audio        audio update_audio delete_audio source_audio
 			captions     caption update_caption split_caption merge_captions delete_caption captions_style
+			markers      marker update_marker delete_marker — named points on the recording; chapters export to MP4 metadata + chapters.txt
 			settings     set {key: value} — any key from inspect {view:"settings"}
 			history      undo n | redo n | revert_ai (send alone)
 			sources      audio/image paths, ids and where they come from
@@ -113,6 +115,14 @@ public final class AgentHelpText {
 			merge_captions {a,b} — must be adjacent.
 			delete_caption {id} | {all:true}
 			captions_style {…any autoCaptionSettings key}, e.g. {fontSize:40, textColor:"#FFFFFF"}""".stripTrailing();
+
+	private static final String MARKERS = """
+			marker {at, name?, chapter?} — place a marker at a SOURCE time (the recording's own clock, like captions). name defaults to "Marker N"; chapter:true promotes it.
+			update_marker {id, at?, name?, chapter?} — retime (source seconds), rename, promote to a chapter or demote it.
+			delete_marker {id} | {all:true}
+			Markers ride the footage: trims, cuts and reorders move them with it, and a marker whose footage was cut away disappears from the timeline (it is not deleted).
+			Chapters are exported as MP4 chapter metadata plus a YouTube-ready chapters.txt sidecar; when the first chapter starts after 00:00 an "Intro" chapter at 00:00 is added, because YouTube ignores lists that do not start there.
+			inspect {view:"timeline"} lists markers as k1, k2 … with their edited-timeline time and their source time.""".stripTrailing();
 
 	private static final String SETTINGS = """
 			set {key: value, …} — dotted paths allowed (padding.top, webcam.positionPreset, cropRegion.x).
@@ -254,6 +264,7 @@ public final class AgentHelpText {
 			case "elements" -> ELEMENTS;
 			case "audio" -> AUDIO;
 			case "captions" -> CAPTIONS;
+			case "markers" -> MARKERS;
 			case "settings" -> SETTINGS;
 			case "sources" -> SOURCES;
 			case "history" -> HISTORY;

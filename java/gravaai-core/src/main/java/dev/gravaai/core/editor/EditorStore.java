@@ -55,6 +55,7 @@ public final class EditorStore {
 	private @Nullable String selectedKeystrokeId;
 	private @Nullable String selectedGradeId;
 	private @Nullable String selectedCameraLayoutId;
+	private @Nullable String selectedMarkerId;
 	private java.util.Optional<String> selectedElementId = java.util.Optional.empty();
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
 	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
@@ -81,9 +82,19 @@ public final class EditorStore {
 
 	/** Applies a command, records an undo step when it changed the state, and publishes. */
 	public boolean apply(EditorCommand command) {
+		return apply(command, null);
+	}
+
+	/**
+	 * Applies a command with an undo label (e.g. {@code "AI: cut 2 ranges"}). The label is what
+	 * {@link EditorHistory#peekUndoLabel} and the history menu show for this step; a null label
+	 * records an unlabeled step, like {@link #apply(EditorCommand)}.
+	 */
+	public boolean apply(EditorCommand command, @Nullable String undoLabel) {
 		boolean changed = command.apply(this);
 		if (changed) {
-			EditorHistory.record(history, snapshot());
+			EditorHistory.record(history, snapshot(),
+					new EditorHistory.RecordOptions(null, null, undoLabel));
 			changes.publish(this);
 		}
 		return changed;
@@ -155,6 +166,23 @@ public final class EditorStore {
 		ObjectNode json = editorJson();
 		json.set("elementAssets", ProjectDocument.writeElementAssets(assets));
 		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
+	/** Replaces the timeline markers (the undoable list; the view projects them onto the timeline). */
+	public void setMarkers(List<dev.gravaai.core.project.TimelineMarker> markers) {
+		ObjectNode json = editorJson();
+		json.set("markers", ProjectDocument.writeMarkers(markers));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
+	/** The selected timeline marker, if any (markers select from the ruler, not from a lane). */
+	public @Nullable String selectedMarkerId() {
+		return selectedMarkerId;
+	}
+
+	/** Selects a marker; pass {@code null} to clear it. */
+	public void setSelectedMarkerId(@Nullable String id) {
+		this.selectedMarkerId = id;
 	}
 
 	/** The selected element on the elements lane, if any. */
@@ -234,7 +262,8 @@ public final class EditorStore {
 				state.cameraLayoutSegments(), selectedCameraLayoutId, state.elementComponents(),
 				state.elements(), state.elementAssets(), selectedElementId,
 				state.defaultSourceAudioTrackSettings() == null ? null
-						: state.defaultSourceAudioTrackSettings().deepCopy());
+						: state.defaultSourceAudioTrackSettings().deepCopy(),
+				state.markers());
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -251,6 +280,8 @@ public final class EditorStore {
 		setElementComponents(snapshot.elementComponents());
 		setElements(snapshot.elements());
 		setElementAssets(snapshot.elementAssets());
+		setMarkers(snapshot.markers());
+		selectedMarkerId = null;
 		selectedElementId = snapshot.selectedElementId();
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();
@@ -377,6 +408,7 @@ public final class EditorStore {
 		selectedKeystrokeId = keepKeystroke;
 		selectedGradeId = keepGrade;
 		selectedCameraLayoutId = null;
+		selectedMarkerId = null;
 		selectedElementId = java.util.Optional.empty();
 		multiSelection.clear();
 	}

@@ -374,7 +374,7 @@ public final class ProjectExporter {
 		}
 	}
 
-	/** Moves the caption sidecars written next to the staged file to the final destination. */
+	/** Moves the caption and chapter sidecars written next to the staged file to the destination. */
 	private static void moveSidecars(Path stagedFile, Path destination) {
 		if (stagedFile == null) {
 			return;
@@ -385,7 +385,7 @@ public final class ProjectExporter {
 		String finalName = destination.getFileName().toString();
 		int finalDot = finalName.lastIndexOf('.');
 		String finalBase = finalDot > 0 ? finalName.substring(0, finalDot) : finalName;
-		for (String extension : List.of(".srt", ".vtt")) {
+		for (String extension : List.of(".srt", ".vtt", ".chapters.txt")) {
 			Path sidecar = stagedFile.resolveSibling(stagedBase + extension);
 			if (!Files.isRegularFile(sidecar)) {
 				continue;
@@ -395,7 +395,7 @@ public final class ProjectExporter {
 						StandardCopyOption.REPLACE_EXISTING);
 			} catch (IOException error) {
 				LOG.log(System.Logger.Level.WARNING,
-						"could not move the caption sidecar: " + error);
+						"could not move the export sidecar: " + error);
 			}
 		}
 	}

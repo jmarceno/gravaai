@@ -3,6 +3,7 @@ package dev.gravaai.services.export;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -13,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
+import dev.gravaai.core.project.Chapters;
 import dev.gravaai.media.export.CaptionSidecars;
 import dev.gravaai.media.export.ExportAudioPlan;
 import dev.gravaai.media.export.ExportCancellation;
@@ -42,19 +44,30 @@ public final class ExportCoordinator implements AutoCloseable {
 	public record Request(ExportFormat format, int width, int height, int frameRate, int bitrate,
 			ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
 			Path destination, boolean reveal, boolean overwrite,
-			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {
+			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan,
+			List<Chapters.Chapter> chapters) {
 
 		public Request {
 			Objects.requireNonNull(destination, "export destination is required");
 			Objects.requireNonNull(format, "export format is required");
 			Objects.requireNonNull(encodingMode, "export encoding mode is required");
 			Objects.requireNonNull(audioPlan, "export audio plan is required");
+			chapters = chapters == null ? List.of() : List.copyOf(chapters);
+		}
+
+		/** A request without chapter metadata (the shape callers used before markers). */
+		public Request(ExportFormat format, int width, int height, int frameRate, int bitrate,
+				ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
+				Path destination, boolean reveal, boolean overwrite,
+				CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {
+			this(format, width, height, frameRate, bitrate, encodingMode, durationSeconds, gifLoop,
+					destination, reveal, overwrite, captionSidecars, audioPlan, List.of());
 		}
 
 		ExportRunner.Spec toSpec() {
 			return new ExportRunner.Spec(format, width, height, frameRate, bitrate, encodingMode,
 					durationSeconds, gifLoop, destination, reveal, overwrite, captionSidecars,
-					audioPlan);
+					audioPlan, chapters);
 		}
 	}
 

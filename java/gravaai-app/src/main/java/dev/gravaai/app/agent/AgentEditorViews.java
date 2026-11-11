@@ -46,7 +46,7 @@ final class AgentEditorViews {
 
 	private static final Set<String> TIMELINE_KEYS = Set.of("zoomRegions", "trimRegions",
 			"clipRegions", "speedRegions", "annotationRegions", "audioRegions", "autoCaptions",
-			"autoFullTrackClipId", "autoFullTrackClipEndMs");
+			"autoFullTrackClipId", "autoFullTrackClipEndMs", "markers");
 
 	/** Setting-key hints copied from {@code SETTING_HINTS} in the React source. */
 	private static final Map<String, String> SETTING_HINTS = Map.ofEntries(
@@ -442,6 +442,28 @@ final class AgentEditorViews {
 				: "captions: " + cueCount + " cues"
 						+ (state.autoCaptionSettings().enabled() ? "" : " (disabled)")
 						+ " \u2014 inspect view:\"transcript\" for words");
+		// Markers are source-time anchors; the line shows their edited-timeline position too.
+		List<dev.gravaai.core.project.MarkerTimeline.Fragment> markers =
+				dev.gravaai.core.project.MarkerTimeline.projectMarkers(state.markers(),
+						state.clipRegions());
+		if (markers.isEmpty()) {
+			lines.add(state.markers().isEmpty() ? "markers: none"
+					: "markers: " + state.markers().size() + " (none on the edited timeline)");
+		} else {
+			int chapterCount = (int) markers.stream().filter(f -> f.marker().chapter()).count();
+			lines.add("markers: " + markers.size()
+					+ (chapterCount > 0 ? " (" + chapterCount + " chapters)" : ""));
+			for (var fragment : markers) {
+				if (!overlaps(fragment.timelineMs(), fragment.timelineMs() + 1, fromMs, toMs)) {
+					continue;
+				}
+				lines.add("  " + ids.markerShortById().getOrDefault(fragment.marker().id(), "?")
+						+ " " + seconds(fragment.timelineMs()) + " src "
+						+ seconds(fragment.marker().startMs()) + " "
+						+ (fragment.marker().chapter() ? "[chapter] " : "")
+						+ fragment.marker().name());
+			}
+		}
 		lines.add("rev " + rev);
 		return String.join("\n", lines);
 	}

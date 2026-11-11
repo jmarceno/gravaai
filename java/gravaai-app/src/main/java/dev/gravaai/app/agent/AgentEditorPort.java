@@ -268,7 +268,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 		}
 
 		ProjectEditorState before = state;
-		commit(session, ok.state());
+		commit(session, ok.state(), "AI: " + label);
 		long newRev = rev(session);
 		pushRevert(new RevertEntry(before, newRev));
 		highlightSink.accept(highlights(ok.highlights(), label));
@@ -352,10 +352,15 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 
 	/** One editor store change = one undo step, so the user can Ctrl+Z the whole AI batch. */
 	private void commit(EditorSession session, ProjectEditorState next) {
+		commit(session, next, null);
+	}
+
+	/** As above, recording {@code undoLabel} (e.g. {@code "AI: cut 2 ranges"}) on the undo step. */
+	private void commit(EditorSession session, ProjectEditorState next, @Nullable String undoLabel) {
 		session.store().apply(editor -> {
 			editor.replaceState(next);
 			return true;
-		});
+		}, undoLabel);
 	}
 
 	private void pushRevert(RevertEntry entry) {
@@ -400,6 +405,7 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 			case CAMERA -> state.cameraLayoutSegments().stream()
 					.map(segment -> segment.id()).toList();
 			case GRADE -> state.gradeRegions().stream().map(grade -> grade.id()).toList();
+			case MARKER -> state.markers().stream().map(marker -> marker.id()).toList();
 		};
 	}
 

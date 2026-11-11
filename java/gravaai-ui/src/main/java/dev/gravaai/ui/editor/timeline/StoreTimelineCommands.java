@@ -19,6 +19,7 @@ import dev.gravaai.core.editor.EditorStore;
 import dev.gravaai.core.editor.CameraLayoutCommands;
 import dev.gravaai.core.editor.GradeCommands;
 import dev.gravaai.core.editor.KeystrokeCommands;
+import dev.gravaai.core.editor.MarkerCommands;
 import dev.gravaai.core.project.CameraLayoutSegment;
 import dev.gravaai.core.editor.SelectionCommands;
 import dev.gravaai.core.editor.SourceAudioCommands;
@@ -348,6 +349,36 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	@Override
 	public void addCameraLayout(double startMs, double endMs) {
 		store.apply(new CameraLayoutCommands.Add(startMs, endMs));
+	}
+
+	@Override
+	public void addMarker(double timelineMs) {
+		store.apply(new MarkerCommands.Add(Math.round(timelineMs), null));
+	}
+
+	@Override
+	public void moveMarker(String markerId, double timelineMs) {
+		store.apply(new MarkerCommands.MoveToTimelineMs(markerId, Math.round(timelineMs)));
+	}
+
+	@Override
+	public void renameMarker(String markerId, String name) {
+		store.apply(new MarkerCommands.Rename(markerId, name));
+	}
+
+	@Override
+	public void setMarkerChapter(String markerId, boolean chapter) {
+		store.apply(new MarkerCommands.SetChapter(markerId, chapter));
+	}
+
+	@Override
+	public void deleteMarker(String markerId) {
+		store.apply(new MarkerCommands.Delete(markerId));
+	}
+
+	@Override
+	public void selectMarker(@Nullable String markerId) {
+		store.apply(new MarkerCommands.Select(markerId));
 	}
 
 	private void retimeCaption(String id, Span span) {

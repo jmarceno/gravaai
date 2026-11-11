@@ -86,7 +86,9 @@ public final class KeyboardShortcutsHelp {
 				row("Save Project", isMac ? "⌘ S" : "Ctrl + S"),
 				row("Pan Timeline", "Shift + Scroll"),
 				row("Zoom Timeline", "Ctrl + Scroll"),
-				row("Cycle Annotations", "Tab"));
+				row("Cycle Annotations", "Tab"),
+				row("Add Marker", "M"),
+				row("Camera Layout Menu", "L"));
 
 		ScrollPane scroll = new ScrollPane(rows);
 		scroll.setFitToWidth(true);

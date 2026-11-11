@@ -70,6 +70,12 @@ public final class EditorSnapshot {
 			    {"id": "cap-1", "startMs": 500, "endMs": 4500, "text": "So the inspector docks on the right"},
 			    {"id": "cap-2", "startMs": 6000, "endMs": 11000, "text": "and stays open through the edit"},
 			    {"id": "cap-3", "startMs": 15000, "endMs": 19000, "text": "That is the whole idea."}
+			  ],
+			  "markers": [
+			    {"id": "marker-1", "startMs": 0, "name": "Intro", "chapter": true},
+			    {"id": "marker-2", "startMs": 8000, "name": "The inspector", "chapter": true},
+			    {"id": "marker-3", "startMs": 20000, "name": "Zoom demo", "chapter": false},
+			    {"id": "marker-4", "startMs": 30000, "name": "Recap", "chapter": true}
 			  ]
 			}
 			""";

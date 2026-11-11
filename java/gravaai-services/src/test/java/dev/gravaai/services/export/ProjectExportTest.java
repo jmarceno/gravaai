@@ -109,6 +109,50 @@ class ProjectExportTest {
 	}
 
 	@Test
+	@DisplayName("chapters come from the markers promoted to chapters, mapped onto the edited timeline")
+	void chaptersFromMarkers() {
+		Path video = media("h264-1080p60.mp4");
+		ObjectNode editor = twoSecondEditor();
+		var markers = editor.putArray("markers");
+		markers.addObject().put("id", "marker-1").put("startMs", 500).put("name", "Step one")
+				.put("chapter", true);
+		markers.addObject().put("id", "marker-2").put("startMs", 1200).put("name", "Note")
+				.put("chapter", false);
+		markers.addObject().put("id", "marker-3").put("startMs", 1500).put("name", "Wrap up")
+				.put("chapter", true);
+		ProjectEditorState state = ProjectPersistence.normalizeProjectEditor(editor);
+		ExportPreferences preferences = preferences(ExportQuality.MEDIUM,
+				ExportEncodingMode.FAST, ExportFormat.MP4, false);
+		ProjectExport.Prepared prepared = ProjectExport.prepare(new ProjectExport.Input(state,
+				video, null, List.of(), preferences, tempDir.resolve("chapters.mp4"), false, false,
+				0, List.of()));
+		// The first chapter starts at 00:00:05, so the list opens with the implicit Intro.
+		assertEquals(List.of(
+				new dev.gravaai.core.project.Chapters.Chapter(0,
+						dev.gravaai.core.project.Chapters.INTRO_TITLE),
+				new dev.gravaai.core.project.Chapters.Chapter(500, "Step one"),
+				new dev.gravaai.core.project.Chapters.Chapter(1500, "Wrap up")),
+				prepared.chapters());
+		assertEquals(prepared.chapters(), prepared.request().chapters());
+	}
+
+	@Test
+	@DisplayName("a GIF export carries no chapters (the format has no metadata stream)")
+	void gifHasNoChapters() {
+		Path video = media("h264-1080p60.mp4");
+		ObjectNode editor = twoSecondEditor();
+		editor.putArray("markers").addObject().put("id", "marker-1").put("startMs", 0)
+				.put("name", "Intro").put("chapter", true);
+		ExportPreferences preferences = preferences(ExportQuality.MEDIUM,
+				ExportEncodingMode.FAST, ExportFormat.GIF, false);
+		ProjectExport.Prepared prepared = ProjectExport.prepare(new ProjectExport.Input(
+				ProjectPersistence.normalizeProjectEditor(editor), video, null, List.of(),
+				preferences, tempDir.resolve("chapters.gif"), false, false, 0, List.of()));
+		assertEquals(List.of(), prepared.chapters());
+		assertEquals(List.of(), prepared.request().chapters());
+	}
+
+	@Test
 	@DisplayName("audio follows the clip sequence (clip speed, muted clip), not speed regions")
 	void audioFollowsTheClipSequence() {
 		// A real export of an edited recording drifted 1 s after a speed region (the audio

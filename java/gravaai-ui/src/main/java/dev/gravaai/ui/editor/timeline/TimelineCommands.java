@@ -168,4 +168,28 @@ public interface TimelineCommands {
 	 */
 	default void addCameraLayout(double startMs, double endMs) {
 	}
+
+	/** Add a marker at a timeline time (the {@code M} shortcut); the editor names it. */
+	default void addMarker(double timelineMs) {
+	}
+
+	/** Move a marker to a timeline position (ruler drag); no-op over a gap. */
+	default void moveMarker(String markerId, double timelineMs) {
+	}
+
+	/** Rename a marker; a blank name falls back to the generic {@code Marker N}. */
+	default void renameMarker(String markerId, String name) {
+	}
+
+	/** Promote a marker to a chapter, or demote it when {@code chapter} is false. */
+	default void setMarkerChapter(String markerId, boolean chapter) {
+	}
+
+	/** Delete one marker. */
+	default void deleteMarker(String markerId) {
+	}
+
+	/** Select a marker in the editor store (ruler click); {@code null} clears it. */
+	default void selectMarker(@org.jspecify.annotations.Nullable String markerId) {
+	}
 }

@@ -22,6 +22,7 @@ import dev.gravaai.app.export.ExportQueueController;
 import dev.gravaai.app.export.ProjectExporter;
 import dev.gravaai.core.editor.ExportPreferences;
 import dev.gravaai.core.event.Subscription;
+import dev.gravaai.core.project.MarkerTimeline;
 import dev.gravaai.core.project.ZoomRegion;
 import dev.gravaai.core.settings.AppSettingsStore;
 import dev.gravaai.services.projects.ProjectLibraryEntry;
@@ -299,6 +300,24 @@ public final class EditorWindow {
 		timeline.onItemPressed(() -> shell.setClipsOpen(false));
 		timeline.setOnCameraLayoutShortcut(() -> shell.playbackControls().showCameraLayoutMenu());
 		timeline.setOnSuggestZooms(this::suggestInteractionZooms);
+		// Markers: a ruler click selects and seeks; double click / the context menu renames.
+		timeline.setOnMarkerSelected(markerId -> {
+			session.store().state().markers().stream()
+					.filter(marker -> marker.id().equals(markerId))
+					.findFirst()
+					.flatMap(marker -> java.util.Optional.ofNullable(MarkerTimeline.timelineMs(
+							marker, session.store().state().clipRegions())))
+					.ifPresent(timelineMs -> {
+						timeline.setCurrentTimeMs(timelineMs);
+						session.timelineCommands().seek(timelineMs);
+					});
+		});
+		timeline.setOnMarkerRenameRequested(markerId -> session.store().state().markers().stream()
+				.filter(marker -> marker.id().equals(markerId))
+				.findFirst()
+				.ifPresent(marker -> new dev.gravaai.ui.editor.MarkerRenameDialog(marker,
+						(id, name) -> session.timelineCommands().renameMarker(id, name))
+						.show(timeline)));
 		shell.setTimelineContent(timeline);
 		// The timeline playhead is drawn from TimelineView.currentTimeMs; nothing else feeds it, so
 		// subscribe to the engine clock here (React: useTimelineState currentTime). Coalesce the

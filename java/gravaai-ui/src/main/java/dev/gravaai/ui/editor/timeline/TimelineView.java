@@ -20,9 +20,11 @@ import dev.gravaai.core.project.CaptionTimeline;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.ClipTransition;
 import dev.gravaai.core.project.ClipTransitionKind;
+import dev.gravaai.core.project.MarkerTimeline;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.SourceAudioTrackSettings;
 import dev.gravaai.core.project.SpeedRegion;
+import dev.gravaai.core.project.TimelineMarker;
 import dev.gravaai.core.project.TrimRegion;
 import dev.gravaai.core.project.ZoomRegion;
 import dev.gravaai.media.compose.SmartFraming;
@@ -203,6 +205,17 @@ public final class TimelineView extends Region {
 	private static final double PLAYHEAD_GRAB_PX = 4;
 	private static final Font PLAYHEAD_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9);
 	private static final Color GRID_LINE = Color.web("#171e24");
+	/* Timeline markers: a violet flag on the ruler, chapters a filled one. */
+	private static final Color MARKER_COLOR = Color.web("#a78bfa");
+	private static final Color MARKER_CHAPTER_COLOR = Color.web("#c4b5fd");
+	private static final Color MARKER_CHAPTER_TEXT = Color.web("#e9e2ff");
+	private static final Color MARKER_TEXT = Color.web("#0d0a17");
+	private static final Color MARKER_PILL_FILL = Color.web("#141020", 0.85);
+	private static final Color MARKER_LINE = Color.web("#a78bfa", 0.35);
+	private static final double MARKER_FLAG_WIDTH = 9;
+	private static final double MARKER_FLAG_HEIGHT = 11;
+	/** Grab tolerance around a marker flag on the ruler, in pixels. */
+	private static final double MARKER_GRAB_PX = 6;
 	private static final Color BLOCK_TEXT = Color.web("#e9f1f4", 0.92);
 	/** Dark pill behind clip labels (mock {@code .clip__lbl}). */
 	private static final Color BADGE_FILL = Color.web("#060a0d", 0.55);
@@ -214,6 +227,8 @@ public final class TimelineView extends Region {
 	private static final long[] FADE_DURATION_CHOICES_MS = {200, 500, 1000, 2000};
 
 	private static final Font AXIS_FONT = AppFonts.monoFont(9);
+	private static final Font MARKER_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM,
+			8.5);
 	private static final Font BLOCK_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9.5);
 	private static final Font SMALL_FONT = AppFonts.monoFont(9);
 	private static final Font ROW_LABEL_FONT = AppFonts.monoFont(javafx.scene.text.FontWeight.MEDIUM, 9.5);
@@ -337,6 +352,22 @@ public final class TimelineView extends Region {
 	private javafx.collections.@Nullable ListChangeListener<AgentHighlightView> agentHighlightsListener;
 	private java.util.function.@Nullable Consumer<String> onCaptionSelected;
 	private @Nullable Runnable onItemPressed;
+	/**
+	 * Marker gestures that need a dialog or a menu live in the shell (rename prompt, chapter
+	 * toggle menu); the view routes the gesture and keeps the painting.
+	 */
+	private java.util.function.@Nullable Consumer<String> onMarkerRenameRequested;
+	/** A marker was selected on the ruler: the shell scrolls to it and refreshes the inspector. */
+	private java.util.function.@Nullable Consumer<String> onMarkerSelected;
+	/** The marker under the pointer, highlighted while the pointer is over its flag. */
+	private @Nullable String hoveredMarkerId;
+	/** Markers projected onto the edited timeline (source-time markers whose footage is kept). */
+	private List<MarkerTimeline.Fragment> markerFragments = List.of();
+	/** Marker id → ruler flag bounds, for the ruler hit test and the drag ghost. */
+	private final Map<String, BlockBounds> markerBounds = new LinkedHashMap<>();
+	private @Nullable String dragMarkerId;
+	private double dragMarkerMs;
+	private boolean markerDragged;
 	/** Ids of every multi-selected element (Ctrl/Cmd+click toggles; Ctrl/Cmd+A selects all zooms). */
 	private final java.util.LinkedHashSet<String> selectedIds = new java.util.LinkedHashSet<>();
 	/** Live spans of the same-row group during a multi-selection move drag (id → translated span). */
@@ -387,6 +418,7 @@ public final class TimelineView extends Region {
 		canvas.setOnMouseExited(event -> {
 			hoverGhost = null;
 			hoverGhostKind = null;
+			hoveredMarkerId = null;
 			canvas.setCursor(Cursor.DEFAULT);
 			redraw();
 		});
@@ -619,6 +651,9 @@ public final class TimelineView extends Region {
 				() -> javafx.application.Platform.runLater(this::redraw));
 		captionFragments = CaptionTimeline.projectCaptionCues(project.autoCaptions(),
 				project.clipRegions());
+		// Markers are stored in source time; project them through the retained clips so trims and
+		// cuts move them with the footage (a marker whose footage is gone is not drawn).
+		markerFragments = MarkerTimeline.projectMarkers(project.markers(), project.clipRegions());
 		clipPresentation = buildClipPresentation(project.clipRegions());
 		rowLayouts = buildRowLayouts();
 		requestLayout();
@@ -843,6 +878,14 @@ public final class TimelineView extends Region {
 
 	private void handleMousePressed(MouseEvent event) {
 		if (event.getButton() == MouseButton.SECONDARY) {
+			// A right click on a marker flag opens its chapter menu instead of the clip fade menu.
+			String markerId = markerAt(event.getX(), event.getY());
+			if (markerId != null) {
+				selectMarker(markerId);
+				showMarkerContextMenu(markerId, event.getX(), event.getY());
+				event.consume();
+				return;
+			}
 			openClipContextMenu(event.getX(), event.getY());
 			event.consume();
 			return;
@@ -851,8 +894,52 @@ public final class TimelineView extends Region {
 			return;
 		}
 		canvas.requestFocus();
+		if (event.getClickCount() >= 2 && markerAt(event.getX(), event.getY()) != null) {
+			// Double click on a flag renames it, like the caption strip's double click edits text.
+			String markerId = java.util.Objects.requireNonNull(markerAt(event.getX(), event.getY()));
+			selectMarker(markerId);
+			if (onMarkerRenameRequested != null) {
+				onMarkerRenameRequested.accept(markerId);
+			}
+			event.consume();
+			return;
+		}
+		String markerId = markerAt(event.getX(), event.getY());
+		if (markerId != null) {
+			// A marker press selects it and starts a ruler drag: the flag follows the pointer and
+			// the store commits the new position on release.
+			pressMarker(markerId, event.getX());
+			event.consume();
+			return;
+		}
 		pressAt(event.getX(), contentY(event.getY()),
 				event.isControlDown() || event.isMetaDown());
+	}
+
+	/** Starts a ruler drag on a marker; also what {@link #pressAt} does over a flag. */
+	private void pressMarker(String markerId, double x) {
+		selectMarker(markerId);
+		dragMarkerId = markerId;
+		markerDragged = false;
+		dragStartX = x;
+	}
+
+	/** The marker flag under a canvas point (ruler strip or the flag's grab box), if any. */
+	public @Nullable String markerAt(double x, double y) {
+		for (Map.Entry<String, BlockBounds> entry : markerBounds.entrySet()) {
+			if (entry.getValue().contains(x, y)) {
+				return entry.getKey();
+			}
+		}
+		return null;
+	}
+
+	private void selectMarker(String markerId) {
+		commands.selectMarker(markerId);
+		if (onMarkerSelected != null) {
+			onMarkerSelected.accept(markerId);
+		}
+		redraw();
 	}
 
 	/** Picks a block edge for resize, or starts a move; the TestFX harness uses this. */
@@ -867,6 +954,14 @@ public final class TimelineView extends Region {
 	 */
 	public void pressAt(double x, double y, boolean additive) {
 		resetDrag();
+		if (y <= AXIS_HEIGHT) {
+			// Ruler presses: a marker flag starts its drag; the playhead cap keeps its scrub grab.
+			String markerId = markerAt(x, y);
+			if (markerId != null) {
+				pressMarker(markerId, x);
+				return;
+			}
+		}
 		if (isOnPlayhead(x, y)) {
 			// PlaybackCursor cap drag: scrub without changing the selection.
 			scrubbing = true;
@@ -1111,7 +1206,57 @@ public final class TimelineView extends Region {
 		return choices;
 	}
 
-	/** One kit menu row with a check mark for the active option (Select's list-box row shape). */
+	/** The marker context menu: rename, promote/demote to chapter, delete. */
+	private void showMarkerContextMenu(String markerId, double canvasX, double viewY) {
+		TimelineMarker marker = null;
+		for (TimelineMarker candidate : dataSource.project().markers()) {
+			if (candidate.id().equals(markerId)) {
+				marker = candidate;
+				break;
+			}
+		}
+		if (marker == null) {
+			return;
+		}
+		TimelineMarker target = marker;
+		Region anchor = new Region();
+		anchor.setManaged(false);
+		anchor.resizeRelocate(canvasX, viewY, 1, 1);
+		getChildren().add(anchor);
+
+		VBox menu = new VBox();
+		menu.getStyleClass().add("menu");
+		VBox content = new VBox(menu);
+		content.getStyleClass().add("popover");
+		Label heading = new Label(target.name());
+		heading.getStyleClass().add("menu__label");
+		menu.getChildren().add(heading);
+
+		Popup[] holder = new Popup[1];
+		menu.getChildren().add(fadeMenuRow("Rename…", false, holder, () -> {
+			if (onMarkerRenameRequested != null) {
+				onMarkerRenameRequested.accept(markerId);
+			}
+		}));
+		menu.getChildren().add(fadeMenuRow(target.chapter() ? "Remove chapter"
+				: "Promote to chapter", target.chapter(), holder,
+				() -> commands.setMarkerChapter(markerId, !target.chapter())));
+		Region separator = new Region();
+		separator.getStyleClass().add("menu__separator");
+		separator.setMaxWidth(Double.MAX_VALUE);
+		VBox.setMargin(separator, new Insets(4, 0, 4, 0));
+		menu.getChildren().add(separator);
+		menu.getChildren().add(fadeMenuRow("Delete marker", false, holder,
+				() -> commands.deleteMarker(markerId)));
+
+		Popup popup = new Popup(anchor, content);
+		popup.side(Anchors.Side.BOTTOM).align(Anchors.Align.START).offset(4).modal(true);
+		popup.onHide(closed -> getChildren().remove(anchor));
+		holder[0] = popup;
+		popup.show();
+	}
+
+	/** One menu row with an optional check mark; clicking hides the popup and runs the action. */
 	private HBox fadeMenuRow(String label, boolean checked, Popup[] popup, Runnable action) {
 		HBox row = new HBox();
 		row.getStyleClass().add("menu-item");
@@ -1137,6 +1282,17 @@ public final class TimelineView extends Region {
 
 	/** Updates the live preview during a drag; the TestFX harness uses this. */
 	public void dragTo(double x, double y) {
+		if (dragMarkerId != null) {
+			// Ruler drag: the flag follows the pointer; the store commits on release.
+			if (!markerDragged && Math.abs(x - dragStartX) <= DRAG_THRESHOLD_PX) {
+				return;
+			}
+			markerDragged = true;
+			hoveredMarkerId = dragMarkerId;
+			dragMarkerMs = Math.max(0, Math.min(timeAtX(x), fullRange.end()));
+			redraw();
+			return;
+		}
 		if (scrubbing) {
 			double time = scrubTimeAtX(x);
 			if (time != currentTimeMs) {
@@ -1245,6 +1401,17 @@ public final class TimelineView extends Region {
 
 	/** Commits the drag or treats the press as a click; the TestFX harness uses this. */
 	public void releaseAt(double x, double y) {
+		if (dragMarkerId != null) {
+			String markerId = dragMarkerId;
+			boolean moved = markerDragged;
+			double time = Math.max(0, Math.min(timeAtX(x), fullRange.end()));
+			resetDrag();
+			if (moved) {
+				commands.moveMarker(markerId, time);
+			}
+			redraw();
+			return;
+		}
 		if (scrubbing) {
 			// handleMouseUp flushes the last pointer position.
 			double time = scrubTimeAtX(x);
@@ -1311,6 +1478,9 @@ public final class TimelineView extends Region {
 		pressedCameraLane = false;
 		cameraLaneDrawSpan = null;
 		scrubbing = false;
+		dragMarkerId = null;
+		dragMarkerMs = 0;
+		markerDragged = false;
 	}
 
 	/** Timeline time under a pointer x, clamped and moved off clip seams (getTimeAtClipSeam). */
@@ -1393,6 +1563,16 @@ public final class TimelineView extends Region {
 	public void moveTo(double x, double y) {
 		hoverGhost = null;
 		hoverGhostKind = null;
+		// Marker flags live on the ruler: hovering one highlights it, pressing drags it.
+		String overMarker = markerAt(x, y);
+		if (!java.util.Objects.equals(overMarker, hoveredMarkerId)) {
+			hoveredMarkerId = overMarker;
+			redraw();
+		}
+		if (overMarker != null) {
+			canvas.setCursor(Cursor.H_RESIZE);
+			return;
+		}
 		boolean overPlayhead = isOnPlayhead(x, y);
 		if (overPlayhead != playheadHovered) {
 			playheadHovered = overPlayhead;
@@ -1614,6 +1794,12 @@ public final class TimelineView extends Region {
 		if (TimelineShortcuts.matches(code, ctrl, meta, shift, alt, shortcutBindings.addZoom(),
 				mac)) {
 			addZoomAtPlayhead();
+			consume(event);
+			return;
+		}
+		if (code == KeyCode.M && !ctrl && !meta && !alt && !shift) {
+			// M: drop a marker at the playhead (the Descript/Screen Studio gesture).
+			commands.addMarker(Math.round(currentTimeMs));
 			consume(event);
 			return;
 		}
@@ -1867,6 +2053,16 @@ public final class TimelineView extends Region {
 	/** Reports the source cue when a caption block is selected on the timeline. */
 	public void setOnCaptionSelected(java.util.function.Consumer<String> listener) {
 		this.onCaptionSelected = listener;
+	}
+
+	/** Asks the shell to open the rename prompt for a marker (double click / Enter / context menu). */
+	public void setOnMarkerRenameRequested(java.util.function.Consumer<String> listener) {
+		this.onMarkerRenameRequested = listener;
+	}
+
+	/** Reports a marker selected on the ruler (so the shell can seek to it and refresh panels). */
+	public void setOnMarkerSelected(java.util.function.Consumer<String> listener) {
+		this.onMarkerSelected = listener;
 	}
 
 	/** Fires when a press selects a timeline item (the shell closes the Clips panel, React parity). */
@@ -2144,6 +2340,7 @@ public final class TimelineView extends Region {
 		blockBounds.clear();
 		cameraSwitchBounds.clear();
 		cameraSwitchOutBounds.clear();
+		markerBounds.clear();
 		if (agentOverlay != null) {
 			agentOverlay.range((long) range.start(), (long) range.end());
 		}
@@ -2154,6 +2351,8 @@ public final class TimelineView extends Region {
 		syncScrollBars();
 		drawGrid(graphics, width, height);
 		drawRuler(graphics, width);
+		// Marker flags go over the ruler's own ticks and time labels (their pills cover them).
+		drawMarkers(graphics, width);
 		// Lanes scroll under the pinned ruler: clip right of the gutter, below the axis.
 		graphics.save();
 		graphics.beginPath();
@@ -2219,6 +2418,69 @@ public final class TimelineView extends Region {
 				continue;
 			}
 			graphics.strokeLine(x, AXIS_HEIGHT - 5, x, AXIS_HEIGHT);
+		}
+	}
+
+	/**
+	 * Markers on the ruler: a small flag at each projected marker, filled when it is a chapter.
+	 * Chapter flags carry their title in the ruler strip; markers only get a tooltip-ish short
+	 * label on hover so a busy ruler stays readable.
+	 */
+	private void drawMarkers(GraphicsContext graphics, double width) {
+		markerBounds.clear();
+		if (markerFragments.isEmpty()) {
+			return;
+		}
+		graphics.setFont(MARKER_FONT);
+		double flagTop = AXIS_HEIGHT - MARKER_FLAG_HEIGHT;
+		for (int index = 0; index < markerFragments.size(); index++) {
+			MarkerTimeline.Fragment fragment = markerFragments.get(index);
+			TimelineMarker marker = fragment.marker();
+			boolean dragged = marker.id().equals(dragMarkerId) && markerDragged;
+			// The dragged flag previews at the pointer until the store commits.
+			double markerMs = dragged ? dragMarkerMs : fragment.timelineMs();
+			double x = xForTime(markerMs);
+			if (x < GUTTER_WIDTH || x > width) {
+				continue;
+			}
+			// The label stops before the next flag (and before the playhead-style edge of the view).
+			double nextMarkerX = width;
+			for (int next = index + 1; next < markerFragments.size(); next++) {
+				double nextX = xForTime(markerFragments.get(next).timelineMs());
+				if (nextX > x) {
+					nextMarkerX = nextX;
+					break;
+				}
+			}
+			boolean hovered = marker.id().equals(hoveredMarkerId) || dragged;
+			boolean chapter = marker.chapter();
+			// The flag is a small pennant: a vertical hairline down through the ruler, then the
+			// head to the right of it, so two markers at the same pixel stay countable.
+			graphics.setStroke(chapter ? MARKER_CHAPTER_COLOR : MARKER_LINE);
+			graphics.setLineWidth(chapter ? 1.5 : 1);
+			graphics.strokeLine(x, flagTop, x, AXIS_HEIGHT);
+			graphics.setFill(chapter ? MARKER_CHAPTER_COLOR : MARKER_COLOR);
+			graphics.fillPolygon(new double[] {x, x + MARKER_FLAG_WIDTH, x + MARKER_FLAG_WIDTH,
+					x}, new double[] {flagTop, flagTop, flagTop + MARKER_FLAG_HEIGHT * 0.75,
+							flagTop + MARKER_FLAG_HEIGHT * 0.5}, 4);
+			double halfWidth = Math.max(MARKER_GRAB_PX, MARKER_FLAG_WIDTH / 2 + 2);
+			markerBounds.put(marker.id(), new BlockBounds(x - halfWidth, 0, halfWidth * 2,
+					AXIS_HEIGHT));
+			// Chapter titles sit on the ruler strip in a small pill (the ruler's own time labels are
+			// underneath them); plain markers show their name only while hovered. The pill is
+			// clipped before the next marker so two chapter titles never run into each other.
+			String label = chapter || hovered ? marker.name() : null;
+			if (label != null && !label.isBlank()) {
+				double labelX = x + MARKER_FLAG_WIDTH + 3;
+				double available = Math.max(24, Math.min(width, nextMarkerX) - labelX - 4);
+				String fitted = fitText(label, Math.max(24, available), MARKER_FONT);
+				double textWidth = textWidth(fitted, MARKER_FONT);
+				graphics.setFill(MARKER_PILL_FILL);
+				graphics.fillRoundRect(labelX - 2, flagTop - 1, textWidth + 4,
+						MARKER_FLAG_HEIGHT, 2, 2);
+				graphics.setFill(hovered ? MARKER_TEXT : MARKER_CHAPTER_TEXT);
+				graphics.fillText(fitted, labelX, flagTop + MARKER_FLAG_HEIGHT - 3);
+			}
 		}
 	}
 

@@ -14,7 +14,8 @@ import dev.gravaai.core.project.ProjectEditorState;
  * Short, stable identifiers used by the agent surface (port of
  * {@code src/components/video-editor/agent/ids.ts}, plan §5.16): the nth clip in timeline order is
  * {@code c1}, zooms are {@code z1}, speed regions {@code s1}, annotations {@code a1}, audio regions
- * {@code m1}, caption cues {@code q1}, transcript words {@code w1} and color grades {@code g1}.
+ * {@code m1}, caption cues {@code q1}, transcript words {@code w1}, color grades {@code g1} and
+ * timeline markers {@code k1}.
  */
 public record AgentIds(List<String> clipIds, List<String> zoomIds, List<String> speedIds,
 		List<String> annotationIds, List<String> audioIds, List<String> cueIds,
@@ -26,7 +27,9 @@ public record AgentIds(List<String> clipIds, List<String> zoomIds, List<String> 
 		Map<String, String> annotationIdByShort, Map<String, String> audioIdByShort,
 		Map<String, String> cueIdByShort, Map<String, String> wordShortByKey,
 		Map<String, String> wordKeyByShort, List<String> gradeIds,
-		Map<String, String> gradeShortById, Map<String, String> gradeIdByShort) {
+		Map<String, String> gradeShortById, Map<String, String> gradeIdByShort,
+		List<String> markerIds, Map<String, String> markerShortById,
+		Map<String, String> markerIdByShort) {
 
 	private record ShortMaps(List<String> ids, Map<String, String> shortById,
 			Map<String, String> idByShort) {}
@@ -50,6 +53,8 @@ public record AgentIds(List<String> clipIds, List<String> zoomIds, List<String> 
 				.map(cue -> new Span(cue.startMs(), cue.endMs(), cue.id())).toList()));
 		ShortMaps grades = shortMaps("g", byStart(state.gradeRegions().stream()
 				.map(region -> new Span(region.startMs(), region.endMs(), region.id())).toList()));
+		ShortMaps markers = shortMaps("k", byStart(state.markers().stream()
+				.map(marker -> new Span(marker.startMs(), marker.startMs(), marker.id())).toList()));
 
 		List<AgentTranscript.Word> words = AgentTranscript.flattenTranscriptWords(
 				state.autoCaptions());
@@ -65,7 +70,8 @@ public record AgentIds(List<String> clipIds, List<String> zoomIds, List<String> 
 				speeds.shortById(), annotationMaps.shortById(), audio.shortById(),
 				cues.shortById(), clips.idByShort(), zooms.idByShort(), speeds.idByShort(),
 				annotationMaps.idByShort(), audio.idByShort(), cues.idByShort(), wordShortByKey,
-				wordKeyByShort, grades.ids(), grades.shortById(), grades.idByShort());
+				wordKeyByShort, grades.ids(), grades.shortById(), grades.idByShort(),
+				markers.ids(), markers.shortById(), markers.idByShort());
 	}
 
 	/** Element short ids: {@code e1}, {@code e2} … in start order (internal id → short id). */

@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,15 +23,32 @@ public final class ExportRunner {
 	 * Everything one export needs.
 	 *
 	 * @param captionSidecars the caption sidecar payload, or null when the export has no captions
+	 * @param chapters the chapters to embed and write as a sidecar, or empty for none
 	 */
 	public record Spec(ExportFormat format, int width, int height, int frameRate, int bitrate,
 			ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
 			Path destination, boolean reveal, boolean overwrite,
-			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {}
+			CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan,
+			List<dev.gravaai.core.project.Chapters.Chapter> chapters) {
+
+		public Spec {
+			chapters = chapters == null ? List.of() : List.copyOf(chapters);
+		}
+
+		/** An export with no chapters (the shape every caller but the editor used before markers). */
+		public Spec(ExportFormat format, int width, int height, int frameRate, int bitrate,
+				ExportEncodingMode encodingMode, double durationSeconds, boolean gifLoop,
+				Path destination, boolean reveal, boolean overwrite,
+				CaptionSidecars.@Nullable Payload captionSidecars, ExportAudioPlan audioPlan) {
+			this(format, width, height, frameRate, bitrate, encodingMode, durationSeconds, gifLoop,
+					destination, reveal, overwrite, captionSidecars, audioPlan, List.of());
+		}
+	}
 
 	/** Result of a published export. */
 	public record Outcome(Path path, long bytes, int frames, double durationSeconds,
-			CaptionSidecars.WriteResult captionSidecars) {}
+			CaptionSidecars.WriteResult captionSidecars,
+			ChapterSidecars.WriteResult chapterSidecars) {}
 
 	private ExportRunner() {}
 
@@ -70,8 +88,8 @@ public final class ExportRunner {
 							frames, capturing, cancellation)
 					: Mp4Encoder.encode(new Mp4ExportRequest(spec.width(), spec.height(),
 							spec.frameRate(), spec.bitrate(), spec.encodingMode(),
-							spec.durationSeconds(), tempFile, spec.audioPlan()), frames, capturing,
-							cancellation);
+							spec.durationSeconds(), tempFile, spec.audioPlan(), spec.chapters()),
+							frames, capturing, cancellation);
 			ExportProgress savingProgress = ExportProgressState
 					.resolveSavingExportProgress(lastProgress.get());
 			capturing.onProgress(savingProgress);
@@ -79,8 +97,14 @@ public final class ExportRunner {
 					new ExportPublisher.Destination(target, spec.reveal()), spec.overwrite());
 			CaptionSidecars.WriteResult sidecars = CaptionSidecars.writeBestEffort(published.path(),
 					spec.captionSidecars());
+			// The chapters are already inside the MP4; the sidecar is the YouTube-ready copy.
+			ChapterSidecars.WriteResult chapterSidecars =
+					format == ExportFormat.MP4
+							? ChapterSidecars.writeBestEffort(published.path(),
+									new ChapterSidecars.Payload(spec.chapters()))
+							: new ChapterSidecars.WriteResult(false, null);
 			return new Outcome(published.path(), published.bytes(), encoded.frames(),
-					encoded.durationSeconds(), sidecars);
+					encoded.durationSeconds(), sidecars, chapterSidecars);
 		} catch (RuntimeException error) {
 			try {
 				Files.deleteIfExists(tempFile);

@@ -15,6 +15,7 @@ import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
 import dev.gravaai.core.project.AudioCleanup;
 import dev.gravaai.core.project.AudioRegion;
 import dev.gravaai.core.project.ClipTransitions;
+import dev.gravaai.core.project.Chapters;
 import dev.gravaai.core.project.Clips;
 import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.ProjectEditorState;
@@ -139,7 +140,19 @@ public final class ProjectExport {
 	public record Prepared(ExportCoordinator.Request request, ExportAudioPlan audioPlan,
 			CaptionSidecars.@Nullable Payload captionPayload, @Nullable ExportFormat format,
 			int outputWidth, int outputHeight, int frameRate, int bitrate, double durationSeconds,
-			Path videoPath, @Nullable Path webcamPath, List<Path> audioInputs) {}
+			Path videoPath, @Nullable Path webcamPath, List<Path> audioInputs,
+			List<Chapters.Chapter> chapters) {
+
+		/** A prepared export without chapters (the shape callers used before markers). */
+		public Prepared(ExportCoordinator.Request request, ExportAudioPlan audioPlan,
+				CaptionSidecars.@Nullable Payload captionPayload, @Nullable ExportFormat format,
+				int outputWidth, int outputHeight, int frameRate, int bitrate,
+				double durationSeconds, Path videoPath, @Nullable Path webcamPath,
+				List<Path> audioInputs) {
+			this(request, audioPlan, captionPayload, format, outputWidth, outputHeight, frameRate,
+					bitrate, durationSeconds, videoPath, webcamPath, audioInputs, List.of());
+		}
+	}
 
 	private ProjectExport() {}
 
@@ -206,13 +219,18 @@ public final class ProjectExport {
 				timelineDurationMs);
 		CaptionSidecars.Payload captionPayload = buildCaptionPayload(editor,
 				preferences.includeCaptionSidecar());
+		// Chapters come from the markers promoted to chapters, projected through the clip timeline.
+		// GIF has no metadata stream, so only MP4 carries them.
+		List<Chapters.Chapter> chapters = format == ExportFormat.MP4
+				? Chapters.build(editor.markers(), editor.clipRegions(), timelineDurationMs)
+				: List.of();
 		ExportCoordinator.Request request = new ExportCoordinator.Request(format, outputWidth,
 				outputHeight, frameRate, bitrate, preferences.exportEncodingMode(), durationSeconds,
 				gifLoop, input.destination(), input.reveal(), input.overwrite(), captionPayload,
-				audioPlan);
+				audioPlan, chapters);
 		return new Prepared(request, audioPlan, captionPayload, format, outputWidth, outputHeight,
 				frameRate, bitrate, durationSeconds, videoPath, input.webcamPath(),
-				audioPlan.inputs());
+				audioPlan.inputs(), chapters);
 	}
 
 	/**

@@ -12,6 +12,7 @@ import dev.gravaai.media.compose.SmartFraming;
 import dev.gravaai.media.playback.PlaybackController;
 import dev.gravaai.media.playback.PlaybackStatus;
 import dev.gravaai.ui.editor.preview.AnnotationOverlayController;
+import dev.gravaai.ui.editor.preview.CropOverlayController;
 import dev.gravaai.ui.editor.preview.EditorPreviewView;
 import dev.gravaai.ui.editor.preview.PreviewFrameMapper;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
@@ -21,6 +22,8 @@ import dev.gravaai.ui.kit.Icon;
 import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.Label;
 import dev.gravaai.ui.kit.Skeleton;
+import dev.gravaai.ui.kit.Toggle;
+import dev.gravaai.ui.kit.Tooltip;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -71,6 +74,13 @@ public final class EditorPreviewPanel extends VBox {
 	private final Label playheadTimecode = new Label("");
 	/** Interactive annotation overlay (selection outline, drag/resize) over the preview. */
 	private final AnnotationOverlayController annotationOverlay;
+	/** Interactive crop overlay (drag handles, aspect lock) shown while crop mode is on. */
+	private final CropOverlayController cropOverlay;
+	/** Crop-mode toolbar controls: the aspect lock and the reset (hidden outside crop mode). */
+	private final Toggle aspectLockToggle;
+	private final Button resetCropButton;
+	/** The mode toggle; renders pressed (secondary) while crop mode is on. */
+	private final Button cropButton;
 	private final Skeleton loadingSkeleton = new Skeleton();
 	private PlaybackController playback;
 	/** Last status pushed by the engine; the panel never takes the engine lock on FX. */
@@ -81,6 +91,8 @@ public final class EditorPreviewPanel extends VBox {
 	private @Nullable Node previewContent;
 	/** Uncommitted overlay drag/resize; the composited annotation follows it live. */
 	private AnnotationOverlayController.@Nullable LiveBox liveAnnotationBox;
+	/** Whether the crop overlay is active (the Crop Video toolbar button toggles it). */
+	private boolean cropMode;
 	/** The smart-framing plan cache: state, track, and stage size the plan was walked for. */
 	private SmartFraming.@Nullable Plan smartFramingPlan;
 	private @Nullable ProjectEditorState smartFramingPlanState;
@@ -96,7 +108,16 @@ public final class EditorPreviewPanel extends VBox {
 		VBox.setVgrow(this, javafx.scene.layout.Priority.ALWAYS);
 		annotationOverlay = new AnnotationOverlayController(store, previewView::geometry,
 				this::currentTimelineSeconds);
-		previewView.setFramePresentedListener(annotationOverlay::sync);
+		cropOverlay = new CropOverlayController(store, previewView::geometry,
+				() -> actions.exportSourceSize()[0], () -> actions.exportSourceSize()[1],
+				() -> {
+					previewView.setScene(currentScene());
+					previewView.requestRepaint();
+				});
+		previewView.setFramePresentedListener(() -> {
+			annotationOverlay.sync();
+			cropOverlay.sync();
+		});
 		annotationOverlay.setLiveBoxListener(box -> {
 			liveAnnotationBox = box;
 			// null arrives right before the commit, whose store change repaints the final box.
@@ -129,14 +150,37 @@ public final class EditorPreviewPanel extends VBox {
 		crop.icon(Icons.Crop);
 		crop.setGraphicTextGap(6);
 		crop.setContentDisplay(ContentDisplay.LEFT);
-		crop.setOnAction(event -> actions.openCropEditor());
+		// Crop handles need the composited frame: no preview, nothing to drag on.
+		crop.disableProperty().bind(previewView.readyProperty().not());
+		crop.setOnAction(event -> setCropMode(!cropMode));
 		cropDot.managedProperty().bind(cropDot.visibleProperty());
 		HBox cropGraphic = new HBox(6, Icon.of(Icons.Crop, 14), new Label("Crop Video"), cropDot);
 		cropGraphic.setAlignment(Pos.CENTER);
 		crop.setGraphic(cropGraphic);
 		crop.setText("");
 
-		toolbar.getChildren().addAll(aspectButton, divider, crop);
+		// Crop-mode controls (visible only while the mode is on): aspect lock + reset.
+		Toggle aspectLock = new Toggle("Aspect", Toggle.Variant.GHOST, Toggle.Size.SM);
+		aspectLock.setGraphicTextGap(4);
+		aspectLock.setGraphic(Icon.of(Icons.BoundingBox, 12));
+		Tooltip.install(aspectLock, "Lock the crop aspect ratio");
+		aspectLock.onPressedChange(locked -> cropOverlay.setAspectLocked(locked));
+		aspectLock.setVisible(false);
+		aspectLock.setManaged(false);
+		Button resetCrop = new Button("", Button.Variant.GHOST, Button.Size.SM);
+		resetCrop.icon(Icons.ArrowCounterClockwise);
+		Tooltip.install(resetCrop, "Reset the crop to the full frame");
+		resetCrop.setOnAction(event -> {
+			cropOverlay.reset();
+			aspectLock.setSelected(false);
+		});
+		resetCrop.setVisible(false);
+		resetCrop.setManaged(false);
+		aspectLockToggle = aspectLock;
+		resetCropButton = resetCrop;
+		cropButton = crop;
+
+		toolbar.getChildren().addAll(aspectButton, divider, crop, aspectLock, resetCrop);
 
 		// ---- stage ------------------------------------------------------------
 		stage.getStyleClass().add("editor-preview__stage");
@@ -163,7 +207,7 @@ public final class EditorPreviewPanel extends VBox {
 		playheadTimecode.setManaged(false);
 		playheadTimecode.setMouseTransparent(true);
 		previewFrame.getChildren().addAll(previewView, annotationOverlay.layer(),
-				playheadTimecode);
+				cropOverlay.layer(), playheadTimecode);
 		Rectangle frameClip = new Rectangle();
 		frameClip.widthProperty().bind(previewFrame.widthProperty());
 		frameClip.heightProperty().bind(previewFrame.heightProperty());
@@ -426,6 +470,7 @@ public final class EditorPreviewPanel extends VBox {
 		} else {
 			refreshFallback(state.wallpaper());
 		}
+		cropOverlay.sync();
 		layoutStage();
 	}
 
@@ -516,7 +561,42 @@ public final class EditorPreviewPanel extends VBox {
 		// size here; this is what triggers the preview renderer for the new target size.
 		previewView.resizeRelocate(0, 0, width, height);
 		annotationOverlay.layer().resizeRelocate(0, 0, width, height);
+		cropOverlay.layer().resizeRelocate(0, 0, width, height);
 		loadingSkeleton.resizeRelocate(x, y, width, height);
+	}
+
+	// ── crop mode (the Crop Video toolbar button) ────────────────────────────
+
+	/** Whether the crop overlay is active on the preview. */
+	public boolean cropMode() {
+		return cropMode;
+	}
+
+	/** Enters or leaves crop mode; the annotation layer yields its gestures while cropping. */
+	public void setCropMode(boolean nextCropMode) {
+		if (cropMode == nextCropMode) {
+			return;
+		}
+		cropMode = nextCropMode;
+		cropOverlay.setActive(cropMode);
+		annotationOverlay.layer().setMouseTransparent(cropMode);
+		aspectLockToggle.setVisible(cropMode);
+		aspectLockToggle.setManaged(cropMode);
+		resetCropButton.setVisible(cropMode);
+		resetCropButton.setManaged(cropMode);
+		cropButton.setAriaPressed(cropMode);
+		if (!cropMode) {
+			// The lock is a mode-local setting: each crop-mode entry starts freeform.
+			aspectLockToggle.setSelected(false);
+		}
+		if (cropMode) {
+			cropOverlay.sync();
+		}
+	}
+
+	/** The crop overlay controller (tests/snapshots). */
+	public CropOverlayController cropOverlay() {
+		return cropOverlay;
 	}
 
 	private static boolean isDefaultCrop(CropRegion crop) {

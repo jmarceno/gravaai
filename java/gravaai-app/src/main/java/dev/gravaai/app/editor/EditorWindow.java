@@ -378,6 +378,12 @@ public final class EditorWindow {
 				saveProject();
 				return;
 			}
+			// Escape leaves preview crop mode (the overlay owns no key handling of its own).
+			if (event.getCode() == KeyCode.ESCAPE && shell.preview().cropMode()) {
+				event.consume();
+				shell.preview().setCropMode(false);
+				return;
+			}
 			// Play / pause on the configured shortcut (space by default), like Premiere and
 			// Kdenlive: it works wherever the user is, except while typing or when a focused
 			// control uses Space itself.
@@ -1525,37 +1531,6 @@ public final class EditorWindow {
 		public Optional<Path> chooseVideoWallpaper() {
 			return chooseMedia("Choose video background", "Videos", "*.mp4", "*.webm", "*.mov",
 					"*.m4v", "*.mkv", "*.avi");
-		}
-
-		@Override
-		public void openCropEditor() {
-			var state = session.store().state();
-			Path video = Path.of(session.videoPath());
-			int[] size = videoSize(video);
-			dev.gravaai.ui.editor.CropEditorDialog dialog = new dev.gravaai.ui.editor.CropEditorDialog(
-					state.cropRegion(), size[0], size[1],
-					region -> dev.gravaai.ui.editor.EditorMutations.update(session.store(), json -> {
-						var crop = json.putObject("cropRegion");
-						crop.put("x", region.x());
-						crop.put("y", region.y());
-						crop.put("width", region.width());
-						crop.put("height", region.height());
-					}));
-			dialog.show(shell);
-			long sourceMs = dev.gravaai.core.project.Clips.mapTimelineTimeToSourceTime(
-					playheadMs(), state.clipRegions());
-			Thread.ofVirtual().name("crop-frame").start(() -> {
-				try (var reader = new dev.gravaai.media.compose.MediaFrameReader(video, 0, true)) {
-					var frame = reader.decode(sourceMs / 1000.0);
-					if (frame != null) {
-						var image = dev.gravaai.ui.editor.CropEditorDialog.toImage(frame.width(),
-								frame.height(), frame.pixelsTopFirstRgba());
-						javafx.application.Platform.runLater(() -> dialog.setFrame(image));
-					}
-				} catch (RuntimeException error) {
-					LOG.log(System.Logger.Level.WARNING, "crop frame decode failed: " + error);
-				}
-			});
 		}
 
 		@Override

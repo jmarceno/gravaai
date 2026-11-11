@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.gravaai.core.json.Json;
 import dev.gravaai.core.project.ClipRegion;
+import dev.gravaai.core.project.CropRegion;
 import dev.gravaai.core.project.ProjectDocument;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
@@ -81,6 +82,33 @@ class EditorStoreTest {
 		assertEquals(List.of(), store.history().past());
 		assertEquals(List.of(), store.history().future());
 		assertTrue(store.snapshot() != null);
+	}
+
+	@Test
+	@DisplayName("a crop edit is one undoable step; undo restores the previous crop")
+	void cropIsUndoable() {
+		EditorStore store = new EditorStore(state("{}"));
+		CropRegion crop = new CropRegion(0.1, 0.2, 0.7, 0.6);
+
+		assertTrue(store.apply(new CropCommands.Set(crop)));
+		assertEquals(crop, store.state().cropRegion());
+
+		assertTrue(store.undo());
+		assertEquals(CropRegion.DEFAULT, store.state().cropRegion());
+		assertTrue(store.redo());
+		assertEquals(crop, store.state().cropRegion());
+	}
+
+	@Test
+	@DisplayName("setting the same crop again records no history step")
+	void cropSetNoChange() {
+		EditorStore store = new EditorStore(state("{}"));
+		CropRegion crop = new CropRegion(0.1, 0.2, 0.7, 0.6);
+
+		assertTrue(store.apply(new CropCommands.Set(crop)));
+		assertEquals(1, store.history().past().size());
+		assertFalse(store.apply(new CropCommands.Set(crop)));
+		assertEquals(1, store.history().past().size());
 	}
 
 	@Test

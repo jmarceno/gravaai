@@ -175,6 +175,13 @@ public final class EditorStore {
 		state = ProjectPersistence.normalizeProjectEditor(json);
 	}
 
+	/** Replaces the screen-recording crop through the canonical project-JSON path. */
+	public void setCropRegion(dev.gravaai.core.project.CropRegion crop) {
+		ObjectNode json = editorJson();
+		json.set("cropRegion", ProjectDocument.writeCropRegion(crop));
+		state = ProjectPersistence.normalizeProjectEditor(json);
+	}
+
 	/** The selected timeline marker, if any (markers select from the ruler, not from a lane). */
 	public java.util.Optional<String> selectedMarkerId() {
 		return selectedMarkerId;
@@ -268,7 +275,8 @@ public final class EditorStore {
 				state.elements(), state.elementAssets(), selectedElementId,
 				state.defaultSourceAudioTrackSettings() == null ? null
 						: state.defaultSourceAudioTrackSettings().deepCopy(),
-				state.markers());
+				state.markers(),
+				state.cropRegion());
 	}
 
 	private void restore(EditorHistory.Snapshot snapshot) {
@@ -286,6 +294,7 @@ public final class EditorStore {
 		setElements(snapshot.elements());
 		setElementAssets(snapshot.elementAssets());
 		setMarkers(snapshot.markers());
+		setCropRegion(snapshot.cropRegion());
 		selectedMarkerId = java.util.Optional.empty();
 		selectedElementId = snapshot.selectedElementId();
 		selectedZoomId = snapshot.selectedZoomId();

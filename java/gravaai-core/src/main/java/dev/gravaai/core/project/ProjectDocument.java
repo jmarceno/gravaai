@@ -234,7 +234,8 @@ public final class ProjectDocument {
 		return node;
 	}
 
-	private static ObjectNode writeCropRegion(CropRegion crop) {
+	/** {@code cropRegion} wire object ({@code EditorStore.setCropRegion} reuses it). */
+	public static ObjectNode writeCropRegion(CropRegion crop) {
 		ObjectNode node = Json.nodeFactory().objectNode();
 		node.put("x", crop.x());
 		node.put("y", crop.y());

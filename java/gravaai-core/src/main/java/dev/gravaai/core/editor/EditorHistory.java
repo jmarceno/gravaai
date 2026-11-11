@@ -51,7 +51,8 @@ public final class EditorHistory {
 			List<dev.gravaai.core.project.ElementAsset> elementAssets,
 			java.util.Optional<String> selectedElementId,
 			tools.jackson.databind.node.@Nullable ObjectNode defaultSourceAudioTrackSettings,
-			List<dev.gravaai.core.project.TimelineMarker> markers) {
+			List<dev.gravaai.core.project.TimelineMarker> markers,
+			dev.gravaai.core.project.CropRegion cropRegion) {
 
 		/** The snapshot shape before the element layer: no components, elements or selection. */
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
@@ -69,7 +70,8 @@ public final class EditorHistory {
 				autoCaptions, selectedZoomId, selectedClipId, selectedAnnotationId, selectedAudioId,
 				sourceAudioTrackSettingsByClip, multiSelectedIds, keystrokeElements,
 				selectedKeystrokeId, List.of(), null, cameraLayoutSegments, selectedCameraLayoutId,
-				List.of(), List.of(), List.of(), java.util.Optional.empty(), null, List.of());
+				List.of(), List.of(), List.of(), java.util.Optional.empty(), null, List.of(),
+				dev.gravaai.core.project.CropRegion.DEFAULT);
 		}
 
 		public Snapshot(List<ZoomRegion> zoomRegions, List<ClipRegion> clipRegions,
@@ -188,7 +190,8 @@ public final class EditorHistory {
 				snapshot.selectedElementId(),
 				snapshot.defaultSourceAudioTrackSettings() == null ? null
 						: snapshot.defaultSourceAudioTrackSettings().deepCopy(),
-				List.copyOf(snapshot.markers()));
+				List.copyOf(snapshot.markers()),
+				snapshot.cropRegion());
 	}
 
 	/** {@code areEditorHistorySnapshotsEqual}: records compare their lists element by element. */

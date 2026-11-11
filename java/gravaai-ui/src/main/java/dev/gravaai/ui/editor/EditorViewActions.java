@@ -80,9 +80,6 @@ public interface EditorViewActions {
 		return Optional.empty();
 	}
 
-	/** Opens the crop editor dialog. */
-	default void openCropEditor() {}
-
 	default void openKeyboardShortcutsHelp() {}
 
 	default void openShortcutsConfig() {}

@@ -161,6 +161,15 @@ public record ProjectEditorState(
 				cameraLayoutSegments, elementComponents, elements, elementAssets, markers);
 	}
 
+	/**
+	 * Copy with a new screen-recording crop, without re-normalising the rest of the state. The
+	 * preview crop overlay calls this on every drag move for the live compositor update; the
+	 * committed value goes through {@code EditorStore.setCropRegion} (the canonical JSON path).
+	 */
+	public ProjectEditorState withCropRegion(CropRegion nextCropRegion) {
+		return toBuilder().cropRegion(nextCropRegion).build();
+	}
+
 	/** Typed view of {@link #sourceAudioTrackSettingsByClip()} (raw JSON stays canonical). */
 	public java.util.Map<String, SourceAudioTrackSettings> sourceAudioTrackSettings() {
 		return SourceAudioSettings.parseAll(sourceAudioTrackSettingsByClip);

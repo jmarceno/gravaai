@@ -133,3 +133,24 @@ The playback engine thread NEVER waits for the compositor:
   `EditorPreviewView.framesSubmitted()/framesDrawn()/framesReceived()/framesDropped()`.
   Real-decoder fixture-07 run: 14 frames submitted, 12 drawn/received, 0 sink drops, 2.6 s total
   harness wall time (JVM + GL + decode + snapshot).
+
+## Crop mode on the preview
+
+- `CropOverlayController` is the crop-mode layer over the compositor surface (the
+  `EditorPreviewPanel` "Crop Video" toolbar button toggles it; the modal `CropEditorDialog` is
+  gone). The compositor displays the cropped recording, so the crop's edges are the recording
+  rect's edges: the layer draws four edge strips + four corner handles + an accent outline on
+  `CameraGeometry`, and gestures convert panel pixels → source fractions through the gesture-start
+  geometry and crop (`CropOverlayMath.sourcePointFor`), anchored like the annotation overlay so
+  the conversion stays linear while the compositor re-fits the moving crop.
+- Aspect lock (the "Aspect" toolbar toggle) captures the crop's pixel ratio when it turns on
+  (`CropOverlayMath.pixelRatio` over the probed source size; 0 dims fall back to a square source)
+  and holds it while dragging: the dragged axis follows the pointer, the other axis follows the
+  ratio (corners anchor the opposite corner, edges re-centre their fixed axis). Reset restores
+  `CropRegion.DEFAULT` and releases the lock.
+- Undo: a gesture replaces the store state live on every move (no publish, so the undo stack and
+  the other panels stay quiet) and commits once on release through `CropCommands.Set` — exactly
+  one undo step that restores the previous crop. `cropRegion` is part of `EditorHistory.Snapshot`,
+  so undo/redo restore it like every other edit.
+- `CropOverlayMath` is pure and unit-tested in `CropOverlayMathTest` (mapping both ways, drag
+  clamps, ratio fits, boundary behaviour).

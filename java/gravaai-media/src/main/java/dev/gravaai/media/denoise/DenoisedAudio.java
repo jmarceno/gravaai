@@ -268,7 +268,7 @@ public final class DenoisedAudio {
 	}
 
 	/** True when every frame of a raw stereo capture has the same sample in both channels. */
-	static boolean isDualMono(Path rawStereo) throws IOException {
+	public static boolean isDualMono(Path rawStereo) throws IOException {
 		try (InputStream in = new java.io.BufferedInputStream(Files.newInputStream(rawStereo),
 				1 << 16)) {
 			byte[] bytes = new byte[1 << 16];

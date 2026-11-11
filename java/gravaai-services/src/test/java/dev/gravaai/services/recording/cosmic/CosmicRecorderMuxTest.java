@@ -46,7 +46,43 @@ class CosmicRecorderMuxTest {
 		String previous = System.getProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
 		System.setProperty(NativeHelpers.NATIVE_DIR_PROPERTY, nativeBuild.toString());
 		try {
-			muxInto(dir, nativeBuild.getParent().getParent());
+			muxInto(dir, nativeBuild.getParent().getParent(), MicNoiseReduction.OFF);
+			assertTrue(dev.gravaai.services.recording.RecordingAudioManifest
+					.read(dir.resolve("recording-1.mp4")).isEmpty(),
+					"without noise reduction the recording itself is the capture: no sidecars");
+		} finally {
+			if (previous == null) {
+				System.clearProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
+			} else {
+				System.setProperty(NativeHelpers.NATIVE_DIR_PROPERTY, previous);
+			}
+		}
+	}
+
+	@Test
+	@DisplayName("with mic noise reduction the untouched captures are kept next to the recording")
+	void keepsTheCaptureSidecars(@TempDir Path dir) throws Exception {
+		Path nativeBuild = repoNativeBuild();
+		assumeTrue(nativeBuild != null, "java/native/build not found");
+		String previous = System.getProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
+		System.setProperty(NativeHelpers.NATIVE_DIR_PROPERTY, nativeBuild.toString());
+		try {
+			muxInto(dir, nativeBuild.getParent().getParent(), MicNoiseReduction.BALANCED);
+			Path recording = dir.resolve("recording-1.mp4");
+			var manifest = dev.gravaai.services.recording.RecordingAudioManifest.read(recording)
+					.orElseThrow(() -> new AssertionError("no audio manifest next to " + recording));
+			assertEquals("balanced", manifest.micNoiseReduction());
+			assertEquals(List.of("mic", "system"), manifest.tracks());
+			Path mic = dev.gravaai.services.recording.RecordingAudioManifest.micSidecar(recording);
+			// The fixture's mic is the same sine in both channels: kept as one lossless channel,
+			// 2 s at 48 kHz 16-bit, exactly the capture (no denoise, no high-pass).
+			long micBytes = Files.size(mic);
+			assertTrue(micBytes > 2L * RATE * 2 - 4_096 && micBytes < 2L * RATE * 2 + 4_096,
+					"mono 16-bit WAV of 2 s expected, got " + micBytes + " bytes");
+			assertTrue(Files.size(dev.gravaai.services.recording.RecordingAudioManifest
+					.systemSidecar(recording)) > 0, "system capture is empty");
+			// The temporary cleaned capture does not outlive the mux.
+			assertTrue(Files.notExists(dir.resolve(".recording-1.mic.pcm.clean")));
 		} finally {
 			if (previous == null) {
 				System.clearProperty(NativeHelpers.NATIVE_DIR_PROPERTY);
@@ -71,7 +107,7 @@ class CosmicRecorderMuxTest {
 		return null;
 	}
 
-	private void muxInto(Path dir, Path javaRoot) throws Exception {
+	private void muxInto(Path dir, Path javaRoot, MicNoiseReduction level) throws Exception {
 		PlatformRecordingEnvironment environment = new PlatformRecordingEnvironment();
 		Path ffmpeg = environment.ffmpeg();
 		assumeTrue(Files.isExecutable(ffmpeg), "bundled ffmpeg not built: " + ffmpeg);
@@ -100,7 +136,7 @@ class CosmicRecorderMuxTest {
 					video.toString(),
 					List.of(new CosmicAudioInput(CosmicAudioRole.MIC, mic.toString(), 1000),
 							new CosmicAudioInput(CosmicAudioRole.SYSTEM, system.toString(), 1000)),
-					1000, output.toString(), false, MicNoiseReduction.OFF, false));
+					1000, output.toString(), false, level, false));
 		} finally {
 			processIo.close();
 			recorder.close();

@@ -318,6 +318,12 @@ public final class EditorSession implements AutoCloseable {
 			}
 			String mic = firstExistingSidecar(video, "mic");
 			String system = firstExistingSidecar(video, "system");
+			if (dev.gravaai.services.recording.RecordingAudioManifest.read(video).isPresent()) {
+				// The recording kept its capture tracks: the lanes are the untouched microphone
+				// and the system audio, and the recording's own audio (the same two, mixed, with
+				// the record-time noise reduction baked in) must not play on top of them.
+				hasEmbeddedAudio = false;
+			}
 			// The has*Sidecar flags gate the paths; the absent ones carry an unused empty string.
 			tracks = TimelineSourceAudioTracks.buildTracks(hasEmbeddedAudio, videoPath,
 					mic != null, mic == null ? "" : mic,
@@ -847,6 +853,17 @@ public final class EditorSession implements AutoCloseable {
 		// The Keystrokes track: recorded presses become editable elements before the store exists,
 		// so the first undo step already contains them.
 		addKeystrokeElementsFromSidecar(editor, videoPath, KeystrokeOverlaySettings.DEFAULT.lingerMs());
+		// A recording made with microphone noise reduction kept its untouched microphone: the
+		// editor plays that capture, so the new project starts with the same level on the mic
+		// lane. It sounds like the recording did, and the user can now turn it down or off.
+		dev.gravaai.services.recording.RecordingAudioManifest.read(videoPath)
+				.filter(manifest -> manifest.mic(videoPath).isPresent())
+				.map(manifest -> dev.gravaai.core.project.AudioCleanup.NoiseReduction
+						.fromText(manifest.micNoiseReduction()))
+				.filter(level -> level != dev.gravaai.core.project.AudioCleanup.NoiseReduction.OFF)
+				.ifPresent(level -> editor.set("defaultSourceAudioTrackSettings",
+						SourceAudioSettings.mergeDefaultCleanup(null, SourceAudioTrackSettings.MIC,
+								new dev.gravaai.core.project.AudioCleanup(level, 0, 0))));
 		ProjectDocument document = ProjectDocument.create(
 				videoPath.toAbsolutePath().normalize().toString(),
 				ProjectPersistence.normalizeProjectEditor(editor));

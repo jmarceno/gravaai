@@ -19,6 +19,7 @@ import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
 import dev.gravaai.services.recording.CosmicSession.CosmicMux;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.MicNoiseReductionFilters;
+import dev.gravaai.services.recording.RecordingAudioManifest;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.recording.ports.RecordingProcesses.SpawnOptions;
@@ -127,6 +128,12 @@ final class CosmicMuxer implements CosmicMux {
 			}
 		}
 
+		// With microphone noise reduction on, the recording's own audio carries the cleaned
+		// microphone. The capture tracks are kept untouched next to it, so the editor can start
+		// from the real microphone and the noise reduction stays reversible.
+		List<FfmpegRun> sidecarRuns = new ArrayList<>();
+		List<String> sidecarTracks = startCaptureSidecars(input, sidecarRuns);
+
 		FfmpegRun mux = runFfmpeg(args);
 		int muxCode = waitFor(mux);
 		String muxStderr = mux.stderr().join();
@@ -135,12 +142,108 @@ final class CosmicMuxer implements CosmicMux {
 				LOG.log(System.Logger.Level.WARNING, "Speaker track failed: " + speaker.stderr().join());
 			}
 		}
+		boolean sidecarsOk = !sidecarTracks.isEmpty();
+		for (FfmpegRun sidecar : sidecarRuns) {
+			if (waitFor(sidecar) != 0) {
+				sidecarsOk = false;
+				LOG.log(System.Logger.Level.WARNING,
+						"Capture sidecar failed: " + sidecar.stderr().join());
+			}
+		}
+		finishCaptureSidecars(input, sidecarTracks, sidecarsOk && muxCode == 0);
 		if (muxCode != 0) {
 			return CosmicMuxResult.err(muxStderr.isEmpty()
 					? "Muxing failed with code " + muxCode + "."
 					: muxStderr);
 		}
 		return CosmicMuxResult.ok();
+	}
+
+	/**
+	 * Starts the ffmpeg runs that keep the capture tracks next to the recording: the untouched
+	 * microphone as lossless WAV and the system audio as AAC, both lined up like the mix. Only
+	 * for a screen recording made with microphone noise reduction — without it the recording's
+	 * own audio already is the untouched capture.
+	 *
+	 * @return the roles being written ({@code "mic"}, {@code "system"}), empty when none are
+	 */
+	private List<String> startCaptureSidecars(CosmicMuxInput input, List<FfmpegRun> runs) {
+		if (input.micNoiseReduction() == MicNoiseReduction.OFF || input.videoPath() == null) {
+			return List.of();
+		}
+		CosmicAudioInput mic = firstTrack(input, CosmicAudioRole.MIC);
+		if (mic == null) {
+			return List.of();
+		}
+		Path recording = Path.of(input.outputPath());
+		List<String> tracks = new ArrayList<>();
+		int micChannels = AUDIO_CHANNELS;
+		try {
+			// A mono microphone opened as stereo is kept as one channel: half the disk.
+			if (dev.gravaai.media.denoise.DenoisedAudio.isDualMono(Path.of(mic.path()))) {
+				micChannels = 1;
+			}
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.DEBUG, "could not inspect the microphone capture: " + error);
+		}
+		runs.add(runFfmpeg(sidecarArgs(input, mic, List.of("-ac", String.valueOf(micChannels),
+				"-c:a", "pcm_s16le"), RecordingAudioManifest.micSidecar(recording))));
+		tracks.add("mic");
+		CosmicAudioInput system = firstTrack(input, CosmicAudioRole.SYSTEM);
+		if (system != null) {
+			runs.add(runFfmpeg(sidecarArgs(input, system, List.of("-c:a", "aac", "-b:a",
+					AUDIO_ENCODING), RecordingAudioManifest.systemSidecar(recording))));
+			tracks.add("system");
+		}
+		return List.copyOf(tracks);
+	}
+
+	private static List<String> sidecarArgs(CosmicMuxInput input, CosmicAudioInput track,
+			List<String> encoding, Path output) {
+		List<String> args = new ArrayList<>(List.of("-hide_banner", "-loglevel", "error", "-y"));
+		args.addAll(rawTrackInput(Path.of(track.path())));
+		// Lined up with the recording's start like the mix, and nothing else: no denoise, no
+		// high-pass. This is the capture.
+		args.addAll(List.of("-af", alignTrackFilter(track.startedAtMs(), input.startedAtMs())));
+		args.addAll(encoding);
+		args.add(output.toString());
+		return List.copyOf(args);
+	}
+
+	/**
+	 * Writes the manifest that makes the sidecars count, or removes them. All or nothing: a
+	 * manifest promises that the sidecars cover every captured track, so a half-written set must
+	 * not be left for the editor to trust.
+	 */
+	private static void finishCaptureSidecars(CosmicMuxInput input, List<String> tracks,
+			boolean ok) {
+		if (tracks.isEmpty()) {
+			return;
+		}
+		Path recording = Path.of(input.outputPath());
+		if (ok) {
+			try {
+				new RecordingAudioManifest(tracks, input.micNoiseReduction().wire())
+						.write(recording);
+				return;
+			} catch (IOException error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"could not write the audio manifest; dropping the sidecars: " + error);
+			}
+		}
+		deleteQuietly(RecordingAudioManifest.micSidecar(recording));
+		deleteQuietly(RecordingAudioManifest.systemSidecar(recording));
+		deleteQuietly(RecordingAudioManifest.pathFor(recording));
+	}
+
+	private static @Nullable CosmicAudioInput firstTrack(CosmicMuxInput input,
+			CosmicAudioRole role) {
+		for (CosmicAudioInput track : input.audio()) {
+			if (track.role() == role) {
+				return track;
+			}
+		}
+		return null;
 	}
 
 	/** The raw file the mux reads for a track: its cleaned capture when there is one. */

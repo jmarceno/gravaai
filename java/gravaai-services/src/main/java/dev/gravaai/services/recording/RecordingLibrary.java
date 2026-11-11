@@ -133,6 +133,7 @@ public final class RecordingLibrary {
 				|| name.equals(video + ".cursor.json")
 				|| name.equals(video + ".keys.json")
 				|| (name.startsWith(stem + ".") && COMPANION_NAME.matcher(name).find())
+				|| name.equals(stem + RecordingAudioManifest.SUFFIX)
 				|| name.equals(stem + ".gravaai-session.json")
 				|| name.equals(stem + ".recording-session.json")
 				|| (name.startsWith(stem + "-webcam.") && WEBCAM_TRACK_NAME.matcher(name).find());

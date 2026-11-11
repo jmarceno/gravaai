@@ -47,6 +47,7 @@ import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.media.ffmpeg.VideoStreamInfo;
 import dev.gravaai.services.export.ExportCoordinator;
 import dev.gravaai.services.recording.KeystrokePresses;
+import dev.gravaai.services.recording.RecordingAudioManifest;
 import dev.gravaai.core.json.Json;
 import tools.jackson.databind.JsonNode;
 
@@ -266,15 +267,7 @@ public final class ProjectExport {
 
 	private static ExportAudioPlan buildAudioPlan(Input input, Path videoPath, MediaInfo info,
 			long sourceDurationMs, long timelineDurationMs) {
-		List<String> fallbacks = new ArrayList<>();
-		if (info.hasAudio()) {
-			fallbacks.add(videoPath.toString());
-		}
-		for (Path companion : input.companionAudioPaths()) {
-			if (companion != null && !companion.toString().isBlank()) {
-				fallbacks.add(companion.toAbsolutePath().normalize().toString());
-			}
-		}
+		List<String> fallbacks = sourceAudioPaths(input, videoPath, info.hasAudio());
 		Map<String, ExportAudioRouting.TrackSetting> trackSettings = parseTrackSettings(
 				input.editor().defaultSourceAudioTrackSettings());
 		ExportAudioRouting.ResolvedPlan resolved = ExportAudioRouting.buildResolvedPlan(
@@ -354,15 +347,8 @@ public final class ProjectExport {
 			// The common case: no probe, no routing.
 			return List.of();
 		}
-		List<String> fallbacks = new ArrayList<>();
-		if (MediaProbe.probe(videoPath).hasAudio()) {
-			fallbacks.add(videoPath.toString());
-		}
-		for (Path companion : input.companionAudioPaths()) {
-			if (companion != null && !companion.toString().isBlank()) {
-				fallbacks.add(companion.toAbsolutePath().normalize().toString());
-			}
-		}
+		List<String> fallbacks = sourceAudioPaths(input, videoPath,
+				MediaProbe.probe(videoPath).hasAudio());
 		ExportAudioRouting.ResolvedPlan resolved = ExportAudioRouting.buildResolvedPlan(
 				videoPath.toString(), fallbacks, input.editor().audioRegions(), trackSettings, null,
 				null);
@@ -375,6 +361,34 @@ public final class ProjectExport {
 			}
 		}
 		return List.copyOf(sources);
+	}
+
+	/**
+	 * The audio files the recording's source tracks come from. A recording that kept its capture
+	 * tracks ({@link RecordingAudioManifest}) plays those — the untouched microphone and the
+	 * system audio — and not its own audio, which already has the record-time noise reduction
+	 * baked into the mix: the editor's lanes and the export then start from the same captures.
+	 * Any other recording plays its own audio plus the companions the caller passes.
+	 */
+	private static List<String> sourceAudioPaths(Input input, Path videoPath, boolean hasAudio) {
+		List<String> paths = new ArrayList<>();
+		List<Path> captures = RecordingAudioManifest.read(videoPath)
+				.map(manifest -> manifest.sidecars(videoPath)).orElse(List.of());
+		if (!captures.isEmpty()) {
+			for (Path capture : captures) {
+				paths.add(capture.toAbsolutePath().normalize().toString());
+			}
+			return paths;
+		}
+		if (hasAudio) {
+			paths.add(videoPath.toString());
+		}
+		for (Path companion : input.companionAudioPaths()) {
+			if (companion != null && !companion.toString().isBlank()) {
+				paths.add(companion.toAbsolutePath().normalize().toString());
+			}
+		}
+		return paths;
 	}
 
 	/** The rendered denoised copy of one source track, or null (resolver failures included). */

@@ -330,6 +330,8 @@ public final class EditorShellView extends VBox {
 			inspector.setTrackCount(timelineView::rowCount);
 			// The Audio section lists the recording's source lanes; the timeline owns that list.
 			inspector.setSourceAudioTracks(timelineView::sourceAudioTracks);
+			// ... and shows the same cleaned-copy state as the lane's CLEAN badge.
+			inspector.setCleanupRenderStatus(timelineView::cleanupRenderStatus);
 		}
 		if (autoMask != null) {
 			inspector.setAutoMaskService(autoMask);

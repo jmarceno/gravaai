@@ -53,6 +53,15 @@ public final class PlatformRecordingEnvironment implements RecordingEnvironment 
 	}
 
 	@Override
+	public @Nullable MicDenoiser micDenoiser() {
+		if (!dev.gravaai.media.denoise.DenoisedAudio.isAvailable()) {
+			return null;
+		}
+		return (rawInput, rawOutput, channels, dryGain) -> dev.gravaai.media.denoise.DenoisedAudio
+				.denoiseRaw(rawInput, rawOutput, channels, dryGain, () -> false);
+	}
+
+	@Override
 	public Path command(String name) throws IOException {
 		return ExecutableLookup.require(System.getenv(), name);
 	}

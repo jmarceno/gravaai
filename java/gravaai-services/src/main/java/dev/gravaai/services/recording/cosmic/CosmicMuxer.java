@@ -58,7 +58,27 @@ final class CosmicMuxer implements CosmicMux {
 	/** Muxes the temp files into the final recording, plus the speaker tracks for meetings. */
 	@Override
 	public CosmicMuxResult mux(CosmicMuxInput input) {
-		List<String> micFilters = prepareMicFilters(input.micNoiseReduction());
+		// Microphone noise reduction runs the speech denoiser over the raw capture first; the
+		// mux (and a meeting's speaker track) then reads the cleaned capture in its place.
+		java.util.Map<String, Path> cleanedMic = denoiseMicTracks(input);
+		try {
+			return mux(input, cleanedMic);
+		} finally {
+			for (Path cleaned : cleanedMic.values()) {
+				try {
+					java.nio.file.Files.deleteIfExists(cleaned);
+				} catch (IOException error) {
+					LOG.log(System.Logger.Level.DEBUG, "could not delete " + cleaned);
+				}
+			}
+		}
+	}
+
+	private CosmicMuxResult mux(CosmicMuxInput input, java.util.Map<String, Path> cleanedMic) {
+		List<String> micFilters = cleanedMic.isEmpty()
+				? prepareMicFilters(input.micNoiseReduction())
+				// Already denoised: only the record-time rumble filter is left to apply.
+				: List.of(MicNoiseReductionFilters.RECORDING_HIGH_PASS);
 		List<String> args = new ArrayList<>(List.of("-hide_banner", "-loglevel", "error", "-y"));
 		if (input.videoPath() != null) {
 			// A video that was never finalised may end in a truncated cluster.
@@ -70,7 +90,7 @@ final class CosmicMuxer implements CosmicMux {
 		}
 		int firstAudioInput = input.videoPath() != null ? 1 : 0;
 		for (CosmicAudioInput track : input.audio()) {
-			args.addAll(rawTrackInput(Path.of(track.path())));
+			args.addAll(rawTrackInput(sourceOf(track, cleanedMic)));
 		}
 		if (input.videoPath() != null) {
 			args.addAll(List.of("-map", "0:v"));
@@ -103,7 +123,7 @@ final class CosmicMuxer implements CosmicMux {
 		List<FfmpegRun> speakerRuns = new ArrayList<>();
 		if (input.keepSpeakerTracks()) {
 			for (CosmicAudioInput track : input.audio()) {
-				speakerRuns.add(runFfmpeg(speakerArgs(input, track, micFilters)));
+				speakerRuns.add(runFfmpeg(speakerArgs(input, track, micFilters, cleanedMic)));
 			}
 		}
 
@@ -123,11 +143,72 @@ final class CosmicMuxer implements CosmicMux {
 		return CosmicMuxResult.ok();
 	}
 
+	/** The raw file the mux reads for a track: its cleaned capture when there is one. */
+	private static Path sourceOf(CosmicAudioInput track, java.util.Map<String, Path> cleanedMic) {
+		Path cleaned = cleanedMic.get(track.path());
+		return cleaned != null ? cleaned : Path.of(track.path());
+	}
+
+	/**
+	 * Runs the speech denoiser over every microphone capture and returns the cleaned files by
+	 * the original track path. Empty when noise reduction is off, the build has no denoiser or
+	 * any capture failed: the mux then uses the ffmpeg fallback chain for all of them, so a
+	 * recording never ends up with one microphone on each engine.
+	 */
+	private java.util.Map<String, Path> denoiseMicTracks(CosmicMuxInput input) {
+		MicNoiseReduction level = input.micNoiseReduction();
+		RecordingEnvironment.MicDenoiser denoiser =
+				level == MicNoiseReduction.OFF ? null : environment.micDenoiser();
+		if (denoiser == null) {
+			return java.util.Map.of();
+		}
+		double dryGain = dev.gravaai.media.denoise.DenoisedAudio.dryGain(switch (level) {
+			case OFF -> dev.gravaai.core.project.AudioCleanup.NoiseReduction.OFF;
+			case LIGHT -> dev.gravaai.core.project.AudioCleanup.NoiseReduction.LIGHT;
+			case BALANCED -> dev.gravaai.core.project.AudioCleanup.NoiseReduction.BALANCED;
+			case STRONG -> dev.gravaai.core.project.AudioCleanup.NoiseReduction.STRONG;
+		});
+		java.util.Map<String, Path> cleaned = new java.util.LinkedHashMap<>();
+		for (CosmicAudioInput track : input.audio()) {
+			if (track.role() != CosmicAudioRole.MIC) {
+				continue;
+			}
+			Path raw = Path.of(track.path());
+			Path output = raw.resolveSibling(raw.getFileName() + ".clean");
+			try {
+				denoiser.denoise(raw, output, AUDIO_CHANNELS, dryGain);
+				cleaned.put(track.path(), output);
+			} catch (IOException | RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING,
+						"speech denoiser failed on the microphone capture; using the basic"
+								+ " filter instead: " + error);
+				for (Path partial : cleaned.values()) {
+					deleteQuietly(partial);
+				}
+				deleteQuietly(output);
+				return java.util.Map.of();
+			}
+		}
+		if (!cleaned.isEmpty()) {
+			LOG.log(System.Logger.Level.INFO, "mic noise reduction: " + level.wire()
+					+ " (speech denoiser)");
+		}
+		return cleaned;
+	}
+
+	private static void deleteQuietly(Path file) {
+		try {
+			java.nio.file.Files.deleteIfExists(file);
+		} catch (IOException ignored) {
+			// A stray temp capture is removed with the recording's temp files.
+		}
+	}
+
 	/** The per-speaker ffmpeg run for one track, or null when the track needs none. */
-	private static List<String> speakerArgs(
-			CosmicMuxInput input, CosmicAudioInput track, List<String> micFilters) {
+	private static List<String> speakerArgs(CosmicMuxInput input, CosmicAudioInput track,
+			List<String> micFilters, java.util.Map<String, Path> cleanedMic) {
 		List<String> speakerArgs = new ArrayList<>(List.of("-hide_banner", "-loglevel", "error", "-y"));
-		speakerArgs.addAll(rawTrackInput(Path.of(track.path())));
+		speakerArgs.addAll(rawTrackInput(sourceOf(track, cleanedMic)));
 		speakerArgs.addAll(List.of(
 				"-af",
 				String.join(",", trackFilterChain(

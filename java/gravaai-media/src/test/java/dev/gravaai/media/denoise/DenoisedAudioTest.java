@@ -66,6 +66,88 @@ class DenoisedAudioTest {
 		assertEquals(48_000 * 4, header.getInt(40), "data bytes");
 	}
 
+	private static Path writeRawStereo(Path file, int frames, boolean dualMono) throws Exception {
+		ByteBuffer raw = ByteBuffer.allocate(frames * 4).order(ByteOrder.LITTLE_ENDIAN);
+		java.util.Random random = new java.util.Random(9);
+		for (int frame = 0; frame < frames; frame++) {
+			short left = (short) (random.nextGaussian() * 1500);
+			short right = dualMono ? left : (short) (random.nextGaussian() * 1500);
+			raw.putShort(left).putShort(right);
+		}
+		Files.write(file, raw.array());
+		return file;
+	}
+
+	private static double rmsDb(Path rawStereo, int skipFrames) throws Exception {
+		ByteBuffer raw = ByteBuffer.wrap(Files.readAllBytes(rawStereo))
+				.order(ByteOrder.LITTLE_ENDIAN);
+		raw.position(skipFrames * 4);
+		double sum = 0;
+		long count = 0;
+		while (raw.remaining() >= 2) {
+			double value = raw.getShort() / 32768.0;
+			sum += value * value;
+			count++;
+		}
+		return 10 * Math.log10(sum / Math.max(1, count) + 1e-20);
+	}
+
+	@Test
+	@DisplayName("a stereo capture with identical channels is recognised as dual mono")
+	void detectsDualMono(@TempDir Path directory) throws Exception {
+		assertTrue(DenoisedAudio.isDualMono(writeRawStereo(directory.resolve("a.raw"), 70_000,
+				true)));
+		assertTrue(!DenoisedAudio.isDualMono(writeRawStereo(directory.resolve("b.raw"), 70_000,
+				false)));
+	}
+
+	@Test
+	@org.junit.jupiter.api.Timeout(120)
+	@DisplayName("a raw microphone capture comes back cleaned, same length, level baked in")
+	void denoisesARawCapture(@TempDir Path directory) throws Exception {
+		// The module's tests run from java/gravaai-media: point the payload at the staged build.
+		Path staged = Path.of("..", "native", "build").toAbsolutePath().normalize();
+		String property = dev.gravaai.platform.nativehelpers.NativeHelpers.NATIVE_DIR_PROPERTY;
+		String previous = System.getProperty(property);
+		if (Files.isDirectory(staged)) {
+			System.setProperty(property, staged.toString());
+		}
+		try {
+			org.junit.jupiter.api.Assumptions.assumeTrue(
+					SpeechDenoiser.isInstalled(DenoisedAudio.modelDir()),
+					"denoiser model not staged in the native payload");
+			denoiseRawCapture(directory);
+		} finally {
+			if (previous == null) {
+				System.clearProperty(property);
+			} else {
+				System.setProperty(property, previous);
+			}
+		}
+	}
+
+	private static void denoiseRawCapture(Path directory) throws Exception {
+		int frames = 3 * 48_000 + 77;
+		Path input = writeRawStereo(directory.resolve("mic.raw"), frames, true);
+		Path strong = directory.resolve("strong.raw");
+		Path light = directory.resolve("light.raw");
+
+		assertEquals(frames, DenoisedAudio.denoiseRaw(input, strong, 2, 0, () -> false));
+		assertEquals(frames, DenoisedAudio.denoiseRaw(input, light, 2,
+				DenoisedAudio.dryGain(AudioCleanup.NoiseReduction.LIGHT), () -> false));
+		assertEquals(Files.size(input), Files.size(strong), "the mux needs the same length");
+		assertEquals(Files.size(input), Files.size(light));
+		assertTrue(DenoisedAudio.isDualMono(strong), "a dual-mono capture stays dual mono");
+
+		double before = rmsDb(input, 48_000);
+		double strongAfter = rmsDb(strong, 48_000);
+		double lightAfter = rmsDb(light, 48_000);
+		assertTrue(strongAfter < before - 25, "noise must go at full strength: " + before
+				+ " -> " + strongAfter);
+		// Light caps the reduction at 12 dB: the room stays, quieter.
+		assertEquals(before - 12, lightAfter, 1.5, "Light is a 12 dB attenuation limit");
+	}
+
 	@Test
 	@DisplayName("the decode reads the first audio stream from container time zero")
 	void decodeCommandKeepsTheTimeline() {

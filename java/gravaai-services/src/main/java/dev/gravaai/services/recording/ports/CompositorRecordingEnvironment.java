@@ -112,6 +112,11 @@ public final class CompositorRecordingEnvironment implements RecordingEnvironmen
 	}
 
 	@Override
+	public @Nullable MicDenoiser micDenoiser() {
+		return delegate.micDenoiser();
+	}
+
+	@Override
 	public Path command(String name) throws IOException {
 		return delegate.command(name);
 	}

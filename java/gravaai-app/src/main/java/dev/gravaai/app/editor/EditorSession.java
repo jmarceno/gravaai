@@ -649,12 +649,10 @@ public final class EditorSession implements AutoCloseable {
 		if (ready.isPresent()) {
 			return ready.get().toString();
 		}
-		if (denoiseCache.status(source).phase()
-				!= dev.gravaai.services.denoise.DenoiseCache.Phase.FAILED) {
-			// A failed render is not retried on every preview refresh; the next export asks
-			// for it again.
-			denoiseCache.ensure(source);
-		}
+		// Asked again every time the preview audio is rebuilt (a settings or clip change), so a
+		// render that failed is retried by the next edit; a failure alone rebuilds nothing, so
+		// this cannot loop.
+		denoiseCache.ensure(source);
 		return null;
 	}
 

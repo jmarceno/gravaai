@@ -161,6 +161,131 @@ public final class DenoisedAudio {
 		}
 	}
 
+	/**
+	 * Denoises a raw capture (48 kHz signed 16-bit interleaved PCM, the recorder's own track
+	 * format) into another raw file of the same length, with the level baked in: the result is
+	 * {@code dryGain} of the original plus the rest of the denoised signal, sample for sample.
+	 * This is the record-time path, where the cleaned microphone goes straight into the mux.
+	 *
+	 * <p>A stereo capture whose two channels are identical (a mono microphone opened as stereo,
+	 * the usual case) is denoised once and written to both channels, which halves the time.
+	 *
+	 * @param channels 1 or 2
+	 * @param dryGain 0..1, see {@link #dryGain}
+	 * @param cancelled polled between chunks; a cancelled run throws
+	 * @return how many frames were written
+	 */
+	public static long denoiseRaw(Path rawInput, Path rawOutput, int channels, double dryGain,
+			BooleanSupplier cancelled) throws IOException {
+		if (channels < 1 || channels > 2) {
+			throw new IllegalArgumentException("channels must be 1 or 2: " + channels);
+		}
+		float dry = (float) Math.clamp(dryGain, 0, 1);
+		float wet = 1 - dry;
+		boolean dualMono = channels == 2 && isDualMono(rawInput);
+		int engineChannels = dualMono ? 1 : channels;
+		long started = System.nanoTime();
+		long frames = 0;
+		try (SpeechDenoiser denoiser = SpeechDenoiser.open(modelDir());
+				InputStream in = new java.io.BufferedInputStream(Files.newInputStream(rawInput),
+						1 << 16);
+				java.io.OutputStream out = new java.io.BufferedOutputStream(
+						Files.newOutputStream(rawOutput), 1 << 16)) {
+			SpeechDenoiser.Stream[] streams = new SpeechDenoiser.Stream[engineChannels];
+			for (int channel = 0; channel < engineChannels; channel++) {
+				streams[channel] = denoiser.newStream();
+			}
+			// The original samples wait here until their denoised counterparts come out, so the
+			// two can be mixed at the same positions.
+			java.util.ArrayDeque<float[][]> pendingDry = new java.util.ArrayDeque<>();
+			int pendingOffset = 0;
+			byte[] bytes = new byte[CHUNK_FRAMES * channels * Short.BYTES];
+			boolean ended = false;
+			while (!ended) {
+				if (cancelled.getAsBoolean()) {
+					throw new java.util.concurrent.CancellationException("denoise cancelled");
+				}
+				int filled = in.readNBytes(bytes, 0, bytes.length);
+				ended = filled < bytes.length;
+				int chunk = filled / (channels * Short.BYTES);
+				if (chunk > 0) {
+					float[][] planes = new float[engineChannels][chunk];
+					for (int frame = 0; frame < chunk; frame++) {
+						for (int channel = 0; channel < engineChannels; channel++) {
+							int at = (frame * channels + channel) * Short.BYTES;
+							planes[channel][frame] =
+									(short) ((bytes[at] & 0xFF) | (bytes[at + 1] << 8)) / 32768f;
+						}
+					}
+					pendingDry.add(planes);
+					for (int channel = 0; channel < engineChannels; channel++) {
+						streams[channel].write(planes[channel], 0, chunk);
+					}
+				}
+				if (ended) {
+					for (SpeechDenoiser.Stream stream : streams) {
+						stream.finish();
+					}
+				}
+				int ready = Integer.MAX_VALUE;
+				for (SpeechDenoiser.Stream stream : streams) {
+					ready = Math.min(ready, stream.available());
+				}
+				if (ready <= 0) {
+					continue;
+				}
+				float[][] cleaned = new float[engineChannels][ready];
+				for (int channel = 0; channel < engineChannels; channel++) {
+					streams[channel].read(cleaned[channel], 0, ready);
+				}
+				ByteBuffer mixed = ByteBuffer.allocate(ready * channels * Short.BYTES)
+						.order(ByteOrder.LITTLE_ENDIAN);
+				for (int frame = 0; frame < ready; frame++) {
+					float[][] original = java.util.Objects.requireNonNull(pendingDry.peek());
+					for (int channel = 0; channel < channels; channel++) {
+						int source = dualMono ? 0 : channel;
+						float value = dry * original[source][pendingOffset]
+								+ wet * cleaned[source][frame];
+						mixed.putShort((short) Math.round(Math.clamp(value, -1f, 1f) * 32767f));
+					}
+					if (++pendingOffset == original[0].length) {
+						pendingDry.remove();
+						pendingOffset = 0;
+					}
+				}
+				out.write(mixed.array());
+				frames += ready;
+			}
+		}
+		long written = frames;
+		double audioSeconds = written / (double) DenoiseDsp.SAMPLE_RATE;
+		double seconds = (System.nanoTime() - started) / 1e9;
+		LOG.log(System.Logger.Level.INFO, () -> String.format(java.util.Locale.ROOT,
+				"denoised %s: %.1f s of audio in %.1f s (%.0fx realtime%s)",
+				rawInput.getFileName(), audioSeconds, seconds,
+				seconds > 0 ? audioSeconds / seconds : 0, dualMono ? ", dual mono" : ""));
+		return written;
+	}
+
+	/** True when every frame of a raw stereo capture has the same sample in both channels. */
+	static boolean isDualMono(Path rawStereo) throws IOException {
+		try (InputStream in = new java.io.BufferedInputStream(Files.newInputStream(rawStereo),
+				1 << 16)) {
+			byte[] bytes = new byte[1 << 16];
+			while (true) {
+				int filled = in.readNBytes(bytes, 0, bytes.length);
+				for (int at = 0; at + 3 < filled; at += 4) {
+					if (bytes[at] != bytes[at + 2] || bytes[at + 1] != bytes[at + 3]) {
+						return false;
+					}
+				}
+				if (filled < bytes.length) {
+					return true;
+				}
+			}
+		}
+	}
+
 	/** The decode command: the first audio stream as 48 kHz PCM from container time zero. */
 	static List<String> decodeCommand(Path ffmpeg, Path source, int channels) {
 		return List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-nostdin",

@@ -2102,6 +2102,58 @@ public final class EditorInspectorPanel extends VBox {
 		rebuild();
 	}
 
+	private java.util.function.Function<String, String> cleanupRenderStatus = id -> "";
+	/** The status line of each lane's cleanup group, refreshed while the section is on screen. */
+	private final java.util.Map<String, Label> cleanupStatusLabels = new java.util.HashMap<>();
+	private javafx.animation.@org.jspecify.annotations.Nullable Timeline cleanupStatusTimer;
+
+	/**
+	 * Where each lane's denoised copy stands ({@code "42%"} while it renders, {@code "!"} when the
+	 * render failed, empty when ready or off): the same state the timeline's CLEAN badge shows.
+	 */
+	public void setCleanupRenderStatus(java.util.function.Function<String, String> status) {
+		this.cleanupRenderStatus = status == null ? id -> "" : status;
+		refreshCleanupStatus();
+	}
+
+	private void refreshCleanupStatus() {
+		for (var entry : cleanupStatusLabels.entrySet()) {
+			String status = cleanupRenderStatus.apply(entry.getKey());
+			String text = status == null || status.isBlank() ? ""
+					: status.equals("!")
+							? "The cleaned track could not be rendered; the basic filter is used."
+							: "Rendering the cleaned track… " + status;
+			Label label = entry.getValue();
+			label.setText(text);
+			label.setVisible(!text.isEmpty());
+			label.setManaged(!text.isEmpty());
+		}
+	}
+
+	/** Polls the render state twice a second while the Audio section is showing. */
+	private void startCleanupStatusTimer() {
+		if (cleanupStatusTimer != null) {
+			cleanupStatusTimer.stop();
+		}
+		javafx.animation.Timeline timer = new javafx.animation.Timeline(
+				new javafx.animation.KeyFrame(javafx.util.Duration.millis(500), event -> {
+					boolean showing = cleanupStatusLabels.values().stream()
+							.anyMatch(label -> label.getScene() != null);
+					if (!showing) {
+						// The section was rebuilt or left: this timer has nothing to update.
+						javafx.animation.Timeline current = cleanupStatusTimer;
+						if (current != null) {
+							current.stop();
+						}
+						return;
+					}
+					refreshCleanupStatus();
+				}));
+		timer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+		cleanupStatusTimer = timer;
+		timer.play();
+	}
+
 	/**
 	 * Edit-time cleanup of the recording's source audio: one group per lane with the three
 	 * non-destructive stages. The loudness target is a property of the deliverable, so its row says
@@ -2109,6 +2161,7 @@ public final class EditorInspectorPanel extends VBox {
 	 */
 	private VBox audioSection() {
 		VBox root = new VBox(14);
+		cleanupStatusLabels.clear();
 		List<TimelineSourceAudioTrack> tracks = sourceAudioTracks.get();
 		if (tracks == null || tracks.isEmpty()) {
 			Label hint = new Label("Open a recording with audio to clean up its source tracks.");
@@ -2128,6 +2181,8 @@ public final class EditorInspectorPanel extends VBox {
 		note.setWrapText(true);
 		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 		root.getChildren().add(note);
+		refreshCleanupStatus();
+		startCleanupStatusTimer();
 		return root;
 	}
 
@@ -2151,7 +2206,16 @@ public final class EditorInspectorPanel extends VBox {
 
 		// The chip rows stack under their captions rather than sitting at a row's right edge: four
 		// reduction levels plus the caption overflow the inspector's width in one HBox.
-		VBox body = new VBox(12, labeledChoice("Noise reduction", noise),
+		VBox noiseRow = labeledChoice("Noise reduction", noise);
+		// Where the lane's cleaned copy stands; filled in by refreshCleanupStatus.
+		Label status = new Label();
+		status.setWrapText(true);
+		status.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		status.setVisible(false);
+		status.setManaged(false);
+		cleanupStatusLabels.put(track.id(), status);
+		noiseRow.getChildren().add(status);
+		VBox body = new VBox(12, noiseRow,
 				labeledChoice("High-pass", highPass),
 				labeledChoice("Loudness target", loudness));
 		return group(track.label(), () -> resetCleanup(track.id()), body);

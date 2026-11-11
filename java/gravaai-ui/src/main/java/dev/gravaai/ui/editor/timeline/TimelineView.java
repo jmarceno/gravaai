@@ -3230,6 +3230,11 @@ public final class TimelineView extends Region {
 		return sourceAudioTracks;
 	}
 
+	/** The render state of a source lane's denoised copy (the inspector shows it too). */
+	public String cleanupRenderStatus(String sourceTrackId) {
+		return dataSource.cleanupRenderStatus(sourceTrackId);
+	}
+
 	private java.util.Optional<TimelineSourceAudioTrack> sourceAudioTrackFor(String rowId) {
 		String trackId = TimelineRows.getSourceAudioTrackId(rowId);
 		for (TimelineSourceAudioTrack track : sourceAudioTracks) {

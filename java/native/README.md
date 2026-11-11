@@ -25,8 +25,13 @@ java/native/
     whisper/{whisper-cli,*,whisper-runtime.json}
 ```
 
-The C sources are **copies**; the Electron copy stays until P3.6 (plan §1.2 rule 10). Nothing
-here touches a GPU: no VA-API, VDPAU, Vulkan or `-hwaccel` (plan §1.1.1).
+The C sources are **copies**; the Electron copy stays until P3.6 (plan §1.2 rule 10).
+
+The **development** FFmpeg built here is deliberately software-only (no VA-API, VDPAU or Vulkan),
+so the encoder selection degrades to libx264 and the hardware path cannot be hit by accident from a
+dev build. The **release** payload is BtbN's build staged by `.gitea/scripts/fetch-ffmpeg.sh`,
+which carries `h264_vaapi`, `h264_nvenc`, `h264_qsv` and `h264_vulkan`; the app probes it at
+startup and encodes on the GPU when the device works.
 
 ## Compositor backends
 

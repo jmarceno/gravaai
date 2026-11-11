@@ -17,8 +17,10 @@
 #     java.lang.foreign (FfmpegLibs); the CLIs come from the same build tree.
 #   * --disable-autodetect plus the explicit component lists below: nothing is discovered
 #     from the host.
-#   * NO hardware video anywhere (plan §1.1.1): no --enable-vaapi, no --enable-vdpau, no
-#     --enable-vulkan, no -hwaccel. All encode/decode is software libavcodec/libx264.
+#   * Deliberately software-only: no --enable-vaapi, no --enable-vdpau, no --enable-vulkan, no
+#     -hwaccel. The dev payload exercises the libx264 fallback path; releases stage BtbN's
+#     GPU-enabled build with .gitea/scripts/fetch-ffmpeg.sh. All encode/decode here is software
+#     libavcodec/libx264.
 #   * External codecs (libx264, libopus, libmp3lame) are built from source into the scratch
 #     cache because the host has runtime packages but no -dev packages; the codecs are never
 #     silently dropped.

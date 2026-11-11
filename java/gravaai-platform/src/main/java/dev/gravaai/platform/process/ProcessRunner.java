@@ -3,6 +3,7 @@ package dev.gravaai.platform.process;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
@@ -126,8 +127,43 @@ public final class ProcessRunner {
 			builder.directory(workingDirectory.toFile());
 		}
 		environment.forEach(builder.environment()::put);
+		applyBundledLibraryPath(builder, command.getFirst());
 		Process process = builder.start();
 		return new RunningProcess(command, process, timeout, stdoutLine, stderrLine, rawStdout, rawStderr);
+	}
+
+	/**
+	 * Prepends a bundled tool's own library directory to the child's {@code LD_LIBRARY_PATH}.
+	 *
+	 * <p>Some bundled dependencies are loaded with {@code dlopen} by soname rather than through the
+	 * binary's RUNPATH: the BtbN FFmpeg resolves {@code libva.so.2} that way, so a host libva too old
+	 * for it aborts the probe even though a newer one ships next to the libraries. Pointing
+	 * {@code LD_LIBRARY_PATH} at {@code <tool>/../lib} makes the bundled copy win, and every other
+	 * library still resolves normally afterwards.
+	 *
+	 * <p>Only tools whose path looks like the bundled payload ({@code …/bin/<tool>} with a sibling
+	 * {@code lib}) are touched; system tools such as {@code parec} keep the inherited environment.
+	 */
+	private static void applyBundledLibraryPath(ProcessBuilder builder, String executable) {
+		Path binary;
+		try {
+			binary = Path.of(executable).toAbsolutePath();
+		} catch (RuntimeException invalid) {
+			return;
+		}
+		Path parent = binary.getParent();
+		if (parent == null || parent.getFileName() == null
+				|| !"bin".equals(parent.getFileName().toString())) {
+			return;
+		}
+		Path libraryDirectory = parent.resolveSibling("lib");
+		if (!Files.isDirectory(libraryDirectory)) {
+			return;
+		}
+		String existing = builder.environment().get("LD_LIBRARY_PATH");
+		String value = libraryDirectory.toString();
+		builder.environment().put("LD_LIBRARY_PATH",
+				existing == null || existing.isBlank() ? value : value + ":" + existing);
 	}
 
 	@Override

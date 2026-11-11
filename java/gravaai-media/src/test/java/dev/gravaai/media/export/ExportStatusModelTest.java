@@ -98,7 +98,17 @@ class ExportStatusModelTest {
 				progress().withBackends(ExportProgress.RenderBackend.WEBGPU, EncodeBackend.FFMPEG)
 						.withEncoderName("h264_nvenc"),
 				ExportFormat.MP4, ExportPipelineModel.MODERN);
-		assertEquals("WebGPU + FFmpeg (h264_nvenc)", status.runtimeLabel());
+		assertEquals("WebGPU + FFmpeg · h264_nvenc", status.runtimeLabel());
+	}
+
+	@Test
+	@DisplayName("appends a hardware encoder's own qualifier without nesting parentheses")
+	void runtimeLabelHardware() {
+		ExportStatusModel status = ExportStatusModel.resolve(true,
+				progress().withBackends(ExportProgress.RenderBackend.WEBGPU, EncodeBackend.FFMPEG)
+						.withEncoderName("h264_vaapi (GPU)"),
+				ExportFormat.MP4, ExportPipelineModel.MODERN);
+		assertEquals("WebGPU + FFmpeg · h264_vaapi (GPU)", status.runtimeLabel());
 	}
 
 	@Test

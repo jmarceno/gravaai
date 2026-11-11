@@ -210,7 +210,8 @@ public final class RecordingService {
 			hudHooks.hideAreaRecordingBorder();
 		}
 		String sourceName = source == null ? "Screen" : source.name();
-		events.emitRecordingStateChanged(recording, sourceName);
+		events.emitRecordingStateChanged(recording, sourceName,
+				recording ? cosmic.activeEncoderName() : null);
 	}
 
 	/** {@code pause-cursor-capture}: drops samples after the renderer's pause boundary. */

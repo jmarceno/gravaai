@@ -181,9 +181,14 @@ final class DesktopServices implements AutoCloseable {
 	}
 
 	void applyTrayRecordingState(boolean recording, String sourceName) {
+		applyTrayRecordingState(recording, sourceName, "");
+	}
+
+	/** Keeps the tray tooltip truthful about the encoder while a recording is running. */
+	void applyTrayRecordingState(boolean recording, String sourceName, @Nullable String encoderName) {
 		Tray current = tray;
 		if (current != null) {
-			current.setRecording(recording, sourceName);
+			current.setRecording(recording, sourceName, encoderName == null ? "" : encoderName);
 		}
 	}
 

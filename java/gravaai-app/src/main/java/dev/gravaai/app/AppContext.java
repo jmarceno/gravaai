@@ -31,6 +31,7 @@ import dev.gravaai.platform.trash.Trash;
 
 import dev.gravaai.services.automations.AutomationService;
 import dev.gravaai.media.export.ExportPublisher;
+import dev.gravaai.media.export.VideoEncoderProbe;
 import dev.gravaai.services.export.ExportCoordinator;
 import dev.gravaai.services.export.ExportQueue;
 import dev.gravaai.services.extensions.ExtensionFrameOverlayHooks;
@@ -431,6 +432,7 @@ public final class AppContext {
 						}
 					});
 			lazyHudPort.attach(hudPort);
+			logVideoEncoders();
 			LOG.log(System.Logger.Level.INFO, "recording services ready");
 		} catch (RuntimeException error) {
 			LOG.log(System.Logger.Level.WARNING, "recording services unavailable: " + error);
@@ -1938,7 +1940,7 @@ public final class AppContext {
 			desktopServices.subscribeTrayRecordingState(
 					wiring.events().onRecordingStateChanged(state -> Platform.runLater(
 							() -> desktopServices.applyTrayRecordingState(
-									state.recording(), state.sourceName()))));
+									state.recording(), state.sourceName(), state.encoderName()))));
 		}
 	}
 
@@ -2076,6 +2078,18 @@ public final class AppContext {
 					+ screen.getVisualBounds() + " scale=" + screen.getOutputScaleX() + "x"
 					+ screen.getOutputScaleY() + " dpi=" + screen.getDpi()
 					+ (screen.equals(Screen.getPrimary()) ? " primary" : ""));
+		}
+	}
+
+	/** Logs which H.264 encoders this build can start, so a support log states the GPU path. */
+	private static void logVideoEncoders() {
+		try {
+			VideoEncoderProbe probe = VideoEncoderProbe.bundled();
+			LOG.log(System.Logger.Level.INFO, "video encoders available: "
+					+ VideoEncoderProbe.describe(probe.available())
+					+ " (using " + probe.preferred().label() + ")");
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "could not probe the video encoders: " + error);
 		}
 	}
 

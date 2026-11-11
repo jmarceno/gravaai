@@ -15,10 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.gravaai.media.export.VideoEncoderArguments;
+import dev.gravaai.media.export.VideoEncoderProbe;
+import dev.gravaai.media.export.VideoEncoderSpec;
+import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
@@ -31,7 +34,12 @@ import dev.gravaai.services.recording.ports.SpawnedProcess;
  *
  * <p>The compositor helper writes raw frames to stdout; ffmpeg reads them from a pipe and encodes
  * to a temp Matroska file. The transform the helper reports becomes the transpose filter, so a
- * rotated output is saved upright.
+ * rotated output is saved upright. The encoder is a hardware one when this machine and the bundled
+ * ffmpeg can run it, libx264 otherwise (card "GPU hardware encoding for export and recording").
+ *
+ * <p>A hardware encoder that dies during the first second never had a usable frame: the capture
+ * helper keeps producing, so that recording restarts its encoder on libx264 and loses nothing but
+ * the frames that never encoded.
  */
 final class CosmicVideoPipeline {
 
@@ -40,17 +48,39 @@ final class CosmicVideoPipeline {
 	private static final Pattern FORMAT_LINE = Pattern.compile("^FORMAT (\\d+) (\\d+) (\\w+) (\\d+)$");
 	private static final int COPY_BUFFER_BYTES = 4 * 1024 * 1024;
 
+	/**
+	 * How long to watch a fresh hardware encoder for an immediate exit. Driver/encoder init failures
+	 * happen within milliseconds, so this is a short poll rather than a wait: a healthy encoder adds
+	 * no noticeable delay to the recording start.
+	 */
+	private static final long EARLY_EXIT_PROBE_MS = 400;
+
 	private final RecordingProcesses processes;
 	private final RecordingEnvironment environment;
 	private final CosmicProcessIo processIo;
+	private final VideoEncoderProbe encoderProbe;
 
 	CosmicVideoPipeline(
 			RecordingProcesses processes,
 			RecordingEnvironment environment,
 			CosmicProcessIo processIo) {
+		this(processes, environment, processIo, VideoEncoderProbe.bundled());
+	}
+
+	CosmicVideoPipeline(
+			RecordingProcesses processes,
+			RecordingEnvironment environment,
+			CosmicProcessIo processIo,
+			VideoEncoderProbe encoderProbe) {
 		this.processes = processes;
 		this.environment = environment;
 		this.processIo = processIo;
+		this.encoderProbe = encoderProbe;
+	}
+
+	/** The encoder this pipeline will start: hardware when available, libx264 otherwise. */
+	VideoEncoderSpec selectedEncoder() {
+		return encoderProbe.select(true);
 	}
 
 	/** Starts the capture helper at the chosen frame rate; its FORMAT line decides the encoder's input geometry. */
@@ -86,11 +116,47 @@ final class CosmicVideoPipeline {
 		throw new IOException(text.isEmpty() ? "The screen capture helper exited early." : text);
 	}
 
-	/** Starts ffmpeg on the raw frames and on the helper's stdout, at the chosen quality. */
-	SpawnedProcess startEncoder(CaptureFormat format, Path videoPath, int fps, int crf)
-			throws IOException {
+	/**
+	 * Starts ffmpeg on the raw frames and on the helper's stdout, at the chosen quality.
+	 *
+	 * <p>The encoder that actually runs is carried on the returned capture, which is what the HUD
+	 * and the logs report.
+	 */
+	CosmicRecording.VideoCapture startVideo(SpawnedProcess capture, CaptureFormat format,
+			Path videoPath, int fps, RecordingQuality quality) throws IOException {
+		VideoEncoderSpec spec = encoderProbe.select(true);
+		SpawnedProcess encoder = startEncoder(format, videoPath, fps, quality, spec);
+		if (spec.hardware() && failsImmediately(encoder)) {
+			LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " recording encoder exited"
+					+ " immediately; restarting this recording on libx264");
+			encoder.destroy();
+			spec = VideoEncoderSpec.SOFTWARE;
+			encoder = startEncoder(format, videoPath, fps, quality, spec);
+		}
+		return new CosmicRecording.VideoCapture(capture, encoder, videoPath, spec);
+	}
+
+	/** True when a freshly spawned encoder already exited (it never reached the first frame). */
+	private static boolean failsImmediately(SpawnedProcess encoder) {
+		long deadline = System.nanoTime() + EARLY_EXIT_PROBE_MS * 1_000_000L;
+		while (System.nanoTime() < deadline) {
+			if (!encoder.isAlive()) {
+				return true;
+			}
+			try {
+				Thread.sleep(20);
+			} catch (InterruptedException interrupted) {
+				Thread.currentThread().interrupt();
+				return false;
+			}
+		}
+		return false;
+	}
+
+	private SpawnedProcess startEncoder(CaptureFormat format, Path videoPath, int fps,
+			RecordingQuality quality, VideoEncoderSpec spec) throws IOException {
 		return processes.spawn(
-				encoderCommand(format, filtersFor(format), videoPath, fps, crf),
+				encoderCommand(format, filtersFor(format, spec), videoPath, fps, quality, spec),
 				new SpawnOptions(true, false, true));
 	}
 
@@ -105,60 +171,82 @@ final class CosmicVideoPipeline {
 		Thread.ofPlatform().daemon().name("gravaai-av-copy").start(() -> copyFrames(capture, encoder));
 	}
 
-	/** The filter chain: rotate first, then a fixed yuv420p pixel layout for libx264. */
-	private static String filtersFor(CaptureFormat format) {
+	/**
+	 * The filter chain: rotate first, then a fixed yuv420p pixel layout, plus the GPU upload when
+	 * the encoder only takes GPU surfaces.
+	 */
+	private static String filtersFor(CaptureFormat format, VideoEncoderSpec spec) {
 		List<String> filters = new ArrayList<>();
 		String transpose = transposeFilter(format.transform());
 		if (transpose != null) {
 			filters.add(transpose);
 		}
 		filters.add("format=yuv420p");
-		return String.join(",", filters);
+		return String.join(",", VideoEncoderArguments.appendUpload(filters, spec));
 	}
 
 	/** Visible for {@code RecordingTimestampContractTest}: the encoder arguments are the contract
 	 *  that keeps a recording the same length as the time it took. */
 	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath, int fps, int crf) {
-		return List.of(
-				environment.ffmpeg().toString(),
-				"-hide_banner",
-				"-loglevel",
-				"error",
-				"-y",
-				"-f",
-				"rawvideo",
-				"-pix_fmt",
-				format.pixelFormat(),
-				"-s",
-				format.width() + "x" + format.height(),
+		// The raw factor is what the contract test asserts goes into the command, so it is passed
+		// through verbatim instead of being mapped back onto a quality level.
+		return encoderCommand(format, filters, videoPath, fps, crf, VideoEncoderSpec.SOFTWARE);
+	}
+
+	/**
+	 * The full encoder command for one recording at a named quality level.
+	 *
+	 * <p>The wallclock timestamps and the short cluster limit are not encoder-specific and apply to
+	 * every family: they are what keeps the recording the same length as the recording.
+	 */
+	List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath, int fps,
+			RecordingQuality quality, VideoEncoderSpec spec) {
+		return encoderCommand(format, filters, videoPath, fps, quality.crf(), spec);
+	}
+
+	/** The shared command builder; {@code crf} is the x264 factor or the family's constant-quality QP. */
+	private List<String> encoderCommand(CaptureFormat format, String filters, Path videoPath, int fps,
+			int crf, VideoEncoderSpec spec) {
+		List<String> arguments = new ArrayList<>();
+		arguments.add(environment.ffmpeg().toString());
+		arguments.addAll(List.of("-hide_banner", "-loglevel", "error", "-y"));
+		arguments.addAll(spec.deviceArguments());
+		arguments.addAll(List.of(
+				"-f", "rawvideo",
+				"-pix_fmt", format.pixelFormat(),
+				"-s", format.width() + "x" + format.height(),
 				// Stamp each frame with its arrival time instead of assuming a fixed rate. The
-				// helper writes at the chosen fps, but encoding 1080p can fall behind on a busy or
-				// virtual machine. With a fixed "-r" those late frames were still labelled as if
-				// they had arrived on time, so a 15 s capture came out as a ~2.5 s clip that
-				// played at several times the real speed. Wall-clock timestamps keep the video
-				// the same length as the recording, at a variable frame rate.
-				"-use_wallclock_as_timestamps",
-				"1",
-				"-i",
-				"pipe:0",
-				"-vf",
-				filters,
-				"-fps_mode",
-				"vfr",
-				"-c:v",
-				"libx264",
-				// ultrafast at every quality level: the encoder must keep up with the capture, the
-				// constant-rate factor carries the quality choice on its own.
-				"-preset",
-				"ultrafast",
-				"-crf",
-				String.valueOf(crf),
-				"-g",
-				String.valueOf(fps * 2),
+				// helper writes at the chosen fps, but encoding can fall behind on a busy machine.
+				// With a fixed "-r" those late frames were still labelled as if they had arrived on
+				// time, so a 15 s capture came out as a ~2.5 s clip that played at several times the
+				// real speed. Wall-clock timestamps keep the video the same length as the recording,
+				// at a variable frame rate.
+				"-use_wallclock_as_timestamps", "1",
+				"-i", "pipe:0",
+				"-vf", filters,
+				"-fps_mode", "vfr",
+				"-c:v", spec.codec()));
+		arguments.addAll(recordingRateControl(crf, spec));
+		arguments.addAll(List.of(
+				"-g", String.valueOf(fps * 2),
 				// Short clusters: a crash or power loss loses at most ~2 s of video.
-				"-cluster_time_limit",
-				"2000",
-				videoPath.toString());
+				"-cluster_time_limit", "2000",
+				videoPath.toString()));
+		return List.copyOf(arguments);
+	}
+
+	/**
+	 * The recording rate control: a constant-quality target at every quality level, so the encoder
+	 * keeps up with the capture. The CPU path keeps {@code ultrafast + CRF}; the GPU families take
+	 * the same QP through their own constant-quality mode (VA-API has no CRF and no presets).
+	 */
+	private static List<String> recordingRateControl(int crf, VideoEncoderSpec spec) {
+		if (!spec.hardware()) {
+			return List.of("-preset", "ultrafast", "-crf", String.valueOf(crf));
+		}
+		return VideoEncoderArguments.rateControl(spec,
+				dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode.FAST,
+				0, crf, true);
 	}
 
 	/**

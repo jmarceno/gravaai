@@ -10,8 +10,9 @@
 #    meaningful on an idle machine, plan R8)
 # 4. JavaFX screenshots into java/parity/ui-java (cosmic-screenshot) and the parity gallery
 #
-# Deliberately never touches GPU/hardware video (plan §1.1.1) and never runs Electron at the same
-# time as the Java app (plan §7).
+# The gate itself never exercises hardware video: the tests use fake probes and never open a GPU
+# device (the real hardware path is validated separately, on a kernel that carries the VCE fix).
+# It never runs Electron at the same time as the Java app (plan §7).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

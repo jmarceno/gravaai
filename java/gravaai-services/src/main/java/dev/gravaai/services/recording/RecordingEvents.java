@@ -44,8 +44,15 @@ public final class RecordingEvents {
 		}
 	}
 
-	/** Signals the UI that the recording state changed: {@code { recording, sourceName }}. */
-	public record RecordingState(boolean recording, String sourceName) {
+	/**
+	 * Signals the UI that the recording state changed:
+	 * {@code { recording, sourceName, encoderName }}.
+	 *
+	 * @param encoderName the encoder in use ({@code h264_vaapi (GPU)}, {@code libx264 (CPU)}), or
+	 *     null when nothing is recording yet
+	 */
+	public record RecordingState(boolean recording, String sourceName,
+			@Nullable String encoderName) {
 	}
 
 	private final List<Consumer<RecordingState>> stateChanged = new CopyOnWriteArrayList<>();
@@ -56,8 +63,13 @@ public final class RecordingEvents {
 	}
 
 	public void emitRecordingStateChanged(boolean recording, String sourceName) {
+		emitRecordingStateChanged(recording, sourceName, null);
+	}
+
+	public void emitRecordingStateChanged(boolean recording, String sourceName,
+			@Nullable String encoderName) {
 		for (Consumer<RecordingState> listener : stateChanged) {
-			listener.accept(new RecordingState(recording, sourceName));
+			listener.accept(new RecordingState(recording, sourceName, encoderName));
 		}
 	}
 

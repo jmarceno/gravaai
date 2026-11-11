@@ -17,6 +17,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import dev.gravaai.media.export.VideoEncoderProbe;
+import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.KeystrokeTypes;
@@ -141,6 +143,8 @@ class RecordingSettingsPipelineTest {
 	@DisplayName("the capture helper runs at the chosen frame rate and the encoder at the chosen quality")
 	void settingsReachThePipeline() throws Exception {
 		CommandCapture processes = new CommandCapture();
+		// Pin the encoder: with the bundled GPU payload the real probe answers h264_vaapi, and this
+		// test is about the settings reaching the pipeline, not about which encoder wins.
 		CosmicRecorder recorder = new CosmicRecorder(
 				() -> recordings,
 				processes,
@@ -160,7 +164,8 @@ class RecordingSettingsPipelineTest {
 				() -> List.<KeystrokeTypes.KeystrokeEvent>of(),
 				() -> MicNoiseReduction.OFF,
 				() -> RecordingFrameRate.FPS_30,
-				() -> RecordingQuality.LOSSLESS);
+				() -> RecordingQuality.LOSSLESS,
+				VideoEncoderProbe.of(List.of(VideoEncoderSpec.SOFTWARE)));
 		try {
 			CosmicRecorder.StartResult result = recorder.startCosmicRecording(
 					SelectedSource.screen("cosmic:Virtual-1", "Screen", null),

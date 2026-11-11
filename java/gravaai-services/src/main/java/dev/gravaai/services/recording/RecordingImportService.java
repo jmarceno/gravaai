@@ -17,7 +17,11 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.core.json.Json;
+import dev.gravaai.media.export.VideoEncoderArguments;
+import dev.gravaai.media.export.VideoEncoderProbe;
+import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.media.ffmpeg.MediaInfo;
 import dev.gravaai.media.ffmpeg.MediaProbe;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
@@ -91,16 +95,27 @@ public final class RecordingImportService {
 	private final RecordingProcesses processes;
 	private final RecordingEnvironment environment;
 	private final RecordingLibrary library;
+	private final VideoEncoderProbe encoderProbe;
 
 	public RecordingImportService(
 			Supplier<Path> recordingsDir,
 			RecordingProcesses processes,
 			RecordingEnvironment environment,
 			RecordingLibrary library) {
+		this(recordingsDir, processes, environment, library, VideoEncoderProbe.bundled());
+	}
+
+	public RecordingImportService(
+			Supplier<Path> recordingsDir,
+			RecordingProcesses processes,
+			RecordingEnvironment environment,
+			RecordingLibrary library,
+			VideoEncoderProbe encoderProbe) {
 		this.recordingsDir = recordingsDir;
 		this.processes = processes;
 		this.environment = environment;
 		this.library = library;
+		this.encoderProbe = encoderProbe;
 	}
 
 	/** {@code webcamOutputs}: the composed webcam, the session manifest and the visible ranges. */
@@ -134,7 +149,14 @@ public final class RecordingImportService {
 	}
 
 	/** The {@code normalize} filter graph and argument list from importRecording.ts. */
-	static NormalizePlan planNormalize(MediaMeta meta, NormalizeSources sources, Format format, boolean copyVideo) {
+	static NormalizePlan planNormalize(MediaMeta meta, NormalizeSources sources, Format format,
+			boolean copyVideo) {
+		return planNormalize(meta, sources, format, copyVideo, VideoEncoderSpec.SOFTWARE);
+	}
+
+	/** The {@code normalize} filter graph and argument list, encoded with {@code spec}. */
+	static NormalizePlan planNormalize(MediaMeta meta, NormalizeSources sources, Format format,
+			boolean copyVideo, VideoEncoderSpec spec) {
 		List<String> args = new ArrayList<>();
 		args.add("-i");
 		args.add("placeholder"); // replaced by the caller with the real input path
@@ -164,9 +186,14 @@ public final class RecordingImportService {
 		}
 		String videoMap = copyVideo ? "0:v:0" : "[v]";
 		if (!copyVideo) {
-			filters.add("[0:v:0]setpts=PTS-STARTPTS,scale=" + format.width() + ":" + format.height()
-					+ ":force_original_aspect_ratio=decrease,pad=" + format.width() + ":" + format.height()
-					+ ":(ow-iw)/2:(oh-ih)/2,setsar=1,fps=" + number(format.fps()) + ",format=yuv420p[v]");
+			// The upload tail belongs to the video chain when the encoder only takes GPU surfaces.
+			List<String> chain = new ArrayList<>();
+			chain.add("[0:v:0]setpts=PTS-STARTPTS,scale=" + format.width() + ":" + format.height()
+					+ ":force_original_aspect_ratio=decrease,pad=" + format.width() + ":"
+					+ format.height() + ":(ow-iw)/2:(oh-ih)/2,setsar=1,fps="
+					+ number(format.fps()) + ",format=yuv420p");
+			chain.addAll(VideoEncoderArguments.appendUpload(List.of(), spec));
+			filters.add(String.join(",", chain) + "[v]");
 		}
 		List<String> complete = new ArrayList<>(args);
 		complete.add("-filter_complex");
@@ -177,13 +204,22 @@ public final class RecordingImportService {
 		complete.add("[system]");
 		complete.add("-map");
 		complete.add("[mic]");
-		complete.add("-c:v");
-		complete.add(copyVideo ? "copy" : "libx264");
 		if (!copyVideo) {
-			complete.add("-preset");
-			complete.add("fast");
-			complete.add("-crf");
-			complete.add("18");
+			// Device init must precede the input that uses it; -c:v and rate control follow the maps.
+			complete.addAll(0, spec.deviceArguments());
+		}
+		complete.add("-c:v");
+		complete.add(copyVideo ? "copy" : spec.codec());
+		if (!copyVideo) {
+			if (spec.hardware()) {
+				complete.addAll(VideoEncoderArguments.rateControl(spec, ExportEncodingMode.FAST,
+						0, 18, true));
+			} else {
+				complete.add("-preset");
+				complete.add("fast");
+				complete.add("-crf");
+				complete.add("18");
+			}
 		}
 		complete.add("-c:a");
 		complete.add("pcm_s16le");
@@ -202,6 +238,21 @@ public final class RecordingImportService {
 			long timeOffsetMs,
 			double durationMs,
 			double sourceDurationSeconds) {
+		return planWebcamSegment(sourcePath, width, height, delayMs, durationSeconds, timeOffsetMs,
+				durationMs, sourceDurationSeconds, VideoEncoderSpec.SOFTWARE);
+	}
+
+	/** The filter and arguments for one webcam segment, encoded with {@code spec}. */
+	static WebcamSegmentPlan planWebcamSegment(
+			@Nullable String sourcePath,
+			int width,
+			int height,
+			long delayMs,
+			double durationSeconds,
+			long timeOffsetMs,
+			double durationMs,
+			double sourceDurationSeconds,
+			VideoEncoderSpec spec) {
 		String baseFilter = "scale=" + width + ":" + height
 				+ ":force_original_aspect_ratio=decrease,pad=" + width + ":" + height
 				+ ":(ow-iw)/2:(oh-ih)/2,setsar=1,fps=" + WEBCAM_FPS + ",format=yuv420p";
@@ -223,17 +274,27 @@ public final class RecordingImportService {
 					+ number(durationSeconds));
 			filter = baseFilter;
 		}
+		List<String> upload = VideoEncoderArguments.appendUpload(List.of(), spec);
+		if (!upload.isEmpty()) {
+			filter = filter + "," + String.join(",", upload);
+		}
+		// Device init must precede the input that uses it.
+		args.addAll(0, spec.deviceArguments());
 		args.add("-an");
 		args.add("-vf");
 		args.add(filter);
 		args.add("-t");
 		args.add(number(durationSeconds));
 		args.add("-c:v");
-		args.add("libx264");
-		args.add("-preset");
-		args.add("fast");
-		args.add("-crf");
-		args.add("18");
+		args.add(spec.codec());
+		if (spec.hardware()) {
+			args.addAll(VideoEncoderArguments.rateControl(spec, ExportEncodingMode.FAST, 0, 18, true));
+		} else {
+			args.add("-preset");
+			args.add("fast");
+			args.add("-crf");
+			args.add("18");
+		}
 		return new WebcamSegmentPlan(List.copyOf(args), filter);
 	}
 
@@ -290,6 +351,14 @@ public final class RecordingImportService {
 
 	private void runFfmpeg(List<String> args) throws IOException {
 		runFfmpeg(args, null);
+	}
+
+	/** Runs one webcam segment plan into {@code output}. */
+	private void runSegment(WebcamSegmentPlan plan, Path output, @Nullable BooleanSupplier cancelled)
+			throws IOException {
+		List<String> args = new ArrayList<>(plan.args());
+		args.add(output.toString());
+		runFfmpeg(args, cancelled);
 	}
 
 	/**
@@ -377,12 +446,40 @@ public final class RecordingImportService {
 			BooleanSupplier cancelled) throws IOException {
 		MediaMeta meta = probe(file);
 		NormalizeSources sources = companionSources(file);
-		NormalizePlan plan = planNormalize(meta, sources, format, copyVideo);
+		// A stream copy needs no encoder; only the re-encoding legs probe for one.
+		VideoEncoderSpec spec = copyVideo ? VideoEncoderSpec.SOFTWARE : encoderProbe.select(true);
+		runNormalize(file, out, meta, sources, format, copyVideo, spec, cancelled);
+	}
+
+	/**
+	 * Runs one normalize pass, falling back to libx264 when a hardware session fails.
+	 *
+	 * <p>The source is read again from the top, so a failed attempt leaves the original untouched
+	 * and the fallback starts from the same frame.
+	 */
+	private void runNormalize(String file, Path out, MediaMeta meta, NormalizeSources sources,
+			Format format, boolean copyVideo, VideoEncoderSpec spec, BooleanSupplier cancelled)
+			throws IOException {
+		NormalizePlan plan = planNormalize(meta, sources, format, copyVideo, spec);
 		List<String> args = new ArrayList<>(plan.args());
 		// The placeholder stands in for the input path in the pure plan builder.
 		args.set(args.indexOf("placeholder"), file);
 		args.add(out.toString());
-		runFfmpeg(args, cancelled);
+		try {
+			runFfmpeg(args, cancelled);
+		} catch (IOException failure) {
+			if (!spec.hardware() || (cancelled != null && cancelled.getAsBoolean())) {
+				throw failure;
+			}
+			LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " import encoder failed ("
+					+ failure.getMessage() + "); retrying on libx264");
+			NormalizePlan fallback = planNormalize(meta, sources, format, copyVideo,
+					VideoEncoderSpec.SOFTWARE);
+			List<String> fallbackArgs = new ArrayList<>(fallback.args());
+			fallbackArgs.set(fallbackArgs.indexOf("placeholder"), file);
+			fallbackArgs.add(out.toString());
+			runFfmpeg(fallbackArgs, cancelled);
+		}
 	}
 
 	private @Nullable RecordingWebcamSource linked(String video) throws IOException {
@@ -455,6 +552,7 @@ public final class RecordingImportService {
 			MediaMeta info = source != null && source.sourcePath() != null
 					? probe(source.sourcePath())
 					: new MediaMeta(0, 0, 0, 0, false);
+			VideoEncoderSpec segmentEncoder = encoderProbe.select(true);
 			WebcamSegmentPlan plan = planWebcamSegment(
 					source == null ? null : source.sourcePath(),
 					width,
@@ -463,10 +561,22 @@ public final class RecordingImportService {
 					duration,
 					offsetMs,
 					durationMs,
-					info.durationSeconds());
-			List<String> args = new ArrayList<>(plan.args());
-			args.add(work.resolve("webcam-" + index + ".mp4").toString());
-			runFfmpeg(args, cancelled);
+					info.durationSeconds(),
+					segmentEncoder);
+			Path segmentPath = work.resolve("webcam-" + index + ".mp4");
+			try {
+				runSegment(plan, segmentPath, cancelled);
+			} catch (IOException failure) {
+				if (!segmentEncoder.hardware() || (cancelled != null && cancelled.getAsBoolean())) {
+					throw failure;
+				}
+				LOG.log(System.Logger.Level.WARNING, "The " + segmentEncoder.codec()
+						+ " webcam segment failed (" + failure.getMessage() + "); retrying on libx264");
+				WebcamSegmentPlan fallback = planWebcamSegment(
+						source == null ? null : source.sourcePath(), width, height, delayMs, duration,
+						offsetMs, durationMs, info.durationSeconds(), VideoEncoderSpec.SOFTWARE);
+				runSegment(fallback, segmentPath, cancelled);
+			}
 			if (source != null && source.sourcePath() != null) {
 				List<VisibleRange> active = source.visibleRanges() != null
 						? source.visibleRanges()

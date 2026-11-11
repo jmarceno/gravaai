@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -17,6 +18,9 @@ import dev.gravaai.media.capture.WebcamCapture;
 import dev.gravaai.media.capture.WebcamDevice;
 import dev.gravaai.media.capture.WebcamDevices;
 import dev.gravaai.media.capture.WebcamFormat;
+import dev.gravaai.media.export.VideoEncoderArguments;
+import dev.gravaai.media.export.VideoEncoderProbe;
+import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.recording.ports.RecordingProcesses.SpawnOptions;
@@ -46,6 +50,9 @@ public final class WebcamRecordingService {
 	public static final int WEBCAM_FRAME_RATE = 30;
 	public static final String WEBCAM_SUFFIX = "-webcam";
 	public static final String WEBCAM_EXTENSION = ".mkv";
+
+	/** The webcam's constant-quality factor: the value every webcam take used before the GPU path. */
+	static final int WEBCAM_CRF = 18;
 
 	/** Receives every captured frame (HUD preview) on the capture thread. */
 	public interface FrameListener {
@@ -363,10 +370,19 @@ public final class WebcamRecordingService {
 		return devices.get();
 	}
 
-	/** Encoder backed by the bundled ffmpeg CLI (software libx264); see the class comment. */
+	/** Encoder backed by the bundled ffmpeg CLI (hardware when available, libx264 otherwise). */
 	public static EncoderFactory ffmpegCliEncoder(
 			RecordingProcesses processes, RecordingEnvironment environment) {
-		return (outputPath, format) -> new FfmpegCliWebcamEncoder(processes, environment, outputPath, format);
+		return (outputPath, format) -> new FfmpegCliWebcamEncoder(
+				processes, environment, outputPath, format, VideoEncoderProbe.bundled());
+	}
+
+	/** Encoder backed by {@code probe}'s choice, for tests and for callers that fix the encoder. */
+	public static EncoderFactory ffmpegCliEncoder(
+			RecordingProcesses processes, RecordingEnvironment environment,
+			VideoEncoderProbe probe) {
+		return (outputPath, format) -> new FfmpegCliWebcamEncoder(
+				processes, environment, outputPath, format, probe);
 	}
 
 	/** The webcam file for a recording timestamp: {@code recording-<ts>-webcam.mkv}. */
@@ -374,24 +390,44 @@ public final class WebcamRecordingService {
 		return "recording-" + timestamp + WEBCAM_SUFFIX + WEBCAM_EXTENSION;
 	}
 
-	/** The ffmpeg command for raw RGBA frames into a libx264 MKV. */
+	/** The ffmpeg command for raw RGBA frames, encoded with the software libx264 path. */
 	static List<String> encoderCommand(Path ffmpeg, Path outputPath, WebcamFormat format) {
-		return List.of(
-				ffmpeg.toString(),
-				"-hide_banner",
-				"-loglevel", "error",
-				"-y",
+		return encoderCommand(ffmpeg, outputPath, format, VideoEncoderSpec.SOFTWARE);
+	}
+
+	/** The ffmpeg command for raw RGBA frames into an MKV with {@code spec}. */
+	static List<String> encoderCommand(Path ffmpeg, Path outputPath, WebcamFormat format,
+			VideoEncoderSpec spec) {
+		List<String> arguments = new ArrayList<>();
+		arguments.add(ffmpeg.toString());
+		arguments.addAll(List.of("-hide_banner", "-loglevel", "error", "-y"));
+		arguments.addAll(spec.deviceArguments());
+		arguments.addAll(List.of(
 				"-f", "rawvideo",
 				"-pix_fmt", "rgba",
 				"-s", format.width() + "x" + format.height(),
 				"-r", String.valueOf(WEBCAM_FRAME_RATE),
 				"-i", "pipe:0",
-				"-an",
-				"-c:v", "libx264",
-				"-preset", "ultrafast",
-				"-crf", "18",
-				"-pix_fmt", "yuv420p",
-				outputPath.toString());
+				"-an"));
+		// The camera is not a GPU surface: the upload filter is what makes a hardware encoder
+		// usable here, on the same in-process RGBA frames the preview already receives.
+		List<String> filters = VideoEncoderArguments.appendUpload(List.of(), spec);
+		if (!filters.isEmpty()) {
+			arguments.addAll(List.of("-vf", String.join(",", filters)));
+		}
+		arguments.addAll(List.of("-c:v", spec.codec()));
+		if (spec.hardware()) {
+			// Fast, constant-quality capture like the screen pipeline: the encoder must keep up with
+			// a 30 fps camera, so every level uses the family's fastest speed knob.
+			arguments.addAll(VideoEncoderArguments.rateControl(spec,
+					dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode.FAST,
+					0, WEBCAM_CRF, true));
+		} else {
+			arguments.addAll(List.of("-preset", "ultrafast", "-crf", String.valueOf(WEBCAM_CRF),
+					"-pix_fmt", "yuv420p"));
+		}
+		arguments.add(outputPath.toString());
+		return List.copyOf(arguments);
 	}
 
 	/**
@@ -485,24 +521,53 @@ public final class WebcamRecordingService {
 	/** The ffmpeg CLI implementation of {@link WebcamVideoEncoder}. */
 	private static final class FfmpegCliWebcamEncoder implements WebcamVideoEncoder {
 
-		private final SpawnedProcess process;
+		private final RecordingProcesses processes;
+		private final RecordingEnvironment environment;
+		private final Path outputPath;
+		private final WebcamFormat format;
+		private SpawnedProcess process;
 		/** Null only when the process was spawned without a stdin pipe (it is piped here). */
-		private final @Nullable OutputStream stdin;
+		private @Nullable OutputStream stdin;
+		private VideoEncoderSpec spec;
 		private boolean finished;
+		/** Frames written to {@link #process}; the early-failure window is measured in frames. */
+		private long framesWritten;
+		private long processStartedAtMs;
 
 		FfmpegCliWebcamEncoder(
 				RecordingProcesses processes,
 				RecordingEnvironment environment,
 				Path outputPath,
 				WebcamFormat format) {
+			this(processes, environment, outputPath, format, VideoEncoderProbe.bundled());
+		}
+
+		FfmpegCliWebcamEncoder(
+				RecordingProcesses processes,
+				RecordingEnvironment environment,
+				Path outputPath,
+				WebcamFormat format,
+				VideoEncoderProbe probe) {
+			this.processes = processes;
+			this.environment = environment;
+			this.outputPath = outputPath;
+			this.format = format;
+			this.spec = probe.select(true);
+			startProcess(spec);
+		}
+
+		private void startProcess(VideoEncoderSpec next) {
 			try {
 				this.process = processes.spawn(
-						encoderCommand(environment.ffmpeg(), outputPath, format),
+						encoderCommand(environment.ffmpeg(), outputPath, format, next),
 						new SpawnOptions(true, false, true));
 			} catch (IOException error) {
 				throw new IllegalStateException("Could not start the webcam encoder", error);
 			}
 			this.stdin = process.stdin();
+			this.spec = next;
+			this.framesWritten = 0;
+			this.processStartedAtMs = System.currentTimeMillis();
 			drain(process.stderr());
 		}
 
@@ -526,16 +591,29 @@ public final class WebcamRecordingService {
 
 		@Override
 		public void writeFrame(ByteBuffer rgbaTopFirst) throws IOException {
+			// A hardware encoder that died in its first second never had a usable frame: this
+			// recording restarts on libx264 and keeps going, instead of losing the webcam take.
+			if (spec.hardware() && framesWritten == 0 && !process.isAlive()
+					&& System.currentTimeMillis() - processStartedAtMs < 1_000) {
+				LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " webcam encoder exited"
+						+ " before its first frame; restarting it on libx264");
+				process.destroyForcibly();
+				java.nio.file.Files.deleteIfExists(outputPath);
+				startProcess(VideoEncoderSpec.SOFTWARE);
+			}
 			OutputStream sink = stdin;
 			if (sink == null) {
 				throw new IOException("The webcam encoder has no stdin pipe");
 			}
+			int start = rgbaTopFirst.position();
 			byte[] chunk = new byte[Math.min(rgbaTopFirst.remaining(), 1 << 20)];
 			while (rgbaTopFirst.hasRemaining()) {
 				int length = Math.min(rgbaTopFirst.remaining(), chunk.length);
 				rgbaTopFirst.get(chunk, 0, length);
 				sink.write(chunk, 0, length);
 			}
+			rgbaTopFirst.position(start);
+			framesWritten++;
 		}
 
 		@Override

@@ -133,8 +133,11 @@ public record ExportStatusModel(boolean isExportSaving, boolean isExportPreparin
 		if (pathLabel == null) {
 			return encoderName;
 		}
+		// The encoder name is a full label ("h264_vaapi (GPU)", "libx264 (CPU) · GPU
+		// compositing + YUV"); parentheses around it would nest, so it is appended after a
+		// separator instead.
 		return encoderName != null && !encoderName.isEmpty()
-				? pathLabel + " (" + encoderName + ")"
+				? pathLabel + " · " + encoderName
 				: pathLabel;
 	}
 }

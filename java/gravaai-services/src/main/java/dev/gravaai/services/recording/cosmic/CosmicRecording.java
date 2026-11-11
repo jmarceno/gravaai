@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.ports.SpawnedProcess;
@@ -33,8 +34,14 @@ final class CosmicRecording {
 		}
 	}
 
-	/** The capture helper feeding the encoder, and the path the encoder writes. */
-	record VideoCapture(SpawnedProcess capture, SpawnedProcess encoder, Path videoPath) {
+	/**
+	 * The capture helper feeding the encoder, the encoder itself and the path it writes.
+	 *
+	 * @param encoderSpec the encoder that actually started (a hardware session that died at once was
+	 *     already replaced by libx264, so this is what ran)
+	 */
+	record VideoCapture(SpawnedProcess capture, SpawnedProcess encoder, Path videoPath,
+			VideoEncoderSpec encoderSpec) {
 	}
 
 	/** One parec process writing raw PCM to its own file. */

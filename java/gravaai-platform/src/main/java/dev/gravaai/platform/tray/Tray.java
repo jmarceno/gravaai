@@ -60,9 +60,10 @@ public final class Tray implements AutoCloseable {
 		void RegisterStatusNotifierItem(String service);
 	}
 
-	private record State(boolean recording, @Nullable String sourceName) {
+	private record State(boolean recording, String sourceName, String encoderName) {
 		State {
 			sourceName = sourceName == null ? "" : sourceName;
+			encoderName = encoderName == null ? "" : encoderName;
 		}
 	}
 
@@ -72,7 +73,7 @@ public final class Tray implements AutoCloseable {
 	private final TrayMenu.Actions actions;
 	private final StatusNotifierItemImpl item;
 	private final DBusMenuImpl menu;
-	private final AtomicReference<State> state = new AtomicReference<>(new State(false, ""));
+	private final AtomicReference<State> state = new AtomicReference<>(new State(false, "", ""));
 	private final AtomicInteger revision = new AtomicInteger(1);
 	private volatile boolean installed;
 	/** The watcher the item is currently registered with, for the reconnect handler. */
@@ -200,7 +201,18 @@ public final class Tray implements AutoCloseable {
 	 * @param sourceName the selected source shown in the {@code Recording: <name>} tooltip
 	 */
 	public void setRecording(boolean recording, String sourceName) {
-		State previous = state.getAndSet(new State(recording, sourceName));
+		setRecording(recording, sourceName, "");
+	}
+
+	/**
+	 * Switches the tray between idle and recording and names the encoder that actually ran, so the
+	 * tooltip states whether the capture is on the GPU ({@code h264_vaapi (GPU)}) or the CPU.
+	 *
+	 * @param sourceName the selected source shown in the tooltip
+	 * @param encoderName the encoder in use, or blank when it is not known yet
+	 */
+	public void setRecording(boolean recording, String sourceName, String encoderName) {
+		State previous = state.getAndSet(new State(recording, sourceName, encoderName));
 		if (!installed) {
 			return;
 		}
@@ -247,7 +259,13 @@ public final class Tray implements AutoCloseable {
 
 	private String title() {
 		State current = state.get();
-		return current.recording() ? "Recording: " + current.sourceName() : APP_NAME;
+		if (!current.recording()) {
+			return APP_NAME;
+		}
+		String base = "Recording: " + current.sourceName();
+		// The encoder label already carries its own qualifier ("h264_vaapi (GPU)"), so it is joined
+		// with a separator instead of being wrapped in another pair of parentheses.
+		return current.encoderName().isBlank() ? base : base + " · " + current.encoderName();
 	}
 
 	private TrayIcon currentIcon() {

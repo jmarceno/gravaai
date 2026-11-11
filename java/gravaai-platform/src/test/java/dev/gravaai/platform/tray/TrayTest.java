@@ -137,6 +137,11 @@ class TrayTest {
 					tray.setRecording(true, "Window 2");
 					assertEquals("Recording: Window 2", property(properties, "Title"));
 
+					// The encoder that actually ran is part of the tooltip, so the user can tell a
+					// GPU capture from a CPU one while it records.
+					tray.setRecording(true, "Window 2", "h264_vaapi (GPU)");
+					assertEquals("Recording: Window 2 · h264_vaapi (GPU)", property(properties, "Title"));
+
 					call(bus.uniqueName(), Tray.SNI_PATH, "org.kde.StatusNotifierItem.Activate", "0", "0");
 					assertEquals(1, stopRecording.get());
 

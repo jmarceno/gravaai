@@ -87,6 +87,11 @@ conditionals.
 
 ## Machine rules (plan §1.1)
 
-* Software libx264 only; never GPU/VA-API/VDPAU/Vulkan video, never `-hwaccel`.
+* Hardware encoding is supported and preferred for recording when the bundled ffmpeg can use it
+  (VA-API, NVENC, QSV, AMF, Vulkan video, in that probe order); libx264 is the per-job fallback.
+  Exports use hardware from 4K up only: on the weakest supported GPU it is slower in wall-clock
+  below that (see AGENTS.md for the measurements). The dev payload (`build-ffmpeg.sh`) stays
+  software-only by design; the release payload (`fetch-ffmpeg.sh`) ships the GPU encoders. No
+  `-hwaccel` decode path.
 * One build or test JVM at a time (`mvn-locked.sh`), build output on the scratch disk.
 * Kill the app with `pkill -x gravaai` (never `pkill -f`).

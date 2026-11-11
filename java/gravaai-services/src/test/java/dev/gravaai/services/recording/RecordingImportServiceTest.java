@@ -9,6 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.services.recording.CursorTelemetry.CursorInteractionType;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.KeystrokeTypes.KeyModifier;
@@ -91,6 +92,32 @@ class RecordingImportServiceTest {
 		assertEquals("/rec/cam.mkv", withSource.args().get(1));
 		assertTrue(withSource.filter().contains("tpad=start_mode=add:start_duration=0.2"));
 		assertTrue(withSource.filter().contains("trim=start=0,"));
+	}
+
+	@Test
+	@DisplayName("a hardware import encoder gets its device before the input and an upload in the chain")
+	void plansHardwareImportLegs() {
+		VideoEncoderSpec vaapi = new VideoEncoderSpec("h264_vaapi", VideoEncoderSpec.Family.VAAPI);
+		NormalizePlan normalize = RecordingImportService.planNormalize(
+				BASE_META,
+				new NormalizeSources(null, null, Map.of()),
+				FORMAT,
+				false,
+				vaapi);
+		// Device init is a global option: it has to precede the -i it is meant for.
+		assertEquals("-init_hw_device", normalize.args().get(0));
+		List<String> normalizeFilters = List.of(normalize.filterComplex().split(";"));
+		assertTrue(normalizeFilters.stream().anyMatch(filter -> filter.endsWith("hwupload[v]")),
+				"the upload belongs to the video chain: " + normalize.filterComplex());
+		assertTrue(normalize.args().contains("h264_vaapi"));
+		assertTrue(!normalize.args().contains("libx264"));
+
+		WebcamSegmentPlan segment = RecordingImportService.planWebcamSegment(
+				"/rec/cam.mkv", 1280, 720, 0, 1.0, 0, 1000, 0.8, vaapi);
+		assertEquals("-init_hw_device", segment.args().get(0));
+		assertEquals("-i", segment.args().get(segment.args().indexOf("-init_hw_device") + 4));
+		assertTrue(segment.filter().endsWith("format=nv12,hwupload"), segment.filter());
+		assertEquals("h264_vaapi", segment.args().get(segment.args().indexOf("-c:v") + 1));
 	}
 
 	@Test

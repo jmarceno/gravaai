@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
+import dev.gravaai.media.export.VideoEncoderProbe;
 import dev.gravaai.services.recording.CosmicOutput;
 import dev.gravaai.services.recording.CosmicSession;
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioInput;
@@ -125,6 +126,23 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 			Supplier<MicNoiseReduction> micNoiseReductionSetting,
 			Supplier<RecordingFrameRate> frameRateSetting,
 			Supplier<RecordingQuality> videoQualitySetting) {
+		this(recordingsDir, processes, environment, events, cursorTelemetry, keystrokes,
+				micNoiseReductionSetting, frameRateSetting, videoQualitySetting,
+				VideoEncoderProbe.bundled());
+	}
+
+	/** Test seam: run the encoder a fixed probe answers with instead of this machine's GPU. */
+	CosmicRecorder(
+			Supplier<Path> recordingsDir,
+			RecordingProcesses processes,
+			RecordingEnvironment environment,
+			RecordingEvents events,
+			CursorTelemetrySource cursorTelemetry,
+			KeystrokeSource keystrokes,
+			Supplier<MicNoiseReduction> micNoiseReductionSetting,
+			Supplier<RecordingFrameRate> frameRateSetting,
+			Supplier<RecordingQuality> videoQualitySetting,
+			VideoEncoderProbe encoderProbe) {
 		this.recordingsDir = recordingsDir;
 		this.processes = processes;
 		this.micNoiseReductionSetting = micNoiseReductionSetting;
@@ -132,7 +150,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		this.videoQualitySetting = videoQualitySetting;
 		this.processIo = new CosmicProcessIo(processes);
 		PulseAudioSources pulseSources = new PulseAudioSources(environment, processIo);
-		this.video = new CosmicVideoPipeline(processes, environment, processIo);
+		this.video = new CosmicVideoPipeline(processes, environment, processIo, encoderProbe);
 		this.audioTracks = new CosmicAudioTracks(processes, environment, pulseSources, processIo);
 		this.muxer = new CosmicMuxer(environment, processes, processIo.pipeDrains());
 		this.diskGuard = new CosmicDiskGuard();
@@ -156,6 +174,17 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 
 	public synchronized boolean isCosmicRecordingActive() {
 		return active != null;
+	}
+
+	/**
+	 * The encoder label of the recording in progress ({@code h264_vaapi (GPU)}, {@code libx264
+	 * (CPU)}), or null when nothing records (or the recording is audio-only).
+	 */
+	public synchronized @Nullable String activeEncoderName() {
+		if (active == null || active.video() == null) {
+			return null;
+		}
+		return active.video().encoderSpec().label();
 	}
 
 	// ── Start ──────────────────────────────────────────────────────────────
@@ -203,26 +232,29 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		// starts there.
 		long videoStartedAtMs = System.currentTimeMillis();
 
-		SpawnedProcess encoder;
+		// The encoder is chosen here (hardware when this machine can run one) and, if it dies
+		// immediately, restarted on libx264 before a single frame is lost.
+		VideoCapture videoCapture;
 		try {
-			encoder = video.startEncoder(format, videoPath, fps, currentVideoQuality().crf());
+			videoCapture = video.startVideo(capture, format, videoPath, fps, currentVideoQuality());
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);
 			return StartResult.failed(String.valueOf(error));
 		}
+		SpawnedProcess encoder = videoCapture.encoder();
 		video.drainPipeline(capture, encoder);
 		video.startCopying(capture, encoder);
 
 		CosmicRecording recording = new CosmicRecording(
-				new VideoCapture(capture, encoder, videoPath),
-				audio, outputPath, videoStartedAtMs, options.keepSpeakerTracks(), pauseState,
-				currentMicNoiseReduction(), timestamp,
+				videoCapture, audio, outputPath, videoStartedAtMs, options.keepSpeakerTracks(),
+				pauseState, currentMicNoiseReduction(), timestamp,
 				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
 		beginRecordingSession(recording);
 		sessionWatch.watchCaptureEnd(recording, capture, this::isActive);
 		LOG.log(System.Logger.Level.INFO, "Recording " + outputName + " " + format.width() + "x"
-				+ format.height() + " transform " + format.transform() + " to " + outputPath);
+				+ format.height() + " transform " + format.transform() + " encoded with "
+				+ videoCapture.encoderSpec().label() + " to " + outputPath);
 		return StartResult.ok();
 	}
 

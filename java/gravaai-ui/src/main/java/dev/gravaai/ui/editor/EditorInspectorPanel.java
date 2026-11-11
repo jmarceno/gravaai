@@ -126,6 +126,9 @@ public final class EditorInspectorPanel extends VBox {
 	private boolean autoMaskText = true;
 	private @Nullable AutoCloseable captionModelSubscription;
 	private dev.gravaai.ui.editor.transcript.@Nullable TranscriptPanel transcriptPanel;
+	/** Draws the transcript panel's pending cuts on the timeline; installed by the shell. */
+	private java.util.function.Consumer<List<dev.gravaai.ui.editor.timeline.core.Span>> cutPreviewSink =
+			spans -> { };
 	private Runnable onAddCustomFont = () -> { };
 	private boolean annotationMode;
 	private @Nullable AnnotationSettingsPanel annotationPanel;
@@ -222,6 +225,24 @@ public final class EditorInspectorPanel extends VBox {
 	/** Called by the Settings section's "Tutorial" entry (shell owns the dialog). */
 	public void setOnTutorial(Runnable openDialog) {
 		this.onTutorial = openDialog == null ? () -> { } : openDialog;
+	}
+
+	/**
+	 * Installs the sink the transcript panel uses to preview its pending cuts on the timeline
+	 * (empty list clears). The panel is built lazily, so the shell may install this first.
+	 */
+	public void setCutPreviewSink(
+			java.util.function.Consumer<List<dev.gravaai.ui.editor.timeline.core.Span>> sink) {
+		this.cutPreviewSink = sink == null
+				? spans -> { } : sink;
+		if (transcriptPanel != null) {
+			transcriptPanel.setCutPreviewSink(this.cutPreviewSink);
+		}
+	}
+
+	/** The transcript panel, when the Transcript section has been built (tests/shell). */
+	public dev.gravaai.ui.editor.transcript.@Nullable TranscriptPanel transcriptPanel() {
+		return transcriptPanel;
 	}
 
 	/** Shows the annotation appearance editor (React annotation section). */
@@ -2509,6 +2530,7 @@ public final class EditorInspectorPanel extends VBox {
 						captionModels.transcript(),
 						() -> playback.state().currentTimeSeconds() * 1000.0,
 						() -> playback.state().isPlaying(), playback::seek, null, cues -> { });
+				transcriptPanel.setCutPreviewSink(cutPreviewSink);
 			} else {
 				transcriptPanel.refresh();
 			}

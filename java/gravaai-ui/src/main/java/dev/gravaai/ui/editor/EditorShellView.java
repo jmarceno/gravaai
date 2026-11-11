@@ -349,6 +349,23 @@ public final class EditorShellView extends VBox {
 		if (body != null) {
 			body.getChildren().set(1, inspector);
 		}
+		wireTranscriptCutPreview();
+	}
+
+	/**
+	 * Routes the transcript panel's pending cuts to the timeline ({@code setCutPreview}). Called
+	 * from both the inspector and timeline mount points, because either can arrive first.
+	 */
+	private void wireTranscriptCutPreview() {
+		EditorInspectorPanel panel = inspector;
+		if (panel == null) {
+			return;
+		}
+		panel.setCutPreviewSink(spans -> {
+			if (timelineContent instanceof dev.gravaai.ui.editor.timeline.TimelineView timelineView) {
+				timelineView.setCutPreview(spans);
+			}
+		});
 	}
 
 	/**
@@ -390,6 +407,7 @@ public final class EditorShellView extends VBox {
 		this.timelineContent = timelineContent;
 		timelinePanel.setContent(timelineContent);
 		applyExportUpscaleMarker();
+		wireTranscriptCutPreview();
 	}
 
 	/**

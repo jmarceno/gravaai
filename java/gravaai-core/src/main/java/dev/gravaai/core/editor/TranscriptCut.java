@@ -18,6 +18,36 @@ public final class TranscriptCut {
 
 	private TranscriptCut() {}
 
+	/**
+	 * Silence between consecutive spoken spans that is longer than {@code minGapMs}, trimmed down to
+	 * {@code keepGapMs}: the "shorten pauses" rule shared by the transcript panel and the
+	 * {@code cut_pauses} agent op. A pause is cut from {@code previous.endMs() + keepGapMs} to the
+	 * next spoken start, so {@code previous} and {@code next} are only ever read, never removed.
+	 *
+	 * <p>Callers pass the spans that are still on the timeline; to use transcript words, map the
+	 * kept words to {@link SourceRange}s first. Ranges are returned unmerged.
+	 *
+	 * @param minGapMs silence shorter than this is left alone
+	 * @param keepGapMs silence left in place before the next word
+	 */
+	public static List<SourceRange> pauseRanges(List<SourceRange> spoken, long minGapMs,
+			long keepGapMs) {
+		List<SourceRange> ranges = new ArrayList<>();
+		for (int index = 1; index < spoken.size(); index++) {
+			SourceRange previous = spoken.get(index - 1);
+			SourceRange next = spoken.get(index);
+			long gapMs = next.startMs() - previous.endMs();
+			if (gapMs < minGapMs) {
+				continue;
+			}
+			long startMs = previous.endMs() + Math.max(0, keepGapMs);
+			if (next.startMs() > startMs) {
+				ranges.add(new SourceRange(startMs, next.startMs()));
+			}
+		}
+		return ranges;
+	}
+
 	/** {@code mergeSourceRanges}: overlap/touching ranges become one cut. */
 	public static List<SourceRange> mergeSourceRanges(List<SourceRange> ranges) {
 		List<SourceRange> sorted = new ArrayList<>();

@@ -1,5 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -19,7 +21,12 @@ public final class StoreTranscriptCutController implements TranscriptCutControll
 
 	@Override
 	public boolean cut(List<TranscriptCut.SourceRange> ranges) {
-		return store.apply(new ClipCommands.CutSourceRanges(ranges));
+		return cut(ranges, null);
+	}
+
+	@Override
+	public boolean cut(List<TranscriptCut.SourceRange> ranges, @Nullable String undoLabel) {
+		return store.apply(new ClipCommands.CutSourceRanges(ranges), undoLabel);
 	}
 
 	@Override

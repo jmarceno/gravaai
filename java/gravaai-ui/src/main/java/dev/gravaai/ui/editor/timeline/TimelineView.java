@@ -189,6 +189,10 @@ public final class TimelineView extends Region {
 	private static final Color CAPTION_SELECTED = Color.web("#2fe6d0");
 	private static final Color TRIM_FILL = Color.web("#ff5f6d", 0.12);
 	private static final Color TRIM_BORDER = Color.web("#ff5f6d", 0.4);
+	/** Pending transcript cut: the trim red, at preview weight. */
+	private static final Color CUT_PREVIEW_FILL = Color.web("#ff5f6d", 0.26);
+	private static final Color CUT_PREVIEW_BORDER = Color.web("#ff8b92", 0.85);
+	private static final Color CUT_PREVIEW_HATCH = Color.web("#ff5f6d", 0.32);
 	private static final Color SPEED_FILL = Color.web("#f0b429", 0.14);
 	private static final Color SPEED_BORDER = Color.web("#f0b429", 0.45);
 	private static final Color SPEED_TEXT = Color.web("#f0b429");
@@ -279,6 +283,11 @@ public final class TimelineView extends Region {
 	private boolean rangeInitialised;
 	private @Nullable TimelineSelection selection;
 	private List<AgentHighlight> agentHighlights = List.of();
+	/**
+	 * Source ranges a transcript edit would cut, drawn as warning bands before the edit is applied
+	 * ({@link #setCutPreview}); empty when no preview is pending.
+	 */
+	private List<Span> cutPreview = List.of();
 	private double currentTimeMs;
 	private List<RowLayout> rowLayouts = List.of();
 	private List<TimelineRenderItem> items = List.of();
@@ -558,6 +567,25 @@ public final class TimelineView extends Region {
 	public void setAgentHighlights(List<AgentHighlight> highlights) {
 		this.agentHighlights = highlights == null ? List.of() : List.copyOf(highlights);
 		redraw();
+	}
+
+	/**
+	 * Pending cut preview: source-cut spans (already mapped to timeline time) drawn as warning
+	 * bands over the clip row before a transcript edit is applied. Empty clears it; applying or
+	 * cancelling the edit does, and the split clips show the result afterwards.
+	 */
+	public void setCutPreview(List<Span> spans) {
+		List<Span> next = spans == null ? List.of() : List.copyOf(spans);
+		if (next.equals(cutPreview)) {
+			return;
+		}
+		cutPreview = next;
+		redraw();
+	}
+
+	/** The spans currently previewed as pending cuts (tests/shell). */
+	public List<Span> cutPreview() {
+		return cutPreview;
 	}
 
 	/** Row ids in painting order; the Clip row first, then Zoom, annotations, audio. */
@@ -2363,6 +2391,7 @@ public final class TimelineView extends Region {
 		drawRows(graphics, width);
 		drawLaneSeparators(graphics, width);
 		drawInteractionOverlays(graphics);
+		drawCutPreview(graphics, width);
 		drawSmartFramingMoves(graphics, width);
 		graphics.restore();
 		// Track headers (mock .tlheads) live in the fixed gutter and scroll with the lanes.
@@ -3750,6 +3779,41 @@ public final class TimelineView extends Region {
 			return Icons.Keyboard;
 		}
 		return "";
+	}
+
+	/**
+	 * Pending transcript cuts: red warning bands over the clip row, one per source range. They are
+	 * what the transcript panel is about to remove, so the user sees the edit before committing it.
+	 */
+	private void drawCutPreview(GraphicsContext graphics, double width) {
+		if (cutPreview.isEmpty()) {
+			return;
+		}
+		RowLayout clipRow = rowById(TimelineConstants.CLIP_ROW_ID);
+		double top = clipRow == null ? AXIS_HEIGHT + 2 : clipRow.top() + 2;
+		double height = clipRow == null ? 24 : Math.max(6, clipRow.height() - 4);
+		for (Span span : cutPreview) {
+			double startX = xForTime(span.start());
+			double endX = xForTime(span.end());
+			if (endX < GUTTER_WIDTH || startX > width || endX <= startX) {
+				continue;
+			}
+			double x = Math.max(GUTTER_WIDTH, startX);
+			double bandWidth = Math.min(width, endX) - x;
+			graphics.setFill(CUT_PREVIEW_FILL);
+			graphics.fillRect(x, top, bandWidth, height);
+			graphics.setStroke(CUT_PREVIEW_BORDER);
+			graphics.setLineWidth(1);
+			graphics.setLineDashes(3, 2);
+			graphics.strokeRect(x + 0.5, top + 0.5, Math.max(1, bandWidth - 1), height - 1);
+			graphics.setLineDashes(null);
+			// A diagonal hatch so a narrow band still reads as "this goes away" at small zoom.
+			graphics.setStroke(CUT_PREVIEW_HATCH);
+			double step = 6;
+			for (double hatchX = x - height; hatchX < x + bandWidth; hatchX += step) {
+				graphics.strokeLine(hatchX, top + height, hatchX + height, top);
+			}
+		}
 	}
 
 	private void drawAgentHighlights(GraphicsContext graphics, double width) {

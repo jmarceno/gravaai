@@ -19,6 +19,7 @@ import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.ui.editor.captions.CaptionListModel;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
 import dev.gravaai.ui.kit.Button;
+import dev.gravaai.ui.kit.Input;
 import dev.gravaai.ui.kit.Theme;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -59,6 +60,18 @@ public final class TranscriptPanel extends VBox {
 
 	private final Button fillerButton = new Button("Select filler words", Button.Variant.SECONDARY,
 			Button.Size.SM);
+	private final Button removeFillersButton = new Button("Remove filler words",
+			Button.Variant.SECONDARY, Button.Size.SM);
+	private final Button shortenPausesButton = new Button("Shorten pauses",
+			Button.Variant.SECONDARY, Button.Size.SM);
+	private final Input minPauseInput = new Input("1.0").text("1.0");
+	private final Input keepPauseInput = new Input("0.25").text("0.25");
+	private final VBox previewBox = new VBox(6);
+	private final Label previewLabel = new Label();
+	private final Button applyPreviewButton = new Button("Apply", Button.Variant.DEFAULT,
+			Button.Size.SM);
+	private final Button cancelPreviewButton = new Button("Cancel", Button.Variant.GHOST,
+			Button.Size.SM);
 	private final Label hintLabel = new Label();
 	private final VBox generationBox = new VBox(6);
 	private final Label generationMessage = new Label();
@@ -86,6 +99,12 @@ public final class TranscriptPanel extends VBox {
 	private @Nullable String feedback;
 	private boolean feedbackDanger;
 	private @Nullable Object appliedDoneStatus;
+	/** The cleanup waiting for the user's confirmation; null when nothing is previewed. */
+	private @Nullable TranscriptCleanUp pendingCleanUp;
+	/** Last preview pushed to the timeline, so an equal span list is not re-sent on every refresh. */
+	private List<dev.gravaai.ui.editor.timeline.core.Span> pushedPreview = List.of();
+	/** Sink for pending-cut spans; the app mounts it on the timeline. */
+	private Consumer<List<dev.gravaai.ui.editor.timeline.core.Span>> cutPreviewSink = spans -> { };
 
 	/**
 	 * @param cutController optional cut controller; null uses the store-backed one
@@ -116,6 +135,49 @@ public final class TranscriptPanel extends VBox {
 		hintLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + css(Theme.MUTED) + ";");
 		fillerButton.setOnAction(event -> selectFillers());
 
+		removeFillersButton.setOnAction(event -> previewFillers());
+		shortenPausesButton.setOnAction(event -> previewPauses());
+		for (Input input : List.of(minPauseInput, keepPauseInput)) {
+			input.setPrefWidth(56);
+			input.setStyle("-fx-font-size: 11px;");
+			input.setOnAction(event -> {
+				// Enter in either field re-runs the pause preview with the typed values.
+				if (pendingCleanUp instanceof TranscriptCleanUp.Pauses) {
+					previewPauses();
+				}
+			});
+		}
+		HBox pauseRow = new HBox(6, new Label("min pause (s)"), minPauseInput,
+				new Label("keep (s)"), keepPauseInput, shortenPausesButton);
+		pauseRow.setAlignment(Pos.CENTER_LEFT);
+		for (javafx.scene.Node node : pauseRow.getChildren()) {
+			if (node instanceof Label label) {
+				label.setStyle("-fx-font-size: 11px; -fx-text-fill: " + css(Theme.MUTED) + ";");
+			}
+		}
+		// The two one-click batches sit together, apart from the manual selection flow.
+		Label cleanUpTitle = new Label("Clean up in one click");
+		cleanUpTitle.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: "
+				+ css(Theme.MUTED) + ";");
+		VBox cleanUpBox = new VBox(6, cleanUpTitle, removeFillersButton, pauseRow);
+		cleanUpBox.setStyle("-fx-background-color: " + css(Theme.SURFACE)
+				+ "; -fx-background-radius: 4px; -fx-padding: 8 10 8 10;");
+
+		previewLabel.setWrapText(true);
+		previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.FG) + ";");
+		applyPreviewButton.setOnAction(event -> applyPreview());
+		cancelPreviewButton.setOnAction(event -> cancelPreview());
+		Region previewSpacer = new Region();
+		HBox.setHgrow(previewSpacer, Priority.ALWAYS);
+		HBox previewActions = new HBox(8, previewSpacer, cancelPreviewButton, applyPreviewButton);
+		previewActions.setAlignment(Pos.CENTER_RIGHT);
+		previewBox.getChildren().addAll(previewLabel, previewActions);
+		previewBox.setStyle("-fx-background-color: " + css(Theme.WARNING)
+				+ "1f; -fx-background-radius: 4px; -fx-padding: 8 10 8 10;"
+				+ " -fx-border-color: " + css(Theme.WARNING) + "77; -fx-border-radius: 4px;");
+		previewBox.setVisible(false);
+		previewBox.setManaged(false);
+
 		generationMessage.setWrapText(true);
 		generationMessage.setStyle("-fx-font-size: 12px; -fx-text-fill: " + css(Theme.FG) + ";");
 		generationProgress.setPrefWidth(Double.MAX_VALUE);
@@ -130,7 +192,7 @@ public final class TranscriptPanel extends VBox {
 		generationBox.setVisible(false);
 		generationBox.setManaged(false);
 
-		VBox header = new VBox(6, fillerButton, hintLabel, generationBox);
+		VBox header = new VBox(6, cleanUpBox, fillerButton, hintLabel, previewBox, generationBox);
 		header.setPadding(new Insets(0, 0, 4, 0));
 
 		contentHost.setPadding(new Insets(2));
@@ -156,12 +218,18 @@ public final class TranscriptPanel extends VBox {
 			requestFocus();
 		});
 		cutButton.setOnAction(event -> cutSelected());
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
+		// The feedback can be long ("removed 2.30s across 4 cuts..."), so it wraps and takes the
+		// free width; the two buttons keep their natural size instead of shrinking to ellipses.
+		for (javafx.scene.control.Button button : List.of(clearButton, cutButton)) {
+			button.setMinWidth(Region.USE_PREF_SIZE);
+		}
+		feedbackLabel.setWrapText(true);
+		feedbackLabel.setMinWidth(0);
 		feedbackLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + css(Theme.MUTED) + ";");
-		HBox footer = new HBox(8, feedbackLabel, spacer, clearButton, cutButton);
+		HBox footer = new HBox(8, feedbackLabel, clearButton, cutButton);
 		footer.setAlignment(Pos.CENTER_LEFT);
 		footer.setPadding(new Insets(8, 0, 0, 0));
+		HBox.setHgrow(feedbackLabel, Priority.ALWAYS);
 
 		getChildren().addAll(header, scroll, footer);
 
@@ -195,6 +263,7 @@ public final class TranscriptPanel extends VBox {
 		if (anchorKey != null && !keptWordKeys().contains(anchorKey)) {
 			anchorKey = null;
 		}
+		recomputePendingCut();
 		TranscriptTimeMap timeMap = new TranscriptTimeMap(clips);
 		TranscriptWords.Word active = playing.getAsBoolean()
 				? timeMap.activeWord(words, timelinePlayheadMs.getAsDouble()) : null;
@@ -369,6 +438,132 @@ public final class TranscriptPanel extends VBox {
 		refresh();
 	}
 
+	/** One-click "Remove filler words": computes the batch and shows it as a pending preview. */
+	private void previewFillers() {
+		pendingCleanUp = null;
+		TranscriptCleanUp cleanUp = new TranscriptCleanUp.Fillers(
+				TranscriptCutPlan.fillers(words, store.state().clipRegions(), language()),
+				language());
+		preview(cleanUp, "No filler words found.");
+	}
+
+	/**
+	 * One-click "Shorten pauses": reads the two fields, computes the batch and previews it. Invalid
+	 * values (blank, non-numeric, keep >= min) leave the previous pending batch untouched.
+	 */
+	private void previewPauses() {
+		double minSeconds;
+		double keepSeconds;
+		try {
+			minSeconds = Double.parseDouble(minPauseInput.getText().trim());
+			keepSeconds = Double.parseDouble(keepPauseInput.getText().trim());
+		} catch (NumberFormatException error) {
+			feedback = "Enter the minimum pause and the amount to keep in seconds.";
+			feedbackDanger = true;
+			refresh();
+			return;
+		}
+		if (!Double.isFinite(minSeconds) || !Double.isFinite(keepSeconds) || minSeconds <= 0
+				|| keepSeconds < 0 || keepSeconds >= minSeconds) {
+			feedback = "Keep must be 0 or more and smaller than the minimum pause.";
+			feedbackDanger = true;
+			refresh();
+			return;
+		}
+		pendingCleanUp = null;
+		TranscriptCleanUp cleanUp = new TranscriptCleanUp.Pauses(
+				TranscriptCutPlan.pauses(words, store.state().clipRegions(),
+						Math.round(minSeconds * 1000), Math.round(keepSeconds * 1000)),
+				Math.round(minSeconds * 1000), Math.round(keepSeconds * 1000));
+		preview(cleanUp, "No pauses longer than " + formatSeconds(minSeconds) + "s to shorten.");
+	}
+
+	/**
+	 * Shows {@code cleanUp} as the pending preview, or explains that there is nothing to do. Any
+	 * previous pending batch is dropped either way, so the preview always matches the last click.
+	 */
+	private void preview(TranscriptCleanUp cleanUp, String emptyMessage) {
+		if (cleanUp.plan().isEmpty()) {
+			feedback = emptyMessage;
+			feedbackDanger = false;
+			refresh();
+			return;
+		}
+		pendingCleanUp = cleanUp;
+		selected.clear();
+		anchorKey = null;
+		feedback = "";
+		feedbackDanger = false;
+		refresh();
+	}
+
+	/** Applies the pending cleanup as one source cut, so a single undo restores everything. */
+	private void applyPreview() {
+		TranscriptCleanUp cleanUp = pendingCleanUp;
+		if (cleanUp == null) {
+			return;
+		}
+		TranscriptCutPlan plan = cleanUp.plan();
+		boolean applied = cutController.cut(plan.ranges(), "Transcript: " + cleanUp.label());
+		if (!applied) {
+			feedback = "That would remove the whole video.";
+			feedbackDanger = true;
+			refresh();
+			return;
+		}
+		pendingCleanUp = null;
+		feedback = cleanUp.label() + ": removed " + formatSeconds(plan.removedMs() / 1000.0)
+				+ "s (" + plan.ranges().size() + (plan.ranges().size() == 1 ? " cut" : " cuts")
+				+ "). Undo restores it.";
+		feedbackDanger = false;
+		refresh();
+	}
+
+	/** Drops the pending cleanup and its timeline preview. */
+	private void cancelPreview() {
+		if (pendingCleanUp != null) {
+			feedback = "Preview discarded; nothing was cut.";
+			feedbackDanger = false;
+		}
+		pendingCleanUp = null;
+		refresh();
+	}
+
+	/**
+	 * Re-runs the pending cleanup against the current clips, so an edit elsewhere (or an undo)
+	 * shrinks the preview instead of leaving ranges that are no longer on the timeline.
+	 */
+	private void recomputePendingCut() {
+		TranscriptCleanUp cleanUp = pendingCleanUp;
+		if (cleanUp == null) {
+			return;
+		}
+		pendingCleanUp = cleanUp.refreshed(words, store.state().clipRegions());
+	}
+
+	/** Mounts the sink that draws pending cuts on the timeline (empty list clears it). */
+	public void setCutPreviewSink(
+			Consumer<List<dev.gravaai.ui.editor.timeline.core.Span>> sink) {
+		this.cutPreviewSink = sink == null ? spans -> { } : sink;
+		pushedPreview = List.of();
+		pushCutPreview();
+	}
+
+	private void pushCutPreview() {
+		List<dev.gravaai.ui.editor.timeline.core.Span> spans = pendingCleanUp == null ? List.of()
+				: new TranscriptTimeMap(store.state().clipRegions())
+						.spansForSourceRanges(pendingCleanUp.plan().ranges());
+		if (spans.equals(pushedPreview)) {
+			return;
+		}
+		pushedPreview = spans;
+		cutPreviewSink.accept(spans);
+	}
+
+	private static String formatSeconds(double seconds) {
+		return String.format(java.util.Locale.ROOT, "%.2f", seconds);
+	}
+
 	private void clearSelection() {
 		selected.clear();
 		anchorKey = null;
@@ -381,6 +576,12 @@ public final class TranscriptPanel extends VBox {
 		cutButton.setDisable(count == 0);
 		clearButton.setDisable(count == 0);
 		fillerButton.setDisable(words.isEmpty());
+		boolean hasWords = !words.isEmpty();
+		removeFillersButton.setDisable(!hasWords || pendingCleanUp != null);
+		shortenPausesButton.setDisable(words.size() < 2 || pendingCleanUp != null);
+		minPauseInput.setDisable(!hasWords);
+		keepPauseInput.setDisable(!hasWords);
+		updatePreview();
 		if (feedback == null) {
 			feedback = "";
 			feedbackDanger = false;
@@ -388,6 +589,28 @@ public final class TranscriptPanel extends VBox {
 		feedbackLabel.setText(feedback);
 		feedbackLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: "
 				+ (feedbackDanger ? css(Theme.DANGER) : css(Theme.MUTED)) + ";");
+	}
+
+	/** Renders the pending batch (what will be cut, how much) and keeps the timeline preview in sync. */
+	private void updatePreview() {
+		TranscriptCleanUp cleanUp = pendingCleanUp;
+		boolean visible = cleanUp != null && !cleanUp.plan().isEmpty();
+		previewBox.setVisible(visible);
+		previewBox.setManaged(visible);
+		if (cleanUp != null && !cleanUp.plan().isEmpty()) {
+			TranscriptCutPlan plan = cleanUp.plan();
+			String action = cleanUp.label();
+			int cuts = plan.ranges().size();
+			previewLabel.setText(action + ": will remove " + formatSeconds(plan.removedMs() / 1000.0)
+					+ "s across " + cuts + (cuts == 1 ? " cut" : " cuts")
+					+ (plan.wordKeys().isEmpty() ? ""
+							: " (" + plan.wordKeys().size()
+									+ (plan.wordKeys().size() == 1 ? " word)" : " words)"))
+					+ ". Review it on the timeline, then apply.");
+			applyPreviewButton.setDisable(false);
+			cancelPreviewButton.setDisable(false);
+		}
+		pushCutPreview();
 	}
 
 	private void updateGenerationStatus() {
@@ -446,6 +669,9 @@ public final class TranscriptPanel extends VBox {
 		} catch (Exception ignored) {
 			// best-effort unsubscribe
 		}
+		// Leaving the panel must not leave a pending preview painted on the timeline.
+		pendingCleanUp = null;
+		pushCutPreview();
 	}
 
 	/* ---------- inspection (tests/shell) ---------- */
@@ -525,6 +751,48 @@ public final class TranscriptPanel extends VBox {
 
 	public javafx.scene.control.Button clearSelectionButton() {
 		return clearButton;
+	}
+
+	public javafx.scene.control.Button removeFillersButton() {
+		return removeFillersButton;
+	}
+
+	public javafx.scene.control.Button shortenPausesButton() {
+		return shortenPausesButton;
+	}
+
+	public javafx.scene.control.Button applyPreviewButton() {
+		return applyPreviewButton;
+	}
+
+	public javafx.scene.control.Button cancelPreviewButton() {
+		return cancelPreviewButton;
+	}
+
+	/** Sets the pause fields the way the user would type them (s). */
+	public void setPauseRule(double minSeconds, double keepSeconds) {
+		minPauseInput.setText(String.valueOf(minSeconds));
+		keepPauseInput.setText(String.valueOf(keepSeconds));
+	}
+
+	public boolean isPreviewVisible() {
+		return previewBox.isVisible();
+	}
+
+	/** The cleanup waiting for confirmation, or null (tests/shell). */
+	public @Nullable TranscriptCleanUp pendingCleanUp() {
+		return pendingCleanUp;
+	}
+
+	/** The pending batch, or null when nothing is previewed (tests/shell). */
+	public @Nullable TranscriptCutPlan pendingCut() {
+		TranscriptCleanUp cleanUp = pendingCleanUp;
+		return cleanUp == null ? null : cleanUp.plan();
+	}
+
+	/** Spans currently sent to the timeline as the pending preview (tests/shell). */
+	public List<dev.gravaai.ui.editor.timeline.core.Span> pushedCutPreview() {
+		return pushedPreview;
 	}
 
 	public String generationMessageText() {

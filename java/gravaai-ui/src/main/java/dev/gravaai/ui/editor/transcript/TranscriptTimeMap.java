@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import dev.gravaai.core.editor.TranscriptCut;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
+import dev.gravaai.ui.editor.timeline.core.Span;
 
 /**
  * Source-time to edited-timeline mapping for transcripts (the transcript words are always in
@@ -73,6 +75,29 @@ public final class TranscriptTimeMap {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Where source-time cut ranges land on the edited timeline, one span per clip piece they touch.
+	 * The timeline draws these as the pending-cut preview.
+	 */
+	public List<Span> spansForSourceRanges(List<TranscriptCut.SourceRange> ranges) {
+		List<Span> spans = new ArrayList<>();
+		for (TranscriptCut.SourceRange range : ranges) {
+			for (ClipRegion clip : clips) {
+				long clipStartMs = Clips.getClipSourceStartMs(clip);
+				long clipEndMs = Clips.getClipSourceEndMs(clip);
+				long startMs = Math.max(range.startMs(), clipStartMs);
+				long endMs = Math.min(range.endMs(), clipEndMs);
+				if (endMs <= startMs) {
+					continue;
+				}
+				double speed = speedOf(clip);
+				spans.add(new Span(clip.startMs() + (startMs - clipStartMs) / speed,
+						clip.startMs() + (endMs - clipStartMs) / speed));
+			}
+		}
+		return List.copyOf(spans);
 	}
 
 	/** Timeline duration of a source-time span at the clip's speed (caption-speed values). */

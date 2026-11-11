@@ -1232,16 +1232,12 @@ public final class AgentPlanner {
 		}
 		long minMs = Math.round(minSeconds * 1000);
 		long keepMs = Math.round(keepSeconds * 1000);
-		List<TranscriptCut.SourceRange> ranges = new ArrayList<>();
-		for (int index = 1; index < draft.words.size(); index++) {
-			AgentTranscript.Word previous = draft.words.get(index - 1);
-			AgentTranscript.Word next = draft.words.get(index);
-			if (next.startMs() - previous.endMs() < minMs) {
-				continue;
-			}
-			ranges.add(new TranscriptCut.SourceRange(previous.endMs() + keepMs,
-					next.startMs()));
+		// The same rule the transcript panel's one-click "Shorten pauses" uses (TranscriptCut).
+		List<TranscriptCut.SourceRange> spoken = new ArrayList<>(draft.words.size());
+		for (AgentTranscript.Word word : draft.words) {
+			spoken.add(new TranscriptCut.SourceRange(word.startMs(), word.endMs()));
 		}
+		List<TranscriptCut.SourceRange> ranges = TranscriptCut.pauseRanges(spoken, minMs, keepMs);
 		List<ClipRegion> before = draft.state.clipRegions();
 		List<ClipRegion> next = ranges.isEmpty() ? before
 				: TranscriptCut.removeSourceRangesFromClips(before, ranges,

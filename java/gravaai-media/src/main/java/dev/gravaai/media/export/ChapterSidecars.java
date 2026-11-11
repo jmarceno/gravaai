@@ -1,13 +1,12 @@
 package dev.gravaai.media.export;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 import dev.gravaai.core.project.Chapters;
 
@@ -27,7 +26,7 @@ public final class ChapterSidecars {
 		public static final Payload NONE = new Payload(List.of());
 
 		public Payload {
-			chapters = chapters == null ? List.of() : List.copyOf(chapters);
+			chapters = List.copyOf(chapters);
 		}
 
 		public boolean hasChapters() {
@@ -36,7 +35,11 @@ public final class ChapterSidecars {
 	}
 
 	/** The sidecar write result, like {@link CaptionSidecars.WriteResult}. */
-	public record WriteResult(boolean wrote, @Nullable String error) {}
+	public record WriteResult(boolean wrote, Optional<String> error) {
+
+		/** Nothing was asked for, so nothing was written and nothing failed. */
+		public static final WriteResult SKIPPED = new WriteResult(false, Optional.empty());
+	}
 
 	/** The temporary {@code ffmetadata} file name handed to ffmpeg beside an export temp file. */
 	static final String METADATA_SUFFIX = ".chapters.txt";
@@ -73,9 +76,6 @@ public final class ChapterSidecars {
 	 * {@code ;} or {@code #} would otherwise start a comment.
 	 */
 	static String escape(String value) {
-		if (value == null) {
-			return "";
-		}
 		StringBuilder escaped = new StringBuilder(value.length() + 8);
 		for (int index = 0; index < value.length(); index++) {
 			char character = value.charAt(index);
@@ -96,51 +96,42 @@ public final class ChapterSidecars {
 
 	/** Writes {@code <video base>.chapters.txt} next to the published video, best effort. */
 	public static WriteResult writeBestEffort(Path videoPath, Payload payload) {
-		if (payload == null || !payload.hasChapters()) {
-			return new WriteResult(false, null);
+		if (!payload.hasChapters()) {
+			return WriteResult.SKIPPED;
 		}
 		try {
 			Path sidecar = sidecarPath(videoPath);
 			Files.writeString(sidecar, sidecarText(payload.chapters()), StandardCharsets.UTF_8);
-			return new WriteResult(true, null);
+			return new WriteResult(true, Optional.empty());
 		} catch (IOException error) {
-			return new WriteResult(false, error.getMessage() == null
-					? error.getClass().getSimpleName() : error.getMessage());
+			return new WriteResult(false, Optional.of(Optional.ofNullable(error.getMessage())
+					.orElse(error.getClass().getSimpleName())));
 		}
 	}
 
 	/** {@code <video base>.chapters.txt}. */
 	public static Path sidecarPath(Path videoPath) {
 		Path absolute = videoPath.toAbsolutePath().normalize();
-		Path fileName = absolute.getFileName();
-		String name = fileName == null ? "export" : fileName.toString();
+		String name = Optional.ofNullable(absolute.getFileName()).map(Path::toString).orElse("export");
 		int dot = name.lastIndexOf('.');
 		String base = dot > 0 ? name.substring(0, dot) : name;
-		Path parent = absolute.getParent();
-		return parent == null ? Path.of(base + ".chapters.txt")
-				: parent.resolve(base + ".chapters.txt");
+		String sidecarName = base + ".chapters.txt";
+		return Optional.ofNullable(absolute.getParent()).map(parent -> parent.resolve(sidecarName))
+				.orElse(Path.of(sidecarName));
 	}
 
 	/**
 	 * Writes the {@code ffmetadata} document next to an export temp file and returns its path, or
-	 * null when there is nothing to embed. The caller deletes it after the encode.
+	 * empty when there is nothing to embed. The caller deletes it after the encode.
 	 */
-	static @Nullable Path writeMetadataFile(Path exportFile, List<Chapters.Chapter> chapters,
+	static Optional<Path> writeMetadataFile(Path exportFile, List<Chapters.Chapter> chapters,
 			long durationMs) throws IOException {
-		if (chapters == null || chapters.isEmpty()) {
-			return null;
+		if (chapters.isEmpty()) {
+			return Optional.empty();
 		}
 		Path metadata = exportFile.resolveSibling(exportFile.getFileName() + METADATA_SUFFIX);
 		Files.writeString(metadata, ffmetadata(chapters, durationMs), StandardCharsets.UTF_8);
-		return metadata;
-	}
-
-	/** {@code withChapterMessage}: appends the sidecar failure to an export message. */
-	public static String withSidecarMessage(String baseMessage, WriteResult result) {
-		if (result == null || result.error() == null) {
-			return baseMessage;
-		}
-		return baseMessage + " Chapters could not be saved alongside the video.";
+		return Optional.of(metadata);
 	}
 
 	/** The chapter count line used in export summaries ({@code "3 chapters"}). */

@@ -1,6 +1,5 @@
 package dev.gravaai.media.export;
 
-import org.jspecify.annotations.Nullable;
 
 /**
  * One usable H.264 encoder and everything that differs between the software and hardware families
@@ -61,16 +60,6 @@ public record VideoEncoderSpec(String codec, Family family) {
 		public boolean hardware() {
 			return this != X264;
 		}
-
-		/** The family whose codec id is {@code codec}, or null when it is not one of ours. */
-		public static @Nullable Family forCodec(String codec) {
-			for (Family family : values()) {
-				if (family.codec.equals(codec)) {
-					return family;
-				}
-			}
-			return null;
-		}
 	}
 
 	/** The software fallback every job can always use. */
@@ -114,7 +103,7 @@ public record VideoEncoderSpec(String codec, Family family) {
 	 * actually encode is settled by running the job.
 	 */
 	static String vaapiRenderNode() {
-		java.nio.file.Path node = VaapiDevices.firstRenderNode();
-		return node == null ? "/dev/dri/renderD128" : node.toString();
+		return VaapiDevices.firstRenderNode().map(java.nio.file.Path::toString)
+				.orElse("/dev/dri/renderD128");
 	}
 }

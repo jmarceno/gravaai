@@ -353,7 +353,7 @@ public final class StoreTimelineCommands implements TimelineCommands {
 
 	@Override
 	public void addMarker(double timelineMs) {
-		store.apply(new MarkerCommands.Add(Math.round(timelineMs), null));
+		store.apply(new MarkerCommands.Add(Math.round(timelineMs)));
 	}
 
 	@Override
@@ -377,7 +377,7 @@ public final class StoreTimelineCommands implements TimelineCommands {
 	}
 
 	@Override
-	public void selectMarker(@Nullable String markerId) {
+	public void selectMarker(String markerId) {
 		store.apply(new MarkerCommands.Select(markerId));
 	}
 

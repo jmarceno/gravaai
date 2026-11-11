@@ -55,7 +55,7 @@ public final class EditorStore {
 	private @Nullable String selectedKeystrokeId;
 	private @Nullable String selectedGradeId;
 	private @Nullable String selectedCameraLayoutId;
-	private @Nullable String selectedMarkerId;
+	private java.util.Optional<String> selectedMarkerId = java.util.Optional.empty();
 	private java.util.Optional<String> selectedElementId = java.util.Optional.empty();
 	/** Ids of every multi-selected element (zoom/annotation/audio); includes the primary id. */
 	private final LinkedHashSet<String> multiSelection = new LinkedHashSet<>();
@@ -176,13 +176,18 @@ public final class EditorStore {
 	}
 
 	/** The selected timeline marker, if any (markers select from the ruler, not from a lane). */
-	public @Nullable String selectedMarkerId() {
+	public java.util.Optional<String> selectedMarkerId() {
 		return selectedMarkerId;
 	}
 
-	/** Selects a marker; pass {@code null} to clear it. */
-	public void setSelectedMarkerId(@Nullable String id) {
-		this.selectedMarkerId = id;
+	/** Selects a marker. */
+	public void setSelectedMarkerId(String id) {
+		this.selectedMarkerId = java.util.Optional.of(id);
+	}
+
+	/** Clears the marker selection. */
+	public void clearSelectedMarker() {
+		this.selectedMarkerId = java.util.Optional.empty();
 	}
 
 	/** The selected element on the elements lane, if any. */
@@ -281,7 +286,7 @@ public final class EditorStore {
 		setElements(snapshot.elements());
 		setElementAssets(snapshot.elementAssets());
 		setMarkers(snapshot.markers());
-		selectedMarkerId = null;
+		selectedMarkerId = java.util.Optional.empty();
 		selectedElementId = snapshot.selectedElementId();
 		selectedZoomId = snapshot.selectedZoomId();
 		selectedClipId = snapshot.selectedClipId();
@@ -408,7 +413,7 @@ public final class EditorStore {
 		selectedKeystrokeId = keepKeystroke;
 		selectedGradeId = keepGrade;
 		selectedCameraLayoutId = null;
-		selectedMarkerId = null;
+		selectedMarkerId = java.util.Optional.empty();
 		selectedElementId = java.util.Optional.empty();
 		multiSelection.clear();
 	}

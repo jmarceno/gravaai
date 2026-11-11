@@ -1014,6 +1014,7 @@ public final class EditorInspectorPanel extends VBox {
 		GradeRegion grade = selected != null ? selected : gradeAtPlayhead();
 		VBox root = new VBox(14);
 		if (grade == null) {
+			root.setPadding(new Insets(0, 10, 10, 10));
 			root.getChildren().add(emptySelection(
 					"Grade the footage over a span: click the COLOR lane in the timeline, press G, "
 							+ "or use Add Layer → Color. The grade then shades every clip it covers."));
@@ -2201,6 +2202,7 @@ public final class EditorInspectorPanel extends VBox {
 				+ " the lane.");
 		note.setWrapText(true);
 		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		VBox.setMargin(note, new Insets(0, 10, 10, 10));
 		root.getChildren().add(note);
 		refreshCleanupStatus();
 		startCleanupStatusTimer();

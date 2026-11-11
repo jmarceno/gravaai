@@ -1,14 +1,12 @@
 package dev.gravaai.core.editor;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.Clips;
-import dev.gravaai.core.project.MarkerTimeline;
 import dev.gravaai.core.project.TimelineMarker;
 
 /**
@@ -32,19 +30,23 @@ public final class MarkerCommands {
 		return TimelineMarker.defaultName(markers.size() + 1);
 	}
 
-	/** The clip under a timeline position, or null when that time is past the last clip. */
-	private static @Nullable ClipRegion clipAtTimelineMs(List<ClipRegion> clips, long timelineMs) {
-		return Clips.findClipAtTimelineTime(timelineMs, clips);
-	}
-
 	/** {@code handleAddMarker}: drops a marker at a timeline time, named from the marker count. */
 	public static final class Add implements EditorCommand {
 		private final long timelineMs;
-		private final @Nullable String name;
+		private final Optional<String> name;
 
-		public Add(long timelineMs, @Nullable String name) {
+		/** A marker with the next generic name ({@code Marker N}). */
+		public Add(long timelineMs) {
+			this(timelineMs, Optional.empty());
+		}
+
+		public Add(long timelineMs, String name) {
+			this(timelineMs, Optional.of(name));
+		}
+
+		private Add(long timelineMs, Optional<String> name) {
 			this.timelineMs = Math.max(0, timelineMs);
-			this.name = name;
+			this.name = name.filter(candidate -> !candidate.isBlank());
 		}
 
 		@Override
@@ -53,8 +55,7 @@ public final class MarkerCommands {
 			String id = store.nextId("marker", markers.stream().map(TimelineMarker::id).toList());
 			long sourceMs = Clips.mapTimelineTimeToSourceTime(timelineMs,
 					store.state().clipRegions());
-			String resolvedName = name == null || name.isBlank() ? nextName(markers)
-					: TimelineMarker.cleanName(name);
+			String resolvedName = name.map(TimelineMarker::cleanName).orElseGet(() -> nextName(markers));
 			List<TimelineMarker> next = new ArrayList<>(markers);
 			next.add(new TimelineMarker(id, sourceMs, resolvedName, false));
 			store.setMarkers(sorted(next));
@@ -78,9 +79,14 @@ public final class MarkerCommands {
 			if (store.state().markers().stream().noneMatch(marker -> marker.id().equals(id))) {
 				return false;
 			}
+			List<TimelineMarker> markers = store.state().markers();
 			List<TimelineMarker> next = new ArrayList<>();
-			for (TimelineMarker marker : store.state().markers()) {
-				next.add(marker.id().equals(id) ? marker.withName(name) : marker);
+			for (int index = 0; index < markers.size(); index++) {
+				TimelineMarker marker = markers.get(index);
+				// A blank name falls back to this marker's generic name, never to an empty flag.
+				String resolved = name.isBlank() ? TimelineMarker.defaultName(index + 1)
+						: TimelineMarker.cleanName(name);
+				next.add(marker.id().equals(id) ? marker.withName(resolved) : marker);
 			}
 			store.setMarkers(next);
 			return true;
@@ -102,17 +108,15 @@ public final class MarkerCommands {
 
 		@Override
 		public boolean apply(EditorStore store) {
-			TimelineMarker marker = store.state().markers().stream()
-					.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
-			if (marker == null) {
+			List<ClipRegion> clips = store.state().clipRegions();
+			// Clips.findClipAtTimelineTime is the legacy nullable lookup: null means a gap.
+			boolean overGap = Optional.ofNullable(Clips.findClipAtTimelineTime(timelineMs, clips))
+					.isEmpty();
+			if (timelineMs > 0 && overGap) {
 				return false;
 			}
-			long sourceMs = Clips.mapTimelineTimeToSourceTime(timelineMs,
-					store.state().clipRegions());
-			if (timelineMs > 0 && clipAtTimelineMs(store.state().clipRegions(), timelineMs) == null) {
-				return false;
-			}
-			return applySource(store, marker, sourceMs);
+			long sourceMs = Clips.mapTimelineTimeToSourceTime(timelineMs, clips);
+			return find(store, id).map(marker -> applySource(store, marker, sourceMs)).orElse(false);
 		}
 	}
 
@@ -128,10 +132,12 @@ public final class MarkerCommands {
 
 		@Override
 		public boolean apply(EditorStore store) {
-			TimelineMarker marker = store.state().markers().stream()
-					.filter(candidate -> candidate.id().equals(id)).findFirst().orElse(null);
-			return marker != null && applySource(store, marker, sourceMs);
+			return find(store, id).map(marker -> applySource(store, marker, sourceMs)).orElse(false);
 		}
+	}
+
+	private static Optional<TimelineMarker> find(EditorStore store, String id) {
+		return store.state().markers().stream().filter(marker -> marker.id().equals(id)).findFirst();
 	}
 
 	private static boolean applySource(EditorStore store, TimelineMarker marker, long sourceMs) {
@@ -197,8 +203,8 @@ public final class MarkerCommands {
 				return false;
 			}
 			store.setMarkers(next);
-			if (id.equals(store.selectedMarkerId())) {
-				store.setSelectedMarkerId(null);
+			if (store.selectedMarkerId().filter(id::equals).isPresent()) {
+				store.clearSelectedMarker();
 			}
 			return true;
 		}
@@ -206,16 +212,15 @@ public final class MarkerCommands {
 
 	/** {@code handleMarkerSelect}. */
 	public static final class Select implements EditorCommand {
-		private final @Nullable String id;
+		private final String id;
 
-		public Select(@Nullable String id) {
+		public Select(String id) {
 			this.id = id;
 		}
 
 		@Override
 		public boolean apply(EditorStore store) {
-			if (id != null && store.state().markers().stream()
-					.noneMatch(marker -> marker.id().equals(id))) {
+			if (find(store, id).isEmpty()) {
 				return false;
 			}
 			store.setSelectedMarkerId(id);
@@ -223,18 +228,4 @@ public final class MarkerCommands {
 		}
 	}
 
-	/** The marker at a timeline position, for the ruler hit test. */
-	public static @Nullable TimelineMarker markerAtTimelineMs(List<TimelineMarker> markers,
-			List<ClipRegion> clips, double timelineMs, double toleranceMs) {
-		TimelineMarker best = null;
-		double bestDistance = Double.POSITIVE_INFINITY;
-		for (MarkerTimeline.Fragment fragment : MarkerTimeline.projectMarkers(markers, clips)) {
-			double distance = Math.abs(fragment.timelineMs() - timelineMs);
-			if (distance <= toleranceMs && distance < bestDistance) {
-				best = fragment.marker();
-				bestDistance = distance;
-			}
-		}
-		return best;
-	}
 }

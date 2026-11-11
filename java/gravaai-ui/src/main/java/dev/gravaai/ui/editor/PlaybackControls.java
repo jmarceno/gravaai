@@ -70,7 +70,7 @@ public final class PlaybackControls extends GridPane {
 		setPadding(new Insets(0, 0, 0, 0));
 
 		// ---- left: add layer / zoom / suggest / split -------------------------
-		HBox tools = new HBox(4);
+		HBox tools = new HBox(8);
 		tools.getStyleClass().add("editor-playback__tools");
 		tools.setAlignment(Pos.CENTER_LEFT);
 
@@ -120,6 +120,12 @@ public final class PlaybackControls extends GridPane {
 			cameraMenu.item(layout.label(), () -> actions.switchCameraLayout(layout));
 		}
 		tools.getChildren().addAll(addLayer, zoom, cameraLayout);
+		// The column is a percentage of the bar: never let it squeeze a button into an ellipsis.
+		for (javafx.scene.Node tool : tools.getChildren()) {
+			if (tool instanceof javafx.scene.layout.Region region) {
+				region.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+			}
+		}
 
 		// ---- centre: timecode / transport / duration ----------------------------
 		HBox centerBox = new HBox(6);

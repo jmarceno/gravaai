@@ -2,7 +2,6 @@ package dev.gravaai.core.project;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -46,15 +45,15 @@ class MarkerTimelineTest {
 		// Source 2500–3500 is not in any clip.
 		assertEquals(List.of(), MarkerTimeline.projectMarkers(
 				List.of(marker("gone", 3000, "Cut", false)), CLIPS));
-		assertNull(MarkerTimeline.timelineMs(marker("gone", 3000, "Cut", false), CLIPS));
+		assertTrue(MarkerTimeline.timelineMs(marker("gone", 3000, "Cut", false), CLIPS).isEmpty());
 	}
 
 	@Test
 	@DisplayName("a marker on the last frame of a clip belongs to that clip")
 	void lastFrameBoundary() {
 		TimelineMarker end = marker("end", 1000, "End", false);
-		assertEquals(1000L, MarkerTimeline.timelineMs(end, List.of(CLIPS.get(0))));
-		assertEquals(2500L, MarkerTimeline.timelineMs(
+		assertEquals(java.util.OptionalLong.of(1000L), MarkerTimeline.timelineMs(end, List.of(CLIPS.get(0))));
+		assertEquals(java.util.OptionalLong.of(2500L), MarkerTimeline.timelineMs(
 				marker("end2", 6000, "End", false), List.of(CLIPS.get(1))));
 	}
 

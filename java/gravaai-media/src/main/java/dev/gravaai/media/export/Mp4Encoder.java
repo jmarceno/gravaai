@@ -7,9 +7,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode;
 import dev.gravaai.platform.process.ProcessRunner;
@@ -158,16 +158,16 @@ public final class Mp4Encoder {
 	/** One-shot record of the first exception the frame provider threw (rendering is serial). */
 	private static final class RenderFailure {
 
-		private @Nullable Throwable first;
+		private Optional<Throwable> first = Optional.empty();
 
 		void record(Throwable error) {
-			if (first == null) {
-				first = error;
+			if (first.isEmpty()) {
+				first = Optional.of(error);
 			}
 		}
 
 		boolean happened() {
-			return first != null;
+			return first.isPresent();
 		}
 	}
 
@@ -179,7 +179,7 @@ public final class Mp4Encoder {
 		String encoderName = VideoEncoderArguments.label(spec, yuvInput);
 		// ffmpeg reads the chapters from an ffmetadata input document; the bundled build has the
 		// demuxer, so the MP4 stays a single encode and faststart is applied once.
-		Path metadataFile;
+		Optional<Path> metadataFile;
 		try {
 			metadataFile = ChapterSidecars.writeMetadataFile(outputPath, request.chapters(),
 					Math.round(request.durationSeconds() * 1000));
@@ -190,20 +190,20 @@ public final class Mp4Encoder {
 			return runEncode(request, frames, listener, cancellation, spec, yuvInput, outputPath,
 					encoderName, metadataFile);
 		} finally {
-			if (metadataFile != null) {
+			metadataFile.ifPresent(file -> {
 				try {
-					Files.deleteIfExists(metadataFile);
+					Files.deleteIfExists(file);
 				} catch (IOException ignored) {
 					// Best effort; the export itself already succeeded or failed on its own.
 				}
-			}
+			});
 		}
 	}
 
 	private static ExportResult runEncode(Mp4ExportRequest request, ExportFrameProvider frames,
 			ExportProgressListener listener, ExportCancellation cancellation, VideoEncoderSpec spec,
 			boolean yuvInput, Path outputPath, String encoderName,
-			@Nullable Path metadataFile) {
+			Optional<Path> metadataFile) {
 		long totalFrames = request.totalFrames();
 		List<String> arguments = buildArguments(request, yuvInput, spec, metadataFile);
 		StringBuilder stderr = new StringBuilder();
@@ -283,16 +283,16 @@ public final class Mp4Encoder {
 	 */
 	public static List<String> buildArguments(Mp4ExportRequest request, boolean yuv420pInput,
 			VideoEncoderSpec spec) {
-		return buildArguments(request, yuv420pInput, spec, null);
+		return buildArguments(request, yuv420pInput, spec, Optional.empty());
 	}
 
 	/**
-	 * The ffmpeg arguments, embedding the chapters of {@code metadataFile} when it is not null.
+	 * The ffmpeg arguments, embedding the chapters of {@code metadataFile} when there is one.
 	 * The document is an extra {@code ffmetadata} input; {@code -map_chapters 1} attaches its
 	 * chapters to the output, and {@code -map 0} keeps the rest of the streams out of it.
 	 */
 	public static List<String> buildArguments(Mp4ExportRequest request, boolean yuv420pInput,
-			VideoEncoderSpec spec, @Nullable Path metadataFile) {
+			VideoEncoderSpec spec, Optional<Path> metadataFile) {
 		List<String> arguments = new ArrayList<>();
 		arguments.add(FfmpegCli.binary().toString());
 		arguments.addAll(List.of("-y", "-hide_banner", "-loglevel", "error", "-stats_period", "0.5",
@@ -304,11 +304,9 @@ public final class Mp4Encoder {
 		if (request.audioPlan().hasAudio()) {
 			arguments.addAll(request.audioPlan().inputArguments());
 		}
-		boolean chapters = metadataFile != null;
-		if (chapters) {
-			arguments.addAll(List.of("-f", "ffmetadata", "-i",
-					java.util.Objects.requireNonNull(metadataFile).toString()));
-		}
+		boolean chapters = metadataFile.isPresent();
+		metadataFile.ifPresent(file -> arguments.addAll(
+				List.of("-f", "ffmetadata", "-i", file.toString())));
 		if (request.audioPlan().hasAudio()) {
 			arguments.addAll(List.of("-filter_complex", request.audioPlan().filterComplex(),
 					"-map", "0:v:0", "-map", "[aout]"));

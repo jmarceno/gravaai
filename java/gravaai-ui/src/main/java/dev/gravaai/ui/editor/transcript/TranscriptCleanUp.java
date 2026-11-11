@@ -1,8 +1,7 @@
 package dev.gravaai.ui.editor.transcript;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
+import java.util.Optional;
 
 import dev.gravaai.core.project.ClipRegion;
 
@@ -28,10 +27,10 @@ public sealed interface TranscriptCleanUp {
 	 * Re-runs the rule and drops the cleanup when nothing is left to cut; the panel shows no
 	 * preview in that case, exactly as if the user had clicked the button now.
 	 */
-	default @Nullable TranscriptCleanUp refreshed(List<TranscriptWords.Word> words,
+	default Optional<TranscriptCleanUp> refreshed(List<TranscriptWords.Word> words,
 			List<ClipRegion> clips) {
 		TranscriptCleanUp next = recompute(words, clips);
-		return next.plan().isEmpty() ? null : next;
+		return next.plan().isEmpty() ? Optional.empty() : Optional.of(next);
 	}
 
 	/** Language-aware filler removal. */

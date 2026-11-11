@@ -19,6 +19,8 @@ import dev.gravaai.core.editor.ExportPreferences.ExportFormat;
  */
 public final class ExportRunner {
 
+	private static final System.Logger LOG = System.getLogger(ExportRunner.class.getName());
+
 	/**
 	 * Everything one export needs.
 	 *
@@ -102,7 +104,10 @@ public final class ExportRunner {
 					format == ExportFormat.MP4
 							? ChapterSidecars.writeBestEffort(published.path(),
 									new ChapterSidecars.Payload(spec.chapters()))
-							: new ChapterSidecars.WriteResult(false, null);
+							: ChapterSidecars.WriteResult.SKIPPED;
+			// The video is fine without it, but a silent failure would leave the user without the file.
+			chapterSidecars.error().ifPresent(error -> LOG.log(System.Logger.Level.WARNING,
+					"chapters.txt was not written next to " + published.path() + ": " + error));
 			return new Outcome(published.path(), published.bytes(), encoded.frames(),
 					encoded.durationSeconds(), sidecars, chapterSidecars);
 		} catch (RuntimeException error) {

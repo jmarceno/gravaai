@@ -1,7 +1,5 @@
 package dev.gravaai.media.export;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,26 +17,25 @@ final class VaapiDevices {
 
 	private VaapiDevices() {}
 
-	/** The first usable {@code /dev/dri/renderD*} node, or null when there is none. */
-	static @Nullable Path firstRenderNode() {
+	/** The first usable {@code /dev/dri/renderD*} node, or empty when there is none. */
+	static Optional<Path> firstRenderNode() {
 		Path dri = Path.of("/dev/dri");
 		if (!Files.isDirectory(dri)) {
-			return null;
+			return Optional.empty();
 		}
 		try (Stream<Path> nodes = Files.list(dri)) {
-			Optional<Path> node = nodes
+			return nodes
 					.filter(path -> path.getFileName().toString().startsWith("renderD"))
 					.filter(Files::exists)
 					.sorted()
 					.findFirst();
-			return node.orElse(null);
 		} catch (IOException error) {
-			return null;
+			return Optional.empty();
 		}
 	}
 
 	/** True when there is a render node to try. */
 	static boolean present() {
-		return firstRenderNode() != null;
+		return firstRenderNode().isPresent();
 	}
 }

@@ -190,6 +190,6 @@ public interface TimelineCommands {
 	}
 
 	/** Select a marker in the editor store (ruler click); {@code null} clears it. */
-	default void selectMarker(@org.jspecify.annotations.Nullable String markerId) {
+	default void selectMarker(String markerId) {
 	}
 }

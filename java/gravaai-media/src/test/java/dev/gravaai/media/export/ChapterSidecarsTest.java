@@ -2,7 +2,6 @@ package dev.gravaai.media.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -45,7 +44,6 @@ class ChapterSidecarsTest {
 	void escapesTitles() {
 		assertEquals("Demo \\= fun\\; \\#1", ChapterSidecars.escape("Demo = fun; #1"));
 		assertEquals("back\\\\slash", ChapterSidecars.escape("back\\slash"));
-		assertEquals("", ChapterSidecars.escape(null));
 		String document = ChapterSidecars.ffmetadata(CHAPTERS, 20_000);
 		assertTrue(document.contains("title=Demo \\= fun\\; \\#1"), document);
 	}
@@ -59,7 +57,7 @@ class ChapterSidecarsTest {
 		ChapterSidecars.WriteResult result = ChapterSidecars.writeBestEffort(video,
 				new ChapterSidecars.Payload(CHAPTERS));
 		assertTrue(result.wrote());
-		assertNull(result.error());
+		assertTrue(result.error().isEmpty());
 		assertTrue(Files.isRegularFile(sidecar));
 		assertEquals("00:00 Intro\n00:05 Demo = fun; #1\n00:13 Wrap up\n",
 				readString(sidecar));
@@ -79,8 +77,8 @@ class ChapterSidecarsTest {
 	@DisplayName("the metadata temp file is only written when there are chapters and is cleaned by the caller")
 	void metadataFile() throws Exception {
 		Path exportFile = tempDir.resolve(".gravaai-export-1.mp4");
-		assertNull(ChapterSidecars.writeMetadataFile(exportFile, List.of(), 1000));
-		Path metadata = ChapterSidecars.writeMetadataFile(exportFile, CHAPTERS, 20_000);
+		assertTrue(ChapterSidecars.writeMetadataFile(exportFile, List.of(), 1000).isEmpty());
+		Path metadata = ChapterSidecars.writeMetadataFile(exportFile, CHAPTERS, 20_000).orElseThrow();
 		assertTrue(Files.isRegularFile(metadata));
 		assertEquals(ChapterSidecars.ffmetadata(CHAPTERS, 20_000), readString(metadata));
 		assertEquals(".gravaai-export-1.mp4.chapters.txt",
@@ -95,7 +93,7 @@ class ChapterSidecarsTest {
 				ExportEncodingMode.FAST, 1.0, tempDir.resolve("export.mp4"), ExportAudioPlan.NONE,
 				CHAPTERS);
 		List<String> arguments = Mp4Encoder.buildArguments(request, true,
-				VideoEncoderSpec.SOFTWARE, metadata);
+				VideoEncoderSpec.SOFTWARE, java.util.Optional.of(metadata));
 		int metadataInput = arguments.indexOf(metadata.toString());
 		assertTrue(metadataInput > 0);
 		// The document is read as "-f ffmetadata -i <path>".
@@ -108,7 +106,8 @@ class ChapterSidecarsTest {
 		assertTrue(arguments.contains("+faststart"));
 
 		// Without chapters there is no extra input at all.
-		List<String> none = Mp4Encoder.buildArguments(request, true, VideoEncoderSpec.SOFTWARE, null);
+		List<String> none = Mp4Encoder.buildArguments(request, true, VideoEncoderSpec.SOFTWARE,
+				java.util.Optional.empty());
 		assertFalse(none.contains("ffmetadata"));
 		assertFalse(none.contains("-map_chapters"));
 	}
@@ -123,7 +122,7 @@ class ChapterSidecarsTest {
 		Mp4ExportRequest request = new Mp4ExportRequest(160, 90, 24, 1_000_000,
 				ExportEncodingMode.FAST, 1.0, tempDir.resolve("export.mp4"), plan, CHAPTERS);
 		List<String> arguments = Mp4Encoder.buildArguments(request, true,
-				VideoEncoderSpec.SOFTWARE, metadata);
+				VideoEncoderSpec.SOFTWARE, java.util.Optional.of(metadata));
 		// rawvideo #0, one audio input #1, then the ffmetadata #2.
 		assertEquals("2", arguments.get(arguments.indexOf("-map_chapters") + 1));
 	}

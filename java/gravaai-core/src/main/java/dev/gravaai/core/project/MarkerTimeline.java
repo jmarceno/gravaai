@@ -25,12 +25,8 @@ public final class MarkerTimeline {
 		List<ClipRegion> sequence = Clips.sortClipRegions(clips);
 		List<Fragment> fragments = new ArrayList<>();
 		for (TimelineMarker marker : markers) {
-			ClipRegion owner = clipAtSourceTime(marker.startMs(), sequence);
-			if (owner == null) {
-				continue;
-			}
-			fragments.add(new Fragment(marker.id(), marker, owner,
-					timelineTime(owner, marker.startMs())));
+			clipAtSourceTime(marker.startMs(), sequence).ifPresent(owner -> fragments.add(
+					new Fragment(marker.id(), marker, owner, timelineTime(owner, marker.startMs()))));
 		}
 		// Stable sort: two markers at the same timeline position keep their list order, so the
 		// chapter list's "first title wins" rule is the one the user sees in the marker list.
@@ -38,28 +34,29 @@ public final class MarkerTimeline {
 		return List.copyOf(fragments);
 	}
 
-	/** The timeline position of a marker, or {@code null} when its footage is not on the timeline. */
-	public static @org.jspecify.annotations.Nullable Long timelineMs(TimelineMarker marker,
+	/** The timeline position of a marker, or empty when its footage is not on the timeline. */
+	public static java.util.OptionalLong timelineMs(TimelineMarker marker,
 			List<ClipRegion> clips) {
-		ClipRegion owner = clipAtSourceTime(marker.startMs(), Clips.sortClipRegions(clips));
-		return owner == null ? null : timelineTime(owner, marker.startMs());
+		return clipAtSourceTime(marker.startMs(), Clips.sortClipRegions(clips))
+				.map(owner -> java.util.OptionalLong.of(timelineTime(owner, marker.startMs())))
+				.orElse(java.util.OptionalLong.empty());
 	}
 
-	private static @org.jspecify.annotations.Nullable ClipRegion clipAtSourceTime(long sourceMs,
+	private static java.util.Optional<ClipRegion> clipAtSourceTime(long sourceMs,
 			List<ClipRegion> sequence) {
 		for (int index = 0; index < sequence.size(); index++) {
 			ClipRegion clip = sequence.get(index);
 			long sourceStart = Clips.getClipSourceStartMs(clip);
 			long sourceEnd = Clips.getClipSourceEndMs(clip);
 			if (sourceMs >= sourceStart && sourceMs < sourceEnd) {
-				return clip;
+				return java.util.Optional.of(clip);
 			}
 			// A marker on the very last frame of the recording belongs to the last kept clip.
 			if (sourceMs == sourceEnd && index == sequence.size() - 1) {
-				return clip;
+				return java.util.Optional.of(clip);
 			}
 		}
-		return null;
+		return java.util.Optional.empty();
 	}
 
 	private static long timelineTime(ClipRegion clip, long sourceMs) {

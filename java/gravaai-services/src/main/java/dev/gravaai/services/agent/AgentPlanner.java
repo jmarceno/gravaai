@@ -2092,8 +2092,7 @@ public final class AgentPlanner {
 				+ AgentIds.formatSeconds(sourceMs) + "s src" + (chapter ? " (chapter)" : ""));
 		TimelineMarker added = markers.stream().filter(marker -> marker.id().equals(id))
 				.findFirst().orElseThrow();
-		Long addedTimelineMs = MarkerTimeline.timelineMs(added, draft.state.clipRegions());
-		long timelineMs = addedTimelineMs == null ? sourceMs : addedTimelineMs;
+		long timelineMs = MarkerTimeline.timelineMs(added, draft.state.clipRegions()).orElse(sourceMs);
 		push(draft, Highlight.Kind.ADDED, timelineMs, timelineMs + 1, "marker");
 	}
 
@@ -2119,9 +2118,8 @@ public final class AgentPlanner {
 		markers.sort(Comparator.comparingLong(TimelineMarker::startMs));
 		draft.state = draft.state.toBuilder().markers(markers).build();
 		draft.summary.add("updated " + shortId);
-		Long timelineMs = MarkerTimeline.timelineMs(next, draft.state.clipRegions());
-		push(draft, Highlight.Kind.CHANGED, timelineMs == null ? sourceMs : timelineMs,
-				(timelineMs == null ? sourceMs : timelineMs) + 1, "marker");
+		long timelineMs = MarkerTimeline.timelineMs(next, draft.state.clipRegions()).orElse(sourceMs);
+		push(draft, Highlight.Kind.CHANGED, timelineMs, timelineMs + 1, "marker");
 	}
 
 	/** {@code delete_marker {id}} or {@code {all:true}}. */

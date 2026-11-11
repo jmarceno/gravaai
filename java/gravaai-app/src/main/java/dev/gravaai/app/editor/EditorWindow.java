@@ -305,8 +305,9 @@ public final class EditorWindow {
 			session.store().state().markers().stream()
 					.filter(marker -> marker.id().equals(markerId))
 					.findFirst()
-					.flatMap(marker -> java.util.Optional.ofNullable(MarkerTimeline.timelineMs(
-							marker, session.store().state().clipRegions())))
+					.map(marker -> MarkerTimeline.timelineMs(marker, session.store().state().clipRegions()))
+					.filter(java.util.OptionalLong::isPresent)
+					.map(java.util.OptionalLong::getAsLong)
 					.ifPresent(timelineMs -> {
 						timeline.setCurrentTimeMs(timelineMs);
 						session.timelineCommands().seek(timelineMs);

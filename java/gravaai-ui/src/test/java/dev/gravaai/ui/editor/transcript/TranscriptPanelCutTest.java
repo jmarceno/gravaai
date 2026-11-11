@@ -2,8 +2,6 @@ package dev.gravaai.ui.editor.transcript;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -83,8 +81,7 @@ class TranscriptPanelCutTest {
 
 		panel.removeFillersButton().fire();
 
-		TranscriptCutPlan pending = panel.pendingCut();
-		assertNotNull(pending, "clicking the action must prepare a batch");
+		TranscriptCutPlan pending = panel.pendingCut().orElseThrow();
 		assertEquals(List.of(new TranscriptCut.SourceRange(1_500, 1_950)), pending.ranges());
 		assertTrue(panel.isPreviewVisible(), "the panel must show what it will cut");
 		assertEquals(List.of(new Span(1_500, 1_950)), previewPushes.get(previewPushes.size() - 1),
@@ -93,7 +90,7 @@ class TranscriptPanelCutTest {
 
 		panel.applyPreviewButton().fire();
 
-		assertNull(panel.pendingCut());
+		assertTrue(panel.pendingCut().isEmpty());
 		assertEquals(List.of(), panel.pushedCutPreview(), "applying clears the preview");
 		assertEquals(2, clips(store).size(), "the filler is cut out of the clip sequence");
 		assertTrue(panel.isWordCut("cue-1:1"), "the cut word is struck through in the transcript");
@@ -116,7 +113,7 @@ class TranscriptPanelCutTest {
 		panel.removeFillersButton().fire();
 		panel.cancelPreviewButton().fire();
 
-		assertNull(panel.pendingCut());
+		assertTrue(panel.pendingCut().isEmpty());
 		assertFalse(panel.isPreviewVisible());
 		assertEquals(List.of(), panel.pushedCutPreview());
 		assertEquals(1, clips(store).size());
@@ -134,8 +131,7 @@ class TranscriptPanelCutTest {
 
 		panel.shortenPausesButton().fire();
 
-		TranscriptCutPlan pending = panel.pendingCut();
-		assertNotNull(pending);
+		TranscriptCutPlan pending = panel.pendingCut().orElseThrow();
 		assertEquals(List.of(new TranscriptCut.SourceRange(1_200, 1_500),
 				new TranscriptCut.SourceRange(1_900, 2_500),
 				new TranscriptCut.SourceRange(3_200, 3_500)), pending.ranges());
@@ -162,7 +158,7 @@ class TranscriptPanelCutTest {
 		panel.setPauseRule(0.5, 0.9);
 		panel.shortenPausesButton().fire();
 
-		assertNull(panel.pendingCut());
+		assertTrue(panel.pendingCut().isEmpty());
 		assertFalse(panel.isPreviewVisible());
 		assertTrue(panel.feedbackText().contains("smaller than the minimum"),
 				"the panel must say why nothing happened");
@@ -180,7 +176,7 @@ class TranscriptPanelCutTest {
 
 		panel.shortenPausesButton().fire();
 
-		assertNull(panel.pendingCut());
+		assertTrue(panel.pendingCut().isEmpty());
 		assertFalse(panel.isPreviewVisible());
 		assertFalse(panel.feedbackText().isBlank());
 		});
@@ -196,7 +192,7 @@ class TranscriptPanelCutTest {
 		panel.removeFillersButton().fire();
 		panel.setPauseRule(0.5, 0.2);
 		panel.shortenPausesButton().fire();
-		int cutsAfterFillers = panel.pendingCut() == null ? 0 : panel.pendingCut().ranges().size();
+		int cutsAfterFillers = panel.pendingCut().map(plan -> plan.ranges().size()).orElse(0);
 		panel.cancelPreviewButton().fire();
 		panel.applyPreviewButton(); // no pending batch: a no-op, not an edit
 

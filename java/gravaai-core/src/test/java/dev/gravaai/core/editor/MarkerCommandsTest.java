@@ -2,7 +2,6 @@ package dev.gravaai.core.editor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -39,21 +38,21 @@ class MarkerCommandsTest {
 	@DisplayName("adding a marker stores source time and names it from the marker count")
 	void addStoresSourceTime() {
 		EditorStore store = store();
-		store.apply(new MarkerCommands.Add(250, null));
+		store.apply(new MarkerCommands.Add(250));
 		TimelineMarker marker = store.state().markers().get(0);
 		// Timeline 250 at 2x is source 500.
 		assertEquals(500, marker.startMs());
 		assertEquals("Marker 1", marker.name());
 		assertFalse(marker.chapter());
-		assertEquals(marker.id(), store.selectedMarkerId());
-		assertEquals(250L, MarkerTimeline.timelineMs(marker, store.state().clipRegions()));
+		assertEquals(java.util.Optional.of(marker.id()), store.selectedMarkerId());
+		assertEquals(java.util.OptionalLong.of(250L), MarkerTimeline.timelineMs(marker, store.state().clipRegions()));
 
 		store.apply(new MarkerCommands.Add(0, "  My   Chapter "));
 		assertEquals("My Chapter", store.state().markers().get(0).name());
 	}
 
 	@Test
-	@DisplayName("renaming keeps the position; a blank name falls back to Marker")
+	@DisplayName("renaming keeps the position; a blank name falls back to Marker N")
 	void rename() {
 		EditorStore store = new EditorStore(state(List.of(clip("clip-1", 0, 1000, 0L, 2)),
 				List.of(new TimelineMarker("marker-1", 400, "Old", false))));
@@ -61,7 +60,7 @@ class MarkerCommandsTest {
 		assertEquals(new TimelineMarker("marker-1", 400, "New name", false),
 				store.state().markers().get(0));
 		store.apply(new MarkerCommands.Rename("marker-1", "   "));
-		assertEquals("Marker", store.state().markers().get(0).name());
+		assertEquals("Marker 1", store.state().markers().get(0).name());
 		assertFalse(store.apply(new MarkerCommands.Rename("missing", "x")));
 	}
 
@@ -69,11 +68,11 @@ class MarkerCommandsTest {
 	@DisplayName("a ruler drag maps the timeline position back to source time")
 	void moveToTimelineMs() {
 		EditorStore store = store();
-		store.apply(new MarkerCommands.Add(0, null));
+		store.apply(new MarkerCommands.Add(0));
 		String id = store.state().markers().get(0).id();
 		assertTrue(store.apply(new MarkerCommands.MoveToTimelineMs(id, 900)));
 		assertEquals(1800, store.state().markers().get(0).startMs());
-		assertEquals(900L, MarkerTimeline.timelineMs(store.state().markers().get(0),
+		assertEquals(java.util.OptionalLong.of(900L), MarkerTimeline.timelineMs(store.state().markers().get(0),
 				store.state().clipRegions()));
 	}
 
@@ -94,11 +93,11 @@ class MarkerCommandsTest {
 	@DisplayName("deleting removes the marker and clears its selection")
 	void delete() {
 		EditorStore store = store();
-		store.apply(new MarkerCommands.Add(0, null));
+		store.apply(new MarkerCommands.Add(0));
 		String id = store.state().markers().get(0).id();
 		assertTrue(store.apply(new MarkerCommands.Delete(id)));
 		assertEquals(List.of(), store.state().markers());
-		assertNull(store.selectedMarkerId());
+		assertTrue(store.selectedMarkerId().isEmpty());
 		assertFalse(store.apply(new MarkerCommands.Delete(id)));
 	}
 
@@ -106,8 +105,8 @@ class MarkerCommandsTest {
 	@DisplayName("every marker edit is one undoable step, and undo restores the list")
 	void undoable() {
 		EditorStore store = store();
-		store.apply(new MarkerCommands.Add(100, null));
-		store.apply(new MarkerCommands.Add(200, null));
+		store.apply(new MarkerCommands.Add(100));
+		store.apply(new MarkerCommands.Add(200));
 		assertEquals(2, store.state().markers().size());
 		assertTrue(store.undo());
 		assertEquals(1, store.state().markers().size());
@@ -136,7 +135,7 @@ class MarkerCommandsTest {
 	void idSequence() {
 		EditorStore store = new EditorStore(state(List.of(clip("clip-1", 0, 1000, 0L, 2)),
 				List.of(new TimelineMarker("marker-4", 100, "Four", false))));
-		store.apply(new MarkerCommands.Add(0, null));
+		store.apply(new MarkerCommands.Add(0));
 		assertEquals("marker-5", store.state().markers().stream()
 				.filter(marker -> marker.name().equals("Marker 2") || marker.startMs() == 0)
 				.findFirst().orElseThrow().id());

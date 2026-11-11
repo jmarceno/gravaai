@@ -57,8 +57,18 @@ class Mp4EncoderHardwareTest {
 				.filter(VideoEncoderSpec::hardware)
 				.findFirst()
 				.orElseThrow(() -> new AssertionError("no GPU encoder in " + probe.available()));
+		// The final snapshot names the encoder that actually ran, so a silent fallback to libx264
+		// cannot pass this test.
+		java.util.concurrent.atomic.AtomicReference<String> ran =
+				new java.util.concurrent.atomic.AtomicReference<>("");
 		Mp4Encoder.encode(request, new SyntheticFrameProvider(3840, 2160, 30),
-				ExportProgressListener.NONE, ExportCancellation.NONE, VideoEncoderProbe.of(List.of(hardware)));
+				progress -> {
+					if (progress.encoderName() != null) {
+						ran.set(progress.encoderName());
+					}
+				}, ExportCancellation.NONE, VideoEncoderProbe.of(List.of(hardware)));
+		assertTrue(ran.get().startsWith(hardware.codec()),
+				"expected " + hardware.codec() + " to run, got: " + ran.get());
 		assertTrue(java.nio.file.Files.isRegularFile(output));
 		MediaInfo info = MediaProbe.probe(output);
 		VideoStreamInfo video = info.video().orElseThrow();

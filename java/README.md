@@ -131,3 +131,20 @@ conditionals.
   `-hwaccel` decode path.
 * One build or test JVM at a time (`mvn-locked.sh`), build output on the scratch disk.
 * Kill the app with `pkill -x gravaai` (never `pkill -f`).
+
+## Document export
+
+Meeting notes export to Markdown, DOCX and PDF from `services/…/document/`: one typed
+`PlainDocument` (headings, paragraphs, list items with their kind and number, quotes, rules, and
+inline runs) is parsed once from the notes with commonmark, and each format renders that same tree.
+Keeping the three writers on one model is what stops the formats from drifting apart.
+
+* **DOCX** is a plain zip of OOXML parts (`[Content_Types].xml`, `word/document.xml`,
+  `styles.xml`, `numbering.xml`, relationships, docProps). Lists are real `w:numPr` numbering, and
+  the static layout parts are constants; there is no document library.
+* **PDF** goes through Skija's `Document.makePDF` (Skia's `SkPDF`), which the compositor already
+  ships. Skia embeds the font subsets and emits a `ToUnicode` map, so the text stays selectable and
+  extractable. The faces come from `CompositorFonts`, the compositor's cache, so an export embeds
+  the same DM Sans files the app draws with.
+* The PDF is a text layout, not a picture: pages are A4, blocks paginate at the bottom margin, and
+  a quote paints its left rule per line so it survives a page break.

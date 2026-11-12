@@ -13,6 +13,7 @@ import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
+import dev.gravaai.services.meeting.MeetingNotesExport;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.NoteTemplates;
 import dev.gravaai.services.meeting.MeetingSettings;
@@ -49,6 +50,14 @@ public interface MeetingUiService {
 	Result<MeetingService.FilesView> getFiles(Path mediaPath);
 
 	Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content);
+
+	/**
+	 * Exports the meeting's notes (and optionally its transcript) as a document.
+	 *
+	 * @param fallbackTitle the label for a meeting with no title and no date ("Meeting")
+	 */
+	Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
+			MeetingNotesExport.Request request, Path destination, String fallbackTitle);
 
 	Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode);
 

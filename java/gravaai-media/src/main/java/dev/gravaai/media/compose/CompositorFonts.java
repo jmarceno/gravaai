@@ -20,10 +20,14 @@ import io.github.humbleui.skija.Typeface;
  * the build. Loading it gives captions/annotations/keystrokes identical metrics in preview and
  * export instead of whatever the host system resolves. If a face cannot be loaded the code falls
  * back to Skia's default font, so rendering never fails.
+ *
+ * <p>The cache is the one place the app resolves a bundled face: the compositor draws with it, and
+ * the document writers (DOCX/PDF export of meeting notes) embed the same files.
  */
-final class CompositorFonts {
+public final class CompositorFonts {
 
-	enum Face {
+	/** A bundled face: the file name plus the style it represents. */
+	public enum Face {
 		REGULAR("DMSans-Regular.ttf"),
 		MEDIUM("DMSans-Medium.ttf"),
 		SEMI_BOLD("DMSans-SemiBold.ttf"),
@@ -37,6 +41,11 @@ final class CompositorFonts {
 		Face(String file) {
 			this.file = file;
 		}
+
+		/** The resource file name under {@code /fonts/}. */
+		public String file() {
+			return file;
+		}
 	}
 
 	private static final String RESOURCE_PREFIX = "/fonts/";
@@ -46,8 +55,12 @@ final class CompositorFonts {
 	private CompositorFonts() {
 	}
 
-	/** The DM Sans typeface for a face, or null when the bundled resource is unavailable. */
-	static synchronized @Nullable Typeface typeface(Face face) {
+	/**
+	 * The DM Sans typeface for a face, or null when the bundled resource is unavailable.
+	 *
+	 * <p>The typeface is cached for the app lifetime; callers must not close it.
+	 */
+	public static synchronized @Nullable Typeface typeface(Face face) {
 		Typeface cached = TYPEFACES.get(face);
 		if (cached != null) {
 			return cached;
@@ -72,7 +85,7 @@ final class CompositorFonts {
 	}
 
 	/** A font for the face; the caller closes it. */
-	static Font font(Face face, float size) {
+	public static Font font(Face face, float size) {
 		Typeface typeface = typeface(face);
 		if (typeface == null) {
 			Font fallback = new Font();

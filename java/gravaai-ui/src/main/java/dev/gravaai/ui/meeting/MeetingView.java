@@ -3,11 +3,6 @@ package dev.gravaai.ui.meeting;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +11,7 @@ import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingMeta;
 import dev.gravaai.services.meeting.MeetingService;
+import dev.gravaai.services.meeting.MeetingTexts;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
@@ -94,7 +90,7 @@ public final class MeetingView extends Region {
 			if (this.actions.media() != null) {
 				this.actions.media().seek(seconds);
 			}
-		});
+		}, this.actions);
 		MeetingMediaHost mediaHost = this.actions.media();
 		if (mediaHost != null) {
 			// The transcript highlight follows the playhead; the notes pane owns the scroll rule.
@@ -428,13 +424,9 @@ public final class MeetingView extends Region {
 		if (iso == null || iso.isBlank()) {
 			return null;
 		}
-		try {
-			LocalDateTime date = LocalDateTime.ofInstant(Instant.parse(iso), ZoneId.systemDefault());
-			return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-					.withLocale(Locale.getDefault()).format(date);
-		} catch (RuntimeException error) {
-			return iso;
-		}
+		// A timestamp the shared formatter cannot parse is still worth showing as it stands.
+		String formatted = MeetingTexts.formatDateTime(iso);
+		return formatted == null ? iso : formatted;
 	}
 
 	private static String css(javafx.scene.paint.Color color) {

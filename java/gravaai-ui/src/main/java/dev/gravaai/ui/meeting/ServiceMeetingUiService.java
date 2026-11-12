@@ -16,6 +16,7 @@ import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
+import dev.gravaai.services.meeting.MeetingNotesExport;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingSettings;
 import dev.gravaai.services.meeting.NoteTemplates;
@@ -83,6 +84,12 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 	@Override
 	public Result<Unit> saveFile(Path mediaPath, MeetingService.FileKind kind, String content) {
 		return service.saveFile(mediaPath, kind, content);
+	}
+
+	@Override
+	public Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
+			MeetingNotesExport.Request request, Path destination, String fallbackTitle) {
+		return service.exportNotes(mediaPath, request, destination, fallbackTitle);
 	}
 
 	@Override

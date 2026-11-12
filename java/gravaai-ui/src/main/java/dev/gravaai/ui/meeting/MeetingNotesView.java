@@ -12,12 +12,16 @@ import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.core.result.Result;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
+import dev.gravaai.services.meeting.MeetingNotesExport;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.NoteTemplates;
+import dev.gravaai.services.document.DocumentFormat;
 import dev.gravaai.services.meeting.Subscription;
 import dev.gravaai.ui.UiThreads;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.ChoiceGroup;
+import dev.gravaai.ui.kit.Icon;
+import dev.gravaai.ui.kit.Icons;
 import dev.gravaai.ui.kit.Theme;
 import dev.gravaai.ui.kit.Toast;
 import dev.gravaai.ui.kit.ToggleGroup;
@@ -53,6 +57,7 @@ public final class MeetingNotesView extends VBox {
 
 	private final MeetingUiService service;
 	private final Consumer<Double> onSeek;
+	private final MeetingViewActions viewActions;
 
 	private final VBox jobHost = new VBox();
 	private final Label errorLabel = new Label();
@@ -87,9 +92,11 @@ public final class MeetingNotesView extends VBox {
 	private boolean following;
 	private @Nullable Integer lastFollowedSeconds;
 
-	public MeetingNotesView(MeetingUiService service, Consumer<Double> onSeek) {
+	public MeetingNotesView(MeetingUiService service, Consumer<Double> onSeek,
+			MeetingViewActions viewActions) {
 		this.service = service;
 		this.onSeek = onSeek;
+		this.viewActions = viewActions == null ? MeetingViewActions.none() : viewActions;
 		// The field initializers run before the constructor body, so the markdown view (which
 		// captures onSeek) is created here, after the assignment.
 		this.markdown = new MeetingMarkdownView(null,
@@ -532,7 +539,12 @@ public final class MeetingNotesView extends VBox {
 			Button edit = new Button("Edit", Button.Variant.GHOST, Button.Size.SM);
 			edit.setDisable(busy());
 			edit.setOnAction(event -> startEdit());
-			actions.getChildren().addAll(copy, edit);
+			Button export = new Button("Export notes", Button.Variant.GHOST, Button.Size.SM);
+			export.setGraphic(Icon.of(Icons.DownloadSimple, 16));
+			export.setGraphicTextGap(6);
+			export.setDisable(busy());
+			export.setOnAction(event -> openExportDialog());
+			actions.getChildren().addAll(copy, edit, export);
 			if (tab == Tab.NOTES && currentFiles.transcript() != null && currentFiles.notes() != null) {
 				Button rewrite = new Button("Rewrite notes", Button.Variant.GHOST, Button.Size.SM);
 				rewrite.setDisable(busy());
@@ -627,6 +639,45 @@ public final class MeetingNotesView extends VBox {
 		Clipboard.getSystemClipboard().setContent(clipboard);
 		Toast.show(this, tab == Tab.NOTES ? "Notes copied" : "Transcript copied")
 				.variant(Toast.Variant.SUCCESS);
+	}
+
+	/**
+	 * Opens the export dialog: format, whether to append the transcript, then the save chooser.
+	 * The export itself runs off the FX thread; the writers do real work (fonts, zip, shaping).
+	 */
+	private void openExportDialog() {
+		Path current = mediaPath;
+		if (current == null || files == null) {
+			return;
+		}
+		String title = MeetingText.meetingTitle(files.meta(), null);
+		String transcript = files.transcript();
+		MeetingExportDialog.show(this, DocumentFormat.DOCX,
+				transcript != null && !transcript.isBlank(),
+				format -> MeetingNotesExport.defaultFileName(title, format),
+				viewActions.exportFileChooser(),
+				choice -> exportNotes(current, choice));
+	}
+
+	private void exportNotes(Path mediaPath, MeetingExportDialog.Choice choice) {
+		MeetingService.FilesView currentFiles = files;
+		String title = MeetingText.meetingTitle(currentFiles == null ? null : currentFiles.meta(),
+				null);
+		CompletableFuture<Result<MeetingNotesExport.Written>> pending = CompletableFuture
+				.supplyAsync(() -> service.exportNotes(mediaPath, choice.request(),
+						choice.destination(), title), UiThreads.background());
+		pending.thenAcceptAsync(result -> {
+			if (result.isErr()) {
+				showError(result.errorMessage());
+				return;
+			}
+			MeetingNotesExport.Written written = result.orNull();
+			if (written == null) {
+				return;
+			}
+			Toast.show(this, "Exported " + written.file().getFileName())
+					.variant(Toast.Variant.SUCCESS);
+		}, Platform::runLater);
 	}
 
 	private void run(MeetingJobMode mode) {

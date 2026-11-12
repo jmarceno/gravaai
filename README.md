@@ -81,6 +81,7 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 - Local Whisper transcription saved as Markdown, with silence guarding so quiet stretches don't produce invented text
 - Notes — summary, decisions, action items — from a local model or any OpenAI-compatible API
 - A Meetings library to browse, re-transcribe and regenerate notes
+- Export the notes to Markdown, DOCX or PDF, with the full transcript as an optional appendix
 
 ## AI control (MCP)
 

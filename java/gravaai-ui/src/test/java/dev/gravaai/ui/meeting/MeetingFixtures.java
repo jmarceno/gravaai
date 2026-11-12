@@ -17,6 +17,7 @@ import dev.gravaai.core.result.Result.Unit;
 import dev.gravaai.services.meeting.MeetingJob;
 import dev.gravaai.services.meeting.MeetingJobMode;
 import dev.gravaai.services.meeting.MeetingLibraryEntry;
+import dev.gravaai.services.meeting.MeetingNotesExport;
 import dev.gravaai.services.meeting.MeetingMeta;
 import dev.gravaai.services.meeting.MeetingService;
 import dev.gravaai.services.meeting.MeetingSettings;
@@ -210,6 +211,12 @@ final class MeetingFixtures {
 				notes.put(mediaPath, content);
 			}
 			return Result.okUnit();
+		}
+
+		@Override
+		public Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
+				MeetingNotesExport.Request request, Path destination, String fallbackTitle) {
+			throw new UnsupportedOperationException("exportNotes not used by this fake");
 		}
 
 		@Override

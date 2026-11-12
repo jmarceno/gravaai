@@ -96,6 +96,7 @@ public final class MeetingService {
 	private final MeetingMetaStore metaStore;
 	private final MeetingJobs jobs;
 	private final MeetingLibrary library;
+	private final MeetingNotesExport export;
 	private final LlamaServer llama;
 	private final Reveal reveal;
 	private final MeetingAudioRecorder audioRecorder;
@@ -118,6 +119,7 @@ public final class MeetingService {
 		this.metaStore = metaStore;
 		this.jobs = jobs;
 		this.library = library;
+		this.export = new MeetingNotesExport(this);
 		this.llama = llama;
 		this.reveal = reveal;
 		this.audioRecorder = audioRecorder;
@@ -441,6 +443,21 @@ public final class MeetingService {
 	public Subscription onOpenRequested(Runnable listener) {
 		openListeners.add(listener);
 		return () -> openListeners.remove(listener);
+	}
+
+	// --- export -------------------------------------------------------------------------------
+
+	/**
+	 * Exports the meeting's notes (and optionally its transcript) as Markdown, DOCX or PDF.
+	 *
+	 * @param mediaPath the meeting recording
+	 * @param request the format and whether to append the transcript
+	 * @param destination the file to write
+	 * @param fallbackTitle the label for a meeting with no title and no date ("Meeting")
+	 */
+	public Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
+			MeetingNotesExport.Request request, Path destination, String fallbackTitle) {
+		return export.export(mediaPath, request, destination, fallbackTitle);
 	}
 
 	// --- recording and lifecycle ------------------------------------------------------------

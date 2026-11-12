@@ -836,13 +836,30 @@ public final class EditorSession implements AutoCloseable {
 	 */
 	public static EditorSession openRecording(Path videoPath, @Nullable String webcamPath,
 			long webcamTimeOffsetMs) {
+		ProjectDocument document = recordingDocument(videoPath, Optional.ofNullable(webcamPath),
+				webcamTimeOffsetMs);
+		return new EditorSession(null, document, document);
+	}
+
+	/**
+	 * The document of a raw recording as a new project, without an editor session around it.
+	 *
+	 * <p>This is the one definition of "what a recording looks like before the user edits it": one
+	 * full-length clip, the Keystrokes track seeded from the sidecar, and the record-time
+	 * microphone cleanup carried over. {@link #openRecording} wraps it in a session for the editor
+	 * and the headless CLI exports it, so both see the same timeline.
+	 *
+	 * @param webcamPath the linked webcam recording, or empty when the take has none
+	 */
+	public static ProjectDocument recordingDocument(Path videoPath, Optional<String> webcamPath,
+			long webcamTimeOffsetMs) {
 		tools.jackson.databind.node.ObjectNode editor = dev.gravaai.core.json.Json.nodeFactory().objectNode();
-		if (webcamPath != null && !webcamPath.isBlank()) {
+		webcamPath.filter(path -> !path.isBlank()).ifPresent(path -> {
 			tools.jackson.databind.node.ObjectNode webcam = editor.putObject("webcam");
 			webcam.put("enabled", true);
-			webcam.put("sourcePath", webcamPath);
+			webcam.put("sourcePath", path);
 			webcam.put("timeOffsetMs", webcamTimeOffsetMs);
-		}
+		});
 		// useTimelineProjection: a source without clips starts as one full-length clip. Seeded here,
 		// before the store exists, so the first undo step cannot return to an empty timeline.
 		long durationMs = probeDurationMs(videoPath);
@@ -864,10 +881,8 @@ public final class EditorSession implements AutoCloseable {
 				.ifPresent(level -> editor.set("defaultSourceAudioTrackSettings",
 						SourceAudioSettings.mergeDefaultCleanup(null, SourceAudioTrackSettings.MIC,
 								new dev.gravaai.core.project.AudioCleanup(level, 0, 0))));
-		ProjectDocument document = ProjectDocument.create(
-				videoPath.toAbsolutePath().normalize().toString(),
+		return ProjectDocument.create(videoPath.toAbsolutePath().normalize().toString(),
 				ProjectPersistence.normalizeProjectEditor(editor));
-		return new EditorSession(null, document, document);
 	}
 
 	/**

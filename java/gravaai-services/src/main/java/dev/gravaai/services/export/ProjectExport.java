@@ -247,10 +247,23 @@ public final class ProjectExport {
 	/** Runs one export synchronously through {@link ExportRunner} (tests / headless callers). */
 	public static ExportRunner.Outcome run(Input input, ExportFrameProvider provider,
 			ExportPublisher publisher) throws IOException {
+		return run(input, provider,
+				dev.gravaai.media.export.ExportProgressListener.NONE, publisher);
+	}
+
+	/**
+	 * Runs one export synchronously, reporting progress to {@code listener} (the headless CLI's
+	 * NDJSON stream).
+	 *
+	 * @param listener where encoder progress goes; pass
+	 *     {@link dev.gravaai.media.export.ExportProgressListener#NONE} when nobody listens
+	 */
+	public static ExportRunner.Outcome run(Input input, ExportFrameProvider provider,
+			dev.gravaai.media.export.ExportProgressListener listener,
+			ExportPublisher publisher) throws IOException {
 		Prepared prepared = prepare(input);
 		try {
-			return ExportRunner.run(prepared.request().toSpec(), provider,
-					dev.gravaai.media.export.ExportProgressListener.NONE,
+			return ExportRunner.run(prepared.request().toSpec(), provider, listener,
 					dev.gravaai.media.export.ExportCancellation.NONE, publisher);
 		} finally {
 			Files.deleteIfExists(clickBusFor(input.destination()));

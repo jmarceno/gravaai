@@ -120,8 +120,15 @@ public final class RecordingLibrary {
 		return result;
 	}
 
-	// Only capture sidecars belonging to this exact recording, never adjacent recordings or projects.
-	static boolean belongsToRecording(String name, String video) {
+	/**
+	 * Whether a file name is a sidecar of {@code video}: its telemetry, audio captures and their
+	 * manifest, the session manifests, the webcam track and the waveform peaks caches. Only that
+	 * recording's own sidecars count, never an adjacent recording's or a project's.
+	 *
+	 * <p>This is the one definition of "a recording's bundle"; the recorder's output move and the
+	 * library's removal both use it.
+	 */
+	public static boolean belongsToRecording(String name, String video) {
 		if (name.endsWith(PEAKS_SUFFIX)) {
 			// The timeline's waveform cache of the recording or of one of its audio sidecars.
 			return belongsToRecording(

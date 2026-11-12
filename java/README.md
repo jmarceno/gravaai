@@ -29,10 +29,46 @@ gravaai --dashboard   # dashboard screen (P1.10 dev/screenshot entry)
 gravaai --mcp         # MCP bridge over stdio (Phase 3, P3.2)
 gravaai --no-tray     # start without the status tray (GRAVAAI_NO_TRAY=1 is the env form)
 gravaai --toggle-recording   # any gravaai-ctl action; forwarded to a running instance
+gravaai --help        # the headless CLI (record/export) and its flags
 ```
 
 Only one Gravaai runs per user-data directory (`instance.lock`). A second launch forwards its
 action, or `show` to bring the running window to the front, over the control socket and exits.
+
+## Headless CLI
+
+`record` and `export` run the real recording and export pipelines without starting JavaFX, so they
+work from a script, over SSH, and while the app is open (they open no windows, so they are not a
+second instance). `gravaai --help` documents every flag.
+
+```bash
+# record the first output for 30 s with system audio and the mic
+gravaai record --duration 30 --system-audio --mic --out demo.mp4
+
+# record until Ctrl-C (stops and finalises, like the HUD's stop button)
+gravaai record --out demo.mp4
+
+# render a project (or a raw recording) to 1080p MP4
+gravaai export demo.gravaai --out demo.mp4 --preset 1080p
+
+# a 720p GIF at 15 fps, with machine-readable progress
+gravaai export demo.gravaai --out demo.gif --format gif --fps 15 --preset 720p --json
+```
+
+- **`--preset`** takes the export menu's quality tiers (`medium`, `good`, `high`, `source`); the
+  resolution spellings are aliases, because the menu's quality *scales* the recording, so `1080p`
+  means the full-size master for a 1080p source.
+- **`--json`** writes one compact JSON object per line on stdout (`export_start`, `progress`,
+  `done`/`error`) and keeps every human line on stderr. Without it the written file name goes to
+  stdout and progress to stderr, so `out=$(gravaai export …)` works.
+- **Exit codes:** `0` success, `1` the recording/export failed, `2` bad usage. Unknown flags are
+  usage errors rather than silently ignored.
+- Exports honour the app's export settings (quality, fps, captions sidecar) unless overridden on the
+  command line, and render extension hooks when the user has extensions installed.
+- Recording still uses the session's capture backend, so on KDE/GNOME the desktop's own
+  screen-sharing dialog remains the picker.
+- **Telemetry:** the recorder writes the same cursor and key sidecars as the HUD, so a scripted take
+  exports with the cursor, zooms and keystrokes the app would generate.
 
 Use a scratch profile for tests/screenshots: `GRAVAAI_USER_DATA=/tmp/... gravaai --ui-kit`.
 

@@ -38,6 +38,17 @@ public final class Main {
 		Startup.mark();
 		UserData userData = UserData.resolve();
 		Logging.configure(userData.logsDir().resolve("gravaai.log"));
+
+		java.util.Optional<Integer> headless = dev.gravaai.app.cli.HeadlessCli.run(args, userData,
+				System.out, System.err);
+		if (headless.isPresent()) {
+			// The headless verbs own the process: no JavaFX, no single-instance lock, no forwarding
+			// to a running app. They open no windows, so they are not a second instance.
+			System.out.flush();
+			System.err.flush();
+			System.exit(headless.get());
+			return;
+		}
 		Startup.log("main");
 
 		CliArgs cli = CliArgs.parse(args);

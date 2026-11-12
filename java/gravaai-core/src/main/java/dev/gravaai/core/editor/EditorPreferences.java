@@ -221,8 +221,14 @@ public record EditorPreferences(
 		return fallback.replaceControls(normalized);
 	}
 
-	/** The export half as a JSON object (used as the merge base in {@link #normalize}). */
-	ObjectNode exportToJson() {
+	/**
+	 * The export half as a JSON object (the merge base in {@link #normalize}).
+	 *
+	 * <p>Public so a caller holding editor preferences reads its export settings through
+	 * {@link ExportPreferences#normalizeExportPreferences} on this object instead of re-listing the
+	 * eleven fields: a new export key then only needs adding here.
+	 */
+	public ObjectNode exportToJson() {
 		return new ExportPreferences(exportEncodingMode, exportBackendPreference,
 				exportPipelineModel, exportQuality, mp4FrameRate, exportFormat, gifFrameRate,
 				gifLoop, gifSizePreset, publishDestination, includeCaptionSidecar).toJson();

@@ -9,6 +9,7 @@
 # Output layout (what -Pdist copies to <appimage>/lib/native/linux-x64/, plan §5.19.3):
 #
 #   java/native/build/onnxruntime/lib/libonnxruntime.so*
+#   java/native/build/onnxruntime/lib/libonnxruntime_providers_webgpu.so  (GPU plugin EP)
 #   java/native/build/onnxruntime/include/...   (only to regenerate the FFM bindings)
 #   java/native/build/models/segmentation/selfie-segmenter.onnx   (fast path)
 #   java/native/build/models/segmentation/modnet.onnx             (precise path)
@@ -17,10 +18,19 @@
 #   java/native/build/models/detection/ch_PP-OCRv4_rec_infer.onnx
 #
 # Properties
-#   * CPU-only linux-x64 build: the models run on dedicated platform threads and
-#     the CUDA/OpenVINO providers are never shipped (the FFmpeg payload policy of
-#     software-only playback does not extend to inference, but GPU providers would
-#     drag in CUDA runtimes we do not bundle).
+#   * The runtime is the stock CPU-only linux-x64 build: every model except the
+#     super-resolution upscaler runs on the CPU EP, on dedicated platform
+#     threads. Vendor GPU *bridge* providers (CUDA, ROCm, OpenVINO) are never
+#     shipped: each one is single-vendor and drags in a vendor runtime.
+#   * The one GPU provider is the vendor-neutral **WebGPU plugin EP**
+#     (`onnxruntime_providers_webgpu.so`, MIT, Microsoft): on Linux it runs
+#     through Dawn on Vulkan, so AMD (RADV/AMDVLK), Intel (ANV) and NVIDIA
+#     all use the same library. It is a *plugin* registered into the stock
+#     runtime, not a second libonnxruntime.so, so OnnxLibs' one-runtime
+#     invariant holds. The system Vulkan loader (`libvulkan.so.1`) is a runtime
+#     requirement and is deliberately NOT bundled — it must match the host
+#     driver. Registration and device enumeration are validated at startup;
+#     any failure (missing loader, old driver) means "CPU only", never a crash.
 #   * Every model is committed under java/native/models/: MediaPipe selfie
 #     segmenter (Apache-2.0, ONNX conversion) for the fast path, MODNet (Apache-2.0,
 #     README covers code, models and demos) for the precise one, and YuNet
@@ -43,6 +53,13 @@ set -euo pipefail
 ONNXRUNTIME_VERSION="1.31.1"
 # sha256 of https://github.com/microsoft/onnxruntime/releases/download/v1.31.1/onnxruntime-linux-x64-1.31.1.tgz
 ONNXRUNTIME_SHA256="c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9"
+
+# WebGPU plugin EP (MIT, Microsoft), the vendor-neutral GPU provider: Dawn over Vulkan on Linux.
+# The wheel is a zip; only libonnxruntime_providers_webgpu.so is staged, never the wheel.
+WEBGPU_EP_VERSION="0.5.0"
+WEBGPU_EP_WHEEL_SHA256="b6baa3e223d9a679023388b1179e5597b6bc0d282ba72f2afe38d46ef37deeb4"
+# sha256 of the extracted libonnxruntime_providers_webgpu.so (16,613,128 bytes).
+WEBGPU_EP_SO_SHA256="fc98b10c7d03537694ff4ea6ebca79ed3b41ca71e316dac3292257ee5f85c95d"
 
 SELFIE_SEGMENTER_SHA256="3241ac4ad8aa35bdaf33946776db29f7c283a413aa0b0dacb9483594b4531aad"
 # Xenova/modnet onnx/model.onnx, the file the two-path design was measured on
@@ -90,6 +107,30 @@ fetch() {
 	[[ "$got" == "$want" ]] || die "sha256 mismatch for $dst: expected $want, got $got"
 }
 
+# fetch_optional is fetch(), but a missing network is a skip instead of a build failure. Used for
+# the WebGPU plugin EP, whose absence degrades the app to the CPU provider but breaks nothing.
+fetch_optional() {
+	# fetch_optional <url> <dst> <sha256>
+	local url="$1" dst="$2" want="$3"
+	if [[ -f "$dst" && "$(sha256sum "$dst" | cut -d' ' -f1)" == "$want" ]]; then
+		return 0
+	fi
+	rm -f "$dst" "$dst.part"
+	mkdir -p "$(dirname "$dst")"
+	say "downloading $url"
+	if ! curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 --max-time 600 -o "$dst.part" "$url"; then
+		rm -f "$dst.part"
+		return 1
+	fi
+	local got
+	got="$(sha256sum "$dst.part" | cut -d' ' -f1)"
+	if [[ "$got" != "$want" ]]; then
+		rm -f "$dst.part"
+		die "sha256 mismatch for $dst: expected $want, got $got"
+	fi
+	mv "$dst.part" "$dst"
+}
+
 if [[ "${1:-}" == "--clean" ]]; then
 	say "cleaning $out"
 	rm -rf "$out"
@@ -113,6 +154,41 @@ else
 fi
 
 [[ -f "$out/lib/libonnxruntime.so" ]] || die "libonnxruntime.so missing after staging"
+
+# Stage the WebGPU plugin EP beside the runtime. It is skipped (with a warning) when the
+# manylinux wheel is unreachable, because every other feature still works on the CPU EP; but a
+# downloaded wheel whose .so does not match the pin is fatal.
+if [[ -f "$out/lib/libonnxruntime_providers_webgpu.so" ]]; then
+	say "webgpu plugin EP $WEBGPU_EP_VERSION already staged"
+else
+	wheel="$downloads/onnxruntime_ep_webgpu-$WEBGPU_EP_VERSION-py3-none-manylinux_2_28_x86_64.whl"
+	if fetch_optional "https://files.pythonhosted.org/packages/e2/1d/ac0ccbe8bd6435b6e1946fea964790ffa3d73ee2513775e90958fd6b860e/onnxruntime_ep_webgpu-$WEBGPU_EP_VERSION-py3-none-manylinux_2_28_x86_64.whl" \
+			"$wheel" "$WEBGPU_EP_WHEEL_SHA256"; then
+		say "extracting libonnxruntime_providers_webgpu.so from $wheel"
+		# The wheel is a zip. Extract the one member into a scratch dir: running an interpreter
+		# here is unnecessary, and the member path is fixed by the package layout.
+		ep_tmp="$(mktemp -d)"
+		unzip -q -o "$wheel" 'onnxruntime_ep_webgpu/libonnxruntime_providers_webgpu.so' -d "$ep_tmp"
+		ep_so="$ep_tmp/onnxruntime_ep_webgpu/libonnxruntime_providers_webgpu.so"
+		[[ -f "$ep_so" ]] || die "libonnxruntime_providers_webgpu.so missing from $wheel"
+		got="$(sha256sum "$ep_so" | cut -d' ' -f1)"
+		[[ "$got" == "$WEBGPU_EP_SO_SHA256" ]] \
+			|| die "sha256 mismatch for libonnxruntime_providers_webgpu.so: expected $WEBGPU_EP_SO_SHA256, got $got"
+		# Baseline check: the plugin may need nothing newer than the manylinux_2_28 glibc.
+		if command -v objdump >/dev/null 2>&1; then
+			newest_glibc="$(objdump -T "$ep_so" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)"
+			case "$newest_glibc" in
+				""|GLIBC_2.25|GLIBC_2.27|GLIBC_2.28) ;;
+				*) die "$ep_so needs $newest_glibc, newer than the manylinux_2_28 baseline" ;;
+			esac
+		fi
+		cp "$ep_so" "$out/lib/libonnxruntime_providers_webgpu.so"
+		rm -rf "$ep_tmp"
+		say "staged $out/lib/libonnxruntime_providers_webgpu.so (Vulkan loader is a system requirement)"
+	else
+		say "warning: could not fetch the webgpu plugin EP; GPU super-resolution will be unavailable"
+	fi
+fi
 
 # Stage the bundled models (committed in the repo; shas pinned above).
 mkdir -p "$models_out" "$detection_out"

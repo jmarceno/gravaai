@@ -46,6 +46,15 @@ public final class SuperResolutionController {
 			new CopyOnWriteArrayList<>();
 	/** Cancels an install in flight when the user toggles it back off mid-download. */
 	private final AtomicBoolean installing = new AtomicBoolean();
+	/**
+	 * Guards the one provider probe per JVM: {@link OnnxWebGpuPlugin} registers the plugin into a
+	 * process-wide ORT registry, so a second probe must never re-register it.
+	 */
+	private static final AtomicBoolean PROVIDER_PROBE_STARTED = new AtomicBoolean();
+	/** The probed provider label ("WebGPU · AMD Radeon RX 560" / "CPU"), null until it lands. */
+	private static volatile @Nullable String probedProvider;
+	/** Why the CPU is in use when no GPU device was found, null when on GPU or not probed yet. */
+	private static volatile @Nullable String probedProviderDetail;
 
 	private volatile SuperResolutionUiService.State state;
 
@@ -142,12 +151,17 @@ public final class SuperResolutionController {
 			writeSetting(true);
 			state = newState(state.percent(), state.message(), state.failed(), true);
 			publish();
+			probeProviderAsync();
 			downloadModel();
 			return;
 		}
 		writeSetting(enabled);
 		state = newState(state.percent(), state.message(), state.failed(), enabled);
 		publish();
+		if (enabled) {
+			// The provider row is the promise this toggle makes; fill it in as soon as it matters.
+			probeProviderAsync();
+		}
 	}
 
 	private void downloadModel() {
@@ -190,6 +204,8 @@ public final class SuperResolutionController {
 			} finally {
 				installing.set(false);
 				publish();
+				// The model just landed: the provider row can now describe what exports will use.
+				probeProviderAsync();
 			}
 		});
 	}
@@ -235,12 +251,68 @@ public final class SuperResolutionController {
 
 	private SuperResolutionUiService.State newState(int percent, @Nullable String message,
 			boolean failed, boolean enabled, boolean installed) {
-		return new SuperResolutionUiService.State(enabled, installed, percent, message, failed);
+		// Every mutation keeps the probed provider: it is a property of the machine, not of the
+		// install, and dropping it would blank the row on every toggle.
+		return new SuperResolutionUiService.State(enabled, installed, percent, message, failed,
+				probedProvider, probedProviderDetail);
 	}
 
 	/** Re-reads the setting and the model from disk (the window's initial state). */
 	public void refresh() {
 		state = newState(100, null, false, readEnabledSetting());
+		publish();
+		probeProviderAsync();
+	}
+
+	/**
+	 * Probes the execution provider once per process and republishes the state with what exports
+	 * will actually run on.
+	 *
+	 * <p>Only when the feature can matter (the model is installed or the user turned the toggle on):
+	 * the probe loads the plugin and creates a Vulkan device, and an untouched machine must not pay
+	 * that at editor open. Off the FX thread on purpose — it touches the GPU driver. The result is
+	 * process-wide (the plugin registration is), so the first window that needs it pays and every
+	 * later one reuses the label.</p>
+	 */
+	private void probeProviderAsync() {
+		if (!state.modelInstalled() && !state.enabled()) {
+			return;
+		}
+		String known = probedProvider;
+		if (known != null) {
+			publishProvider(known, probedProviderDetail);
+			return;
+		}
+		if (!PROVIDER_PROBE_STARTED.compareAndSet(false, true)) {
+			return;
+		}
+		Threads.startVirtual("gravaai-superres-provider-probe", () -> {
+			String provider;
+			String detail;
+			try {
+				var selection = dev.gravaai.media.onnx.OnnxWebGpuPlugin.probe();
+				provider = selection.provider().label();
+				detail = selection.detail();
+			} catch (RuntimeException error) {
+				// The probe itself never throws for a missing driver, but a broken native binding
+				// must still not take the Settings panel down.
+				LOG.log(System.Logger.Level.WARNING, "execution provider probe failed: " + error);
+				provider = dev.gravaai.media.onnx.OnnxExecutionProvider.CPU.label();
+				detail = error.getMessage() == null ? error.toString() : error.getMessage();
+			}
+			probedProvider = provider;
+			probedProviderDetail = detail;
+			publishProvider(provider, detail);
+		});
+	}
+
+	private void publishProvider(String provider, @Nullable String detail) {
+		SuperResolutionUiService.State current = state;
+		if (provider.equals(current.provider()) && java.util.Objects.equals(detail,
+				current.providerDetail())) {
+			return;
+		}
+		state = current.withProvider(provider, detail);
 		publish();
 	}
 

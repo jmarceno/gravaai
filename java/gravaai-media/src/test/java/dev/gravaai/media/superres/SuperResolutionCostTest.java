@@ -45,8 +45,28 @@ class SuperResolutionCostTest {
 		RgbaFrame frame = noiseFrame(1920, 1080);
 		io.github.humbleui.types.Rect source = io.github.humbleui.types.Rect.makeXYWH(0, 0, 1920, 1080);
 		io.github.humbleui.types.Rect box = source;
-		double[] scales = {5.0, 4.0, 3.5, 3.0};
-		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model)) {
+		// A 1080p source stretched onto a 1080p canvas: the visible window is canvas / camera
+		// scale, and the engine's padding grows it before inference. These are the zoom depths a
+		// real timeline runs through from the upscale gate (D5, 3.5x) to D6 (5x); 3.0x is below
+		// SuperResolution.MIN_MAGNIFICATION and deliberately does not upscale.
+		double[] scales = {5.0, 4.0, 3.5};
+		// CPU first (the documented baseline), then whatever provider this machine offers, so one
+		// run reports both sides of the card's "re-measure per zoom depth" requirement.
+		measure(new dev.gravaai.media.onnx.OnnxWebGpuPlugin.Selection(
+				dev.gravaai.media.onnx.OnnxExecutionProvider.CPU, null, null), model, frame, source,
+				box, scales);
+		var selection = dev.gravaai.media.onnx.OnnxWebGpuPlugin.probe();
+		if (selection.provider().hardware()) {
+			measure(selection, model, frame, source, box, scales);
+		} else {
+			System.out.println("SUPERRES-SIZE no GPU device: " + selection.detail());
+		}
+	}
+
+	private static void measure(dev.gravaai.media.onnx.OnnxWebGpuPlugin.Selection selection,
+			Path model, RgbaFrame frame, io.github.humbleui.types.Rect source,
+			io.github.humbleui.types.Rect box, double[] scales) {
+		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, selection)) {
 			for (double scale : scales) {
 				// Anchor the zoom on the frame centre so the window is fully inside the source.
 				var transform = new dev.gravaai.media.compose.ZoomTransform.AppliedTransform(scale,
@@ -56,10 +76,10 @@ class SuperResolutionCostTest {
 				long elapsed = (System.nanoTime() - started) / 1_000_000;
 				assertTrue(upscaled != null, "no upscale at " + scale + "x");
 				System.out.printf(
-						"SUPERRES-SIZE scale %.1fx  visible %3dx%-3d  inferred %3dx%-3d"
+						"SUPERRES-SIZE %-6s scale %.1fx  visible %3dx%-3d  inferred %3dx%-3d"
 								+ " (%6d px)  %5d ms%n",
-						scale, (int) (1920 / scale), (int) (1080 / scale),
-						upscaled.crop().width(), upscaled.crop().height(),
+						engine.provider().kind().label(), scale, (int) (1920 / scale),
+						(int) (1080 / scale), upscaled.crop().width(), upscaled.crop().height(),
 						upscaled.crop().pixels(), elapsed);
 				engine.reset();
 			}

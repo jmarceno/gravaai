@@ -52,6 +52,12 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	private static final int MAX_METADATA_BYTES = 1 << 20;
 	/** Cap on a model I/O name; ORT names are short identifiers. */
 	private static final int MAX_IO_NAME_BYTES = 4096;
+	/**
+	 * {@code kOrtSessionOptionsDisableCPUEPFallback}: forbids running a node on the CPU EP when a
+	 * GPU provider was appended, so an unsupported op fails session creation instead of silently
+	 * splitting the graph.
+	 */
+	private static final String DISABLE_CPU_EP_FALLBACK = "session.disable_cpu_ep_fallback";
 
 	private final MemorySegment api;
 	/** The OrtEnv backing every session; released in {@link #close()}. */
@@ -83,8 +89,17 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 
 	/** Creates the ORT environment (error-level logging, "gravaai" logger id). */
 	public MemorySegment createEnv() {
+		return createEnv("gravaai");
+	}
+
+	/**
+	 * Creates an ORT environment with a named logger id. The keeper environment that owns the
+	 * process-wide plugin EP registration uses its own id so its log lines are distinguishable
+	 * from a session's.
+	 */
+	public MemorySegment createEnv(String loggerId) {
 		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment name = cString(arena, "gravaai");
+			MemorySegment name = cString(arena, loggerId);
 			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
 			checkStatus(OrtApi.CreateEnv.invoke(OrtApi.CreateEnv(api), ORT_LOGGING_LEVEL_ERROR,
 					name, out), "CreateEnv");
@@ -110,34 +125,57 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	 */
 	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
 			int threads) {
+		return createSession(env, modelFile, threads, OnnxExecutionProvider.CPU);
+	}
+
+	/**
+	 * Loads a model into a session on the requested execution provider.
+	 *
+	 * <p>A {@link OnnxExecutionProvider.Kind#WEBGPU} provider is appended through
+	 * {@link OrtApi#SessionOptionsAppendExecutionProvider_V2} using the device handle a
+	 * {@link OnnxEpDevice} probe returned. A GPU session also disables the CPU EP fallback, so the
+	 * whole graph must run on the GPU provider or session creation fails; the engine then opens a
+	 * CPU session instead. {@code threads} only matters on the CPU path: a GPU session gets no
+	 * intra-op pool, because the work is not there to parallelise and an idle pool per export would
+	 * only hold threads.</p>
+	 *
+	 * @param provider the provider to append; {@link OnnxExecutionProvider#CPU} for the built-in
+	 *                 CPU EP
+	 * @param device   the probed EP device for {@code provider}, ignored on the CPU path
+	 * @throws IllegalStateException when the provider cannot be appended or the session fails
+	 */
+	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
+			int threads, OnnxExecutionProvider provider, OnnxEpDevice device) {
 		if (threads < 0) {
 			throw new IllegalArgumentException("threads must not be negative: " + threads);
+		}
+		if (provider.hardware() && device == null) {
+			throw new IllegalArgumentException(
+					"provider " + provider.kind() + " needs a probed device");
 		}
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment path = cString(arena, modelFile.toAbsolutePath().toString());
 			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
-			if (threads == 0) {
-				checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
-						MemorySegment.NULL, out), "CreateSession(" + modelFile + ")");
-			} else {
-				MemorySegment optionsOut = arena.allocate(ValueLayout.ADDRESS);
-				checkStatus(OrtApi.CreateSessionOptions.invoke(
-						OrtApi.CreateSessionOptions(api), optionsOut), "CreateSessionOptions");
-				MemorySegment options = optionsOut.get(ValueLayout.ADDRESS, 0);
-				try {
-					checkStatus(OrtApi.SetIntraOpNumThreads.invoke(
-							OrtApi.SetIntraOpNumThreads(api), options, threads),
-							"SetIntraOpNumThreads(" + threads + ")");
-					// Inter-op parallelism would open a second pool on top of the intra-op one; one
-					// worker is enough for this graph and keeps a frame's thread count predictable.
-					checkStatus(OrtApi.SetInterOpNumThreads.invoke(
-							OrtApi.SetInterOpNumThreads(api), options, 1),
-							"SetInterOpNumThreads(1)");
-					checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
-							options, out), "CreateSession(" + modelFile + ")");
-				} finally {
-					OrtApi.ReleaseSessionOptions.invoke(OrtApi.ReleaseSessionOptions(api), options);
+			MemorySegment optionsOut = arena.allocate(ValueLayout.ADDRESS);
+			checkStatus(OrtApi.CreateSessionOptions.invoke(
+					OrtApi.CreateSessionOptions(api), optionsOut), "CreateSessionOptions");
+			MemorySegment options = optionsOut.get(ValueLayout.ADDRESS, 0);
+			try {
+				if (provider.hardware()) {
+					// No silent per-node CPU fallback: with the fallback enabled, a node the GPU
+					// provider cannot claim runs quietly on the CPU EP while the session still
+					// reports WebGPU — exactly the false "GPU" claim this feature must not make.
+					// Disabled, such a model fails session creation loudly and the engine's CPU
+					// reopen path takes over.
+					setConfigEntry(options, DISABLE_CPU_EP_FALLBACK, "1");
+					appendProvider(arena, options, env, device);
+				} else if (threads > 0) {
+					applyThreads(options, threads);
 				}
+				checkStatus(OrtApi.CreateSession.invoke(OrtApi.CreateSession(api), env, path,
+						options, out), "CreateSession(" + modelFile + ")");
+			} finally {
+				OrtApi.ReleaseSessionOptions.invoke(OrtApi.ReleaseSessionOptions(api), options);
 			}
 			MemorySegment created = out.get(ValueLayout.ADDRESS, 0);
 			if (created.address() == 0) {
@@ -146,6 +184,63 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 			}
 			return created;
 		}
+	}
+
+	/**
+	 * Creates a session on {@code provider} without a device handle: only valid for the CPU EP,
+	 * which needs none.
+	 */
+	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
+			int threads, OnnxExecutionProvider provider) {
+		if (provider.hardware()) {
+			throw new IllegalArgumentException(
+					"provider " + provider.kind() + " needs a probed device");
+		}
+		return createSession(env, modelFile, threads, provider, null);
+	}
+
+	/** Writes one session config entry ({@code OrtSessionOptionsAppendSessionConfigEntry}). */
+	private void setConfigEntry(MemorySegment options, String key, String value) {
+		try (Arena arena = Arena.ofConfined()) {
+			checkStatus(OrtApi.AddSessionConfigEntry.invoke(OrtApi.AddSessionConfigEntry(api),
+					options, cString(arena, key), cString(arena, value)),
+					"AddSessionConfigEntry(" + key + ")");
+		}
+	}
+
+	private void applyThreads(MemorySegment options, int threads) {
+		checkStatus(OrtApi.SetIntraOpNumThreads.invoke(
+				OrtApi.SetIntraOpNumThreads(api), options, threads),
+				"SetIntraOpNumThreads(" + threads + ")");
+		// Inter-op parallelism would open a second pool on top of the intra-op one; one
+		// worker is enough for this graph and keeps a frame's thread count predictable.
+		checkStatus(OrtApi.SetInterOpNumThreads.invoke(
+				OrtApi.SetInterOpNumThreads(api), options, 1), "SetInterOpNumThreads(1)");
+	}
+
+	/** Appends one probed WebGPU device (with its Dawn adapter index) to the session options. */
+	private void appendProvider(Arena arena, MemorySegment options, MemorySegment env,
+			OnnxEpDevice device) {
+		MemorySegment deviceArray = arena.allocate(ValueLayout.ADDRESS, 1);
+		deviceArray.setAtIndex(ValueLayout.ADDRESS, 0, device.handle());
+		// The plugin's one documented session option: which Dawn adapter (by enumeration index)
+		// backs the device. Omitting it keeps Dawn's automatic selection.
+		MemorySegment keys = arena.allocate(ValueLayout.ADDRESS, 1);
+		keys.setAtIndex(ValueLayout.ADDRESS, 0, cString(arena, "adapterIndex"));
+		MemorySegment values = arena.allocate(ValueLayout.ADDRESS, 1);
+		values.setAtIndex(ValueLayout.ADDRESS, 0,
+				cString(arena, Integer.toString(device.adapterIndex())));
+		checkStatus(OrtApi.SessionOptionsAppendExecutionProvider_V2.invoke(
+				OrtApi.SessionOptionsAppendExecutionProvider_V2(api), options, env, deviceArray, 1,
+				keys, values, 1), "SessionOptionsAppendExecutionProvider_V2(WebGPU)");
+	}
+
+	/**
+	 * Loads a model on {@code provider} with the ORT default session options.
+	 */
+	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
+			OnnxExecutionProvider provider) {
+		return createSession(env, modelFile, 0, provider);
 	}
 
 	/**
@@ -609,6 +704,148 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	/** Releases a session (before {@link #close()} releases the env). */
 	public void releaseSession(MemorySegment session) {
 		OrtApi.ReleaseSession.invoke(OrtApi.ReleaseSession(api), session);
+	}
+
+	/**
+	 * Registers an execution-provider plugin library with {@code env}.
+	 *
+	 * <p>Registration is <b>process-wide</b>: ONNX Runtime keeps one registry for the whole process,
+	 * so the same plugin must never be registered twice (a duplicate call leaves the loaded library
+	 * in a state where the next session creation crashes). One keeper environment owns the single
+	 * call for the process; sessions on other environments use the devices it enumerates.</p>
+	 *
+	 * @throws IllegalStateException when the library is rejected (wrong runtime version, missing
+	 *                               Vulkan loader); callers treat that as "CPU only"
+	 */
+	public void registerExecutionProviderLibrary(MemorySegment env, String registrationName,
+			java.nio.file.Path library) {
+		try (Arena arena = Arena.ofConfined()) {
+			checkStatus(OrtApi.RegisterExecutionProviderLibrary.invoke(
+					OrtApi.RegisterExecutionProviderLibrary(api), env,
+					cString(arena, registrationName),
+					cString(arena, library.toAbsolutePath().toString())),
+					"RegisterExecutionProviderLibrary(" + registrationName + ")");
+		}
+	}
+
+	/**
+	 * The execution-provider devices registered in {@code env}: one per provider/hardware pair.
+	 *
+	 * <p>The returned handles are owned by ONNX Runtime and stay valid while {@code env} is alive,
+	 * which is why the keeper environment that registered the plugin outlives every session.</p>
+	 */
+	public List<OnnxEpDevice> epDevices(MemorySegment env) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
+			MemorySegment countOut = arena.allocate(ValueLayout.JAVA_LONG);
+			checkStatus(OrtApi.GetEpDevices.invoke(OrtApi.GetEpDevices(api), env, out, countOut),
+					"GetEpDevices");
+			long count = countOut.get(ValueLayout.JAVA_LONG, 0);
+			if (count < 0 || count > MAX_EP_DEVICES) {
+				throw new IllegalStateException("implausible EP device count: " + count);
+			}
+			MemorySegment array = out.get(ValueLayout.ADDRESS, 0);
+			if (count == 0) {
+				return List.of();
+			}
+			if (array.address() == 0) {
+				throw new IllegalStateException("GetEpDevices produced a null device array");
+			}
+			array = array.reinterpret(Math.multiplyExact(count, ValueLayout.ADDRESS.byteSize()));
+			List<OnnxEpDevice> devices = new java.util.ArrayList<>((int) count);
+			for (int i = 0; i < count; i++) {
+				MemorySegment handle = array.getAtIndex(ValueLayout.ADDRESS, i);
+				if (handle.address() == 0) {
+					continue;
+				}
+				devices.add(epDevice(handle));
+			}
+			return List.copyOf(devices);
+		}
+	}
+
+	private static final long MAX_EP_DEVICES = 256;
+
+	private OnnxEpDevice epDevice(MemorySegment handle) {
+		String epName = readMetadataString(() -> OrtApi.EpDevice_EpName.invoke(
+				OrtApi.EpDevice_EpName(api), handle));
+		MemorySegment hardware = OrtApi.EpDevice_Device.invoke(OrtApi.EpDevice_Device(api), handle);
+		int hardwareType = hardware.address() == 0 ? -1
+				: OrtApi.HardwareDevice_Type.invoke(OrtApi.HardwareDevice_Type(api), hardware);
+		int vendorId = hardware.address() == 0 ? 0
+				: OrtApi.HardwareDevice_VendorId.invoke(OrtApi.HardwareDevice_VendorId(api),
+						hardware);
+		int deviceId = hardware.address() == 0 ? 0
+				: OrtApi.HardwareDevice_DeviceId.invoke(OrtApi.HardwareDevice_DeviceId(api),
+						hardware);
+		String metadataVendor = "";
+		String cardIndex = null;
+		if (hardware.address() != 0) {
+			metadataVendor = readMetadataString(() -> OrtApi.HardwareDevice_Vendor.invoke(
+					OrtApi.HardwareDevice_Vendor(api), hardware));
+			cardIndex = keyValue(
+					OrtApi.HardwareDevice_Metadata.invoke(
+							OrtApi.HardwareDevice_Metadata(api), hardware),
+					"card_idx");
+		}
+		OnnxExecutionProvider.Device device = new OnnxExecutionProvider.Device(
+				GpuDeviceNames.describe(vendorId, deviceId), vendorId, deviceId);
+		// The plugin exposes the Dawn adapter index as card_idx; the documented session option uses
+		// exactly that value to select the physical adapter. Absent metadata means adapter 0.
+		int adapterIndex = 0;
+		if (cardIndex != null) {
+			String reported = cardIndex;
+			try {
+				adapterIndex = Integer.parseInt(reported.trim());
+			} catch (NumberFormatException ignored) {
+				LOG.log(System.Logger.Level.DEBUG,
+						() -> "unparsable webgpu card_idx: " + reported);
+			}
+		}
+		return new OnnxEpDevice(epName, hardwareType, metadataVendor, handle, adapterIndex, device);
+	}
+
+	/** Reads one value from an {@code OrtKeyValuePairs} (ORT-owned, never freed), or null. */
+	private @Nullable String keyValue(MemorySegment pairs, String key) {
+		if (pairs.address() == 0) {
+			return null;
+		}
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment value = OrtApi.GetKeyValue.invoke(OrtApi.GetKeyValue(api), pairs,
+					cString(arena, key));
+			if (value.address() == 0) {
+				return null;
+			}
+			return readCString(value, MAX_METADATA_BYTES);
+		}
+	}
+
+	/** Reads a NUL-terminated string an accessor returns, tolerating a null pointer. */
+	private String readMetadataString(java.util.function.Supplier<MemorySegment> accessor) {
+		MemorySegment value = accessor.get();
+		if (value == null || value.address() == 0) {
+			return "";
+		}
+		return readCString(value, MAX_IO_NAME_BYTES);
+	}
+
+	/**
+	 * The provider name a session actually runs on, read from the device bound to its first input,
+	 * or {@code null} when the runtime has no answer (an older session, a failed query).
+	 */
+	public @Nullable String sessionInputProvider(MemorySegment session) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
+			checkStatus(OrtApi.SessionGetEpDeviceForInputs.invoke(
+					OrtApi.SessionGetEpDeviceForInputs(api), session, out, 1),
+					"SessionGetEpDeviceForInputs");
+			MemorySegment device = out.get(ValueLayout.ADDRESS, 0);
+			if (device.address() == 0) {
+				return null;
+			}
+			return readMetadataString(() -> OrtApi.EpDevice_EpName.invoke(
+					OrtApi.EpDevice_EpName(api), device));
+		}
 	}
 
 	/**

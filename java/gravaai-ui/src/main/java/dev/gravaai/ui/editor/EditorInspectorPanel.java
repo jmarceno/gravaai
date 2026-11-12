@@ -2628,7 +2628,9 @@ public final class EditorInspectorPanel extends VBox {
 		body.getChildren().add(new Label(
 				"Runs a super-resolution model on the deepest zoom stages when you export, so"
 						+ " text on a 1080p recording stays legible at 3.5–5×. The preview keeps"
-						+ " the fast sharpening pass; exports get the sharper texture."));
+						+ " the fast sharpening pass; exports get the sharper texture."
+						+ " Inference uses the GPU when the system Vulkan driver offers one, and the"
+						+ " CPU otherwise."));
 
 		if (!state.modelInstalled() && !state.enabled()) {
 			Label hint = new Label("The model (4.9 MB) downloads when you turn this on.");
@@ -2651,6 +2653,22 @@ public final class EditorInspectorPanel extends VBox {
 			failure.setWrapText(true);
 			failure.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-danger;");
 			body.getChildren().add(failure);
+		}
+		if (state.provider() != null) {
+			// Which provider an export will actually use is a promise the app has to keep: the
+			// GPU path is the point of the feature and the CPU is the honest fallback.
+			HBox provider = new HBox(8);
+			provider.setAlignment(Pos.CENTER_LEFT);
+			Label providerLabel = new Label("Runs on " + state.provider());
+			providerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			provider.getChildren().add(providerLabel);
+			body.getChildren().add(provider);
+			if (!state.hardwareAccelerated() && state.providerDetail() != null) {
+				Label reason = new Label(state.providerDetail());
+				reason.setWrapText(true);
+				reason.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+				body.getChildren().add(reason);
+			}
 		}
 		if (state.modelInstalled()) {
 			HBox actions = new HBox(8);

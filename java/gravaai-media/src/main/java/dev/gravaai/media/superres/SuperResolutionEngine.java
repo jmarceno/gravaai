@@ -12,7 +12,10 @@ import org.jspecify.annotations.Nullable;
 
 import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.compose.ZoomTransform;
+import dev.gravaai.media.onnx.OnnxEpDevice;
+import dev.gravaai.media.onnx.OnnxExecutionProvider;
 import dev.gravaai.media.onnx.OnnxRuntimeApi;
+import dev.gravaai.media.onnx.OnnxWebGpuPlugin;
 import dev.gravaai.media.onnx.gen.onnxruntime_h;
 import dev.gravaai.media.superres.SuperResolution.Crop;
 import io.github.humbleui.types.Rect;
@@ -22,11 +25,20 @@ import io.github.humbleui.types.Rect;
  * source window a deeply zoomed camera shows, so an exported 5&times; stage has real detail instead
  * of a stretched 1080p crop.
  *
- * <p><b>Export only.</b> One 5&times; window of a 1080p source takes about half a second on the
- * bundled (CPU) ONNX Runtime, which is fine inside an export and impossible in a 60 fps preview;
- * the preview keeps the compositor's cheap {@link dev.gravaai.media.compose.ZoomSharpen} pass. Both
- * paths draw through the same compositor, so an export with this engine simply has a sharper
- * texture for the same frames.</p>
+ * <p><b>Export only.</b> One 5&times; window of a 1080p source costs 1.3–1.7 s on the bundled ONNX
+ * Runtime (CPU) and 1.2–1.3 s on a GPU, which is fine inside an export and impossible in a 60 fps
+ * preview; the preview keeps the compositor's cheap {@link dev.gravaai.media.compose.ZoomSharpen}
+ * pass. Both paths draw through the same compositor, so an export with this engine simply has a
+ * sharper texture for the same frames.</p>
+ *
+ * <p><b>GPU first, CPU guaranteed.</b> The engine runs on the vendor-neutral WebGPU plugin
+ * execution provider (Dawn over Vulkan on Linux) whenever one enumerated a device, and on the
+ * built-in CPU EP otherwise. The GPU is preferred even where its wall clock is a little slower
+ * (above ~260k px on the baseline RX 560) because it uses a fraction of a core instead of eight,
+ * which matters to the decode/composite/encode stages running alongside it — the measured numbers
+ * are in {@link dev.gravaai.media.onnx.OnnxProviderSelection}. A GPU session that cannot be created,
+ * or whose inference fails, is replaced by a CPU session for the rest of the run, so an export
+ * never fails because the GPU path is broken.</p>
  *
  * <p><b>Window caching.</b> The inference runs on a <em>padded</em> window (see
  * {@link SuperResolution#padded}) and the result is kept until the camera moves far enough that the
@@ -42,18 +54,27 @@ public final class SuperResolutionEngine implements AutoCloseable {
 			System.getLogger(SuperResolutionEngine.class.getName());
 
 	/**
-	 * Intra-op threads for the upscaler. The network is small and fully convolutional, so it scales
-	 * well up to a point: 8 threads measured ~0.5 s on a 5&times; 1080p window, 12 no better, and
-	 * leaving it to the ORT default oversubscribes the export's GL and decode threads.
+	 * Intra-op threads for the CPU upscaler. The network is small and fully convolutional, so it
+	 * scales well up to a point: 8 threads measured ~0.5 s on a 5&times; 1080p window, 12 no
+	 * better, and leaving it to the ORT default oversubscribes the export's GL and decode threads.
+	 * A GPU session gets no intra-op pool (see {@code OnnxRuntimeApi.createSession}).
 	 */
 	private static final int THREADS = 8;
 
+	/** Cap on session re-opens after a GPU failure: one retry on the CPU, then the source stays. */
+	private static final int MAX_REOPEN_ATTEMPTS = 2;
+
 	private final OnnxRuntimeApi api;
-	private final MemorySegment session;
-	private final MemorySegment memoryInfo;
-	private final String inputName;
-	private final String outputName;
+	private final MemorySegment env;
 	private final Path modelFile;
+	/** The provider the current session runs on; {@link #session} must match it. */
+	private OnnxExecutionProvider provider;
+	private @Nullable OnnxEpDevice device;
+	private MemorySegment session;
+	private MemorySegment memoryInfo;
+	private String inputName;
+	private String outputName;
+	private int reopened;
 	private boolean closed;
 
 	// The cached upscaled window: the padded source crop it covers, and the pixels at 4x.
@@ -65,33 +86,72 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	private long cacheHits;
 	private long totalInferenceNanos;
 
-	private SuperResolutionEngine(OnnxRuntimeApi api, MemorySegment session,
-			MemorySegment memoryInfo, String inputName, String outputName, Path modelFile) {
+	private SuperResolutionEngine(OnnxRuntimeApi api, MemorySegment env, Path modelFile,
+			OnnxExecutionProvider provider, @Nullable OnnxEpDevice device, MemorySegment session,
+			MemorySegment memoryInfo, String inputName, String outputName) {
 		this.api = api;
+		this.env = env;
+		this.modelFile = modelFile;
+		this.provider = provider;
+		this.device = device;
 		this.session = session;
 		this.memoryInfo = memoryInfo;
 		this.inputName = inputName;
 		this.outputName = outputName;
-		this.modelFile = modelFile;
 	}
 
 	/**
-	 * Opens the pinned model (loading ONNX Runtime if needed).
+	 * Opens the pinned model on the best available execution provider (loading ONNX Runtime if
+	 * needed).
+	 *
+	 * <p>A GPU session that cannot be created (the device disappeared between probe and open, the
+	 * append is rejected) is reported and reopened on the CPU, so a present model still runs.</p>
 	 *
 	 * @param modelFile the installed {@code realesr-general-x4v3.onnx}
 	 * @throws IllegalArgumentException when the file is missing
-	 * @throws IllegalStateException    when the runtime or the model cannot be bound
+	 * @throws IllegalStateException    when the runtime or the model cannot be bound on any provider
 	 */
 	public static SuperResolutionEngine open(Path modelFile) {
+		return open(modelFile, OnnxWebGpuPlugin.probe());
+	}
+
+	/**
+	 * Opens the model on the provider a {@link OnnxWebGpuPlugin.Selection} names. Used by tests to
+	 * force the CPU or the GPU path; production code calls {@link #open(Path)}.
+	 */
+	public static SuperResolutionEngine open(Path modelFile, OnnxWebGpuPlugin.Selection selection) {
 		if (!Files.isRegularFile(modelFile)) {
 			throw new IllegalArgumentException("super-resolution model missing: " + modelFile);
 		}
 		OnnxRuntimeApi api = OnnxRuntimeApi.bind();
+		MemorySegment env = null;
 		MemorySegment session = null;
 		MemorySegment memoryInfo = null;
+		OnnxExecutionProvider provider = selection.provider();
+		OnnxEpDevice device = selection.device();
 		try {
-			MemorySegment env = api.createEnv();
-			session = api.createSession(env, modelFile, THREADS);
+			env = api.createEnv();
+			if (device != null) {
+				MemorySegment gpuSession = null;
+				try {
+					gpuSession = api.createSession(env, modelFile, THREADS, provider, device);
+					assertSessionOn(api, gpuSession, provider, device);
+					session = gpuSession;
+				} catch (RuntimeException gpuFailure) {
+					// Presence is not proof: a rejected append or a session that silently landed on
+					// the CPU EP is a GPU miss, and the CPU path is the guaranteed fallback.
+					LOG.log(System.Logger.Level.WARNING, "super-resolution WebGPU session failed,"
+							+ " falling back to the CPU: " + gpuFailure);
+					if (gpuSession != null) {
+						api.releaseSession(gpuSession);
+					}
+					provider = OnnxExecutionProvider.CPU;
+					device = null;
+				}
+			}
+			if (session == null) {
+				session = api.createSession(env, modelFile, THREADS, provider);
+			}
 			memoryInfo = api.createCpuMemoryInfo();
 			MemorySegment allocator = api.defaultAllocator();
 			String inputName = api.sessionInputName(session, allocator, 0);
@@ -100,8 +160,8 @@ public final class SuperResolutionEngine implements AutoCloseable {
 				throw new IllegalArgumentException(modelFile + " must have exactly one input and"
 						+ " one output");
 			}
-			return new SuperResolutionEngine(api, session, memoryInfo, inputName, outputName,
-					modelFile);
+			return new SuperResolutionEngine(api, env, modelFile, provider, device, session,
+					memoryInfo, inputName, outputName);
 		} catch (RuntimeException error) {
 			if (memoryInfo != null) {
 				api.releaseMemoryInfo(memoryInfo);
@@ -111,6 +171,29 @@ public final class SuperResolutionEngine implements AutoCloseable {
 			}
 			api.close();
 			throw error;
+		}
+	}
+
+	/**
+	 * Confirms the session was really bound to the requested provider.
+	 *
+	 * <p>Appending a provider can succeed while the graph still lands on the CPU EP (an
+	 * unsupported op with CPU fallback enabled), and a session that only claims the GPU in its
+	 * options is exactly the silent fallback this feature must not ship. Reading the device bound
+	 * to the input tensor answers where the session actually runs.</p>
+	 */
+	private static void assertSessionOn(OnnxRuntimeApi api, MemorySegment session,
+			OnnxExecutionProvider expected, OnnxEpDevice device) {
+		String actual = api.sessionInputProvider(session);
+		if (actual == null) {
+			// The runtime had no answer: keep the GPU session (the inference itself is the proof).
+			LOG.log(System.Logger.Level.DEBUG,
+					"session did not report its execution provider; assuming requested");
+			return;
+		}
+		if (!actual.equals(device.epName())) {
+			throw new IllegalStateException("session bound to " + actual + " instead of "
+					+ expected.kind().runtimeName());
 		}
 	}
 
@@ -169,6 +252,11 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	}
 
 	private @Nullable RgbaFrame infer(RgbaFrame frame, Crop crop) {
+		if (session.address() == 0) {
+			// A failed CPU fallback left no session: every remaining deep-zoom frame draws the
+			// source instead of retrying an inference that has nowhere to run.
+			return null;
+		}
 		long started = System.nanoTime();
 		try {
 			ByteBuffer window = SuperResolution.copyWindow(frame.pixelsTopFirstRgba(),
@@ -204,7 +292,8 @@ public final class SuperResolutionEngine implements AutoCloseable {
 				totalInferenceNanos += System.nanoTime() - started;
 				LOG.log(System.Logger.Level.DEBUG, () -> "SR " + crop.width() + "x"
 						+ crop.height() + " -> " + upWidth + "x" + upHeight + " in "
-						+ (System.nanoTime() - started) / 1_000_000 + " ms");
+						+ (System.nanoTime() - started) / 1_000_000 + " ms on "
+						+ provider.kind().label());
 				return result;
 			} finally {
 				api.releaseValue(outputs[0]);
@@ -215,10 +304,63 @@ public final class SuperResolutionEngine implements AutoCloseable {
 			cachedCrop = null;
 			cachedUpscaled = null;
 			cachedWindow = null;
+			// A GPU session that fails at inference is the one case where presence was proved
+			// wrong: rebuild the session on the CPU once, so the rest of the export still sharpens
+			// instead of drawing the raw stretch for every remaining deep-zoom frame.
+			if (provider.hardware() && reopened < MAX_REOPEN_ATTEMPTS) {
+				LOG.log(System.Logger.Level.WARNING, "super-resolution WebGPU inference failed,"
+						+ " moving the rest of this export to the CPU: " + error);
+				reopenOnCpu();
+				return null;
+			}
 			LOG.log(System.Logger.Level.WARNING,
 					"super-resolution inference failed, drawing the source: " + error);
 			return null;
 		}
+	}
+
+	/**
+	 * Replaces a broken GPU session with a CPU one. The next deep-zoom frame infers on the CPU;
+	 * this frame still draws the source, because the failed run's output is gone.
+	 */
+	private void reopenOnCpu() {
+		reopened++;
+		// Release the old handles and clear them first: if the CPU session cannot be created, the
+		// engine must not keep pointers that were already released (close() would free them twice
+		// and the next inference would Run on a dangling session).
+		api.releaseMemoryInfo(memoryInfo);
+		api.releaseSession(session);
+		session = MemorySegment.NULL;
+		memoryInfo = MemorySegment.NULL;
+		try {
+			// Keep the export's env: it is unrelated to the GPU failure and sessions share it.
+			MemorySegment cpuSession = api.createSession(env, modelFile, THREADS,
+					OnnxExecutionProvider.CPU);
+			MemorySegment cpuMemoryInfo = api.createCpuMemoryInfo();
+			MemorySegment allocator = api.defaultAllocator();
+			inputName = api.sessionInputName(cpuSession, allocator, 0);
+			outputName = api.sessionOutputName(cpuSession, allocator, 0);
+			session = cpuSession;
+			memoryInfo = cpuMemoryInfo;
+			provider = OnnxExecutionProvider.CPU;
+			device = null;
+		} catch (RuntimeException error) {
+			// Nothing left to fall back to: stop retrying and let every remaining deep-zoom frame
+			// draw the source. The null handles make close() a no-op.
+			reopened = MAX_REOPEN_ATTEMPTS;
+			LOG.log(System.Logger.Level.WARNING,
+					"super-resolution CPU fallback failed, drawing the source: " + error);
+		}
+	}
+
+	/** The execution provider this engine's current session runs on. */
+	public OnnxExecutionProvider provider() {
+		return provider;
+	}
+
+	/** Whether the session is running on a GPU provider (what the export report states). */
+	public boolean hardwareAccelerated() {
+		return provider.hardware();
 	}
 
 	/** Inferences actually run (tests and the export report). */
@@ -263,8 +405,15 @@ public final class SuperResolutionEngine implements AutoCloseable {
 		cachedCrop = null;
 		cachedUpscaled = null;
 		cachedWindow = null;
-		api.releaseMemoryInfo(memoryInfo);
-		api.releaseSession(session);
+		// A failed CPU fallback leaves both handles null; releasing a null handle would crash.
+		if (memoryInfo.address() != 0) {
+			api.releaseMemoryInfo(memoryInfo);
+			memoryInfo = MemorySegment.NULL;
+		}
+		if (session.address() != 0) {
+			api.releaseSession(session);
+			session = MemorySegment.NULL;
+		}
 		api.close();
 	}
 }

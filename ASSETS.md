@@ -123,6 +123,25 @@ Licence texts for the bundled detection models ship beside them under
 `java/native/models/detection/notices/`. The GLiNER asset's licence is the checkpoint's own
 (Apache-2.0), and the download row in *Editor → Auto mask* records the pinned hash.
 
+## Inference runtime
+
+ONNX Runtime itself and its GPU plugin ship as native payload under
+`java/native/build/onnxruntime/lib/` (staged by `java/native/build-onnxruntime.sh`, pinned by
+SHA-256):
+
+| File | Size | License | Source |
+| --- | --- | --- | --- |
+| `libonnxruntime.so.1.31.1` | 29,345,384 B | MIT | [onnxruntime v1.31.1, linux-x64](https://github.com/microsoft/onnxruntime/releases/tag/v1.31.1) |
+| `libonnxruntime_providers_webgpu.so` | 16,613,128 B | MIT | [onnxruntime-ep-webgpu 0.5.0](https://pypi.org/project/onnxruntime-ep-webgpu/0.5.0/) `manylinux_2_28_x86_64` wheel |
+
+The WebGPU plugin is the vendor-neutral GPU execution provider for the optional deep-zoom
+upscaler: on Linux it runs through Dawn on **Vulkan**, so one library covers AMD (RADV/AMDVLK),
+Intel (ANV) and NVIDIA. It is registered into the stock runtime at startup and is not a second
+ONNX Runtime. The system Vulkan loader (`libvulkan.so.1`) is a runtime requirement and is **not**
+bundled — it must match the host driver. Without it (or without a GPU) the app stays on the CPU
+provider. The plugin is MIT licensed; its licence text ships with the wheel it is extracted from,
+and the staged `.so` is the only file distributed here.
+
 ## Logo
 
 `branding/gravaai.png` and `app-icons/gravaai-*.png` are the Gravaai logo and application

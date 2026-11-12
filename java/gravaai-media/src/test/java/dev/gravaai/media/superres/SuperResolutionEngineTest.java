@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Timeout;
 
 import dev.gravaai.media.compose.RgbaFrame;
 import dev.gravaai.media.compose.ZoomTransform;
+import dev.gravaai.media.onnx.OnnxExecutionProvider;
+import dev.gravaai.media.onnx.OnnxWebGpuPlugin;
 import dev.gravaai.media.superres.SuperResolution.Crop;
 import io.github.humbleui.types.Rect;
 
@@ -23,6 +25,9 @@ import io.github.humbleui.types.Rect;
  * The engine against the real pinned network: it opens the installed model, upscales exactly the
  * window it is given at 4&times;, and a held camera reuses its cached window instead of inferring
  * every frame.
+ *
+ * <p>Pinned to the CPU provider on purpose: this is the guaranteed-fallback path, it must pass on
+ * every machine, and the GPU path has its own opt-in suite ({@link SuperResolutionGpuTest}).</p>
  *
  * <p>Skipped unless a model is present: the test runs against {@code
  * -Dgravaai.superres.model=<file>} when set, otherwise the staged copy under
@@ -32,6 +37,9 @@ class SuperResolutionEngineTest {
 
 	private static final Rect SOURCE = Rect.makeXYWH(0, 0, 1920, 1080);
 	private static final Rect BOX = Rect.makeXYWH(0, 0, 1920, 1080);
+
+	private static final OnnxWebGpuPlugin.Selection CPU_ONLY =
+			new OnnxWebGpuPlugin.Selection(OnnxExecutionProvider.CPU, null, null);
 
 	private static Path modelFile() {
 		String configured = System.getProperty("gravaai.superres.model");
@@ -66,7 +74,7 @@ class SuperResolutionEngineTest {
 				"super-resolution model not staged at " + model);
 		RgbaFrame frame = testFrame(960, 540);
 
-		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model)) {
+		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, CPU_ONLY)) {
 			// The source is 960x540 stretched onto a 1920x1080 box: 2 screen px per source px.
 			Crop expected = SuperResolution.cropFor(
 					Rect.makeXYWH(0, 0, 960, 540), BOX,
@@ -105,7 +113,7 @@ class SuperResolutionEngineTest {
 		Assumptions.assumeTrue(Files.isRegularFile(model),
 				"super-resolution model not staged at " + model);
 		RgbaFrame frame = testFrame(960, 540);
-		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model)) {
+		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, CPU_ONLY)) {
 			assertNull(engine.upscaleFor(frame, Rect.makeXYWH(0, 0, 960, 540), BOX,
 					new ZoomTransform.AppliedTransform(1, 0, 0), 1920, 1080));
 			assertEquals(0, engine.inferenceCount());
@@ -120,7 +128,7 @@ class SuperResolutionEngineTest {
 		Assumptions.assumeTrue(Files.isRegularFile(model),
 				"super-resolution model not staged at " + model);
 		RgbaFrame frame = testFrame(960, 540);
-		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model)) {
+		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, CPU_ONLY)) {
 			var upscaled = engine.upscaleFor(frame, Rect.makeXYWH(0, 0, 960, 540), BOX,
 					new ZoomTransform.AppliedTransform(5, -4 * 960, -4 * 540), 1920, 1080);
 			assertNotNull(upscaled);

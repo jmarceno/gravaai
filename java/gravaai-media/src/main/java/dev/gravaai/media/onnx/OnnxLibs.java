@@ -70,6 +70,21 @@ public final class OnnxLibs {
 		}
 	}
 
+	/**
+	 * The directory the runtime was loaded from, loading it first when needed.
+	 *
+	 * <p>The WebGPU plugin lives beside {@code libonnxruntime.so}, and the plugin probe runs before
+	 * any session exists, so it needs the same directory {@link #ensureLoaded()} resolved.</p>
+	 */
+	public static synchronized Path ensureLoadedDirectory() {
+		ensureLoaded();
+		Path dir = libraryDir;
+		if (dir == null) {
+			throw new IllegalStateException("ONNX Runtime library directory is unknown after loading");
+		}
+		return dir;
+	}
+
 	/** The directory the library was loaded from, or {@code null} before loading. */
 	public static synchronized @Nullable Path libraryDir() {
 		return libraryDir;

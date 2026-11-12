@@ -46,7 +46,8 @@ class CompositorAnnotationTest {
 	private static AnnotationSpec text(long startMs, long endMs) {
 		return new AnnotationSpec("text", startMs, endMs, AnnotationSpec.Type.TEXT, "Hi", null,
 				new AnnotationSpec.Position(50, 50), new AnnotationSpec.Size(50, 30),
-				style(0xFFFFFFFF, 0xFFFF0000), 1, null, null, null, null, null);
+				style(0xFFFFFFFF, 0xFFFF0000), 1, null, null, null, null,
+				AnnotationSpec.Spotlight.DEFAULT);
 	}
 
 	private static byte[] greenPng() throws Exception {
@@ -66,20 +67,23 @@ class CompositorAnnotationTest {
 				+ Base64.getEncoder().encodeToString(greenPng());
 		return new AnnotationSpec("image", startMs, endMs, AnnotationSpec.Type.IMAGE, data, data,
 				new AnnotationSpec.Position(50, 50), new AnnotationSpec.Size(20, 20),
-				style(0xFFFFFFFF, null), 1, null, null, null, null, null);
+				style(0xFFFFFFFF, null), 1, null, null, null, null,
+				AnnotationSpec.Spotlight.DEFAULT);
 	}
 
 	private static AnnotationSpec figure(long startMs, long endMs) {
 		return new AnnotationSpec("figure", startMs, endMs, AnnotationSpec.Type.FIGURE, "", null,
 				new AnnotationSpec.Position(50, 50), new AnnotationSpec.Size(40, 40),
 				style(0xFFFFFFFF, null), 1,
-				new AnnotationSpec.Figure("down-right", 0xFFF97316, 8), null, null, null, null);
+				new AnnotationSpec.Figure("down-right", 0xFFF97316, 8), null, null, null,
+				AnnotationSpec.Spotlight.DEFAULT);
 	}
 
 	private static AnnotationSpec blur(long startMs, long endMs) {
 		return new AnnotationSpec("blur", startMs, endMs, AnnotationSpec.Type.BLUR, "", null,
 				new AnnotationSpec.Position(50, 50), new AnnotationSpec.Size(40, 40),
-				style(0xFFFFFFFF, null), 1, null, 45.0, null, null, null);
+				style(0xFFFFFFFF, null), 1, null, 45.0, null, null,
+				AnnotationSpec.Spotlight.DEFAULT);
 	}
 
 	private static FrameInput input(double timeSeconds, List<AnnotationSpec> annotations) {

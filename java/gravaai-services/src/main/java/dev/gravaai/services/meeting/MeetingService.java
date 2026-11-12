@@ -453,11 +453,12 @@ public final class MeetingService {
 	 * @param mediaPath the meeting recording
 	 * @param request the format and whether to append the transcript
 	 * @param destination the file to write
-	 * @param fallbackTitle the label for a meeting with no title and no date ("Meeting")
+	 * @param untitledLabel the localized label of an untitled meeting ("Meeting"); the title itself
+	 *     is built from the meeting's metadata
 	 */
 	public Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
-			MeetingNotesExport.Request request, Path destination, String fallbackTitle) {
-		return export.export(mediaPath, request, destination, fallbackTitle);
+			MeetingNotesExport.Request request, Path destination, String untitledLabel) {
+		return export.export(mediaPath, request, destination, untitledLabel);
 	}
 
 	// --- recording and lifecycle ------------------------------------------------------------

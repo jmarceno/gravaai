@@ -88,7 +88,8 @@ class ProjectPersistenceNormalizerTest {
 				null, null, AnnotationPosition.DEFAULT,
 				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
-				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, 2.5, null);
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, 2.5,
+				SpotlightData.DEFAULT);
 		String json = ProjectDocument.writeAnnotationRegions(List.of(loupe)).toString();
 
 		ProjectEditorState normalized = normalize("{\"annotationRegions\":" + json + "}");
@@ -98,7 +99,8 @@ class ProjectPersistenceNormalizerTest {
 				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
 				AnnotationTextStyle.defaultStyle(), 1, 0, null,
-				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, 2.5, null)),
+				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, 2.5,
+				SpotlightData.DEFAULT)),
 				normalized.annotationRegions());
 	}
 
@@ -136,13 +138,16 @@ class ProjectPersistenceNormalizerTest {
 				new SpotlightData(100, 0))),
 				normalized.annotationRegions());
 
-		// A non-spotlight annotation never carries the payload.
+		// A non-spotlight annotation never persists the payload, and reads back the defaults.
 		AnnotationRegion text = new AnnotationRegion("a2", 100, 900, AnnotationType.TEXT, "Hi",
 				"Hi", null, AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
-				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, null, null);
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, null,
+				new SpotlightData(10, 10));
 		String textJson = ProjectDocument.writeAnnotationRegions(List.of(text)).toString();
+		assertFalse(textJson.contains("spotlightData"));
 		ProjectEditorState textNormalized = normalize("{\"annotationRegions\":" + textJson + "}");
-		assertNull(textNormalized.annotationRegions().get(0).spotlightData());
+		assertEquals(SpotlightData.DEFAULT,
+				textNormalized.annotationRegions().get(0).spotlightData());
 	}
 
 	@Test

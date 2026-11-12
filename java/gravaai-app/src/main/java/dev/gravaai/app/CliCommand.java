@@ -37,11 +37,12 @@ public sealed interface CliCommand {
 	 *     {@code --list-windows}, or a title/app-id fragment to match, or empty to record a screen
 	 * @param systemAudio capture the default output's audio
 	 * @param microphone capture the default microphone
+	 * @param overwrite replace an existing {@code --out} file instead of refusing to start
 	 * @param json emit NDJSON events on stdout
 	 */
 	record Record(Optional<Long> duration, Optional<Path> out, Optional<String> screen,
-			Optional<String> window, boolean systemAudio, boolean microphone, boolean json)
-			implements CliCommand {
+			Optional<String> window, boolean systemAudio, boolean microphone, boolean overwrite,
+			boolean json) implements CliCommand {
 	}
 
 	/**
@@ -77,6 +78,18 @@ public sealed interface CliCommand {
 
 			public String extension() {
 				return extension;
+			}
+
+			/** The frame rates the export settings accept for this format. */
+			public List<Integer> frameRates() {
+				int[] rates = this == GIF
+						? dev.gravaai.core.editor.ExportPreferences.GIF_FRAME_RATES
+						: dev.gravaai.core.editor.ExportPreferences.MP4_FRAME_RATES;
+				return java.util.Arrays.stream(rates).boxed().toList();
+			}
+
+			boolean allowsFrameRate(int rate) {
+				return frameRates().contains(rate);
 			}
 
 			/** Parses {@code mp4}/{@code gif}; empty when the word is neither. */
@@ -161,12 +174,14 @@ public sealed interface CliCommand {
 		Optional<String> window = Optional.empty();
 		boolean systemAudio = false;
 		boolean microphone = false;
+		boolean overwrite = false;
 		boolean json = false;
 		int index = 1;
 		while (index < args.length) {
 			String arg = args[index];
 			switch (arg) {
 				case "--json" -> json = true;
+				case "--overwrite", "-y" -> overwrite = true;
 				case "--system-audio" -> systemAudio = true;
 				case "--mic", "--microphone" -> microphone = true;
 				case "--out" -> {
@@ -216,7 +231,8 @@ public sealed interface CliCommand {
 			// record something the script did not ask for.
 			return Result.err("--screen and --window are mutually exclusive");
 		}
-		return Result.ok(new Record(duration, out, screen, window, systemAudio, microphone, json));
+		return Result.ok(new Record(duration, out, screen, window, systemAudio, microphone,
+				overwrite, json));
 	}
 
 	private static Result<Export> parseExport(String[] args) {
@@ -269,9 +285,9 @@ public sealed interface CliCommand {
 					String value = args[index];
 					try {
 						int rate = Integer.parseInt(value.trim());
-						if (rate <= 0 || rate > 120) {
-							return Result.err("--fps must be between 1 and 120, got \"" + value
-									+ "\"");
+						if (rate <= 0) {
+							return Result.err("--fps must be a positive whole number, got \""
+									+ value + "\"");
 						}
 						frameRate = Optional.of(rate);
 					} catch (NumberFormatException error) {
@@ -296,6 +312,12 @@ public sealed interface CliCommand {
 			return Result.err(
 					"export needs a project path: gravaai export <project.gravaai> --out <file>");
 		}
+		if (frameRate.isPresent() && !format.allowsFrameRate(frameRate.get())) {
+			// The export settings only store these rates; anything else would silently fall back
+			// to the default rate instead of the one the script asked for.
+			return Result.err("--fps for " + format.wire() + " must be one of "
+					+ format.frameRates() + ", got " + frameRate.get());
+		}
 		Path destination = out.isPresent()
 				? out.get()
 				: withExtension(project.get(), format.extension());
@@ -310,25 +332,21 @@ public sealed interface CliCommand {
 
 	/** {@code 30}, {@code 2.5}, {@code 90s}, {@code 1m30s} to whole seconds; empty when unusable. */
 	static Optional<Long> parseDurationSeconds(String value) {
-		String remainder = value.trim().toLowerCase(Locale.ROOT);
-		String minutes = remainder;
-		double total = 0;
-		try {
-			int minutesMark = remainder.indexOf('m');
-			if (minutesMark >= 0) {
-				total += Double.parseDouble(remainder.substring(0, minutesMark)) * 60;
-				minutes = remainder.substring(minutesMark + 1);
-			}
-			String seconds = minutes.replace("s", "");
-			if (!seconds.isEmpty()) {
-				total += Double.parseDouble(seconds);
-			}
-		} catch (NumberFormatException error) {
+		java.util.regex.Matcher match = DURATION.matcher(value.trim().toLowerCase(Locale.ROOT));
+		if (!match.matches()) {
+			// "1s30", "1ms" or "-5" are not durations; guessing would record for the wrong time.
 			return Optional.empty();
 		}
-		long whole = Math.round(total);
+		// Matcher.group answers null for a group that did not take part in the match.
+		double minutes = Optional.ofNullable(match.group(1)).map(Double::parseDouble).orElse(0.0);
+		double seconds = Optional.ofNullable(match.group(2)).map(Double::parseDouble).orElse(0.0);
+		long whole = Math.round(minutes * 60 + seconds);
 		return whole > 0 ? Optional.of(whole) : Optional.empty();
 	}
+
+	/** {@code [<n>m][<n>[s]]}: optional minutes, then optional seconds with an optional unit. */
+	java.util.regex.Pattern DURATION = java.util.regex.Pattern.compile(
+			"(?:(\\d+(?:\\.\\d+)?)m)?(?:(\\d+(?:\\.\\d+)?)s?)?");
 
 	/** The extension without the dot; empty when the name has none. */
 	static Optional<String> extensionOf(String path) {

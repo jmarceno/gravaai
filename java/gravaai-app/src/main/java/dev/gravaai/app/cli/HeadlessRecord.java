@@ -1,20 +1,14 @@
 package dev.gravaai.app.cli;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -127,15 +121,27 @@ final class HeadlessRecord {
 	private int record(CliCommand.Record request, CosmicRecorder recorder,
 			CursorCaptureSession cursorSession, AtomicReference<SelectedSource> selected)
 			throws IOException {
+		Optional<Path> destination = request.out().map(out -> out.toAbsolutePath().normalize());
+		if (destination.isPresent() && Files.exists(destination.get()) && !request.overwrite()) {
+			// Refused before recording: finding out after a long take would lose it or the file.
+			return fail("destination already exists: " + destination.get()
+					+ " (pass --overwrite to replace it)");
+		}
 		SelectedSource source;
 		String label;
 		if (request.window().isPresent()) {
-			SelectedSource window = pickWindow(recorder, request.window().get());
-			if (window == null) {
-				return fail("no window matches \"" + request.window().get() + "\"");
+			List<WindowSources.CaptureWindow> windows = recorder.listCaptureWindows();
+			if (windows.isEmpty()) {
+				return fail("the compositor reported no windows to record (window capture needs "
+						+ "ext-foreign-toplevel-list and toplevel image capture)");
 			}
-			source = window;
-			label = window.name();
+			Optional<SelectedSource> window = pickWindow(windows, request.window().get());
+			if (window.isEmpty()) {
+				return fail("no window matches \"" + request.window().get() + "\"; available: "
+						+ windows.stream().map(WindowSources::label).toList());
+			}
+			source = window.get();
+			label = source.name();
 		} else {
 			List<CosmicOutput> outputs = recorder.listCosmicOutputs();
 			Optional<CosmicOutput> target = pickOutput(outputs, request.screen());
@@ -151,39 +157,54 @@ final class HeadlessRecord {
 		}
 		selected.set(source);
 
-		StartResult started = recorder.startCosmicRecording(source,
-				new RecordingOptions(request.systemAudio(), request.microphone(), null, null,
-						false));
-		if (!started.success()) {
-			return fail("could not start the recording: " + started.message());
+		// Armed before the start, released only after the result is reported: from the moment a
+		// capture can exist, a signal finalises it instead of killing the process under it.
+		try (TakeStop stop = TakeStop.arm()) {
+			StartResult started = recorder.startCosmicRecording(source,
+					new RecordingOptions(request.systemAudio(), request.microphone(), null, null,
+							false));
+			if (!started.success()) {
+				return fail("could not start the recording: " + started.message());
+			}
+			StopResult result;
+			try {
+				// The HUD starts sampling once the recorder has grabbed the first frame; the
+				// sidecar writer shifts the samples by the difference, so this order anchors the
+				// cursor.
+				cursorSession.start();
+				events.emit(CliEvents.Event.RECORD_START, Map.of(
+						"source", label,
+						"window", source.sourceType() == dev.gravaai.services.sources.SourceType.WINDOW,
+						"durationSeconds", request.duration().orElse(0L),
+						"systemAudio", request.systemAudio(),
+						"microphone", request.microphone()));
+				events.note("recording " + label + " ("
+						+ request.duration().map(seconds -> seconds + " s").orElse("until interrupted")
+						+ ")");
+				if (stop.awaitStop(request.duration()) == TakeStop.Cause.SIGNAL) {
+					events.note("stopping: finalising the recording");
+				}
+			} finally {
+				// Whatever ended the take (the duration, a signal or an error above), a started
+				// capture is always stopped and finalised: never left running past the CLI.
+				result = recorder.stopCosmicRecording();
+				cursorSession.stop();
+			}
+			return finish(result, destination);
 		}
-		// The HUD starts sampling once the recorder has grabbed the first frame; the sidecar writer
-		// shifts the samples by the difference, so this order anchors the cursor.
-		cursorSession.start();
+	}
 
-		events.emit("record_start", Map.of(
-				"source", label,
-				"window", source.sourceType() == dev.gravaai.services.sources.SourceType.WINDOW,
-				"durationSeconds", request.duration().orElse(0L),
-				"systemAudio", request.systemAudio(),
-				"microphone", request.microphone()));
-		events.note("recording " + label + " ("
-				+ request.duration().map(seconds -> seconds + " s").orElse("until interrupted")
-				+ ")");
-
-		if (awaitStop(request.duration())) {
-			events.note("stopping: finalising the recording");
-		}
-		StopResult result = recorder.stopCosmicRecording();
-		cursorSession.stop();
-		if (!result.success() || result.path() == null) {
+	/** Moves a finalised take to {@code --out} and reports it. */
+	private int finish(StopResult result, Optional<Path> destination) throws IOException {
+		// StopResult is the recorder's nullable port record; a successful stop always has a path.
+		String savedPath = result.path();
+		if (!result.success() || savedPath == null) {
 			return fail("could not finalise the recording: " + result.error());
 		}
-		Path saved = Path.of(result.path());
-		if (request.out().isPresent()) {
-			Path destination = request.out().get().toAbsolutePath().normalize();
-			moveRecordingBundle(saved, destination);
-			saved = destination;
+		Path saved = Path.of(savedPath);
+		if (destination.isPresent()) {
+			moveRecordingBundle(saved, destination.get());
+			saved = destination.get();
 		}
 		Map<String, Object> facts = new LinkedHashMap<>();
 		facts.put("cursorTelemetry",
@@ -196,7 +217,7 @@ final class HeadlessRecord {
 	}
 
 	private int fail(String message) {
-		events.emit("error", Map.of("message", message));
+		events.emit(CliEvents.Event.ERROR, Map.of("message", message));
 		events.note("gravaai record: " + message);
 		return 1;
 	}
@@ -217,39 +238,6 @@ final class HeadlessRecord {
 	}
 
 	/**
-	 * Waits for the duration or for a signal, answering true when a signal stopped it early.
-	 *
-	 * <p>The handler is a shutdown hook so {@code Ctrl-C} and {@code kill} behave like the HUD's stop
-	 * button: the recording is finalised before the JVM exits.
-	 */
-	private static boolean awaitStop(Optional<Long> durationSeconds) {
-		CountDownLatch stop = new CountDownLatch(1);
-		AtomicBoolean interrupted = new AtomicBoolean();
-		Thread hook = new Thread(() -> {
-			interrupted.set(true);
-			stop.countDown();
-		}, "gravaai-cli-record-stop");
-		Runtime.getRuntime().addShutdownHook(hook);
-		try {
-			if (durationSeconds.isPresent()) {
-				stop.await(durationSeconds.get(), TimeUnit.SECONDS);
-			} else {
-				stop.await();
-			}
-		} catch (InterruptedException error) {
-			Thread.currentThread().interrupt();
-			interrupted.set(true);
-		} finally {
-			try {
-				Runtime.getRuntime().removeShutdownHook(hook);
-			} catch (IllegalStateException shuttingDown) {
-				// The JVM is already exiting: the hook either ran or is about to.
-			}
-		}
-		return interrupted.get();
-	}
-
-	/**
 	 * The window a {@code --window} request names.
 	 *
 	 * <p>The argument is matched against the compositor's stable identifiers first (the exact
@@ -258,43 +246,31 @@ final class HeadlessRecord {
 	 * instead of picking one of the candidates: a script that records the wrong window is worse
 	 * than a script that stops.
 	 *
-	 * @return the window source, or null when nothing matches
+	 * @param windows the compositor's current windows
+	 * @return the window source; empty when nothing matches
 	 * @throws IOException when several windows match, listing them
 	 */
-	private static @Nullable SelectedSource pickWindow(CosmicRecorder recorder, String requested)
-			throws IOException {
-		List<WindowSources.CaptureWindow> windows = recorder.listCaptureWindows();
-		if (windows.isEmpty()) {
-			return null;
-		}
-		String wanted = requested;
-		if (requested.startsWith(WindowSources.WINDOW_SOURCE_PREFIX)) {
-			String identifier = WindowSources.windowIdentifier(requested);
-			if (identifier != null) {
-				wanted = identifier;
-			}
-		}
-		for (WindowSources.CaptureWindow window : windows) {
-			if (window.identifier().equals(wanted)) {
-				return CaptureSelection.asWindowSource(window);
-			}
+	static Optional<SelectedSource> pickWindow(List<WindowSources.CaptureWindow> windows,
+			String requested) throws IOException {
+		String wanted = WindowSources.windowIdentifier(requested).orElse(requested);
+		Optional<WindowSources.CaptureWindow> exact = windows.stream()
+				.filter(window -> window.identifier().equals(wanted))
+				.findFirst();
+		if (exact.isPresent()) {
+			return exact.map(CaptureSelection::asWindowSource);
 		}
 		String needle = wanted.toLowerCase(Locale.ROOT);
-		List<WindowSources.CaptureWindow> matches = new ArrayList<>();
-		for (WindowSources.CaptureWindow window : windows) {
-			boolean titleMatches = window.title().toLowerCase(Locale.ROOT).contains(needle);
-			boolean appMatches = window.appId() != null
-					&& window.appId().toLowerCase(Locale.ROOT).contains(needle);
-			if (titleMatches || appMatches) {
-				matches.add(window);
-			}
-		}
+		List<WindowSources.CaptureWindow> matches = windows.stream()
+				.filter(window -> window.title().toLowerCase(Locale.ROOT).contains(needle)
+						|| window.appId().map(app -> app.toLowerCase(Locale.ROOT).contains(needle))
+								.orElse(false))
+				.toList();
 		if (matches.size() > 1) {
 			throw new IOException("several windows match \"" + requested + "\": "
 					+ matches.stream().map(WindowSources::label).toList()
 					+ " (use an identifier from --list-windows)");
 		}
-		return matches.size() == 1 ? CaptureSelection.asWindowSource(matches.getFirst()) : null;
+		return matches.stream().findFirst().map(CaptureSelection::asWindowSource);
 	}
 
 	/** The requested output by name, the first one when unnamed, or empty when the name is gone. */

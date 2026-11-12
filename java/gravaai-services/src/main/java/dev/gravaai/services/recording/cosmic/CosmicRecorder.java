@@ -224,7 +224,17 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		}
 		CaptureFormat format;
 		try {
-			format = video.readCaptureFormat(capture, cursorTelemetry::onCaptureCursorPoint);
+			format = video.readCaptureFormat(capture, new CosmicVideoPipeline.CaptureStreamListener() {
+				@Override
+				public void onPoint(double cx, double cy) {
+					cursorTelemetry.onCaptureCursorPoint(cx, cy);
+				}
+
+				@Override
+				public void onSurface(WindowSources.CaptureSurface surface) {
+					cursorTelemetry.onCaptureSurface(surface);
+				}
+			});
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);

@@ -262,9 +262,8 @@ public final class ProjectEditorInputs {
 						data.arrowDirection() == null ? null : data.arrowDirection().wire(),
 						parseColour(data.color()), data.strokeWidth());
 			}
-			AnnotationSpec.Spotlight spotlight = region.spotlightData() == null ? null
-					: new AnnotationSpec.Spotlight(region.spotlightData().dimPercent(),
-							region.spotlightData().featherPercent());
+			AnnotationSpec.Spotlight spotlight = new AnnotationSpec.Spotlight(
+					region.spotlightData().dimPercent(), region.spotlightData().featherPercent());
 			boolean underline = style.textDecoration()
 					== dev.gravaai.core.project.AnnotationTextStyle.TextDecoration.UNDERLINE;
 			specs.add(new AnnotationSpec(

@@ -31,6 +31,8 @@
 #include <pipewire/pipewire.h>
 #include <pipewire/loop.h>
 #include <spa/buffer/buffer.h>
+#include <spa/buffer/meta.h>
+#include <spa/param/buffers.h>
 #include <spa/param/props.h>
 #include <spa/param/video/format-utils.h>
 #include <spa/param/video/raw-utils.h>
@@ -676,9 +678,30 @@ static int writing_buffer = -1;
 static size_t buffer_bytes;
 static int frame_width, frame_height;
 static bool frame_announced;
+static bool format_reported;
+
+/* Room for the cursor metadata plus a bitmap of up to w x h pixels (the producer may attach the
+ * cursor image; only the position is read). */
+#define CURSOR_META_SIZE(w, h) \
+	(sizeof(struct spa_meta_cursor) + sizeof(struct spa_meta_bitmap) + (size_t)(w) * (h) * 4u)
+
+/* Asks the producer to attach SPA_META_Cursor to every buffer. cursor_mode=metadata only tells
+ * the portal not to burn the pointer into the frames; the stream still has to request the meta
+ * itself, or the buffers never carry it and every window take falls back to the frame centre. */
+static void request_cursor_metadata(struct pw_stream *stream) {
+	uint8_t storage[256];
+	struct spa_pod_builder builder = SPA_POD_BUILDER_INIT(storage, sizeof(storage));
+	const struct spa_pod *params[1];
+	params[0] = spa_pod_builder_add_object(&builder,
+			SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+			SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Cursor),
+			SPA_PARAM_META_size, SPA_POD_CHOICE_RANGE_Int(
+				(int)CURSOR_META_SIZE(64, 64), (int)CURSOR_META_SIZE(1, 1),
+				(int)CURSOR_META_SIZE(256, 256)));
+	pw_stream_update_params(stream, params, 1);
+}
 
 static void on_param_changed(void *data, uint32_t id, const struct spa_pod *param) {
-	(void)data;
 	if (param == NULL || id != SPA_PARAM_Format)
 		return;
 	struct spa_video_info info;
@@ -718,8 +741,14 @@ static void on_param_changed(void *data, uint32_t id, const struct spa_pod *para
 	/* The size the compositor captures at now; a shared window changes it. */
 	frame_width = width;
 	frame_height = height;
-	bool first = latest_buffer < 0 && writing_buffer < 0;
+	/* The canvas never changes size, so it is announced exactly once: a renegotiation before
+	 * the first frame (common while a stream starts) must not print a second FORMAT. */
+	bool first = !format_reported;
+	format_reported = true;
 	pthread_mutex_unlock(&frame_lock);
+
+	if (cursor_metadata_requested)
+		request_cursor_metadata((struct pw_stream *)data);
 
 	if (first) {
 		/* No transform: the compositor already applies rotation. */
@@ -760,12 +789,21 @@ static void on_process(void *data) {
 			while (spare == latest_buffer || spare == writing_buffer)
 				spare++;
 			unsigned char *staging = buffers[spare];
-			if (staging != NULL && buffer_bytes > 0 && frame_width > 0 && frame_height > 0) {
-				int stride = chunk->stride > 0 ? chunk->stride : frame_width * 4;
+			size_t stride = chunk->stride > 0 ? (size_t)chunk->stride : (size_t)frame_width * 4u;
+			size_t row = (size_t)frame_width * 4u;
+			/* The bytes a frame of the negotiated size needs. During a resize the format is
+			 * renegotiated while buffers of the old size are still in flight, so a buffer can be
+			 * smaller than frame_width x frame_height claims; composing it would read past its
+			 * end. Such a frame is skipped and the previous one keeps the clock fed. */
+			size_t needed = frame_height > 0 ? stride * (size_t)(frame_height - 1) + row : 0;
+			bool fits = stride >= row && needed > 0 && chunk->size >= needed
+					&& (size_t)chunk->offset + needed <= spa_data->maxsize;
+			if (staging != NULL && buffer_bytes > 0 && frame_width > 0 && fits) {
 				/* Pack and fit into the canvas in one pass: the source may be smaller,
 				 * larger or a different aspect than the first frame. */
-				capture_canvas_compose(&canvas, staging, (const unsigned char *)spa_data->data,
-						(size_t)stride, (uint32_t)frame_width, (uint32_t)frame_height);
+				capture_canvas_compose(&canvas, staging,
+						(const unsigned char *)spa_data->data + chunk->offset, stride,
+						(uint32_t)frame_width, (uint32_t)frame_height);
 				/* Publish it: the writer picks up this frame next tick. */
 				latest_buffer = spare;
 			}

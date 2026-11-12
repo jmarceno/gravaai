@@ -54,10 +54,10 @@ public interface MeetingUiService {
 	/**
 	 * Exports the meeting's notes (and optionally its transcript) as a document.
 	 *
-	 * @param fallbackTitle the label for a meeting with no title and no date ("Meeting")
+	 * @param untitledLabel the localized label of an untitled meeting ("Meeting"), not the title
 	 */
 	Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
-			MeetingNotesExport.Request request, Path destination, String fallbackTitle);
+			MeetingNotesExport.Request request, Path destination, String untitledLabel);
 
 	Result<MeetingJob> runJob(Path mediaPath, MeetingJobMode mode);
 

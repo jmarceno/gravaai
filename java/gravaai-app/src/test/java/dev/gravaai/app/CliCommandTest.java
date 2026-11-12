@@ -129,6 +129,10 @@ class CliCommandTest {
 		assertTrue(usage("export", "a.gravaai", "--preset", "8k").contains("--preset"));
 		assertTrue(usage("export", "a.gravaai", "--fps", "0").contains("--fps"));
 		assertTrue(usage("export", "a.gravaai", "--fps", "abc").contains("--fps"));
+		// A rate the export settings cannot store would silently become the default one.
+		assertTrue(usage("export", "a.gravaai", "--fps", "45").contains("24, 30, 60"));
+		assertTrue(usage("export", "a.gravaai", "--format", "gif", "--out", "a.gif", "--fps", "60")
+				.contains("15, 20, 25, 30"));
 		assertTrue(usage("export", "a.gravaai", "--out").contains("--out needs"));
 	}
 
@@ -153,7 +157,9 @@ class CliCommandTest {
 		assertEquals(Optional.of("DP-1"), record.screen());
 		assertEquals(true, record.systemAudio());
 		assertEquals(true, record.microphone());
+		assertEquals(false, record.overwrite());
 		assertEquals(true, record.json());
+		assertEquals(true, record("record", "--out", "demo.mp4", "--overwrite").overwrite());
 	}
 
 	@Test
@@ -167,6 +173,10 @@ class CliCommandTest {
 		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds("0"));
 		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds("-5"));
 		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds("soon"));
+		// Misplaced units are refused rather than read as some other length.
+		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds("1s30"));
+		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds("1ms"));
+		assertEquals(Optional.empty(), CliCommand.parseDurationSeconds(""));
 	}
 
 	@Test

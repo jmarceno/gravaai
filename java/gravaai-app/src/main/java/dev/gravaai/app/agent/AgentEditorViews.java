@@ -389,8 +389,8 @@ final class AgentEditorViews {
 			// A spotlight keeps its box and reports its dim/feather so the agent can read them.
 			String payload = annotation.type() == dev.gravaai.core.project.AnnotationType.SPOTLIGHT
 					? String.format(java.util.Locale.ROOT, " dim %.0f feather %.0f",
-							annotation.spotlightDataOrDefault().dimPercent(),
-							annotation.spotlightDataOrDefault().featherPercent())
+							annotation.spotlightData().dimPercent(),
+							annotation.spotlightData().featherPercent())
 					: "";
 			lines.add("  " + ids.annotationShortById().getOrDefault(annotation.id(), "?") + " "
 					+ seconds(annotation.startMs()) + "\u2013" + seconds(annotation.endMs()) + " "

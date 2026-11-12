@@ -753,12 +753,9 @@ public final class ProjectPersistence {
 				continue;
 			}
 			Span span = normalizeSpan(region);
-			String rawType = text(field(region, "type"));
-			AnnotationType type = "image".equals(rawType) ? AnnotationType.IMAGE
-					: "figure".equals(rawType) ? AnnotationType.FIGURE
-					: "blur".equals(rawType) ? AnnotationType.BLUR
-					: "loupe".equals(rawType) ? AnnotationType.LOUPE
-					: "spotlight".equals(rawType) ? AnnotationType.SPOTLIGHT : AnnotationType.TEXT;
+			// An unknown or missing type reads as text, as the TS normaliser does.
+			AnnotationType type = AnnotationType.parse(text(field(region, "type")))
+					.orElse(AnnotationType.TEXT);
 
 			JsonNode positionNode = field(region, "position");
 			double positionX = isFiniteNumber(field(positionNode, "x"))
@@ -809,26 +806,22 @@ public final class ProjectPersistence {
 	}
 
 	/**
-	 * The spotlight payload of an annotation: clamped for spotlights (defaulting when absent),
-	 * {@code null} for every other type. The record's constructor clamps, so this only has to
-	 * fall back to the defaults.
+	 * The spotlight payload of an annotation: the stored values for a spotlight (each missing one
+	 * defaulting), the defaults for every other type. The record's constructor clamps, so this only
+	 * has to fall back to the defaults.
 	 */
-	private static @Nullable SpotlightData normalizeSpotlightData(AnnotationType type,
-			JsonNode region) {
-		if (type != AnnotationType.SPOTLIGHT) {
-			return null;
-		}
+	private static SpotlightData normalizeSpotlightData(AnnotationType type, JsonNode region) {
 		JsonNode spotlight = field(region, "spotlightData");
-		if (spotlight == null || !spotlight.isObject()) {
+		if (type != AnnotationType.SPOTLIGHT || spotlight == null || !spotlight.isObject()) {
 			return SpotlightData.DEFAULT;
 		}
 		return new SpotlightData(
 				isFiniteNumber(field(spotlight, "dimPercent"))
 						? field(spotlight, "dimPercent").doubleValue()
-						: AnnotationRegion.SPOTLIGHT_DEFAULT_DIM_PERCENT,
+						: SpotlightData.DEFAULT.dimPercent(),
 				isFiniteNumber(field(spotlight, "featherPercent"))
 						? field(spotlight, "featherPercent").doubleValue()
-						: AnnotationRegion.SPOTLIGHT_DEFAULT_FEATHER_PERCENT);
+						: SpotlightData.DEFAULT.featherPercent());
 	}
 
 	private static AnnotationTextStyle normalizeAnnotationStyle(JsonNode rawStyle) {

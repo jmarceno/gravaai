@@ -8,6 +8,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Meeting labels and formatters shared by the UI and the document export. The UI layer used to own
@@ -16,6 +18,10 @@ import java.util.Locale;
  *
  * <p>The one UI-owned input is the localized fallback label ("Meeting"), which the caller passes
  * in: services have no dependency on the translation lookup.
+ *
+ * <p>The {@link MeetingMeta} fields are nullable (they mirror the stored JSON, where every field is
+ * optional), so the inputs here accept null; every answer that may be absent is an
+ * {@link Optional}.
  */
 public final class MeetingTexts {
 
@@ -29,71 +35,73 @@ public final class MeetingTexts {
 	 * The meeting's display title: the saved title, else the creation date/time, else the fallback
 	 * label.
 	 *
-	 * @param meta the meeting metadata, or null when it could not be read
-	 * @param fallbackMs a creation time to use when the metadata has none, or null
+	 * @param meta the meeting metadata, or empty when it could not be read
+	 * @param fallbackMs a creation time to use when the metadata has none
 	 * @param fallbackLabel the label for a meeting with no title and no date ("Meeting")
 	 */
-	public static String meetingTitle(@Nullable MeetingMeta meta, @Nullable Long fallbackMs,
-			String fallbackLabel) {		if (meta != null && meta.title() != null && !meta.title().trim().isEmpty()) {
-			return meta.title().trim();
+	public static String meetingTitle(Optional<MeetingMeta> meta, OptionalLong fallbackMs,
+			String fallbackLabel) {
+		Optional<String> title = meta.map(MeetingMeta::title).map(String::trim)
+				.filter(value -> !value.isEmpty());
+		if (title.isPresent()) {
+			return title.get();
 		}
-		Long created = meta == null ? null : epochMillis(meta.createdAt());
-		if (created == null) {
-			created = fallbackMs;
-		}
-		if (created == null) {
+		OptionalLong created = meta.map(value -> epochMillis(value.createdAt()))
+				.filter(OptionalLong::isPresent)
+				.orElse(fallbackMs);
+		if (created.isEmpty()) {
 			return fallbackLabel;
 		}
-		LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(created),
+		LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(created.getAsLong()),
 				ZoneId.systemDefault());
 		return fallbackLabel + " " + DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
 				.withLocale(Locale.getDefault()).format(date) + " " + TIME.format(date);
 	}
 
-	/** The ISO creation time as epoch milliseconds, or null when absent or unreadable. */
-	static @Nullable Long epochMillis(@Nullable String iso) {
+	/** The ISO creation time as epoch milliseconds; empty when absent or unreadable. */
+	static OptionalLong epochMillis(@Nullable String iso) {
 		if (iso == null || iso.isBlank()) {
-			return null;
+			return OptionalLong.empty();
 		}
 		try {
-			return Instant.parse(iso).toEpochMilli();
+			return OptionalLong.of(Instant.parse(iso).toEpochMilli());
 		} catch (RuntimeException error) {
-			return null;
+			return OptionalLong.empty();
 		}
 	}
 
-	/** "1 h 5 min", "5 min 3 s", "3 s", or null when the duration is unknown or zero. */
-	public static @Nullable String formatDuration(@Nullable Long ms) {
+	/** "1 h 5 min", "5 min 3 s", "3 s"; empty when the duration is unknown or zero. */
+	public static Optional<String> formatDuration(@Nullable Long ms) {
 		if (ms == null || ms == 0) {
-			return null;
+			return Optional.empty();
 		}
 		long total = Math.round(ms / 1000.0);
 		long hours = total / 3600;
 		long minutes = (total % 3600) / 60;
 		long seconds = total % 60;
 		if (hours > 0) {
-			return hours + " h " + minutes + " min";
+			return Optional.of(hours + " h " + minutes + " min");
 		}
-		return minutes > 0 ? minutes + " min " + seconds + " s" : seconds + " s";
+		return Optional.of(minutes > 0 ? minutes + " min " + seconds + " s" : seconds + " s");
 	}
 
 	/**
-	 * The meeting date and time in the user's locale, or null when the metadata carries no
-	 * readable timestamp.
+	 * The meeting date and time in the user's locale; empty when the metadata carries no readable
+	 * timestamp.
 	 */
-	public static @Nullable String formatDateTime(@Nullable String iso) {
-		Long millis = epochMillis(iso);
-		if (millis == null) {
-			return null;
+	public static Optional<String> formatDateTime(@Nullable String iso) {
+		OptionalLong millis = epochMillis(iso);
+		if (millis.isEmpty()) {
+			return Optional.empty();
 		}
-		LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis),
+		LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis.getAsLong()),
 				ZoneId.systemDefault());
-		return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-				.withLocale(Locale.getDefault()).format(date);
+		return Optional.of(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+				.withLocale(Locale.getDefault()).format(date));
 	}
 
 	/** "1.2 GB" or "574 MB". */
-	public static @Nullable String formatSize(long bytes) {
+	public static String formatSize(long bytes) {
 		return bytes >= 1_000_000_000L
 				? String.format(Locale.ROOT, "%.1f GB", bytes / 1_000_000_000.0)
 				: Math.round(bytes / 1_000_000.0) + " MB";

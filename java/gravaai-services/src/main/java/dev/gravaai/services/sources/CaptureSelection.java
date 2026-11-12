@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
@@ -77,7 +78,8 @@ public final class CaptureSelection {
 			return SelectedSource.screen(candidate.id(), "System picker", null);
 		}
 		if (WindowSources.isWindowSourceId(candidate.id())) {
-			return validateWindowSource(candidate);
+			// validate() keeps the ported nullable contract its callers handle ("refused").
+			return validateWindowSource(candidate).orElse(null);
 		}
 		if (!CosmicSources.isCosmicSourceId(candidate.id())) {
 			return null;
@@ -164,37 +166,38 @@ public final class CaptureSelection {
 	 * <p>An identifier that is no longer mapped means the window was closed, so it is refused
 	 * rather than substituted — the same rule the monitor path follows.
 	 */
-	private @Nullable SelectedSource validateWindowSource(SelectedSource candidate) {
-		String identifier = WindowSources.windowIdentifier(candidate.id());
-		if (identifier == null) {
+	private Optional<SelectedSource> validateWindowSource(SelectedSource candidate) {
+		Optional<String> identifier = WindowSources.windowIdentifier(candidate.id());
+		if (identifier.isEmpty()) {
 			// The portal's "the user picks a window" source has no identifier to check, and no
 			// list to check it against: the dialog decides at capture time.
 			return candidate.sourceType() == SourceType.WINDOW
-					? SelectedSource.window(candidate.id(), candidate.name(), candidate.displayId(),
-							candidate.appName(), candidate.windowTitle() == null ? "" : candidate.windowTitle())
-					: null;
+					? Optional.of(SelectedSource.window(candidate.id(), candidate.name(),
+							candidate.displayId(), candidate.appName(),
+							candidate.windowTitle() == null ? "" : candidate.windowTitle()))
+					: Optional.empty();
 		}
 		List<WindowSources.CaptureWindow> windows;
 		try {
 			windows = captureWindows.list();
 		} catch (Exception error) {
-			return null;
+			// No list means nothing can be verified: refuse rather than record blind.
+			return Optional.empty();
 		}
-		for (WindowSources.CaptureWindow window : windows) {
-			if (window.identifier().equals(identifier)) {
-				return asWindowSource(window);
-			}
-		}
-		return null;
+		return windows.stream()
+				.filter(window -> window.identifier().equals(identifier.get()))
+				.findFirst()
+				.map(CaptureSelection::asWindowSource);
 	}
 
 	/** One compositor window as a selected source. */
 	public static SelectedSource asWindowSource(WindowSources.CaptureWindow window) {
+		// SelectedSource is the selection port's record, where an absent app name is null.
 		return SelectedSource.window(
 				WindowSources.windowSourceId(window.identifier()),
 				WindowSources.label(window),
 				null,
-				window.appId(),
+				window.appId().orElse(null),
 				window.title());
 	}
 

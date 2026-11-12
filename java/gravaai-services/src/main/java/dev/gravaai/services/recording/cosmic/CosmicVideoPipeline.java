@@ -22,6 +22,7 @@ import dev.gravaai.media.export.VideoEncoderArguments;
 import dev.gravaai.media.export.VideoEncoderProbe;
 import dev.gravaai.media.export.VideoEncoderSpec;
 import dev.gravaai.services.recording.RecordingQuality;
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
@@ -48,6 +49,8 @@ final class CosmicVideoPipeline {
 	private static final Pattern FORMAT_LINE = Pattern.compile("^FORMAT (\\d+) (\\d+) (\\w+) (\\d+)$");
 	/** The compositor's pointer reading, normalized to the recorded frame. */
 	private static final Pattern CURSOR_LINE = Pattern.compile("^CURSOR (\\d+(?:\\.\\d+)?) (\\d+(?:\\.\\d+)?)$");
+	/** What the stream records: {@code monitor} or {@code window}. */
+	private static final Pattern SOURCE_LINE = Pattern.compile("^SOURCE (\\w+)$");
 	private static final int COPY_BUFFER_BYTES = 4 * 1024 * 1024;
 
 	private final RecordingProcesses processes;
@@ -105,7 +108,7 @@ final class CosmicVideoPipeline {
 	 *
 	 * @param cursor receives each normalized position, on the caller's thread or the drain thread
 	 */
-	CaptureFormat readCaptureFormat(SpawnedProcess capture, CaptureCursorListener cursor)
+	CaptureFormat readCaptureFormat(SpawnedProcess capture, CaptureStreamListener cursor)
 			throws IOException {
 		InputStream helperErrors = capture.stderr();
 		if (helperErrors == null) {
@@ -116,7 +119,6 @@ final class CosmicVideoPipeline {
 		StringBuilder stderr = new StringBuilder();
 		String line;
 		while ((line = reader.readLine()) != null) {
-			stderr.append(line).append('\n');
 			Matcher match = FORMAT_LINE.matcher(line);
 			if (match.matches()) {
 				Thread.ofPlatform().daemon().name("gravaai-capture-log")
@@ -127,25 +129,51 @@ final class CosmicVideoPipeline {
 						match.group(3),
 						Integer.parseInt(match.group(4)));
 			}
-			Matcher pointer = CURSOR_LINE.matcher(line);
-			if (pointer.matches()) {
-				cursor.onPoint(Double.parseDouble(pointer.group(1)),
-						Double.parseDouble(pointer.group(2)));
+			// Protocol lines are forwarded, never kept as error text: an early exit must report
+			// what the helper said went wrong, not the pointer readings that preceded it.
+			if (!forwardProtocolLine(line, cursor)) {
+				stderr.append(line).append('\n');
 			}
 		}
 		String text = stderr.toString().trim();
 		throw new IOException(text.isEmpty() ? "The screen capture helper exited early." : text);
 	}
 
-	/** Receives each pointer position a capture helper measures inside the recorded surface. */
+	/**
+	 * Hands a {@code CURSOR x y} or {@code SOURCE monitor|window} line to the listener.
+	 *
+	 * @return true when the line was one of them
+	 */
+	private static boolean forwardProtocolLine(String line, CaptureStreamListener listener) {
+		Matcher pointer = CURSOR_LINE.matcher(line);
+		if (pointer.matches()) {
+			listener.onPoint(Double.parseDouble(pointer.group(1)),
+					Double.parseDouble(pointer.group(2)));
+			return true;
+		}
+		Matcher source = SOURCE_LINE.matcher(line);
+		if (source.matches()) {
+			WindowSources.CaptureSurface.parse(source.group(1)).ifPresent(listener::onSurface);
+			return true;
+		}
+		return false;
+	}
+
+	/** Receives what a capture helper reports about the stream besides its frames. */
 	@FunctionalInterface
-	interface CaptureCursorListener {
+	interface CaptureStreamListener {
 
 		/**
+		 * One pointer position the helper measured inside the recorded surface.
+		 *
 		 * @param cx normalized x inside the recorded frame (0..1)
 		 * @param cy normalized y inside the recorded frame (0..1)
 		 */
 		void onPoint(double cx, double cy);
+
+		/** What the stream records ({@code SOURCE monitor|window}); reported before FORMAT. */
+		default void onSurface(WindowSources.CaptureSurface surface) {
+		}
 	}
 
 	/**
@@ -348,14 +376,11 @@ final class CosmicVideoPipeline {
 		}
 	}
 
-	private static void drainLines(BufferedReader reader, CaptureCursorListener cursor) {
+	private static void drainLines(BufferedReader reader, CaptureStreamListener cursor) {
 		try {
 			String line;
 			while ((line = reader.readLine()) != null) {
-				Matcher point = CURSOR_LINE.matcher(line);
-				if (point.matches()) {
-					cursor.onPoint(Double.parseDouble(point.group(1)),
-							Double.parseDouble(point.group(2)));
+				if (forwardProtocolLine(line, cursor)) {
 					continue;
 				}
 				LOG.log(System.Logger.Level.WARNING, "[cosmic-capture] helper: " + line.trim());

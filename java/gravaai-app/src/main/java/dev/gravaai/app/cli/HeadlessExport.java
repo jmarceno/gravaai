@@ -109,7 +109,7 @@ final class HeadlessExport {
 
 	/** Reports the failure on both streams and answers the exit code. */
 	private int fail(String message) {
-		events.emit("error", Map.of("message", message));
+		events.emit(CliEvents.Event.ERROR, Map.of("message", message));
 		events.note("gravaai export: " + message);
 		return 1;
 	}
@@ -158,7 +158,7 @@ final class HeadlessExport {
 		if (duration <= 0) {
 			throw new IllegalArgumentException("could not read a duration from " + video);
 		}
-		events.emit("export_start", Map.of("source", video.toString()));
+		events.emit(CliEvents.Event.EXPORT_START, Map.of("source", video.toString()));
 		events.note("exporting " + file.getFileName() + " (" + duration + " s)");
 		return new Source(document.editor(), video, EditorSession.webcamPathFor(document), duration);
 	}

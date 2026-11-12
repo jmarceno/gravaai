@@ -3,6 +3,8 @@ package dev.gravaai.services.recording.cursor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import dev.gravaai.services.recording.CursorCaptureClock;
@@ -16,6 +18,7 @@ import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.services.recording.KeystrokeTypes.KeyModifier;
 import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.sources.SelectedSource;
@@ -50,18 +53,44 @@ public final class CursorCaptureSession
 	private volatile long captureStartTimeMs;
 	private volatile @Nullable CursorVisualType currentCursorVisualType;
 	/**
-	 * A pointer reading that arrived before {@link #start()} armed the session: the capture helper
-	 * reports its first position as soon as the stream is up, which precedes the recording-state
-	 * message that calls start(). Kept with the time it arrived so start() can tell it from a
-	 * leftover of a previous take.
+	 * The capture stream's own feed (pointer readings and the surface it records), as an explicit
+	 * state machine shared by the helper's stderr thread and {@link #start()}/{@link #stop()}:
+	 *
+	 * <pre>
+	 *   Idle(pending) ──start()──▶ Armed ──stop()──▶ Idle(nothing)
+	 *   Idle(pending) ──reading─▶ Idle(newest reading)
+	 *   Armed         ──reading─▶ Armed   (applied to the mapper at once)
+	 * </pre>
+	 *
+	 * <p>The helper reports its first position and its surface as soon as the stream is up, which
+	 * precedes the recording-state message that calls start(), so an Idle state keeps them. Every
+	 * transition is one atomic update, so a reading that races start() either lands in the Idle
+	 * state start() swaps out (and is adopted) or sees Armed (and is applied): it can no longer be
+	 * written after start() looked and be lost.
 	 */
-	private volatile boolean hasPendingCapturePoint;
-	private volatile double pendingCapturePointX;
-	private volatile double pendingCapturePointY;
-	private volatile long pendingCapturePointAtMs;
+	private final AtomicReference<CaptureFeed> captureFeed =
+			new AtomicReference<>(CaptureFeed.Idle.EMPTY);
 
 	/** How long a pre-start capture reading stays adoptable; older ones are previous-take leftovers. */
 	private static final long ADOPT_PENDING_AFTER_MS = 1000;
+
+	/** See {@link #captureFeed}. */
+	private sealed interface CaptureFeed {
+
+		/** Not recording: the newest early reading and surface, kept for the next start(). */
+		record Idle(Optional<PendingPoint> point, Optional<WindowSources.CaptureSurface> surface)
+				implements CaptureFeed {
+			static final Idle EMPTY = new Idle(Optional.empty(), Optional.empty());
+		}
+
+		/** Recording: readings go straight to the coordinate mapper. */
+		record Armed() implements CaptureFeed {
+		}
+	}
+
+	/** A pre-start pointer reading and the wall-clock time it arrived. */
+	private record PendingPoint(double x, double y, long atMs) {
+	}
 
 	public CursorCaptureSession(
 			RecordingProcesses processes,
@@ -101,18 +130,24 @@ public final class CursorCaptureSession
 		interactions.reset();
 		sampler.start();
 		helper.start();
-		// Arming comes last: a capture line that raced with start() between these statements
-		// lands in the pending buffer instead of being dropped, and is adopted below.
 		captureActive = true;
-		adoptPendingCapturePoint();
+		// Arming comes last: whatever the stream reported before now is in the Idle state this
+		// swap takes out, and everything after it is applied directly.
+		if (captureFeed.getAndSet(new CaptureFeed.Armed()) instanceof CaptureFeed.Idle idle) {
+			idle.surface().ifPresent(coordinates::recordCaptureSurface);
+			idle.point()
+					.filter(point -> System.currentTimeMillis() - point.atMs()
+							<= ADOPT_PENDING_AFTER_MS)
+					.ifPresent(point -> applyCapturePoint(point.x(), point.y()));
+		}
 	}
 
 	/** Stops sampling and the helper; snapshots the samples for persistence. */
 	public synchronized void stop() {
 		captureActive = false;
+		captureFeed.set(CaptureFeed.Idle.EMPTY);
 		sampler.stop();
 		helper.stop();
-		hasPendingCapturePoint = false;
 		snapshotCursorTelemetryForPersistence();
 		samples.clearActive();
 	}
@@ -188,18 +223,33 @@ public final class CursorCaptureSession
 	 */
 	@Override
 	public void onCaptureCursorPoint(double cx, double cy) {
-		if (!captureActive) {
-			// The helper reports its first position as soon as the capture stream is up, which
-			// precedes the recording-state message that calls start(). Keep it: a still pointer
-			// never sends a second line, so dropping this one would leave the whole take
-			// unanchored (a window recording falls back to the frame centre).
-			pendingCapturePointX = cx;
-			pendingCapturePointY = cy;
-			pendingCapturePointAtMs = System.currentTimeMillis();
-			hasPendingCapturePoint = true;
-			return;
+		// Before start() the reading is kept: a still pointer never sends a second line, so
+		// dropping this one would leave the whole take unanchored (a window recording falls back
+		// to the frame centre).
+		PendingPoint point = new PendingPoint(cx, cy, System.currentTimeMillis());
+		CaptureFeed state = captureFeed.updateAndGet(current -> switch (current) {
+			case CaptureFeed.Idle idle -> new CaptureFeed.Idle(Optional.of(point), idle.surface());
+			case CaptureFeed.Armed armed -> armed;
+		});
+		if (state instanceof CaptureFeed.Armed) {
+			applyCapturePoint(cx, cy);
 		}
-		applyCapturePoint(cx, cy);
+	}
+
+	/**
+	 * What the capture stream records, as the helper reported it. A portal user can share a window
+	 * from the desktop's dialog while the app selected "a screen": only this tells the mapper that
+	 * the global pointer no longer belongs to the recorded frame.
+	 */
+	@Override
+	public void onCaptureSurface(WindowSources.CaptureSurface surface) {
+		CaptureFeed state = captureFeed.updateAndGet(current -> switch (current) {
+			case CaptureFeed.Idle idle -> new CaptureFeed.Idle(idle.point(), Optional.of(surface));
+			case CaptureFeed.Armed armed -> armed;
+		});
+		if (state instanceof CaptureFeed.Armed) {
+			coordinates.recordCaptureSurface(surface);
+		}
 	}
 
 	/** Records one capture-stream reading and, when it is the first, backfills the samples. */
@@ -217,22 +267,6 @@ public final class CursorCaptureSession
 		} catch (RuntimeException error) {
 			// Geometry not ready yet.
 		}
-	}
-
-	/**
-	 * Adopts a pointer reading that arrived before start() armed the session.
-	 *
-	 * <p>Only a fresh one: a line the previous take's helper managed to emit while being torn
-	 * down is seconds old by the time the next recording starts and must not anchor it.
-	 */
-	private void adoptPendingCapturePoint() {
-		if (!hasPendingCapturePoint
-				|| System.currentTimeMillis() - pendingCapturePointAtMs > ADOPT_PENDING_AFTER_MS) {
-			hasPendingCapturePoint = false;
-			return;
-		}
-		hasPendingCapturePoint = false;
-		applyCapturePoint(pendingCapturePointX, pendingCapturePointY);
 	}
 
 	@Override

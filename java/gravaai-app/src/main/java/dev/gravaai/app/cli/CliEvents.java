@@ -22,6 +22,34 @@ import dev.gravaai.core.json.Json;
  */
 public final class CliEvents {
 
+	/**
+	 * The NDJSON event names: the script-facing contract, one constant per kind of line so a new
+	 * event is declared once and cannot be misspelled at an emit site.
+	 */
+	public enum Event {
+		/** The recording started; carries the source and the requested options. */
+		RECORD_START("record_start"),
+		/** The export opened its source. */
+		EXPORT_START("export_start"),
+		/** Whole-percent progress, optionally with a phase detail. */
+		PROGRESS("progress"),
+		/** The final result: the written file and its facts. */
+		DONE("done"),
+		/** The command failed; carries the message also printed on stderr. */
+		ERROR("error");
+
+		private final String wire;
+
+		Event(String wire) {
+			this.wire = wire;
+		}
+
+		/** The {@code "event"} value written on the line. */
+		public String wire() {
+			return wire;
+		}
+	}
+
 	private final boolean json;
 	private final PrintStream stdout;
 	private final PrintStream stderr;
@@ -35,17 +63,17 @@ public final class CliEvents {
 	}
 
 	/** Emits one event with no fields beyond its name. */
-	public void emit(String event) {
+	public void emit(Event event) {
 		emit(event, Map.of());
 	}
 
 	/** Emits one event; fields keep their insertion order in the JSON line. */
-	public void emit(String event, Map<String, ?> fields) {
+	public void emit(Event event, Map<String, ?> fields) {
 		if (!json) {
 			return;
 		}
 		Map<String, Object> line = new LinkedHashMap<>();
-		line.put("event", event);
+		line.put("event", event.wire());
 		line.putAll(fields);
 		// Compact JSON, one line, flushed: a reader piping into jq must see each event at once.
 		// Json.stringify is the app's pretty format (it mirrors JSON.stringify(v, null, 2)), so the
@@ -76,7 +104,7 @@ public final class CliEvents {
 			if (newDetail) {
 				fields.put("detail", detail.get());
 			}
-			emit("progress", fields);
+			emit(Event.PROGRESS, fields);
 			return;
 		}
 		stderr.println(newDetail ? whole + "% " + detail.get() : whole + "%");
@@ -98,7 +126,7 @@ public final class CliEvents {
 		done.put("path", path.toString());
 		done.putAll(fields);
 		if (json) {
-			emit("done", done);
+			emit(Event.DONE, done);
 			return;
 		}
 		stdout.println(path);

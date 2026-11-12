@@ -10,6 +10,8 @@
 // <fps>, repeating the latest frame when nothing changed. Before the first frame
 // it prints one line to stderr:
 //   FORMAT <width> <height> <rgba|bgra> <transform>
+// preceded by what is being recorded:
+//   SOURCE <monitor|window>
 // and, for a window capture, one normalized pointer line per reported position:
 //   CURSOR <x> <y>            (0..1 inside the recorded window frame)
 // stdin commands: "pause", "resume", "stop" (EOF also stops).
@@ -88,16 +90,26 @@ static void toplevel_done(void *data, struct ext_foreign_toplevel_handle_v1 *han
 	(void)data; (void)handle;
 }
 
+/* Copies a client-provided string into a WINDOW field. Tabs and line breaks become spaces: the
+ * WINDOW record is tab-separated and one per line, so a title such as "a\tb" or "a\nb" would
+ * otherwise split into extra fields or a malformed second record. */
+static void copy_field(char *dest, size_t size, const char *value) {
+	snprintf(dest, size, "%s", value);
+	for (char *c = dest; *c != '\0'; c++)
+		if (*c == '\t' || *c == '\n' || *c == '\r')
+			*c = ' ';
+}
+
 static void toplevel_title(void *data, struct ext_foreign_toplevel_handle_v1 *handle,
 		const char *title) {
 	(void)handle;
-	snprintf(((struct toplevel *)data)->title, sizeof toplevels[0].title, "%s", title);
+	copy_field(((struct toplevel *)data)->title, sizeof toplevels[0].title, title);
 }
 
 static void toplevel_app_id(void *data, struct ext_foreign_toplevel_handle_v1 *handle,
 		const char *app_id) {
 	(void)handle;
-	snprintf(((struct toplevel *)data)->app_id, sizeof toplevels[0].app_id, "%s", app_id);
+	copy_field(((struct toplevel *)data)->app_id, sizeof toplevels[0].app_id, app_id);
 }
 
 static void toplevel_identifier(void *data, struct ext_foreign_toplevel_handle_v1 *handle,
@@ -379,9 +391,17 @@ static bool create_slots(void) {
 	destroy_slots();
 	size_t stride = (size_t)buffer_w * 4, size = stride * buffer_h;
 	int fd = memfd_create("gravaai-capture", MFD_CLOEXEC);
-	if (fd < 0 || ftruncate(fd, size * 2) < 0) return false;
+	if (fd < 0) return false;
+	// A resize re-runs this mid-recording, so a failure must not leak the descriptor.
+	if (ftruncate(fd, size * 2) < 0) {
+		close(fd);
+		return false;
+	}
 	uint8_t *data = mmap(NULL, size * 2, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED) return false;
+	if (data == MAP_FAILED) {
+		close(fd);
+		return false;
+	}
 	slot_map = data;
 	slot_map_size = size * 2;
 	struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size * 2);
@@ -583,6 +603,9 @@ int main(int argc, char **argv) {
 	capturing_slot ^= 1;
 
 	bool rgba = shm_format == WL_SHM_FORMAT_XBGR8888 || shm_format == WL_SHM_FORMAT_ABGR8888;
+	// The same SOURCE contract as gravaai-portal-capture, so the recorder learns what the stream
+	// records from the helper rather than from its own selection.
+	fprintf(stderr, "SOURCE %s\n", window ? "window" : "monitor");
 	fprintf(stderr, "FORMAT %u %u %s %u\n", canvas.width, canvas.height, rgba ? "rgba" : "bgra",
 		frame_transform);
 	fflush(stderr);

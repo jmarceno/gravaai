@@ -2,6 +2,7 @@ package dev.gravaai.services.recording.cursor;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -39,10 +40,18 @@ final class CursorCoordinateMapper {
 	private long linuxCursorUpdatedAt;
 	private boolean hasLinuxCursorPoint;
 
-	/** The newest pointer reading taken from the capture stream itself, if any. */
-	private volatile double captureCursorX;
-	private volatile double captureCursorY;
-	private volatile boolean hasCaptureCursorPoint;
+	/**
+	 * The newest pointer reading taken from the capture stream itself. One immutable value behind
+	 * one volatile reference, so a reader never pairs an x from one reading with a y from the next.
+	 */
+	private volatile Optional<CapturePoint> capturePoint = Optional.empty();
+
+	/** What the capture stream records, when the helper reported it for this take. */
+	private volatile Optional<WindowSources.CaptureSurface> captureSurface = Optional.empty();
+
+	/** One capture-stream reading, normalized to the recorded frame. */
+	private record CapturePoint(double x, double y) {
+	}
 
 	CursorCoordinateMapper(
 			CursorScreen screen,
@@ -58,16 +67,22 @@ final class CursorCoordinateMapper {
 		waylandCaptureDisplayId = null;
 		hasLinuxCursorPoint = false;
 		resetCapturePoint();
+		captureSurface = Optional.empty();
 	}
 
 	/** Forgets the capture-stream reading, so a new recording cannot inherit the old one. */
 	void resetCapturePoint() {
-		hasCaptureCursorPoint = false;
+		capturePoint = Optional.empty();
 	}
 
 	/** True once the capture stream has reported a pointer position. */
 	boolean hasCapturePoint() {
-		return hasCaptureCursorPoint;
+		return capturePoint.isPresent();
+	}
+
+	/** Records what the capture stream records (the helper's {@code SOURCE} line). */
+	void recordCaptureSurface(WindowSources.CaptureSurface surface) {
+		captureSurface = Optional.of(surface);
 	}
 
 	/**
@@ -85,9 +100,8 @@ final class CursorCoordinateMapper {
 		if (!Double.isFinite(cx) || !Double.isFinite(cy)) {
 			return;
 		}
-		captureCursorX = CursorTelemetry.clamp(cx, 0, 1);
-		captureCursorY = CursorTelemetry.clamp(cy, 0, 1);
-		hasCaptureCursorPoint = true;
+		capturePoint = Optional.of(new CapturePoint(CursorTelemetry.clamp(cx, 0, 1),
+				CursorTelemetry.clamp(cy, 0, 1)));
 	}
 
 
@@ -124,11 +138,15 @@ final class CursorCoordinateMapper {
 		// sidecar must describe: prefer it whenever there is one. It is not aged out, because the
 		// compositors report a position when it changes — a still pointer keeps its last value,
 		// and falling back would reintroduce a window-offset error.
-		if (hasCaptureCursorPoint) {
-			return new double[] {captureCursorX, captureCursorY};
+		Optional<CapturePoint> reading = capturePoint;
+		if (reading.isPresent()) {
+			return new double[] {reading.get().x(), reading.get().y()};
 		}
 		SelectedSource source = selectedSource.get();
-		boolean windowSource = WindowSources.isWindowSourceId(source == null ? null : source.id());
+		// A window is either what the app selected, or what the user picked in the portal's own
+		// dialog after the app selected "a screen" (the helper's SOURCE line says so).
+		boolean windowSource = WindowSources.isWindowSourceId(source == null ? null : source.id())
+				|| captureSurface.equals(Optional.of(WindowSources.CaptureSurface.WINDOW));
 		if (windowSource) {
 			// A Wayland window's global position is not exposed to the app, so a global pointer
 			// reading cannot be normalized against it. Without a capture-stream reading there is

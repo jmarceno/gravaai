@@ -23,7 +23,7 @@ public record AnnotationSpec(
 		@Nullable Double blurIntensity,
 		@Nullable String blurColor,
 		@Nullable Double loupeMagnification,
-		@Nullable Spotlight spotlight) {
+		Spotlight spotlight) {
 
 	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur" | "loupe" | "spotlight"}). */
 	public enum Type {
@@ -38,11 +38,6 @@ public record AnnotationSpec(
 	/** The effective magnification of a loupe lens (never below 1). */
 	public double loupeMagnificationOrDefault() {
 		return loupeMagnification == null || loupeMagnification < 1 ? 2.0 : loupeMagnification;
-	}
-
-	/** The effective spotlight payload (defaults when absent). */
-	public Spotlight spotlightOrDefault() {
-		return spotlight == null ? Spotlight.DEFAULT : spotlight;
 	}
 
 	/** Center position in percent of the annotation coordinate rect. */
@@ -86,6 +81,9 @@ public record AnnotationSpec(
 		size = size == null ? new Size(30, 20) : size;
 		style = style == null ? defaultTextStyle() : style;
 		content = content == null ? "" : content;
+		// Every spec carries the spotlight payload (only a SPOTLIGHT reads it), like the project
+		// region it comes from, so the renderer never has to guess a default.
+		java.util.Objects.requireNonNull(spotlight, "spotlight");
 	}
 
 	/** {@code DEFAULT_ANNOTATION_STYLE} equivalent. */

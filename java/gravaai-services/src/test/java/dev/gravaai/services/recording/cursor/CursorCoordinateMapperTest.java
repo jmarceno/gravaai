@@ -109,6 +109,23 @@ class CursorCoordinateMapperTest {
 	}
 
 	@Test
+	@DisplayName("a screen selection the portal dialog turned into a window is treated as a window")
+	void treatsAReportedWindowSurfaceAsAWindow() {
+		SelectedSource portalScreen = SelectedSource.screen(
+				dev.gravaai.services.sources.SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID,
+				"System picker", null);
+		CursorCoordinateMapper mapper = mapper(portalScreen);
+		mapper.recordPosition(480, 270);
+		mapper.recordCaptureSurface(WindowSources.CaptureSurface.WINDOW);
+
+		assertArrayEquals(new double[] {0.5, 0.5}, mapper.normalize(), 1e-9);
+
+		mapper.reset();
+		mapper.recordPosition(480, 270);
+		assertArrayEquals(new double[] {0.25, 0.25}, mapper.normalize(), 1e-9);
+	}
+
+	@Test
 	@DisplayName("out-of-range and non-finite capture readings are ignored")
 	void ignoresImpossibleCaptureReadings() {
 		CursorCoordinateMapper mapper = mapper(WINDOW);

@@ -86,29 +86,25 @@ public final class MeetingWindow {
 	 * no portal-based save chooser), filtered to the chosen format so the extension matches what the
 	 * writers produce.
 	 */
-	private static @Nullable Path chooseExportDestination(Stage owner,
+	private static java.util.Optional<Path> chooseExportDestination(Stage owner,
 			dev.gravaai.services.document.DocumentFormat format, String fileName) {
 		javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
 		chooser.setTitle("Export notes");
 		chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
 				format.label(), format.glob()));
 		chooser.setInitialFileName(fileName);
-		java.io.File file = chooser.showSaveDialog(owner);
-		if (file == null) {
-			return null;
-		}
-		Path picked = file.toPath();
-		// The chooser can return a name the user edited past the filter; keep the chosen format.
-		String name = picked.getFileName() == null ? "" : picked.getFileName().toString();
-		if (!name.toLowerCase(java.util.Locale.ROOT).endsWith("." + format.extension())) {
-			return Path.of(picked + "." + format.extension());
-		}
-		return picked;
+		// JavaFX answers null for a cancelled dialog; that is the only null here.
+		return java.util.Optional.ofNullable(chooser.showSaveDialog(owner))
+				.map(java.io.File::toPath)
+				// The chooser can return a name the user edited past the filter; keep the format.
+				.map(picked -> format.matches(picked.toString()) ? picked
+						: Path.of(picked + "." + format.extension()));
 	}
 
 	/** True when the meeting view is hosted by the app's main window. */
 	public boolean isHosted() {
-		return hosted;	}
+		return hosted;
+	}
 
 	/** Pauses the meeting player when playing (close-to-tray rule; the position is kept). */
 	public void pausePlayback() {

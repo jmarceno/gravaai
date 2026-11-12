@@ -18,6 +18,16 @@ public record SpotlightData(double dimPercent, double featherPercent) {
 		featherPercent = clamp(featherPercent);
 	}
 
+	/** The same spotlight with another dim (clamped). */
+	public SpotlightData withDimPercent(double value) {
+		return new SpotlightData(value, featherPercent);
+	}
+
+	/** The same spotlight with another feather (clamped). */
+	public SpotlightData withFeatherPercent(double value) {
+		return new SpotlightData(dimPercent, value);
+	}
+
 	private static double clamp(double value) {
 		return Math.max(0, Math.min(100, value));
 	}

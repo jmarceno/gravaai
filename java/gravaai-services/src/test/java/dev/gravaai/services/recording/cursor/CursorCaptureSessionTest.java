@@ -103,6 +103,20 @@ class CursorCaptureSessionTest {
 	}
 
 	@Test
+	@DisplayName("readings racing the start from another thread are never lost")
+	void neverLosesARacingReading() throws Exception {
+		for (int attempt = 0; attempt < 50; attempt++) {
+			session.stop();
+			Thread reader = Thread.ofPlatform().start(() -> session.onCaptureCursorPoint(0.3, 0.6));
+			session.start();
+			reader.join(5_000);
+			// Whichever side won, the one reading ends up applied.
+			assertArrayEquals(new double[] {0.3, 0.6}, session.getNormalizedCursorPoint(), 1e-9,
+					"attempt " + attempt);
+		}
+	}
+
+	@Test
 	@DisplayName("a reading that arrives once armed is used directly")
 	void usesLiveReadingsDirectly() {
 		session.start();

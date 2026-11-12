@@ -74,7 +74,11 @@ public final class PdfWriter {
 
 		private final Document pdf;
 		private final Shaper shaper;
-		private final List<Paint> paints = new ArrayList<>();
+		/**
+		 * Paints are pooled per colour and closed with the page: a document draws thousands of
+		 * words in a handful of colours, so one paint each is all it needs.
+		 */
+		private final java.util.Map<Integer, Paint> paints = new java.util.HashMap<>();
 		/** Fonts are pooled per face and size and closed with the page. */
 		private final java.util.Map<FontKey, Font> fonts = new java.util.HashMap<>();
 		private final Paint fillPaint;
@@ -98,24 +102,22 @@ public final class PdfWriter {
 				addMetadata(String.join("  \u00B7  ", document.metadata()));
 			}
 			for (DocumentBlock block : document.blocks()) {
-				if (block instanceof DocumentBlock.Heading heading) {
-					addHeading(heading);
-				} else if (block instanceof DocumentBlock.Paragraph paragraph) {
-					addFlow(paragraph.runs(), MARGIN, BODY_SIZE);
-					cursorY += BODY_SIZE * 0.55f;
-				} else if (block instanceof DocumentBlock.ListItem item) {
-					addListItem(item);
-				} else if (block instanceof DocumentBlock.Quote quote) {
-					addQuote(quote);
-				} else if (block instanceof DocumentBlock.Rule) {
-					addRule();
+				switch (block) {
+					case DocumentBlock.Heading heading -> addHeading(heading);
+					case DocumentBlock.Paragraph paragraph -> {
+						addFlow(paragraph.runs(), MARGIN, BODY_SIZE);
+						cursorY += BODY_SIZE * 0.55f;
+					}
+					case DocumentBlock.ListItem item -> addListItem(item);
+					case DocumentBlock.Quote quote -> addQuote(quote);
+					case DocumentBlock.Rule rule -> addRule();
 				}
 			}
 			pdf.endPage();
 		}
 
 		void close() {
-			for (Paint paint : paints) {
+			for (Paint paint : paints.values()) {
 				paint.close();
 			}
 			for (Font font : fonts.values()) {
@@ -179,7 +181,11 @@ public final class PdfWriter {
 					CompositorFonts.Face.REGULAR, BODY_SIZE)) + 6);
 			drawLine(marker, indent, baseline, CompositorFonts.Face.REGULAR, BODY_SIZE,
 					COLOR_MUTED);
-			addFlow(item.runs(), indent + markerWidth, BODY_SIZE);
+			if (!addFlow(item.runs(), indent + markerWidth, BODY_SIZE)) {
+				// An empty checklist entry still occupies its line: without this the next item
+				// was drawn over the lone checkbox.
+				cursorY += BODY_SIZE * LINE_HEIGHT;
+			}
 			cursorY += BODY_SIZE * 0.3f;
 		}
 
@@ -224,30 +230,28 @@ public final class PdfWriter {
 			if (!hasText) {
 				return;
 			}
-			try (Paint bar = paint(COLOR_RULE)) {
-				canvas.drawRect(new Rect(barX, lineStartY + 2, barX + 3,
-						lineStartY + BODY_SIZE * LINE_HEIGHT - 2), bar);
-			}
+			canvas.drawRect(new Rect(barX, lineStartY + 2, barX + 3,
+					lineStartY + BODY_SIZE * LINE_HEIGHT - 2), paint(COLOR_RULE));
 		}
 
 		private void addRule() {
 			cursorY += 8;
 			ensureSpace(16);
-			try (Paint line = paint(COLOR_RULE)) {
-				canvas.drawLine(MARGIN, cursorY, PAGE_WIDTH - MARGIN, cursorY, line);
-			}
+			canvas.drawLine(MARGIN, cursorY, PAGE_WIDTH - MARGIN, cursorY, paint(COLOR_RULE));
 			cursorY += 10;
 		}
 
 		/**
 		 * Renders inline runs as flowing text at {@code x}, wrapping at the page edge. Every run
 		 * keeps its own face and colour, so bold/italic/code survive inside a wrapped line.
+		 *
+		 * @return false when the runs hold no visible word, so nothing was drawn or advanced
 		 */
-		private void addFlow(List<InlineRun> runs, float x, float size) {
+		private boolean addFlow(List<InlineRun> runs, float x, float size) {
 			float lineHeight = size * LINE_HEIGHT;
 			List<StyledWord> words = styledWords(runs, size, Style.PLAIN);
 			if (words.isEmpty()) {
-				return;
+				return false;
 			}
 			float right = PAGE_WIDTH - MARGIN;
 			float currentX = x;
@@ -269,6 +273,7 @@ public final class PdfWriter {
 				currentX += width;
 			}
 			cursorY += lineHeight;
+			return true;
 		}
 
 		/** Draws one word, with the shading a code run needs behind it. */
@@ -280,29 +285,27 @@ public final class PdfWriter {
 			}
 			drawLine(word.text(), x, baseline, font, word.color());
 			if (word.style().link()) {
-				try (Paint underline = paint(word.color())) {
-					canvas.drawLine(x, baseline + size * 0.12f, x + width,
-							baseline + size * 0.12f, underline);
-				}
+				canvas.drawLine(x, baseline + size * 0.12f, x + width, baseline + size * 0.12f,
+						paint(word.color()));
+			}
+			if (word.style().strike()) {
+				// A PDF text run has no strike flag, so the line is drawn through the x-height.
+				float strikeY = baseline - size * 0.3f;
+				canvas.drawLine(x, strikeY, x + width, strikeY, paint(word.color()));
 			}
 		}
 
 		private void drawLine(String text, float x, float baseline, CompositorFonts.Face face,
 				float size, int color) {
-			if (text.isEmpty()) {
-				return;
-			}
-			try (Paint paint = paint(color); TextLine line = shaper.shapeLine(text, font(face, size))) {
-				canvas.drawTextLine(line, x, baseline, paint);
-			}
+			drawLine(text, x, baseline, font(face, size), color);
 		}
 
 		private void drawLine(String text, float x, float baseline, Font font, int color) {
 			if (text.isEmpty()) {
 				return;
 			}
-			try (Paint paint = paint(color); TextLine line = shaper.shapeLine(text, font)) {
-				canvas.drawTextLine(line, x, baseline, paint);
+			try (TextLine line = shaper.shapeLine(text, font)) {
+				canvas.drawTextLine(line, x, baseline, paint(color));
 			}
 		}
 
@@ -359,19 +362,18 @@ public final class PdfWriter {
 		private static List<StyledWord> styledWords(List<InlineRun> runs, float size, Style style) {
 			List<StyledWord> words = new ArrayList<>();
 			for (InlineRun run : runs) {
-				if (run instanceof InlineRun.Text text) {
-					addWords(words, text.text(), size, style);
-				} else if (run instanceof InlineRun.Code code) {
-					addWords(words, code.text(), size - 0.75f, style.withCode());
-				} else if (run instanceof InlineRun.Strong strong) {
-					words.addAll(styledWords(strong.runs(), size, style.withBold()));
-				} else if (run instanceof InlineRun.Emphasis emphasis) {
-					words.addAll(styledWords(emphasis.runs(), size, style.withItalic()));
-				} else if (run instanceof InlineRun.Strike strike) {
-					// A PDF text run carries no strike flag; the text itself is kept.
-					words.addAll(styledWords(strike.runs(), size, style));
-				} else if (run instanceof InlineRun.Link link) {
-					words.addAll(styledWords(link.runs(), size, style.withLink()));
+				switch (run) {
+					case InlineRun.Text text -> addWords(words, text.text(), size, style);
+					case InlineRun.Code code ->
+							addWords(words, code.text(), size - 0.75f, style.withCode());
+					case InlineRun.Strong strong ->
+							words.addAll(styledWords(strong.runs(), size, style.withBold()));
+					case InlineRun.Emphasis emphasis ->
+							words.addAll(styledWords(emphasis.runs(), size, style.withItalic()));
+					case InlineRun.Strike strike ->
+							words.addAll(styledWords(strike.runs(), size, style.withStrike()));
+					case InlineRun.Link link ->
+							words.addAll(styledWords(link.runs(), size, style.withLink()));
 				}
 			}
 			return words;
@@ -392,10 +394,10 @@ public final class PdfWriter {
 			}
 		}
 
+		/** The pooled paint for a colour (closed with the page; callers never close it). */
 		private Paint paint(int color) {
-			Paint paint = new Paint().setColor(color).setAntiAlias(true);
-			paints.add(paint);
-			return paint;
+			return paints.computeIfAbsent(color,
+					key -> new Paint().setColor(key).setAntiAlias(true));
 		}
 
 		/**
@@ -416,24 +418,29 @@ public final class PdfWriter {
 	 * Accumulated inline formatting, as a value: bold inside a link stays both instead of the inner
 	 * property replacing the outer one.
 	 */
-	private record Style(boolean bold, boolean italic, boolean code, boolean link) {
+	private record Style(boolean bold, boolean italic, boolean code, boolean link,
+			boolean strike) {
 
-		static final Style PLAIN = new Style(false, false, false, false);
+		static final Style PLAIN = new Style(false, false, false, false, false);
 
 		Style withBold() {
-			return new Style(true, italic, code, link);
+			return new Style(true, italic, code, link, strike);
 		}
 
 		Style withItalic() {
-			return new Style(bold, true, code, link);
+			return new Style(bold, true, code, link, strike);
 		}
 
 		Style withCode() {
-			return new Style(bold, italic, true, link);
+			return new Style(bold, italic, true, link, strike);
 		}
 
 		Style withLink() {
-			return new Style(bold, italic, code, true);
+			return new Style(bold, italic, code, true, strike);
+		}
+
+		Style withStrike() {
+			return new Style(bold, italic, code, link, true);
 		}
 
 		CompositorFonts.Face face() {

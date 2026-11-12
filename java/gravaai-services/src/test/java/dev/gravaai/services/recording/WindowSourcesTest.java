@@ -2,7 +2,6 @@ package dev.gravaai.services.recording;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -40,14 +39,13 @@ class WindowSourcesTest {
 				"WINDOW\t5f1c\torg.gnome.Nautilus\t\nWINDOW\t9ab2\t\tUntitled\n");
 
 		assertEquals(new WindowSources.CaptureWindow("5f1c", "org.gnome.Nautilus", ""), windows.get(0));
-		assertNull(windows.get(1).appId());
+		assertEquals(java.util.Optional.empty(), windows.get(1).appId());
 		assertEquals("Untitled", windows.get(1).title());
 	}
 
 	@Test
 	@DisplayName("ignores malformed helper output")
 	void ignoresMalformedLines() {
-		assertTrue(WindowSources.parseWindows(null).isEmpty());
 		assertTrue(WindowSources.parseWindows("").isEmpty());
 		assertTrue(WindowSources.parseWindows("not a window line\nWINDOW\t\nWINDOW\t\t\t\n").isEmpty());
 	}
@@ -61,7 +59,7 @@ class WindowSourcesTest {
 
 		assertEquals("window:5f1c", source.id());
 		assertEquals("Home", source.name());
-		assertEquals("5f1c", WindowSources.windowIdentifier(source.id()));
+		assertEquals(java.util.Optional.of("5f1c"), WindowSources.windowIdentifier(source.id()));
 		assertTrue(WindowSources.isWindowSourceId(source.id()));
 	}
 
@@ -81,7 +79,8 @@ class WindowSourcesTest {
 	void mapsThePortalWindowSentinel() {
 		assertEquals(WindowSources.PORTAL_WINDOW_TARGET, WindowSources.captureTarget(
 				dev.gravaai.services.sources.CaptureSelection.portalWindowSource("Share a window…")));
-		assertNull(WindowSources.windowIdentifier(WindowSources.portalWindowSourceId()));
+		assertEquals(java.util.Optional.empty(),
+				WindowSources.windowIdentifier(WindowSources.portalWindowSourceId()));
 		assertFalse(WindowSources.isWindowSourceId(null));
 		// "no source" means "let the helper decide", which is the portal's dialog.
 		assertEquals("", WindowSources.captureTarget(null));
@@ -95,6 +94,16 @@ class WindowSourcesTest {
 		assertEquals("code", WindowSources.label(
 				new WindowSources.CaptureWindow("5f1c", "code", "  ")));
 		assertEquals("5f1c", WindowSources.label(
-				new WindowSources.CaptureWindow("5f1c", null, "")));
+				new WindowSources.CaptureWindow("5f1c", java.util.Optional.empty(), "")));
+	}
+
+	@Test
+	@DisplayName("reads the helpers' SOURCE words and nothing else")
+	void parsesCaptureSurfaces() {
+		assertEquals(java.util.Optional.of(WindowSources.CaptureSurface.WINDOW),
+				WindowSources.CaptureSurface.parse("window"));
+		assertEquals(java.util.Optional.of(WindowSources.CaptureSurface.MONITOR),
+				WindowSources.CaptureSurface.parse("monitor"));
+		assertEquals(java.util.Optional.empty(), WindowSources.CaptureSurface.parse("area"));
 	}
 }

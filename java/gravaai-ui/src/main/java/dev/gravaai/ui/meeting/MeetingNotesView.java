@@ -96,7 +96,7 @@ public final class MeetingNotesView extends VBox {
 			MeetingViewActions viewActions) {
 		this.service = service;
 		this.onSeek = onSeek;
-		this.viewActions = viewActions == null ? MeetingViewActions.none() : viewActions;
+		this.viewActions = viewActions;
 		// The field initializers run before the constructor body, so the markdown view (which
 		// captures onSeek) is created here, after the assignment.
 		this.markdown = new MeetingMarkdownView(null,
@@ -660,23 +660,20 @@ public final class MeetingNotesView extends VBox {
 	}
 
 	private void exportNotes(Path mediaPath, MeetingExportDialog.Choice choice) {
-		MeetingService.FilesView currentFiles = files;
-		String title = MeetingText.meetingTitle(currentFiles == null ? null : currentFiles.meta(),
-				null);
+		// The service builds the title from the meeting itself; it only needs the localized label
+		// for an untitled meeting. Passing the already-built title here named an untitled meeting
+		// "Meeting <date> <date>".
+		String untitled = MeetingText.untitledLabel();
 		CompletableFuture<Result<MeetingNotesExport.Written>> pending = CompletableFuture
 				.supplyAsync(() -> service.exportNotes(mediaPath, choice.request(),
-						choice.destination(), title), UiThreads.background());
+						choice.destination(), untitled), UiThreads.background());
 		pending.thenAcceptAsync(result -> {
-			if (result.isErr()) {
-				showError(result.errorMessage());
-				return;
+			switch (result) {
+				case Result.Err<MeetingNotesExport.Written> error -> showError(error.error());
+				case Result.Ok<MeetingNotesExport.Written> written ->
+						Toast.show(this, "Exported " + written.value().file().getFileName())
+								.variant(Toast.Variant.SUCCESS);
 			}
-			MeetingNotesExport.Written written = result.orNull();
-			if (written == null) {
-				return;
-			}
-			Toast.show(this, "Exported " + written.file().getFileName())
-					.variant(Toast.Variant.SUCCESS);
 		}, Platform::runLater);
 	}
 

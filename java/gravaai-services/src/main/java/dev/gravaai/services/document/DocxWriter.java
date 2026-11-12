@@ -43,14 +43,15 @@ public final class DocxWriter {
 	/** Writes the document to {@code out}; the caller owns and closes the stream. */
 	public static void write(PlainDocument document, OutputStream out) throws IOException {
 		LinkTable links = new LinkTable();
-		String body = buildDocumentXml(document, links);
+		OrderedLists ordered = new OrderedLists();
+		String body = buildDocumentXml(document, links, ordered);
 		try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
 			put(zip, "[Content_Types].xml", CONTENT_TYPES);
 			put(zip, "_rels/.rels", ROOT_RELATIONSHIPS);
 			put(zip, "word/document.xml", body);
 			put(zip, "word/_rels/document.xml.rels", documentRelationships(links));
 			put(zip, "word/styles.xml", STYLES);
-			put(zip, "word/numbering.xml", NUMBERING);
+			put(zip, "word/numbering.xml", numbering(ordered));
 			put(zip, "docProps/core.xml", coreProperties(document.title()));
 			put(zip, "docProps/app.xml", APP_PROPERTIES);
 		}
@@ -64,7 +65,8 @@ public final class DocxWriter {
 
 	// --- document.xml -------------------------------------------------------------------------
 
-	private static String buildDocumentXml(PlainDocument document, LinkTable links) {
+	private static String buildDocumentXml(PlainDocument document, LinkTable links,
+			OrderedLists ordered) {
 		StringBuilder xml = new StringBuilder();
 		xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
 				.append("<w:document xmlns:w=\"").append(W).append("\" xmlns:r=\"")
@@ -77,17 +79,19 @@ public final class DocxWriter {
 		}
 
 		for (DocumentBlock block : document.blocks()) {
-			if (block instanceof DocumentBlock.Heading heading) {
-				int level = Math.max(1, Math.min(6, heading.level()));
-				xml.append(runsParagraph("Heading" + level, heading.runs(), links));
-			} else if (block instanceof DocumentBlock.Paragraph paragraph) {
-				xml.append(runsParagraph("BodyText", paragraph.runs(), links));
-			} else if (block instanceof DocumentBlock.ListItem item) {
-				xml.append(listItemXml(item, links));
-			} else if (block instanceof DocumentBlock.Quote quote) {
-				xml.append(runsParagraph("Quote", quote.runs(), links));
-			} else if (block instanceof DocumentBlock.Rule) {
-				xml.append(ruleXml());
+			if (!(block instanceof DocumentBlock.ListItem)) {
+				// Any other block ends every open list: the next numbered item starts a new one.
+				ordered.endAll();
+			}
+			switch (block) {
+				case DocumentBlock.Heading heading -> xml.append(runsParagraph(
+						"Heading" + Math.max(1, Math.min(6, heading.level())), heading.runs(), links));
+				case DocumentBlock.Paragraph paragraph ->
+						xml.append(runsParagraph("BodyText", paragraph.runs(), links));
+				case DocumentBlock.ListItem item -> xml.append(listItemXml(item, links, ordered));
+				case DocumentBlock.Quote quote ->
+						xml.append(runsParagraph("Quote", quote.runs(), links));
+				case DocumentBlock.Rule rule -> xml.append(ruleXml());
 			}
 		}
 
@@ -103,12 +107,13 @@ public final class DocxWriter {
 	 * A list item: the paragraph carries its numbering reference so Word and LibreOffice draw the
 	 * marker themselves (a typed bullet would not be a list, and would not indent as one).
 	 */
-	private static String listItemXml(DocumentBlock.ListItem item, LinkTable links) {
+	private static String listItemXml(DocumentBlock.ListItem item, LinkTable links,
+			OrderedLists ordered) {
 		boolean nested = item.depth() > 0;
-		int numId = item.kind() == DocumentBlock.ListItem.Kind.ORDERED
-				? DECIMAL_NUM_ID
-				: BULLET_NUM_ID;
 		int level = Math.min(2, item.depth());
+		int numId = item.kind() == DocumentBlock.ListItem.Kind.ORDERED
+				? ordered.numIdFor(item.depth(), level, item.number())
+				: ordered.bulletAt(item.depth());
 		String style = nested ? "ListNested" : "List";
 		StringBuilder xml = new StringBuilder();
 		xml.append("<w:p><w:pPr><w:pStyle w:val=\"").append(style).append("\"/>")
@@ -145,21 +150,19 @@ public final class DocxWriter {
 	private static String innerRuns(List<InlineRun> runs, LinkTable links, RunStyle style) {
 		StringBuilder xml = new StringBuilder();
 		for (InlineRun run : runs) {
-			if (run instanceof InlineRun.Text text) {
-				xml.append(textRun(esc(text.text()), style));
-			} else if (run instanceof InlineRun.Code code) {
-				xml.append(textRun(esc(code.text()), style.withCode()));
-			} else if (run instanceof InlineRun.Strong strong) {
-				xml.append(innerRuns(strong.runs(), links, style.withBold()));
-			} else if (run instanceof InlineRun.Emphasis emphasis) {
-				xml.append(innerRuns(emphasis.runs(), links, style.withItalic()));
-			} else if (run instanceof InlineRun.Strike strike) {
-				xml.append(innerRuns(strike.runs(), links, style.withStrike()));
-			} else if (run instanceof InlineRun.Link link) {
+			switch (run) {
+				case InlineRun.Text text -> xml.append(textRun(esc(text.text()), style));
+				case InlineRun.Code code -> xml.append(textRun(esc(code.text()), style.withCode()));
+				case InlineRun.Strong strong ->
+						xml.append(innerRuns(strong.runs(), links, style.withBold()));
+				case InlineRun.Emphasis emphasis ->
+						xml.append(innerRuns(emphasis.runs(), links, style.withItalic()));
+				case InlineRun.Strike strike ->
+						xml.append(innerRuns(strike.runs(), links, style.withStrike()));
 				// Word hyperlinks wrap runs and are not themselves formatted; the label keeps
 				// whatever emphasis it had inside.
-				xml.append("<w:hyperlink r:id=\"").append(esc(links.id(link.destination())))
-						.append("\">")
+				case InlineRun.Link link -> xml.append("<w:hyperlink r:id=\"")
+						.append(esc(links.id(link.destination()))).append("\">")
 						.append(innerRuns(link.runs(), links, style.withLink()))
 						.append("</w:hyperlink>");
 			}
@@ -244,7 +247,10 @@ public final class DocxWriter {
 				case '"' -> escaped.append("&quot;");
 				case '\'' -> escaped.append("&apos;");
 				default -> {
-					if (character >= 0x20 || character == '\t' || character == '\n') {
+					// U+FFFE/U+FFFF are not XML characters either; Word refuses the part.
+					boolean allowed = (character >= 0x20 && character != 0xFFFE
+							&& character != 0xFFFF) || character == '\t' || character == '\n';
+					if (allowed) {
 						escaped.append(character);
 					}
 				}
@@ -365,21 +371,86 @@ public final class DocxWriter {
 	/**
 	 * The numbering definitions. Bullets and numbers each get their own abstract numbering so the
 	 * two families never share a counter; each has three levels for nesting.
+	 *
+	 * <p>Every ordered list gets its own {@code w:num} instance with a start override: Word keeps
+	 * counting across every paragraph that shares a numId, so one shared instance would number a
+	 * second list 4, 5, 6 and ignore a list that starts at 3.
 	 */
-	private static final String NUMBERING = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-			+ "<w:numbering xmlns:w=\"" + W + "\">"
-			+ "<w:abstractNum w:abstractNumId=\"0\"><w:multiLevelType w:val=\"hybridMultilevel\"/>"
-			+ bulletLevel(0, LIST_INDENT_TWIPS, "\u2022", "Symbol")
-			+ bulletLevel(1, 2 * LIST_INDENT_TWIPS, "\u25E6", "Courier New")
-			+ bulletLevel(2, 3 * LIST_INDENT_TWIPS, "\u25AA", "Symbol")
-			+ "</w:abstractNum>"
-			+ "<w:abstractNum w:abstractNumId=\"1\"><w:multiLevelType w:val=\"hybridMultilevel\"/>"
-			+ decimalLevel(0, LIST_INDENT_TWIPS) + decimalLevel(1, 2 * LIST_INDENT_TWIPS)
-			+ decimalLevel(2, 3 * LIST_INDENT_TWIPS)
-			+ "</w:abstractNum>"
-			+ "<w:num w:numId=\"" + BULLET_NUM_ID + "\"><w:abstractNumId w:val=\"0\"/></w:num>"
-			+ "<w:num w:numId=\"" + DECIMAL_NUM_ID + "\"><w:abstractNumId w:val=\"1\"/></w:num>"
-			+ "</w:numbering>";
+	private static String numbering(OrderedLists ordered) {
+		StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+				.append("<w:numbering xmlns:w=\"").append(W).append("\">")
+				.append("<w:abstractNum w:abstractNumId=\"0\"><w:multiLevelType w:val=\"hybridMultilevel\"/>")
+				.append(bulletLevel(0, LIST_INDENT_TWIPS, "\u2022", "Symbol"))
+				.append(bulletLevel(1, 2 * LIST_INDENT_TWIPS, "\u25E6", "Courier New"))
+				.append(bulletLevel(2, 3 * LIST_INDENT_TWIPS, "\u25AA", "Symbol"))
+				.append("</w:abstractNum>")
+				.append("<w:abstractNum w:abstractNumId=\"1\"><w:multiLevelType w:val=\"hybridMultilevel\"/>")
+				.append(decimalLevel(0, LIST_INDENT_TWIPS))
+				.append(decimalLevel(1, 2 * LIST_INDENT_TWIPS))
+				.append(decimalLevel(2, 3 * LIST_INDENT_TWIPS))
+				.append("</w:abstractNum>")
+				.append("<w:num w:numId=\"").append(BULLET_NUM_ID)
+				.append("\"><w:abstractNumId w:val=\"0\"/></w:num>");
+		for (OrderedLists.Instance list : ordered.instances()) {
+			xml.append("<w:num w:numId=\"").append(list.numId())
+					.append("\"><w:abstractNumId w:val=\"1\"/><w:lvlOverride w:ilvl=\"")
+					.append(list.level()).append("\"><w:startOverride w:val=\"")
+					.append(list.start()).append("\"/></w:lvlOverride></w:num>");
+		}
+		return xml.append("</w:numbering>").toString();
+	}
+
+	/**
+	 * Splits the flattened list items back into lists for numbering. A numbered item continues the
+	 * open list at its depth when its number is the next one; otherwise (a new list, one that
+	 * starts elsewhere, or one interrupted by a bullet or another block) it opens a new instance.
+	 */
+	private static final class OrderedLists {
+
+		/** One ordered list's numbering instance. */
+		record Instance(int numId, int level, int start) {
+		}
+
+		/** The list currently open at one depth, and the number its last item carried. */
+		private record Open(int numId, int lastNumber) {
+		}
+
+		private final List<Instance> instances = new ArrayList<>();
+		private final java.util.Map<Integer, Open> openByDepth = new java.util.HashMap<>();
+
+		int numIdFor(int depth, int level, int number) {
+			endDeeperThan(depth);
+			int numId = java.util.Optional.ofNullable(openByDepth.get(depth))
+					.filter(open -> number == open.lastNumber() + 1)
+					.map(Open::numId)
+					.orElseGet(() -> {
+						int fresh = DECIMAL_NUM_ID + instances.size();
+						instances.add(new Instance(fresh, level, Math.max(1, number)));
+						return fresh;
+					});
+			openByDepth.put(depth, new Open(numId, number));
+			return numId;
+		}
+
+		/** A bullet or task item at {@code depth}: it ends the numbered list open there. */
+		int bulletAt(int depth) {
+			endDeeperThan(depth);
+			openByDepth.remove(depth);
+			return BULLET_NUM_ID;
+		}
+
+		void endAll() {
+			openByDepth.clear();
+		}
+
+		private void endDeeperThan(int depth) {
+			openByDepth.keySet().removeIf(open -> open > depth);
+		}
+
+		List<Instance> instances() {
+			return List.copyOf(instances);
+		}
+	}
 
 	private static String bulletLevel(int level, int indent, String glyph, String font) {
 		return "<w:lvl w:ilvl=\"" + level + "\"><w:start w:val=\"1\"/>"

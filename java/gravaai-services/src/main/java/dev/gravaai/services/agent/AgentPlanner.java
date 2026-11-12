@@ -1653,18 +1653,19 @@ public final class AgentPlanner {
 
 	/**
 	 * The spotlight payload from an op's {@code dim}/{@code feather} keys (0–100) over
-	 * {@code current}; {@code current} comes back untouched when neither key is present.
+	 * {@code current}; each absent key keeps the current value.
 	 */
-	private static @Nullable SpotlightData readSpotlight(ObjectNode raw,
-			@Nullable SpotlightData current) {
+	private static SpotlightData readSpotlight(ObjectNode raw, SpotlightData current) {
+		SpotlightData next = current;
 		Double dim = AgentOpReader.optionalNumber(raw, "dim");
-		Double feather = AgentOpReader.optionalNumber(raw, "feather");
-		if (dim == null && feather == null) {
-			return current;
+		if (dim != null) {
+			next = next.withDimPercent(dim);
 		}
-		SpotlightData base = current == null ? SpotlightData.DEFAULT : current;
-		return new SpotlightData(dim == null ? base.dimPercent() : dim,
-				feather == null ? base.featherPercent() : feather);
+		Double feather = AgentOpReader.optionalNumber(raw, "feather");
+		if (feather != null) {
+			next = next.withFeatherPercent(feather);
+		}
+		return next;
 	}
 
 	private static void addAnnotation(Draft draft, String op, ObjectNode raw) {
@@ -1681,7 +1682,8 @@ public final class AgentPlanner {
 			AnnotationTextStyle resolved = AgentTextStyles.apply(style);
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.TEXT, text, text, null, annotationPosition(geometry),
-					annotationSize(geometry), resolved, zIndex, 0, null, null, null, null, null);
+					annotationSize(geometry), resolved, zIndex, 0, null, null, null, null,
+					SpotlightData.DEFAULT);
 		} else if ("image".equals(op)) {
 			String path = AgentOpReader.string(raw, "path");
 			String imageContent = raw.path("imageContent").isString()
@@ -1694,7 +1696,8 @@ public final class AgentPlanner {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.IMAGE, imageContent, null, imageContent,
 					annotationPosition(geometry), annotationSize(geometry),
-					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null, null, null);
+					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null, null,
+					SpotlightData.DEFAULT);
 		} else if ("figure".equals(op)) {
 			ArrowDirection arrow = AgentOpReader.readArrow(raw);
 			String color = AgentOpReader.optionalString(raw, "color");
@@ -1703,7 +1706,7 @@ public final class AgentPlanner {
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
 					new FigureData(arrow, color == null ? FigureData.DEFAULT.color() : color,
 							FigureData.DEFAULT.strokeWidth()),
-					null, null, null, null);
+					null, null, null, SpotlightData.DEFAULT);
 		} else if ("loupe".equals(op)) {
 			Double magnification = AgentOpReader.optionalNumber(raw, "magnification");
 			double resolved = magnification == null
@@ -1714,7 +1717,7 @@ public final class AgentPlanner {
 					new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 							AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
 					AnnotationTextStyle.defaultStyle(), zIndex, 0,
-					null, null, null, resolved, null);
+					null, null, null, resolved, SpotlightData.DEFAULT);
 		} else if ("spotlight".equals(op)) {
 			SpotlightData spotlight = readSpotlight(raw, SpotlightData.DEFAULT);
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
@@ -1725,7 +1728,8 @@ public final class AgentPlanner {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.BLUR, "", null, null, annotationPosition(geometry),
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
-					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null, null);
+					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null,
+					SpotlightData.DEFAULT);
 		}
 		List<AnnotationRegion> annotations = new ArrayList<>(draft.state.annotationRegions());
 		annotations.add(annotation);

@@ -33,4 +33,15 @@ public interface CursorTelemetrySource {
 	 */
 	default void onCaptureCursorPoint(double cx, double cy) {
 	}
+
+	/**
+	 * What the capture stream ended up recording ({@code SOURCE monitor|window}), reported once
+	 * before the first frame. On a portal desktop the user picks in the desktop's dialog, so a
+	 * "screen" selection can become a window: this is how the cursor mapper learns that the global
+	 * pointer no longer maps onto the recorded frame.
+	 *
+	 * <p>Called from the capture helper's stderr thread; implementations must be thread-safe.
+	 */
+	default void onCaptureSurface(WindowSources.CaptureSurface surface) {
+	}
 }

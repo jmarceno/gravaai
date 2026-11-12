@@ -88,8 +88,8 @@ public final class ServiceMeetingUiService implements MeetingUiService {
 
 	@Override
 	public Result<MeetingNotesExport.Written> exportNotes(Path mediaPath,
-			MeetingNotesExport.Request request, Path destination, String fallbackTitle) {
-		return service.exportNotes(mediaPath, request, destination, fallbackTitle);
+			MeetingNotesExport.Request request, Path destination, String untitledLabel) {
+		return service.exportNotes(mediaPath, request, destination, untitledLabel);
 	}
 
 	@Override

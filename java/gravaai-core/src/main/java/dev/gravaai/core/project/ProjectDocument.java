@@ -395,7 +395,7 @@ public final class ProjectDocument {
 				node.put("loupeMagnification", region.loupeMagnificationOrDefault());
 			}
 			if (region.type() == AnnotationType.SPOTLIGHT) {
-				SpotlightData spotlight = region.spotlightDataOrDefault();
+				SpotlightData spotlight = region.spotlightData();
 				ObjectNode spotlightNode = Json.nodeFactory().objectNode();
 				spotlightNode.put("dimPercent", spotlight.dimPercent());
 				spotlightNode.put("featherPercent", spotlight.featherPercent());

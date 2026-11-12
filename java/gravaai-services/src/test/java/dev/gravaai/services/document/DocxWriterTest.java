@@ -99,6 +99,48 @@ class DocxWriterTest {
 	}
 
 	@Test
+	@DisplayName("restarts each ordered list at its own number instead of continuing the last")
+	void restartsSeparateOrderedLists() throws Exception {
+		Map<String, byte[]> parts = write(new PlainDocument("Lists", List.of(),
+				MarkdownDocumentParser.parseBlocks("""
+						1. one
+						2. two
+
+						Between the lists.
+
+						3. three
+						4. four
+
+						Another break.
+
+						1. again
+						""")));
+		Document document = parse(parts.get("word/document.xml"));
+
+		// Three lists, three numbering instances; the items of one list share theirs.
+		List<String> ids = valuesOf(document, "numId");
+		assertEquals(5, ids.size(), ids.toString());
+		assertEquals(ids.get(0), ids.get(1));
+		assertEquals(ids.get(2), ids.get(3));
+		assertEquals(3, new java.util.HashSet<>(ids).size(), ids.toString());
+		// Each instance starts where its Markdown list starts.
+		List<String> starts = valuesOf(parse(parts.get("word/numbering.xml")), "startOverride");
+		assertEquals(List.of("1", "3", "1"), starts);
+	}
+
+	@Test
+	@DisplayName("writes a link with no destination as its plain label")
+	void writesEmptyLinksAsText() throws Exception {
+		Map<String, byte[]> parts = write(new PlainDocument("Links", List.of(),
+				MarkdownDocumentParser.parseBlocks("See [the spec]() now.")));
+
+		String body = new String(parts.get("word/document.xml"), StandardCharsets.UTF_8);
+		assertFalse(body.contains("<w:hyperlink"), body);
+		assertTrue(parse(parts.get("word/document.xml")).getDocumentElement().getTextContent()
+				.contains("See the spec now."));
+	}
+
+	@Test
 	@DisplayName("shows the checklist state next to task items")
 	void writesTaskState() throws Exception {
 		Document document = parse(write(notesDocument()).get("word/document.xml"));

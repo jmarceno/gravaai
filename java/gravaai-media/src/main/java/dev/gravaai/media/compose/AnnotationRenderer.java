@@ -322,7 +322,7 @@ final class AnnotationRenderer {
 	 */
 	private static void drawSpotlight(Canvas canvas, AnnotationSpec annotation, Rect rect,
 			int canvasWidth, int canvasHeight, long timeMs) {
-		AnnotationSpec.Spotlight spotlight = annotation.spotlightOrDefault();
+		AnnotationSpec.Spotlight spotlight = annotation.spotlight();
 		double dim = Math.max(0, Math.min(1, spotlight.dimPercent() / 100.0));
 		double presence = LoupeRenderer.presence(timeMs, annotation.startMs(), annotation.endMs());
 		int layerAlpha = (int) Math.round(dim * presence * 255);

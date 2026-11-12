@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.SpawnedProcess;
@@ -145,6 +146,28 @@ class CosmicCaptureFormatTest {
 
 		assertTrue(received.await(5, TimeUnit.SECONDS), "the early pointer line must reach the listener");
 		assertArrayEquals(new double[] {0.821875, 0.772}, points.getFirst(), 1e-9);
+	}
+
+	@Test
+	@DisplayName("the SOURCE line reports the surface, and protocol lines never become error text")
+	void forwardsTheSurfaceAndKeepsErrorsClean() throws Exception {
+		List<WindowSources.CaptureSurface> surfaces = new CopyOnWriteArrayList<>();
+		pipeline().readCaptureFormat(helper("SOURCE window\nFORMAT 800 636 rgba 0\n"),
+				new CosmicVideoPipeline.CaptureStreamListener() {
+					@Override
+					public void onPoint(double cx, double cy) {
+					}
+
+					@Override
+					public void onSurface(WindowSources.CaptureSurface surface) {
+						surfaces.add(surface);
+					}
+				});
+		assertEquals(List.of(WindowSources.CaptureSurface.WINDOW), surfaces);
+
+		IOException error = assertThrows(IOException.class, () -> pipeline().readCaptureFormat(
+				helper("SOURCE monitor\nCURSOR 0.5 0.5\nERROR no output named X\n")));
+		assertEquals("ERROR no output named X", error.getMessage());
 	}
 
 	@Test

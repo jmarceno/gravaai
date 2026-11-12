@@ -1,6 +1,5 @@
 package dev.gravaai.services.document;
 
-import org.jspecify.annotations.Nullable;
 /**
  * The document formats the app writes. Each constant knows its file extension and display name,
  * so a picker, a file chooser filter and a writer lookup all read the same declaration instead of
@@ -38,18 +37,20 @@ public enum DocumentFormat {
 	 * The format of a file name, when it has one of ours.
 	 *
 	 * @param fileName the file name
-	 * @return the matching format, or null when the name carries no known extension
+	 * @return the matching format; empty when the name carries no known extension
 	 */
-	public static @Nullable DocumentFormat fromFileName(@Nullable String fileName) {
-		if (fileName == null) {
-			return null;
-		}
+	public static java.util.Optional<DocumentFormat> fromFileName(String fileName) {
 		String lower = fileName.toLowerCase(java.util.Locale.ROOT);
 		for (DocumentFormat format : values()) {
 			if (lower.endsWith("." + format.extension)) {
-				return format;
+				return java.util.Optional.of(format);
 			}
 		}
-		return null;
+		return java.util.Optional.empty();
+	}
+
+	/** True when {@code fileName} already ends in this format's extension (any case). */
+	public boolean matches(String fileName) {
+		return fileName.toLowerCase(java.util.Locale.ROOT).endsWith("." + extension);
 	}
 }

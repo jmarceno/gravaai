@@ -28,16 +28,27 @@ public final class MeetingText {
 	 * window does; only the untitled label comes from the UI's translations.
 	 */
 	public static String meetingTitle(@Nullable MeetingMeta meta, @Nullable Long fallbackMs) {
-		return MeetingTexts.meetingTitle(meta, fallbackMs, UiI18n.t("dashboard:library.meeting"));
+		return MeetingTexts.meetingTitle(java.util.Optional.ofNullable(meta),
+				fallbackMs == null ? java.util.OptionalLong.empty()
+						: java.util.OptionalLong.of(fallbackMs),
+				untitledLabel());
 	}
 
-	/** Port of {@code formatMeetingDuration}: "1 h 5 min", "5 min 3 s", "3 s" or null. */
+	/** The localized label of a meeting with no title ("Meeting"). */
+	public static String untitledLabel() {
+		return UiI18n.t("dashboard:library.meeting");
+	}
+
+	/**
+	 * Port of {@code formatMeetingDuration}: "1 h 5 min", "5 min 3 s", "3 s" or null. Null is the
+	 * React port's "hide the duration" value that every label call site already handles.
+	 */
 	public static @Nullable String formatMeetingDuration(@Nullable Long ms) {
-		return MeetingTexts.formatDuration(ms);
+		return MeetingTexts.formatDuration(ms).orElse(null);
 	}
 
 	/** Port of {@code formatSize}: "1.2 GB" or "574 MB". */
-	public static @Nullable String formatSize(long bytes) {
+	public static String formatSize(long bytes) {
 		return MeetingTexts.formatSize(bytes);
 	}
 

@@ -75,17 +75,39 @@ class MeetingNotesExportTest {
 	@Test
 	@DisplayName("maps a file name back to its format")
 	void mapsExtensions() {
-		assertEquals(DocumentFormat.DOCX, DocumentFormat.fromFileName("notes.DOCX"));
-		assertEquals(DocumentFormat.PDF, DocumentFormat.fromFileName("a/b/notes.pdf"));
-		assertEquals(null, DocumentFormat.fromFileName("notes.txt"));
-		assertEquals(null, DocumentFormat.fromFileName(null));
+		assertEquals(java.util.Optional.of(DocumentFormat.DOCX),
+				DocumentFormat.fromFileName("notes.DOCX"));
+		assertEquals(java.util.Optional.of(DocumentFormat.PDF),
+				DocumentFormat.fromFileName("a/b/notes.pdf"));
+		assertEquals(java.util.Optional.empty(), DocumentFormat.fromFileName("notes.txt"));
 	}
 
 	@Test
 	@DisplayName("defaults the header to nothing without metadata")
 	void handlesMissingMeta() {
-		assertTrue(MeetingNotesExport.metadata(null, null).isEmpty());
-		assertTrue(MeetingNotesExport.speakers(null).isEmpty());
+		MeetingMeta empty = new MeetingMeta(null, null, null, null, null, null, null, null, null,
+				null, null, null, null);
+		assertTrue(MeetingNotesExport.metadata(empty, "").isEmpty());
+		assertTrue(MeetingNotesExport.speakers("").isEmpty());
+	}
+
+	@Test
+	@DisplayName("an untitled meeting with a date is named once, not with the date twice")
+	void namesAnUntitledMeetingOnce() {
+		MeetingMeta meta = new MeetingMeta("meeting", "2026-11-12T12:00:00.000Z", false, "en",
+				2_700_000L, null, null, null, null, null, null, null, null);
+		var result = MeetingNotesExport.build(new MeetingService.FilesView(
+				MeetingFiles.meetingFilesFor(java.nio.file.Path.of("/tmp/meeting.m4a")), null,
+				NOTES, meta, false), new MeetingNotesExport.Request(DocumentFormat.DOCX, false),
+				"Meeting");
+
+		String title = assertInstanceOf(dev.gravaai.core.result.Result.Ok.class, result).value()
+				instanceof PlainDocument document ? document.title() : "";
+		assertTrue(title.startsWith("Meeting "), title);
+		// The label carries the date exactly once.
+		assertEquals(title.indexOf("Meeting"), title.lastIndexOf("Meeting"), title);
+		assertEquals(MeetingTexts.meetingTitle(java.util.Optional.of(meta),
+				java.util.OptionalLong.empty(), "Meeting"), title);
 	}
 
 	@Test
@@ -94,8 +116,8 @@ class MeetingNotesExportTest {
 		MeetingMeta meta = new MeetingMeta(null, null, null, null, null, "  Design review  ", null,
 				null, null, null, null, null, null);
 
-		assertEquals("Design review",
-				MeetingTexts.meetingTitle(meta, null, "Meeting"));
+		assertEquals("Design review", MeetingTexts.meetingTitle(java.util.Optional.of(meta),
+				java.util.OptionalLong.empty(), "Meeting"));
 	}
 
 	@Test
@@ -104,7 +126,8 @@ class MeetingNotesExportTest {
 		MeetingMeta meta = new MeetingMeta(null, "2026-11-12T12:00:00.000Z", null, null, null, null,
 				null, null, null, null, null, null, null);
 
-		String title = MeetingTexts.meetingTitle(meta, null, "Meeting");
+		String title = MeetingTexts.meetingTitle(java.util.Optional.of(meta),
+				java.util.OptionalLong.empty(), "Meeting");
 		assertTrue(title.startsWith("Meeting "), title);
 	}
 

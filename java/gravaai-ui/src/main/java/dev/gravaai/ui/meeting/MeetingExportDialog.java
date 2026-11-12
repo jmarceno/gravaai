@@ -1,8 +1,7 @@
 package dev.gravaai.ui.meeting;
 
-import org.jspecify.annotations.Nullable;
-
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -48,14 +47,14 @@ public final class MeetingExportDialog {
 	 *     checkbox is disabled and stays off
 	 * @param fileNameFor the default file name for a format (usually
 	 *     {@code MeetingNotesExport.defaultFileName})
-	 * @param saveChooser asks the user where to write; returns null when they cancel. Called on the
-	 *     FX thread, once the format is known.
+	 * @param saveChooser asks the user where to write; empty when they cancel. Called on the FX
+	 *     thread, once the format is known.
 	 * @param onExport receives the finished choice; not called when the user cancels
 	 */
 	public static void show(Node owner, DocumentFormat initialFormat,
 			boolean transcriptAvailable,
 			Function<DocumentFormat, String> fileNameFor,
-			BiFunction<DocumentFormat, String, @Nullable Path> saveChooser,
+			BiFunction<DocumentFormat, String, Optional<Path>> saveChooser,
 			Consumer<Choice> onExport) {
 		MeetingExportDialog export = new MeetingExportDialog(initialFormat, transcriptAvailable,
 				fileNameFor, saveChooser, onExport);
@@ -64,7 +63,7 @@ public final class MeetingExportDialog {
 
 	private MeetingExportDialog(DocumentFormat initialFormat, boolean transcriptAvailable,
 			Function<DocumentFormat, String> fileNameFor,
-			BiFunction<DocumentFormat, String, @Nullable Path> saveChooser,
+			BiFunction<DocumentFormat, String, Optional<Path>> saveChooser,
 			Consumer<Choice> onExport) {
 		dialog = new Dialog("Export notes");
 		dialog.width(460);
@@ -92,14 +91,12 @@ public final class MeetingExportDialog {
 		Button export = new Button("Choose file…", Button.Variant.DEFAULT, Button.Size.SM);
 		export.setOnAction(event -> {
 			DocumentFormat format = formatOf(formats.value(), initialFormat);
-			String fileName = fileNameFor.apply(format);
-			Path destination = saveChooser.apply(format, fileName);
-			if (destination == null) {
-				return;
-			}
-			dialog.close();
-			onExport.accept(new Choice(
-					new MeetingNotesExport.Request(format, transcript.isChecked()), destination));
+			saveChooser.apply(format, fileNameFor.apply(format)).ifPresent(destination -> {
+				dialog.close();
+				onExport.accept(new Choice(
+						new MeetingNotesExport.Request(format, transcript.isChecked()),
+						destination));
+			});
 		});
 
 		Region spacer = new Region();
@@ -120,12 +117,10 @@ public final class MeetingExportDialog {
 	 * always resolves; the fallback keeps a corrupted selection from crashing the dialog.
 	 */
 	private static DocumentFormat formatOf(String value, DocumentFormat fallback) {
-		for (DocumentFormat format : DocumentFormat.values()) {
-			if (format.name().equals(value)) {
-				return format;
-			}
-		}
-		return fallback;
+		return java.util.Arrays.stream(DocumentFormat.values())
+				.filter(format -> format.name().equals(value))
+				.findFirst()
+				.orElse(fallback);
 	}
 
 	private static Label caption(String text) {

@@ -38,7 +38,7 @@ public final class AnnotationCommands {
 			@Nullable Integer trackIndex, String content, @Nullable String textContent, @Nullable String imageContent,
 			AnnotationPosition position, AnnotationSize size, AnnotationTextStyle style,
 			@Nullable FigureData figureData, @Nullable Double blurIntensity, @Nullable String blurColor,
-			@Nullable SpotlightData spotlightData) {
+			SpotlightData spotlightData) {
 		return new AnnotationRegion(region.id(), startMs, endMs, region.type(), content,
 				textContent, imageContent, position, size, style, region.zIndex(),
 				trackIndex != null ? trackIndex : region.trackIndex(), figureData, blurIntensity,
@@ -89,7 +89,8 @@ public final class AnnotationCommands {
 					Math.round(endMs), AnnotationType.TEXT, "Enter text...", null, null,
 					AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
-					trackIndex == null ? 0 : trackIndex, null, null, null, null, null);
+					trackIndex == null ? 0 : trackIndex, null, null, null, null,
+					SpotlightData.DEFAULT);
 			List<AnnotationRegion> next = new ArrayList<>(regions);
 			next.add(region);
 			store.setAnnotationRegions(next);
@@ -145,7 +146,7 @@ public final class AnnotationCommands {
 					AnnotationPosition.DEFAULT, new AnnotationSize(diameter, diameter),
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
 					nextTrack, null, null, null, AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
-					null);
+					SpotlightData.DEFAULT);
 			List<AnnotationRegion> next = new ArrayList<>(regions);
 			next.add(region);
 			store.setAnnotationRegions(next);
@@ -313,9 +314,6 @@ public final class AnnotationCommands {
 					}
 				} else if (type == AnnotationType.SPOTLIGHT) {
 					content = "";
-					if (spotlightData == null) {
-						spotlightData = SpotlightData.DEFAULT;
-					}
 				}
 				next.add(new AnnotationRegion(region.id(), region.startMs(), region.endMs(), type,
 						content, region.textContent(), region.imageContent(), region.position(),
@@ -497,7 +495,7 @@ public final class AnnotationCommands {
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), region.size(), region.style(),
 								region.figureData(), region.blurIntensity(), region.blurColor(),
-								replace(region.spotlightDataOrDefault(), dimPercent, null))
+								region.spotlightData().withDimPercent(dimPercent))
 						: region);
 			}
 			store.setAnnotationRegions(next);
@@ -524,20 +522,12 @@ public final class AnnotationCommands {
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), region.size(), region.style(),
 								region.figureData(), region.blurIntensity(), region.blurColor(),
-								replace(region.spotlightDataOrDefault(), null, featherPercent))
+								region.spotlightData().withFeatherPercent(featherPercent))
 						: region);
 			}
 			store.setAnnotationRegions(next);
 			return true;
 		}
-	}
-
-	/** One spotlight component replaced ({@code null} keeps the current one). */
-	private static SpotlightData replace(SpotlightData spotlight, @Nullable Double dimPercent,
-			@Nullable Double featherPercent) {
-		return new SpotlightData(
-				dimPercent == null ? spotlight.dimPercent() : dimPercent,
-				featherPercent == null ? spotlight.featherPercent() : featherPercent);
 	}
 
 	/** The square lens size for a loupe diameter percent (the lens stays circular). */

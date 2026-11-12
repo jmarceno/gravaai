@@ -311,7 +311,8 @@ public final class RecordingImportController {
 							AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
 					AnnotationTextStyle.defaultStyle(),
 					session.store().nextIndex("annotation-zIndex"), 0, null, null, null,
-					AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION, null));
+					AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+					dev.gravaai.core.project.SpotlightData.DEFAULT));
 		}
 	}
 

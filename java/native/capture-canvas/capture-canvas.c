@@ -19,9 +19,25 @@ void capture_canvas_init(struct capture_canvas *canvas, uint32_t source_w, uint3
 	canvas->bytes = (size_t)width * (size_t)height * 4u;
 }
 
+/* True when the source is the canvas plus at most the one column/row the even rounding in
+ * capture_canvas_init dropped. Such a source is cropped, not scaled: every odd-sized window would
+ * otherwise be resampled by nearest neighbour on every frame, with a one-pixel black bar, for a
+ * difference of a single pixel. */
+static bool is_crop(const struct capture_canvas *canvas, uint32_t source_w, uint32_t source_h) {
+	return source_w >= canvas->width && source_w - canvas->width <= 1
+		&& source_h >= canvas->height && source_h - canvas->height <= 1;
+}
+
 /* The rect a source occupies inside the canvas, preserving aspect ratio. */
 static void fit_rect(const struct capture_canvas *canvas, uint32_t source_w, uint32_t source_h,
 		double *ox, double *oy, double *dw, double *dh) {
+	if (is_crop(canvas, source_w, source_h)) {
+		/* Drawn 1:1 from the top-left; the dropped odd column/row falls off the edge. */
+		*ox = *oy = 0;
+		*dw = source_w;
+		*dh = source_h;
+		return;
+	}
 	if (source_w == canvas->width && source_h == canvas->height) {
 		*ox = *oy = 0;
 		*dw = canvas->width;
@@ -50,10 +66,10 @@ uint8_t *capture_canvas_compose(struct capture_canvas *canvas, uint8_t *dest,
 
 	double ox, oy, dw, dh;
 	fit_rect(canvas, source_w, source_h, &ox, &oy, &dw, &dh);
-	// Only a true size match may copy rows verbatim: a source with the canvas's aspect ratio
-	// but another size also fits the whole canvas, and copying its rows at the canvas width
-	// would read past the source buffer.
-	if (source_w == canvas->width && source_h == canvas->height) {
+	// Only a size match (or the odd-pixel crop, whose source is at least as large as the canvas)
+	// may copy rows verbatim: a source with the canvas's aspect ratio but a smaller size also fits
+	// the whole canvas, and copying its rows at the canvas width would read past the source buffer.
+	if (is_crop(canvas, source_w, source_h)) {
 		for (uint32_t y = 0; y < canvas->height; y++)
 			memcpy(dest + (size_t)y * canvas->width * 4u, source + (size_t)y * stride,
 				(size_t)canvas->width * 4u);

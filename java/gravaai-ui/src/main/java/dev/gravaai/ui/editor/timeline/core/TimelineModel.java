@@ -129,7 +129,7 @@ public final class TimelineModel {
 		}
 		if (region.type() == AnnotationType.SPOTLIGHT) {
 			return String.format(java.util.Locale.ROOT, "Spotlight %.0f%%",
-					region.spotlightDataOrDefault().dimPercent());
+					region.spotlightData().dimPercent());
 		}
 		return "Annotation";
 	}
@@ -139,7 +139,8 @@ public final class TimelineModel {
 		return switch (region.type()) {
 			case LOUPE -> TimelineRenderItem.Variant.LOUPE;
 			case SPOTLIGHT -> TimelineRenderItem.Variant.SPOTLIGHT;
-			default -> TimelineRenderItem.Variant.ANNOTATION;
+			// Listed rather than defaulted, so a new annotation type has to choose its styling.
+			case TEXT, IMAGE, FIGURE, BLUR -> TimelineRenderItem.Variant.ANNOTATION;
 		};
 	}
 

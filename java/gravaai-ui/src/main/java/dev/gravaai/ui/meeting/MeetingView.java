@@ -425,8 +425,7 @@ public final class MeetingView extends Region {
 			return null;
 		}
 		// A timestamp the shared formatter cannot parse is still worth showing as it stands.
-		String formatted = MeetingTexts.formatDateTime(iso);
-		return formatted == null ? iso : formatted;
+		return MeetingTexts.formatDateTime(iso).orElse(iso);
 	}
 
 	private static String css(javafx.scene.paint.Color color) {

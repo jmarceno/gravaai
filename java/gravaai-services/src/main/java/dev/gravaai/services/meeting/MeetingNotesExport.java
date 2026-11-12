@@ -1,15 +1,17 @@
 package dev.gravaai.services.meeting;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 import dev.gravaai.core.result.Result;
@@ -25,9 +27,11 @@ import dev.gravaai.services.document.PlainDocument;
  * Exports a meeting's notes as a document: the title, the date/duration line, the notes themselves
  * and, when asked, the full transcript as an appendix.
  *
- * <p>DOCX and PDF are rendered from one {@link PlainDocument}, so both carry exactly the same
- * headings and lists. Markdown keeps the notes file's own markup, because it is what people paste
- * into other tools.
+ * <p>All three formats are rendered from one {@link PlainDocument}, so they carry exactly the same
+ * headings and lists.
+ *
+ * <p>The file is written next to its destination and moved into place only once it is complete,
+ * so a failed export never leaves a truncated document over an earlier one.
  */
 public final class MeetingNotesExport {
 
@@ -54,26 +58,24 @@ public final class MeetingNotesExport {
 	 * @param mediaPath the meeting recording
 	 * @param request the format and whether to include the transcript
 	 * @param destination the file to write (created, parents included)
-	 * @param fallbackTitle the localized label used when the meeting has no title and no date
+	 * @param untitledLabel the localized label of a meeting with no title ("Meeting"); the date is
+	 *     appended to it when the meeting has one
 	 */
 	public Result<Written> export(Path mediaPath, Request request, Path destination,
-			String fallbackTitle) {
+			String untitledLabel) {
 		try {
-			MeetingService.FilesView files = service.getFiles(mediaPath).orNull();
-			if (files == null) {
+			if (!(service.getFiles(mediaPath) instanceof Result.Ok<MeetingService.FilesView> files)) {
 				return Result.err("Could not read the meeting files.");
 			}
-			Result<PlainDocument> built = build(files, request, fallbackTitle);
-			if (built.isErr()) {
-				return Result.err(built.errorMessage());
-			}
-			PlainDocument document = built.orElse(new PlainDocument(fallbackTitle, List.of(),
-					List.of()));
-			write(document, request.format(), destination);
-			return Result.ok(new Written(destination, request.format(), document.blocks().size()));
-		} catch (IOException error) {
-			return Result.err(message(error));
-		} catch (RuntimeException error) {
+			return switch (build(files.value(), request, untitledLabel)) {
+				case Result.Err<PlainDocument> error -> Result.err(error.error());
+				case Result.Ok<PlainDocument> document -> {
+					write(document.value(), request.format(), destination);
+					yield Result.ok(new Written(destination, request.format(),
+							document.value().blocks().size()));
+				}
+			};
+		} catch (IOException | RuntimeException error) {
 			return Result.err(message(error));
 		}
 	}
@@ -83,37 +85,38 @@ public final class MeetingNotesExport {
 	 * can be inspected (and the writers tested) without a service.
 	 *
 	 * @param files the meeting's notes, transcript and metadata
-	 * @param request the format (only its transcript flag matters here) and the transcript choice
-	 * @param fallbackTitle the label for a meeting with no title and no date ("Meeting")
+	 * @param request the transcript choice (the format does not change the document)
+	 * @param untitledLabel the label for a meeting with no title ("Meeting")
 	 * @return the document, or the reason there is nothing to export
 	 */
 	public static Result<PlainDocument> build(MeetingService.FilesView files, Request request,
-			String fallbackTitle) {
-		String notes = files.notes();
-		String transcript = files.transcript();
-		boolean hasNotes = notes != null && !notes.isBlank();
-		boolean hasTranscript = transcript != null && !transcript.isBlank();
-		if (!hasNotes && !hasTranscript) {
+			String untitledLabel) {
+		Optional<String> notes = nonBlank(files.notes());
+		Optional<String> transcript = nonBlank(files.transcript());
+		if (notes.isEmpty() && transcript.isEmpty()) {
 			return Result.err("This meeting has no notes or transcript to export yet.");
 		}
-		if (request.includeTranscript() && !hasTranscript) {
+		if (request.includeTranscript() && transcript.isEmpty()) {
 			return Result.err("This meeting has no transcript to include.");
 		}
 		List<DocumentBlock> blocks = new ArrayList<>();
-		if (hasNotes) {
-			blocks.addAll(MarkdownDocumentParser.parseBlocks(notes));
-		}
+		notes.ifPresent(markdown -> blocks.addAll(MarkdownDocumentParser.parseBlocks(markdown)));
 		if (request.includeTranscript()) {
 			if (!blocks.isEmpty()) {
 				blocks.add(new DocumentBlock.Rule());
 			}
 			blocks.add(new DocumentBlock.Heading(1,
 					List.of(new InlineRun.Text(TRANSCRIPT_HEADING))));
-			blocks.addAll(MarkdownDocumentParser.parseBlocks(transcript));
+			transcript.ifPresent(markdown -> blocks.addAll(MarkdownDocumentParser.parseBlocks(markdown)));
 		}
 		return Result.ok(new PlainDocument(
-				MeetingTexts.meetingTitle(files.meta(), null, fallbackTitle),
-				metadata(files.meta(), transcript), blocks));
+				MeetingTexts.meetingTitle(Optional.of(files.meta()), OptionalLong.empty(),
+						untitledLabel),
+				metadata(files.meta(), transcript.orElse("")), blocks));
+	}
+
+	private static Optional<String> nonBlank(@org.jspecify.annotations.Nullable String text) {
+		return Optional.ofNullable(text).filter(value -> !value.isBlank());
 	}
 
 	/**
@@ -121,18 +124,10 @@ public final class MeetingNotesExport {
 	 * speakers come from the transcript's own labels, so the header can never list someone who is
 	 * not in the notes.
 	 */
-	static List<String> metadata(@Nullable MeetingMeta meta, @Nullable String transcript) {
+	static List<String> metadata(MeetingMeta meta, String transcript) {
 		List<String> metadata = new ArrayList<>();
-		if (meta != null) {
-			String date = MeetingTexts.formatDateTime(meta.createdAt());
-			if (date != null) {
-				metadata.add(date);
-			}
-			String duration = MeetingTexts.formatDuration(meta.durationMs());
-			if (duration != null) {
-				metadata.add(duration);
-			}
-		}
+		MeetingTexts.formatDateTime(meta.createdAt()).ifPresent(metadata::add);
+		MeetingTexts.formatDuration(meta.durationMs()).ifPresent(metadata::add);
 		Set<String> speakers = speakers(transcript);
 		if (!speakers.isEmpty()) {
 			metadata.add(String.join(", ", speakers));
@@ -141,59 +136,61 @@ public final class MeetingNotesExport {
 	}
 
 	/** The distinct speaker labels the transcript uses, in first-seen order. */
-	static Set<String> speakers(@Nullable String transcript) {
+	static Set<String> speakers(String transcript) {
 		Set<String> speakers = new LinkedHashSet<>();
-		if (transcript == null || transcript.isBlank()) {
-			return speakers;
-		}
 		for (String line : transcript.split("\n")) {
-			String label = speakerLabel(line);
-			if (label != null) {
-				speakers.add(label);
-			}
+			speakerLabel(line).ifPresent(speakers::add);
 		}
 		return speakers;
 	}
 
 	/**
-	 * The bold speaker label of a transcript line ({@code [00:01:05] **Me:** text}), or null when
-	 * the line carries none.
+	 * The bold speaker label of a transcript line ({@code [00:01:05] **Me:** text}); empty when the
+	 * line carries none.
 	 */
-	private static @Nullable String speakerLabel(String line) {
+	private static Optional<String> speakerLabel(String line) {
 		int start = line.indexOf("**");
 		if (start < 0) {
-			return null;
+			return Optional.empty();
 		}
 		int end = line.indexOf("**", start + 2);
 		if (end < 0) {
-			return null;
+			return Optional.empty();
 		}
 		String label = line.substring(start + 2, end).strip();
 		if (label.endsWith(":")) {
 			label = label.substring(0, label.length() - 1).strip();
 		}
-		return label.isEmpty() ? null : label;
+		return label.isEmpty() ? Optional.empty() : Optional.of(label);
 	}
 
+	/**
+	 * Writes the document to a sibling temp file, then moves it over {@code destination}: the move
+	 * is the only step that touches an existing file, so an encoder or font failure halfway leaves
+	 * whatever was there before intact.
+	 */
 	private static void write(PlainDocument document, DocumentFormat format, Path destination)
 			throws IOException {
-		Path parent = destination.getParent();
-		if (parent != null) {
-			Files.createDirectories(parent);
-		}
-		switch (format) {
-			case MARKDOWN -> Files.writeString(destination, document.toMarkdown(),
-					StandardCharsets.UTF_8);
-			case DOCX -> {
-				try (OutputStream out = Files.newOutputStream(destination)) {
-					DocxWriter.write(document, out);
+		Path target = destination.toAbsolutePath().normalize();
+		Path directory = target.getParent();
+		Files.createDirectories(directory);
+		Path temporary = Files.createTempFile(directory, ".gravaai-export-", ".part");
+		try {
+			try (OutputStream out = Files.newOutputStream(temporary)) {
+				switch (format) {
+					case MARKDOWN -> out.write(document.toMarkdown().getBytes(StandardCharsets.UTF_8));
+					case DOCX -> DocxWriter.write(document, out);
+					case PDF -> PdfWriter.write(document, out);
 				}
 			}
-			case PDF -> {
-				try (OutputStream out = Files.newOutputStream(destination)) {
-					PdfWriter.write(document, out);
-				}
+			try {
+				Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING,
+						StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException unsupported) {
+				Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
 			}
+		} finally {
+			Files.deleteIfExists(temporary);
 		}
 	}
 
@@ -209,6 +206,7 @@ public final class MeetingNotesExport {
 	}
 
 	private static String message(Exception error) {
-		return error.getMessage() == null ? error.toString() : error.getMessage();
+		String message = error.getMessage();
+		return message == null || message.isBlank() ? error.toString() : message;
 	}
 }

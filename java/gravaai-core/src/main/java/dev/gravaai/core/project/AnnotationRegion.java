@@ -20,7 +20,7 @@ public record AnnotationRegion(
 		@Nullable Double blurIntensity,
 		@Nullable String blurColor,
 		@Nullable Double loupeMagnification,
-		@Nullable SpotlightData spotlightData) {
+		SpotlightData spotlightData) {
 
 	public static final int BLUR_ANNOTATION_STRENGTH = 20;
 
@@ -33,22 +33,20 @@ public record AnnotationRegion(
 	 */
 	public static final double LOUPE_DEFAULT_DIAMETER_PERCENT = 60.0;
 
-	/** Spotlight dim percent used when a spotlight is created or the payload is absent. */
-	public static final double SPOTLIGHT_DEFAULT_DIM_PERCENT = SpotlightData.DEFAULT.dimPercent();
-
-	/** Spotlight feather percent used when a spotlight is created or the payload is absent. */
-	public static final double SPOTLIGHT_DEFAULT_FEATHER_PERCENT =
-			SpotlightData.DEFAULT.featherPercent();
+	/**
+	 * {@code spotlightData} is always present: every region carries the spotlight payload, and only
+	 * a {@link AnnotationType#SPOTLIGHT} region reads or persists it. A value instead of a nullable
+	 * field means a region whose type is switched to spotlight already has its settings, and no
+	 * caller has to guess a default.
+	 */
+	public AnnotationRegion {
+		java.util.Objects.requireNonNull(spotlightData, "spotlightData");
+	}
 
 	/** The effective magnification of a loupe region (never below 1). */
 	public double loupeMagnificationOrDefault() {
 		return loupeMagnification == null || loupeMagnification < 1
 				? LOUPE_DEFAULT_MAGNIFICATION
 				: loupeMagnification;
-	}
-
-	/** The effective payload of a spotlight region (defaults when absent). */
-	public SpotlightData spotlightDataOrDefault() {
-		return spotlightData == null ? SpotlightData.DEFAULT : spotlightData;
 	}
 }

@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,18 +30,56 @@ import dev.gravaai.services.sources.SelectedSource;
  *
  * <p>Source ids (what {@link SelectedSource#id()} carries) put a {@code screen:} or
  * {@code window:} prefix in front of that, so the UI can tell the two groups apart without
- * knowing the helper's spelling.
+ * knowing the helper's spelling. {@link SelectedSource} is the selection port's record, whose id
+ * may be absent, so the id inputs here accept null.
  */
 public final class WindowSources {
-
-	/** The capture helper argument that records whatever window the desktop's picker returns. */
-	public static final String PORTAL_WINDOW_TARGET = "window:portal";
 
 	/** Source ids for directly captured windows; also the helper's own target prefix. */
 	public static final String WINDOW_SOURCE_PREFIX = "window:";
 
-	/** One window the compositor reported: a stable identifier, an app id and a title. */
-	public record CaptureWindow(String identifier, @Nullable String appId, String title) {
+	/** The identifier slot of the portal's "the desktop dialog picks a window" source. */
+	private static final String PORTAL_IDENTIFIER = "portal";
+
+	/** The capture helper argument that records whatever window the desktop's picker returns. */
+	public static final String PORTAL_WINDOW_TARGET = WINDOW_SOURCE_PREFIX + PORTAL_IDENTIFIER;
+
+	/**
+	 * One window the compositor reported: a stable identifier, an app id when the client set one,
+	 * and a title (possibly empty).
+	 */
+	public record CaptureWindow(String identifier, Optional<String> appId, String title) {
+
+		/** A window whose app id is given as text; a blank one means the client set none. */
+		public CaptureWindow(String identifier, String appId, String title) {
+			this(identifier, appId.isBlank() ? Optional.empty() : Optional.of(appId), title);
+		}
+	}
+
+	/**
+	 * What the capture stream ended up recording, as the helpers report it on their
+	 * {@code SOURCE <monitor|window>} line. On a portal desktop the user picks in the desktop's
+	 * dialog, so this is the only way the app learns that a "screen" selection became a window.
+	 */
+	public enum CaptureSurface {
+		MONITOR("monitor"),
+		WINDOW("window");
+
+		private final String wire;
+
+		CaptureSurface(String wire) {
+			this.wire = wire;
+		}
+
+		/** The surface a helper's {@code SOURCE} value names; empty for an unknown word. */
+		public static Optional<CaptureSurface> parse(String value) {
+			for (CaptureSurface surface : values()) {
+				if (surface.wire.equals(value)) {
+					return Optional.of(surface);
+				}
+			}
+			return Optional.empty();
+		}
 	}
 
 	private static final Pattern WINDOW_LINE =
@@ -57,7 +96,7 @@ public final class WindowSources {
 	 * should pick itself (the portal's dialog). Returning the empty string asks the helper for
 	 * "whatever the portal offers", which is what a portal session has always done.
 	 *
-	 * @param source the selected source, or null when nothing is selected
+	 * @param source the selected source, or null when the selection port has none
 	 */
 	public static String captureTarget(@Nullable SelectedSource source) {
 		if (source == null || source.id() == null) {
@@ -68,8 +107,8 @@ public final class WindowSources {
 			return CosmicSources.outputNameForSourceId(id);
 		}
 		if (isWindowSourceId(id)) {
-			String identifier = id.substring(WINDOW_SOURCE_PREFIX.length());
-			return identifier.isEmpty() ? PORTAL_WINDOW_TARGET : WINDOW_SOURCE_PREFIX + identifier;
+			return windowIdentifier(id).map(WindowSources::windowSourceId)
+					.orElse(PORTAL_WINDOW_TARGET);
 		}
 		// The portal sentinel and every other screen source: the desktop's dialog decides.
 		return "";
@@ -81,17 +120,19 @@ public final class WindowSources {
 	}
 
 	/**
-	 * The window identifier inside a source id, or null for a monitor.
+	 * The window identifier inside a source id; empty for a monitor.
 	 *
-	 * <p>The portal's synthetic window source has no identifier yet, so it also answers null: there
+	 * <p>The portal's synthetic window source has no identifier yet, so it also answers empty: there
 	 * is no window to resolve before the user picks one.
 	 */
-	public static @Nullable String windowIdentifier(@Nullable String sourceId) {
+	public static Optional<String> windowIdentifier(@Nullable String sourceId) {
 		if (sourceId == null || !isWindowSourceId(sourceId)) {
-			return null;
+			return Optional.empty();
 		}
 		String identifier = sourceId.substring(WINDOW_SOURCE_PREFIX.length());
-		return identifier.isEmpty() || identifier.equals("portal") ? null : identifier;
+		return identifier.isEmpty() || identifier.equals(PORTAL_IDENTIFIER)
+				? Optional.empty()
+				: Optional.of(identifier);
 	}
 
 	/** The source id for a window the compositor reported. */
@@ -101,15 +142,12 @@ public final class WindowSources {
 
 	/** The source id for the portal's "the user picks a window in the desktop dialog" source. */
 	public static String portalWindowSourceId() {
-		return WINDOW_SOURCE_PREFIX + "portal";
+		return PORTAL_WINDOW_TARGET;
 	}
 
 	/** Parses the helper's {@code --list-windows} stdout; malformed lines are ignored. */
-	public static List<CaptureWindow> parseWindows(@Nullable String stdout) {
+	public static List<CaptureWindow> parseWindows(String stdout) {
 		List<CaptureWindow> windows = new ArrayList<>();
-		if (stdout == null) {
-			return windows;
-		}
 		for (String line : stdout.split("\n", -1)) {
 			Matcher match = WINDOW_LINE.matcher(line);
 			if (!match.matches()) {
@@ -119,9 +157,8 @@ public final class WindowSources {
 			if (identifier.isEmpty()) {
 				continue;
 			}
-			String appId = match.group(2).trim();
-			String title = match.group(3).trim();
-			windows.add(new CaptureWindow(identifier, appId.isEmpty() ? null : appId, title));
+			windows.add(new CaptureWindow(identifier, match.group(2).trim(),
+					match.group(3).trim()));
 		}
 		return windows;
 	}
@@ -137,9 +174,6 @@ public final class WindowSources {
 		if (!window.title().isBlank()) {
 			return window.title();
 		}
-		if (window.appId() != null && !window.appId().isBlank()) {
-			return window.appId();
-		}
-		return window.identifier();
+		return window.appId().filter(app -> !app.isBlank()).orElse(window.identifier());
 	}
 }

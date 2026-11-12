@@ -79,6 +79,21 @@ int main(void) {
 	check(pixel(destination, canvas.width * 4u, 400, 300) == 0x22222222u,
 		"the content is vertically centred");
 
+	/* An odd-sized window (801x601) keeps its pixels 1:1 on its even 800x600 canvas: the dropped
+	 * column/row is cropped, not resampled into a black-barred, nearest-neighbour copy. */
+	struct capture_canvas odd_canvas;
+	capture_canvas_init(&odd_canvas, 801, 601);
+	for (uint32_t y = 0; y < 601; y++)
+		for (uint32_t x = 0; x < 801; x++) {
+			uint32_t value = y * 1000u + x + 1u;
+			memcpy(source + (size_t)y * 801u * 4u + (size_t)x * 4u, &value, sizeof value);
+		}
+	capture_canvas_compose(&odd_canvas, destination, source, 801u * 4u, 801, 601);
+	check(pixel(destination, odd_canvas.width * 4u, 0, 0) == 1u
+			&& pixel(destination, odd_canvas.width * 4u, 799, 599) == 599u * 1000u + 799u + 1u
+			&& pixel(destination, odd_canvas.width * 4u, 400, 300) == 300u * 1000u + 400u + 1u,
+		"an odd-sized source is cropped to its even canvas, pixel for pixel");
+
 	/* A degenerate frame leaves the canvas untouched instead of reading past it. */
 	memset(destination, 0x7F, canvas.bytes);
 	check(capture_canvas_compose(&canvas, destination, source, 800u * 4u, 0, 600) == NULL,

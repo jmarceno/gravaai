@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.commonmark.Extension;
 import org.commonmark.ext.task.list.items.TaskListItemMarker;
@@ -16,6 +17,8 @@ import org.commonmark.node.Emphasis;
 import org.commonmark.node.FencedCodeBlock;
 import org.commonmark.node.HardLineBreak;
 import org.commonmark.node.Heading;
+import org.commonmark.node.HtmlBlock;
+import org.commonmark.node.IndentedCodeBlock;
 import org.commonmark.node.Link;
 import org.commonmark.node.ListBlock;
 import org.commonmark.node.ListItem;
@@ -51,23 +54,28 @@ public final class MarkdownDocumentParser {
 	 * Parses a Markdown body into blocks. The caller supplies the title and metadata because they
 	 * come from the meeting's own fields, not from the notes text (which may repeat them).
 	 */
-	public static PlainDocument parse(String title, List<String> metadata,
-			@Nullable String markdown) {
-		String source = markdown == null ? "" : markdown;
+	public static PlainDocument parse(String title, List<String> metadata, String markdown) {
 		BlockCollector collector = new BlockCollector();
-		PARSER.parse(source).accept(collector);
+		PARSER.parse(markdown).accept(collector);
 		return new PlainDocument(title, metadata, collector.blocks);
 	}
 
 	/**
-	 * Parses just the body blocks; an absent or blank document is no blocks. A leading H1 the model
-	 * repeated is kept as a heading: the export prints the meeting title above the body already, so
-	 * a repeated title reads as a section break rather than being silently dropped.
+	 * Parses just the body blocks; a blank document is no blocks. A leading H1 the model repeated
+	 * is kept as a heading: the export prints the meeting title above the body already, so a
+	 * repeated title reads as a section break rather than being silently dropped.
 	 *
-	 * @param markdown the Markdown body, or null when there is none
+	 * @param markdown the Markdown body
 	 */
-	public static List<DocumentBlock> parseBlocks(@Nullable String markdown) {
+	public static List<DocumentBlock> parseBlocks(String markdown) {
 		return parse("", List.of(), markdown).blocks();
+	}
+
+	/** Whether a list item is a checklist entry, and its state when it is. */
+	private enum TaskState {
+		NOT_A_TASK,
+		OPEN,
+		DONE
 	}
 
 	/** Walks the commonmark tree and emits one typed block per rendered line. */
@@ -127,11 +135,11 @@ public final class MarkdownDocumentParser {
 		}
 
 		private void emitListItem(ListItem item, boolean ordered, int number) {
-			Boolean checked = taskState(item);
+			TaskState task = taskState(item);
 			// The item's own text is the first paragraph among its children; for a task item the
 			// checkbox marker comes before it, so the first child is not always the paragraph.
-			Paragraph textParagraph = firstParagraph(item);
-			List<InlineRun> runs = textParagraph == null ? List.of() : runsOf(textParagraph);
+			Optional<Paragraph> textParagraph = firstParagraph(item);
+			List<InlineRun> runs = textParagraph.map(BlockCollector::runsOf).orElse(List.of());
 			// A marker with no paragraph still needs its text; fall back to the whole item's text.
 			if (runs.isEmpty()) {
 				String text = plainText(item);
@@ -139,51 +147,79 @@ public final class MarkdownDocumentParser {
 					runs = List.of(new InlineRun.Text(text.strip()));
 				}
 			}
-			if (!runs.isEmpty() || checked != null) {
-				blocks.add(new DocumentBlock.ListItem(depth - 1,
-						checked != null ? DocumentBlock.ListItem.Kind.TASK
-								: ordered ? DocumentBlock.ListItem.Kind.ORDERED
-										: DocumentBlock.ListItem.Kind.BULLET,
-						Boolean.TRUE.equals(checked), number, runs));
+			if (!runs.isEmpty() || task != TaskState.NOT_A_TASK) {
+				DocumentBlock.ListItem.Kind kind = task != TaskState.NOT_A_TASK
+						? DocumentBlock.ListItem.Kind.TASK
+						: ordered ? DocumentBlock.ListItem.Kind.ORDERED
+								: DocumentBlock.ListItem.Kind.BULLET;
+				blocks.add(new DocumentBlock.ListItem(depth - 1, kind, task == TaskState.DONE,
+						number, runs));
 			}
-			// A further paragraph is continuation prose, not another item; a nested list recurses.
+			// Anything after the item's own text belongs to it: continuation prose, a nested list
+			// (which recurses), or a block such as code or a quote, which keeps its own shape.
 			for (Node child = item.getFirstChild(); child != null; child = child.getNext()) {
-				if (child instanceof Paragraph paragraph && paragraph != textParagraph) {
-					if (!plainText(paragraph).isBlank()) {
-						blocks.add(new DocumentBlock.Paragraph(runsOf(paragraph)));
+				if (textParagraph.isPresent() && child == textParagraph.get()) {
+					continue;
+				}
+				switch (child) {
+					case Paragraph paragraph -> {
+						if (!plainText(paragraph).isBlank()) {
+							blocks.add(new DocumentBlock.Paragraph(runsOf(paragraph)));
+						}
 					}
-				} else if (child instanceof ListBlock nested) {
-					visitList(nested);
+					case ListBlock nested -> visitList(nested);
+					case TaskListItemMarker marker -> {
+						// Carried by the item's kind.
+					}
+					default -> child.accept(this);
 				}
 			}
 		}
 
-		/** The first paragraph among a list item's children, or null when it has none. */
-		private static @Nullable Paragraph firstParagraph(ListItem item) {
+		/** The first paragraph among a list item's children; empty when it has none. */
+		private static Optional<Paragraph> firstParagraph(ListItem item) {
 			for (Node child = item.getFirstChild(); child != null; child = child.getNext()) {
 				if (child instanceof Paragraph paragraph) {
-					return paragraph;
+					return Optional.of(paragraph);
 				}
 			}
-			return null;
+			return Optional.empty();
 		}
 
-		/** The {@code [x]} marker of a task item, or null for an ordinary item. */
-		private static @Nullable Boolean taskState(ListItem item) {
+		/** The {@code [ ]}/{@code [x]} marker of a task item. */
+		private static TaskState taskState(ListItem item) {
 			for (Node child = item.getFirstChild(); child != null; child = child.getNext()) {
 				if (child instanceof TaskListItemMarker marker) {
-					return marker.isChecked();
+					return marker.isChecked() ? TaskState.DONE : TaskState.OPEN;
 				}
 			}
-			return null;
+			return TaskState.NOT_A_TASK;
 		}
 
 		@Override
 		public void visit(FencedCodeBlock block) {
-			String literal = block.getLiteral() == null ? "" : block.getLiteral().stripTrailing();
-			if (!literal.isBlank()) {
-				blocks.add(new DocumentBlock.Paragraph(
-						List.of(new InlineRun.Code(literal))));
+			addCode(block.getLiteral());
+		}
+
+		@Override
+		public void visit(IndentedCodeBlock block) {
+			addCode(block.getLiteral());
+		}
+
+		/**
+		 * Raw HTML has no rendering in a document, but its text is still part of the meeting: it is
+		 * kept as code so nothing the model wrote disappears from the export.
+		 */
+		@Override
+		public void visit(HtmlBlock block) {
+			addCode(block.getLiteral());
+		}
+
+		private void addCode(@Nullable String literal) {
+			// commonmark leaves the literal unset on an empty block.
+			String text = literal == null ? "" : literal.stripTrailing();
+			if (!text.isBlank()) {
+				blocks.add(new DocumentBlock.Paragraph(List.of(new InlineRun.Code(text))));
 			}
 		}
 
@@ -250,8 +286,16 @@ public final class MarkdownDocumentParser {
 				} else if (child instanceof Code code) {
 					runs.add(new InlineRun.Code(code.getLiteral()));
 				} else if (child instanceof Link link) {
+					// commonmark's destination is never null for a parsed link; "" when empty.
 					String destination = link.getDestination() == null ? "" : link.getDestination();
-					runs.add(new InlineRun.Link(runsOf(link), destination));
+					List<InlineRun> label = runsOf(link);
+					if (destination.isBlank()) {
+						// A link to nowhere is just its label: an empty hyperlink target is not
+						// valid in a DOCX relationship and means nothing in a PDF.
+						runs.addAll(label);
+					} else {
+						runs.add(new InlineRun.Link(label, destination));
+					}
 				} else if (child instanceof org.commonmark.ext.gfm.strikethrough.Strikethrough strike) {
 					runs.add(new InlineRun.Strike(runsOf(strike)));
 				} else if (child instanceof SoftLineBreak || child instanceof HardLineBreak) {

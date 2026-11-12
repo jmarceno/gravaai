@@ -272,7 +272,7 @@ public final class AnnotationSettingsPanel extends VBox {
 	}
 
 	private Node spotlightSection(AnnotationRegion region) {
-		SpotlightData spotlight = region.spotlightDataOrDefault();
+		SpotlightData spotlight = region.spotlightData();
 		Slider dim = new Slider("Dim");
 		dim.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
 		dim.setValue(spotlight.dimPercent());

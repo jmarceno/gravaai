@@ -21,11 +21,17 @@ public enum AnnotationType {
 
 	@JsonCreator
 	public static AnnotationType fromWire(String value) {
+		return parse(value).orElseThrow(
+				() -> new IllegalArgumentException("Unknown annotation type: " + value));
+	}
+
+	/** The type a wire spelling names; empty for an unknown or absent one. */
+	public static java.util.Optional<AnnotationType> parse(@org.jspecify.annotations.Nullable String value) {
 		for (AnnotationType type : values()) {
 			if (type.wire.equals(value)) {
-				return type;
+				return java.util.Optional.of(type);
 			}
 		}
-		throw new IllegalArgumentException("Unknown annotation type: " + value);
+		return java.util.Optional.empty();
 	}
 }

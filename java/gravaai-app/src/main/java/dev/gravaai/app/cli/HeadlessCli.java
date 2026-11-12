@@ -45,7 +45,7 @@ public final class HeadlessCli {
 		Result<Optional<CliCommand>> parsed = CliCommand.parse(args);
 		if (parsed instanceof Result.Err<Optional<CliCommand>> error) {
 			CliEvents events = new CliEvents(wantsJson(args), stdout, stderr);
-			events.emit("error", java.util.Map.of("message", error.error()));
+			events.emit(CliEvents.Event.ERROR, java.util.Map.of("message", error.error()));
 			stderr.println("gravaai: " + error.error());
 			stderr.println("Run `gravaai --help` for the usage.");
 			return Optional.of(EXIT_USAGE);
@@ -134,14 +134,18 @@ public final class HeadlessCli {
 			                         and it cannot be combined with --screen
 			  --system-audio         capture the default output's audio
 			  --mic                  capture the default microphone
+			  --overwrite, -y        replace an existing --out file (otherwise refused up front)
 			  --json                 NDJSON events on stdout
+
+			Ctrl-C or SIGTERM stops the take and finalises the file before the process exits.
 
 			export options:
 			  --out <file>           destination; default: next to the project, same name
 			  --format mp4|gif       default: mp4
 			  --preset <tier>        medium | good | high | source (aliases: low, 540p, 720p, 900p,
 			                         1080p, 4k, original, native); default: source
-			  --fps <n>              frame rate override (24, 30 or 60 for MP4; 15, 20, 25 or 30 for GIF)
+			  --fps <n>              frame rate override: 24, 30 or 60 for MP4; 15, 20, 25 or 30 for
+			                         GIF (any other rate is refused)
 			  --overwrite, -y        replace an existing destination
 			  --json                 NDJSON events on stdout
 

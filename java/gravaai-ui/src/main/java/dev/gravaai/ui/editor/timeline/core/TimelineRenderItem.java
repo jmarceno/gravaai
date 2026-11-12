@@ -40,6 +40,8 @@ public record TimelineRenderItem(
 		ANNOTATION,
 		/** A magnifying-glass loupe: an annotation lane block with its own lens styling. */
 		LOUPE,
+		/** A spotlight: an annotation lane block with its own warm styling. */
+		SPOTLIGHT,
 		SPEED,
 		AUDIO,
 		CAPTION,

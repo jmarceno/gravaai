@@ -11,6 +11,7 @@ import dev.gravaai.core.project.AnnotationSize;
 import dev.gravaai.core.project.AnnotationTextStyle;
 import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.FigureData;
+import dev.gravaai.core.project.SpotlightData;
 
 /** The {@code useAnnotationRegionCommands} operations, one class per command. */
 public final class AnnotationCommands {
@@ -36,11 +37,12 @@ public final class AnnotationCommands {
 	private static AnnotationRegion withRegion(AnnotationRegion region, long startMs, long endMs,
 			@Nullable Integer trackIndex, String content, @Nullable String textContent, @Nullable String imageContent,
 			AnnotationPosition position, AnnotationSize size, AnnotationTextStyle style,
-			@Nullable FigureData figureData, @Nullable Double blurIntensity, @Nullable String blurColor) {
+			@Nullable FigureData figureData, @Nullable Double blurIntensity, @Nullable String blurColor,
+			@Nullable SpotlightData spotlightData) {
 		return new AnnotationRegion(region.id(), startMs, endMs, region.type(), content,
 				textContent, imageContent, position, size, style, region.zIndex(),
 				trackIndex != null ? trackIndex : region.trackIndex(), figureData, blurIntensity,
-				blurColor, region.loupeMagnification());
+				blurColor, region.loupeMagnification(), spotlightData);
 	}
 
 	/** Selects an annotation region (the hook's {@code onSelectAnnotation}). */
@@ -87,7 +89,7 @@ public final class AnnotationCommands {
 					Math.round(endMs), AnnotationType.TEXT, "Enter text...", null, null,
 					AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
-					trackIndex == null ? 0 : trackIndex, null, null, null, null);
+					trackIndex == null ? 0 : trackIndex, null, null, null, null, null);
 			List<AnnotationRegion> next = new ArrayList<>(regions);
 			next.add(region);
 			store.setAnnotationRegions(next);
@@ -142,7 +144,8 @@ public final class AnnotationCommands {
 					AnnotationType.LOUPE, "", null, null,
 					AnnotationPosition.DEFAULT, new AnnotationSize(diameter, diameter),
 					AnnotationTextStyle.defaultStyle(), store.nextIndex("annotation-zIndex"),
-					nextTrack, null, null, null, AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION);
+					nextTrack, null, null, null, AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION,
+					null);
 			List<AnnotationRegion> next = new ArrayList<>(regions);
 			next.add(region);
 			store.setAnnotationRegions(next);
@@ -196,7 +199,7 @@ public final class AnnotationCommands {
 						region.position(), region.size(), region.style(), region.zIndex(),
 						normalizedTrackIndex >= 0 ? normalizedTrackIndex : region.trackIndex(),
 						region.figureData(), region.blurIntensity(), region.blurColor(),
-						region.loupeMagnification()));
+						region.loupeMagnification(), region.spotlightData()));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -252,7 +255,7 @@ public final class AnnotationCommands {
 				next.add(withRegion(region, region.startMs(), region.endMs(), null, content,
 						textContent, imageContent, region.position(), region.size(),
 						region.style(), region.figureData(), region.blurIntensity(),
-						region.blurColor()));
+						region.blurColor(), region.spotlightData()));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -281,6 +284,7 @@ public final class AnnotationCommands {
 				FigureData figureData = region.figureData();
 				Double blurIntensity = region.blurIntensity();
 				Double loupeMagnification = region.loupeMagnification();
+				SpotlightData spotlightData = region.spotlightData();
 				AnnotationSize size = region.size();
 				if (type == AnnotationType.TEXT) {
 					content = region.textContent() != null ? region.textContent() : "Enter text...";
@@ -307,11 +311,17 @@ public final class AnnotationCommands {
 					} else if (size.width() != size.height()) {
 						size = loupeSize(size.width());
 					}
+				} else if (type == AnnotationType.SPOTLIGHT) {
+					content = "";
+					if (spotlightData == null) {
+						spotlightData = SpotlightData.DEFAULT;
+					}
 				}
 				next.add(new AnnotationRegion(region.id(), region.startMs(), region.endMs(), type,
 						content, region.textContent(), region.imageContent(), region.position(),
 						size, region.style(), region.zIndex(), region.trackIndex(),
-						figureData, blurIntensity, region.blurColor(), loupeMagnification));
+						figureData, blurIntensity, region.blurColor(), loupeMagnification,
+						spotlightData));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -352,7 +362,7 @@ public final class AnnotationCommands {
 				next.add(withRegion(region, region.startMs(), region.endMs(), null,
 						region.content(), region.textContent(), region.imageContent(),
 						region.position(), region.size(), merged, region.figureData(),
-						region.blurIntensity(), region.blurColor()));
+						region.blurIntensity(), region.blurColor(), region.spotlightData()));
 			}
 			store.setAnnotationRegions(next);
 			return true;
@@ -377,7 +387,7 @@ public final class AnnotationCommands {
 						? withRegion(region, region.startMs(), region.endMs(), null,
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), region.size(), region.style(), figureData,
-								region.blurIntensity(), region.blurColor())
+								region.blurIntensity(), region.blurColor(), region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);
@@ -403,7 +413,8 @@ public final class AnnotationCommands {
 						? withRegion(region, region.startMs(), region.endMs(), null,
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), region.size(), region.style(),
-								region.figureData(), blurIntensity, region.blurColor())
+								region.figureData(), blurIntensity, region.blurColor(),
+								region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);
@@ -429,7 +440,8 @@ public final class AnnotationCommands {
 						? withRegion(region, region.startMs(), region.endMs(), null,
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), region.size(), region.style(),
-								region.figureData(), region.blurIntensity(), blurColor)
+								region.figureData(), region.blurIntensity(), blurColor,
+								region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);
@@ -458,12 +470,74 @@ public final class AnnotationCommands {
 								region.imageContent(), region.position(), region.size(),
 								region.style(), region.zIndex(), region.trackIndex(),
 								region.figureData(), region.blurIntensity(), region.blurColor(),
-								clamped)
+								clamped, region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);
 			return true;
 		}
+	}
+
+	/** {@code handleAnnotationSpotlightDimChange}: clamped by {@link SpotlightData}. */
+	public static final class SetSpotlightDim implements EditorCommand {
+		private final String id;
+		private final double dimPercent;
+
+		public SetSpotlightDim(String id, double dimPercent) {
+			this.id = id;
+			this.dimPercent = dimPercent;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			List<AnnotationRegion> next = new ArrayList<>();
+			for (AnnotationRegion region : store.state().annotationRegions()) {
+				next.add(region.id().equals(id)
+						? withRegion(region, region.startMs(), region.endMs(), null,
+								region.content(), region.textContent(), region.imageContent(),
+								region.position(), region.size(), region.style(),
+								region.figureData(), region.blurIntensity(), region.blurColor(),
+								replace(region.spotlightDataOrDefault(), dimPercent, null))
+						: region);
+			}
+			store.setAnnotationRegions(next);
+			return true;
+		}
+	}
+
+	/** {@code handleAnnotationSpotlightFeatherChange}: clamped by {@link SpotlightData}. */
+	public static final class SetSpotlightFeather implements EditorCommand {
+		private final String id;
+		private final double featherPercent;
+
+		public SetSpotlightFeather(String id, double featherPercent) {
+			this.id = id;
+			this.featherPercent = featherPercent;
+		}
+
+		@Override
+		public boolean apply(EditorStore store) {
+			List<AnnotationRegion> next = new ArrayList<>();
+			for (AnnotationRegion region : store.state().annotationRegions()) {
+				next.add(region.id().equals(id)
+						? withRegion(region, region.startMs(), region.endMs(), null,
+								region.content(), region.textContent(), region.imageContent(),
+								region.position(), region.size(), region.style(),
+								region.figureData(), region.blurIntensity(), region.blurColor(),
+								replace(region.spotlightDataOrDefault(), null, featherPercent))
+						: region);
+			}
+			store.setAnnotationRegions(next);
+			return true;
+		}
+	}
+
+	/** One spotlight component replaced ({@code null} keeps the current one). */
+	private static SpotlightData replace(SpotlightData spotlight, @Nullable Double dimPercent,
+			@Nullable Double featherPercent) {
+		return new SpotlightData(
+				dimPercent == null ? spotlight.dimPercent() : dimPercent,
+				featherPercent == null ? spotlight.featherPercent() : featherPercent);
 	}
 
 	/** The square lens size for a loupe diameter percent (the lens stays circular). */
@@ -490,7 +564,7 @@ public final class AnnotationCommands {
 						? withRegion(region, region.startMs(), region.endMs(), null,
 								region.content(), region.textContent(), region.imageContent(),
 								position, region.size(), region.style(), region.figureData(),
-								region.blurIntensity(), region.blurColor())
+								region.blurIntensity(), region.blurColor(), region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);
@@ -516,7 +590,7 @@ public final class AnnotationCommands {
 						? withRegion(region, region.startMs(), region.endMs(), null,
 								region.content(), region.textContent(), region.imageContent(),
 								region.position(), size, region.style(), region.figureData(),
-								region.blurIntensity(), region.blurColor())
+								region.blurIntensity(), region.blurColor(), region.spotlightData())
 						: region);
 			}
 			store.setAnnotationRegions(next);

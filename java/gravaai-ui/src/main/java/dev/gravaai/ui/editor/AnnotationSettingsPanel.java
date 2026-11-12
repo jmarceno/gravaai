@@ -19,6 +19,7 @@ import dev.gravaai.core.project.AnnotationTextStyle.FontWeight;
 import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.ArrowDirection;
 import dev.gravaai.core.project.FigureData;
+import dev.gravaai.core.project.SpotlightData;
 import dev.gravaai.ui.kit.Button;
 import dev.gravaai.ui.kit.ChoiceGroup;
 import dev.gravaai.ui.kit.Icons;
@@ -114,6 +115,7 @@ public final class AnnotationSettingsPanel extends VBox {
 			case BLUR -> getChildren().add(blurSection(region));
 			case IMAGE -> getChildren().add(imageSection(region));
 			case LOUPE -> getChildren().add(loupeSection(region));
+			case SPOTLIGHT -> getChildren().add(spotlightSection(region));
 		}
 	}
 
@@ -125,6 +127,7 @@ public final class AnnotationSettingsPanel extends VBox {
 		tabs.item("figure", "Figure");
 		tabs.item("image", "Image");
 		tabs.item("blur", "Blur");
+		tabs.item("spotlight", "Spotlight");
 		tabs.item("loupe", "Loupe");
 		tabs.setValue(region.type().wire());
 		tabs.onValueChange(value -> {
@@ -266,6 +269,24 @@ public final class AnnotationSettingsPanel extends VBox {
 				region.blurColor() == null ? "#000000" : region.blurColor(),
 				value -> applyForSelection(id -> new AnnotationCommands.SetBlurColor(id, value)));
 		return new VBox(10, sectionHeading("Blur"), strength, color.node());
+	}
+
+	private Node spotlightSection(AnnotationRegion region) {
+		SpotlightData spotlight = region.spotlightDataOrDefault();
+		Slider dim = new Slider("Dim");
+		dim.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
+		dim.setValue(spotlight.dimPercent());
+		dim.onValueCommit(value -> applyForSelection(id -> new AnnotationCommands.SetSpotlightDim(
+				id, value)));
+		Slider feather = new Slider("Feather");
+		feather.range(0, 100).step(1).formatter(value -> Math.round(value) + "%").sliderControl();
+		feather.setValue(spotlight.featherPercent());
+		feather.onValueCommit(value -> applyForSelection(id ->
+				new AnnotationCommands.SetSpotlightFeather(id, value)));
+		Label note = new Label("Everything outside the rectangle dims while the region is active.");
+		note.setWrapText(true);
+		note.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		return new VBox(10, sectionHeading("Spotlight"), dim, feather, note);
 	}
 
 	private Node loupeSection(AnnotationRegion region) {

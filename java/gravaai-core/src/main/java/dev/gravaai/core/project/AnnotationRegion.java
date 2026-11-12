@@ -2,7 +2,7 @@ package dev.gravaai.core.project;
 
 import org.jspecify.annotations.Nullable;
 
-/** A text/image/figure/blur/loupe annotation on the timeline. */
+/** A text/image/figure/blur/loupe/spotlight annotation on the timeline. */
 public record AnnotationRegion(
 		String id,
 		long startMs,
@@ -19,7 +19,8 @@ public record AnnotationRegion(
 		@Nullable FigureData figureData,
 		@Nullable Double blurIntensity,
 		@Nullable String blurColor,
-		@Nullable Double loupeMagnification) {
+		@Nullable Double loupeMagnification,
+		@Nullable SpotlightData spotlightData) {
 
 	public static final int BLUR_ANNOTATION_STRENGTH = 20;
 
@@ -32,10 +33,22 @@ public record AnnotationRegion(
 	 */
 	public static final double LOUPE_DEFAULT_DIAMETER_PERCENT = 60.0;
 
+	/** Spotlight dim percent used when a spotlight is created or the payload is absent. */
+	public static final double SPOTLIGHT_DEFAULT_DIM_PERCENT = SpotlightData.DEFAULT.dimPercent();
+
+	/** Spotlight feather percent used when a spotlight is created or the payload is absent. */
+	public static final double SPOTLIGHT_DEFAULT_FEATHER_PERCENT =
+			SpotlightData.DEFAULT.featherPercent();
+
 	/** The effective magnification of a loupe region (never below 1). */
 	public double loupeMagnificationOrDefault() {
 		return loupeMagnification == null || loupeMagnification < 1
 				? LOUPE_DEFAULT_MAGNIFICATION
 				: loupeMagnification;
+	}
+
+	/** The effective payload of a spotlight region (defaults when absent). */
+	public SpotlightData spotlightDataOrDefault() {
+		return spotlightData == null ? SpotlightData.DEFAULT : spotlightData;
 	}
 }

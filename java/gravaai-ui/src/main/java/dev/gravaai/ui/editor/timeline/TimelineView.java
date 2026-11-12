@@ -157,6 +157,11 @@ public final class TimelineView extends Region {
 	private static final Color LOUPE_BORDER = Color.web("#2f6d80");
 	private static final Color LOUPE_SELECTED = Color.web("#67d4f0");
 	private static final Color LOUPE_GLYPH = Color.web("#a5ecff");
+	/* Spotlight blocks: a warm dim tint so the lamp reads apart from text overlays. */
+	private static final Color SPOTLIGHT_FILL = Color.web("#241f16");
+	private static final Color SPOTLIGHT_BORDER = Color.web("#7a5c25");
+	private static final Color SPOTLIGHT_SELECTED = Color.web("#f0b429");
+	private static final Color SPOTLIGHT_GLYPH = Color.web("#ffd166");
 	private static final Color AUDIO_FILL = Color.web("#1a2128");
 	private static final Color AUDIO_BORDER = Color.web("#28323b");
 	private static final Color AUDIO_TEXT = Color.web("#a9b6c0");
@@ -2343,7 +2348,7 @@ public final class TimelineView extends Region {
 		return switch (variant) {
 			case ZOOM -> TimelineSelection.ZOOM;
 			case CLIP -> TimelineSelection.CLIP;
-			case ANNOTATION, LOUPE -> TimelineSelection.ANNOTATION;
+			case ANNOTATION, LOUPE, SPOTLIGHT -> TimelineSelection.ANNOTATION;
 			case AUDIO -> TimelineSelection.AUDIO;
 			case CAPTION -> TimelineSelection.CAPTION;
 			case KEYSTROKE -> TimelineSelection.KEYSTROKE;
@@ -3364,12 +3369,23 @@ public final class TimelineView extends Region {
 		double height = row.height() - 10;
 		double y = row.top() + 5;
 		boolean loupe = item.variant() == TimelineRenderItem.Variant.LOUPE;
-		graphics.setFill(loupe ? LOUPE_FILL : ANNOTATION_FILL);
+		boolean spotlight = item.variant() == TimelineRenderItem.Variant.SPOTLIGHT;
+		graphics.setFill(spotlight ? SPOTLIGHT_FILL : loupe ? LOUPE_FILL : ANNOTATION_FILL);
 		graphics.fillRoundRect(x, y, blockWidth, height, 3, 3);
-		graphics.setStroke(loupe ? LOUPE_BORDER : ANNOTATION_BORDER);
+		graphics.setStroke(spotlight ? SPOTLIGHT_BORDER : loupe ? LOUPE_BORDER : ANNOTATION_BORDER);
 		graphics.setLineWidth(1);
 		graphics.strokeRoundRect(x + 0.5, y + 0.5, Math.max(1, blockWidth - 1), height - 1, 3, 3);
 		double textX = x + 4;
+		if (spotlight && blockWidth > 18) {
+			// A small lamp glyph marks the block as a spotlight at any zoom level.
+			double bulbRadius = Math.min(3.5, height * 0.16);
+			double bulbX = x + 6 + bulbRadius;
+			double bulbY = y + height / 2 - 1;
+			graphics.setFill(SPOTLIGHT_GLYPH);
+			graphics.fillOval(bulbX - bulbRadius, bulbY - bulbRadius, bulbRadius * 2,
+					bulbRadius * 2);
+			textX = bulbX + bulbRadius + 4;
+		}
 		if (loupe && blockWidth > 18) {
 			// A small lens glyph marks the block as a magnifying glass at any zoom level.
 			double lensRadius = Math.min(4.5, height * 0.2);
@@ -3388,7 +3404,7 @@ public final class TimelineView extends Region {
 				blockWidth - (textX - x) - 8, BLOCK_TEXT);
 		if (isSelected(TimelineSelection.ANNOTATION, item.id())) {
 			drawSelection(graphics, x, y, blockWidth, height,
-					loupe ? LOUPE_SELECTED : ANNOTATION_SELECTED);
+					spotlight ? SPOTLIGHT_SELECTED : loupe ? LOUPE_SELECTED : ANNOTATION_SELECTED);
 		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
 	}

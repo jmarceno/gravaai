@@ -8,6 +8,7 @@ import java.util.Base64;
 import java.util.List;
 
 import io.github.humbleui.skija.Canvas;
+import io.github.humbleui.skija.FilterBlurMode;
 import io.github.humbleui.skija.FilterTileMode;
 import io.github.humbleui.skija.Font;
 import io.github.humbleui.skija.FontMgr;
@@ -15,16 +16,22 @@ import io.github.humbleui.skija.FontMetrics;
 import io.github.humbleui.skija.FontStyle;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageFilter;
+import io.github.humbleui.skija.MaskFilter;
 import io.github.humbleui.skija.Paint;
+import io.github.humbleui.skija.Path;
+import io.github.humbleui.skija.PathBuilder;
+import io.github.humbleui.skija.PathFillMode;
 import io.github.humbleui.skija.SamplingMode;
 import io.github.humbleui.skija.Typeface;
+import io.github.humbleui.types.RRect;
 import io.github.humbleui.types.Rect;
 
 /**
  * Port of {@code src/lib/exporter/annotationRenderer.ts} (plan §5.8 stage 8): text, image, figure
- * arrow and blur annotations inside the camera transform. Positions/sizes are percentages of the
- * annotation coordinate rect (the video mask rect), then transformed by the camera like the TS
- * 2D composite path; the effective text/effect scale is {@code annotationScaleFactor * zoomScale}.
+ * arrow, blur and spotlight annotations inside the camera transform. Positions/sizes are
+ * percentages of the annotation coordinate rect (the video mask rect), then transformed by the
+ * camera like the TS 2D composite path; the effective text/effect scale is
+ * {@code annotationScaleFactor * zoomScale}.
  *
  * <p>Blur annotations sample already-rendered scene pixels: the compositor passes a snapshot of
  * the surface taken after stage 7, and the region is redrawn through a Skia blur image filter.
@@ -76,6 +83,8 @@ final class AnnotationRenderer {
 				case FIGURE -> drawFigure(canvas, annotation, rect, effectiveScaleFactor);
 				case BLUR -> drawBlur(canvas, annotation, rect, effectiveScaleFactor, sceneSnapshot,
 						canvasWidth, canvasHeight);
+				case SPOTLIGHT -> drawSpotlight(canvas, annotation, rect, canvasWidth, canvasHeight,
+						timeMs);
 			}
 		}
 	}
@@ -297,6 +306,56 @@ final class AnnotationRenderer {
 			}
 		}
 		canvas.restore();
+	}
+
+	/** Rounded-corner radius of the bright area, as a fraction of its short side. */
+	private static final double SPOTLIGHT_CORNER_FRACTION = 0.12;
+
+	/**
+	 * The spotlight: the whole output frame (letterbox and background included) dims under a black
+	 * scrim while the annotation rectangle (mapped through the camera, so it rides zooms with the
+	 * content) stays bright. The scrim is one even-odd fill — the frame minus the rounded
+	 * rectangle, blurred by the feather — drawn into a {@code saveLayer} whose alpha carries the
+	 * fade at the region edges. Clearing a hole out of the scrim is not an option here: the GL
+	 * target is opaque, so {@code BlendMode.CLEAR} would punch black into the frame instead of
+	 * revealing the pixels underneath.
+	 */
+	private static void drawSpotlight(Canvas canvas, AnnotationSpec annotation, Rect rect,
+			int canvasWidth, int canvasHeight, long timeMs) {
+		AnnotationSpec.Spotlight spotlight = annotation.spotlightOrDefault();
+		double dim = Math.max(0, Math.min(1, spotlight.dimPercent() / 100.0));
+		double presence = LoupeRenderer.presence(timeMs, annotation.startMs(), annotation.endMs());
+		int layerAlpha = (int) Math.round(dim * presence * 255);
+		if (layerAlpha <= 0) {
+			return;
+		}
+		double shortSide = Math.min(rect.getWidth(), rect.getHeight());
+		float sigma = (float) (shortSide
+				* Math.max(0, Math.min(1, spotlight.featherPercent() / 100.0)) / 3);
+		float radius = (float) (shortSide * SPOTLIGHT_CORNER_FRACTION);
+		Rect frame = Rect.makeXYWH(0, 0, canvasWidth, canvasHeight);
+		// The fill's outer edge sits beyond the frame so the feather cannot lighten the frame's
+		// own border; a Gaussian reaches full coverage 3 sigmas out.
+		float margin = sigma >= 0.5f ? (float) Math.ceil(sigma * 3) : 0;
+		Path scrim;
+		try (PathBuilder builder = new PathBuilder()) {
+			builder.setFillMode(PathFillMode.EVEN_ODD);
+			builder.addRect(Rect.makeLTRB(-margin, -margin,
+					canvasWidth + margin, canvasHeight + margin));
+			builder.addRRect(RRect.makeLTRB(rect._left, rect._top, rect.getRight(),
+					rect.getBottom(), radius));
+			scrim = builder.build();
+		}
+		try (scrim; Paint paint = new Paint()) {
+			paint.setAntiAlias(true);
+			paint.setColor(0xFF000000);
+			if (sigma >= 0.5f) {
+				paint.setMaskFilter(MaskFilter.makeBlur(FilterBlurMode.NORMAL, sigma));
+			}
+			canvas.saveLayerAlpha(frame, layerAlpha);
+			canvas.drawPath(scrim, paint);
+			canvas.restore();
+		}
 	}
 
 	/** The polyline segments for a known arrow direction; null when absent/unknown. */

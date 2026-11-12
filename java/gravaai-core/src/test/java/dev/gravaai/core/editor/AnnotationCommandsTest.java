@@ -16,6 +16,7 @@ import dev.gravaai.core.project.AnnotationType;
 import dev.gravaai.core.project.FigureData;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.SpotlightData;
 
 /** Behaviour tests for {@link AnnotationCommands} derived from {@code useAnnotationRegionCommands.ts}. */
 class AnnotationCommandsTest {
@@ -93,6 +94,41 @@ class AnnotationCommandsTest {
 
 		store.apply(new AnnotationCommands.ChangeType(id, AnnotationType.BLUR));
 		assertEquals(20, store.state().annotationRegions().get(0).blurIntensity());
+	}
+
+	@Test
+	@DisplayName("seeds the spotlight payload when an annotation becomes a spotlight")
+	void seedsSpotlightPayloadOnChangeType() {
+		EditorStore store = storeWithAnnotation();
+		String id = store.selectedAnnotationId();
+
+		store.apply(new AnnotationCommands.ChangeType(id, AnnotationType.SPOTLIGHT));
+		AnnotationRegion region = store.state().annotationRegions().get(0);
+		assertEquals(AnnotationType.SPOTLIGHT, region.type());
+		assertEquals("", region.content());
+		assertEquals(SpotlightData.DEFAULT, region.spotlightData());
+	}
+
+	@Test
+	@DisplayName("updates the spotlight dim and feather independently")
+	void updatesSpotlightDimAndFeather() {
+		EditorStore store = storeWithAnnotation();
+		String id = store.selectedAnnotationId();
+		store.apply(new AnnotationCommands.ChangeType(id, AnnotationType.SPOTLIGHT));
+
+		store.apply(new AnnotationCommands.SetSpotlightDim(id, 35));
+		assertEquals(new SpotlightData(35, SpotlightData.DEFAULT.featherPercent()),
+				store.state().annotationRegions().get(0).spotlightData());
+
+		store.apply(new AnnotationCommands.SetSpotlightFeather(id, 60));
+		assertEquals(new SpotlightData(35, 60),
+				store.state().annotationRegions().get(0).spotlightData());
+
+		// The payload clamps to its 0–100 range instead of producing an invisible/over-bright dim.
+		store.apply(new AnnotationCommands.SetSpotlightDim(id, 150));
+		store.apply(new AnnotationCommands.SetSpotlightFeather(id, -5));
+		assertEquals(new SpotlightData(100, 0),
+				store.state().annotationRegions().get(0).spotlightData());
 	}
 
 	@Test

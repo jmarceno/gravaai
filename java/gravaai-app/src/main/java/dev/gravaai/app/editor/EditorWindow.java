@@ -1590,6 +1590,11 @@ public final class EditorWindow {
 		}
 
 		@Override
+		public void addSpotlightAnnotation() {
+			addAnnotationOfType(dev.gravaai.core.project.AnnotationType.SPOTLIGHT);
+		}
+
+		@Override
 		public void addLoupeAnnotation() {
 			addAnnotationOfType(dev.gravaai.core.project.AnnotationType.LOUPE);
 		}

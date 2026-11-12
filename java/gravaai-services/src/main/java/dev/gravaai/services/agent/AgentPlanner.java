@@ -32,6 +32,7 @@ import dev.gravaai.core.project.CaptionOps;
 import dev.gravaai.core.project.ClipRegion;
 import dev.gravaai.core.project.GradeRegion;
 import dev.gravaai.core.project.GradeTarget;
+import dev.gravaai.core.project.SpotlightData;
 import dev.gravaai.core.project.ClipSequence;
 import dev.gravaai.core.project.ClipSplits;
 import dev.gravaai.core.project.ClipTransition;
@@ -479,7 +480,7 @@ public final class AgentPlanner {
 					region.type(), region.content(), region.textContent(), region.imageContent(),
 					region.position(), region.size(), region.style(), region.zIndex(),
 					region.trackIndex(), region.figureData(), region.blurIntensity(),
-					region.blurColor(), region.loupeMagnification()));
+					region.blurColor(), region.loupeMagnification(), region.spotlightData()));
 		}
 		return List.copyOf(next);
 	}
@@ -945,7 +946,7 @@ public final class AgentPlanner {
 			case "grade" -> addGrade(draft, raw);
 			case "update_grade" -> updateGrade(draft, raw);
 			case "delete_grade" -> deleteGrade(draft, raw);
-			case "text", "image", "figure", "blur", "loupe" -> addAnnotation(draft, op, raw);
+			case "text", "image", "figure", "blur", "loupe", "spotlight" -> addAnnotation(draft, op, raw);
 			case "update_annotation" -> updateAnnotation(draft, raw);
 			case "delete_annotation" -> deleteAnnotation(draft, raw);
 			case "audio" -> addAudio(draft, raw);
@@ -1650,6 +1651,22 @@ public final class AgentPlanner {
 		draft.summary.add("deleted " + shortId);
 	}
 
+	/**
+	 * The spotlight payload from an op's {@code dim}/{@code feather} keys (0–100) over
+	 * {@code current}; {@code current} comes back untouched when neither key is present.
+	 */
+	private static @Nullable SpotlightData readSpotlight(ObjectNode raw,
+			@Nullable SpotlightData current) {
+		Double dim = AgentOpReader.optionalNumber(raw, "dim");
+		Double feather = AgentOpReader.optionalNumber(raw, "feather");
+		if (dim == null && feather == null) {
+			return current;
+		}
+		SpotlightData base = current == null ? SpotlightData.DEFAULT : current;
+		return new SpotlightData(dim == null ? base.dimPercent() : dim,
+				feather == null ? base.featherPercent() : feather);
+	}
+
 	private static void addAnnotation(Draft draft, String op, ObjectNode raw) {
 		double[] range = AgentOpReader.readRange(raw, "from", "to");
 		Span span = clampTimelineSpan(draft, toMs(range[0]), toMs(range[1]));
@@ -1664,7 +1681,7 @@ public final class AgentPlanner {
 			AnnotationTextStyle resolved = AgentTextStyles.apply(style);
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.TEXT, text, text, null, annotationPosition(geometry),
-					annotationSize(geometry), resolved, zIndex, 0, null, null, null, null);
+					annotationSize(geometry), resolved, zIndex, 0, null, null, null, null, null);
 		} else if ("image".equals(op)) {
 			String path = AgentOpReader.string(raw, "path");
 			String imageContent = raw.path("imageContent").isString()
@@ -1677,7 +1694,7 @@ public final class AgentPlanner {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.IMAGE, imageContent, null, imageContent,
 					annotationPosition(geometry), annotationSize(geometry),
-					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null, null);
+					AnnotationTextStyle.defaultStyle(), zIndex, 0, null, null, null, null, null);
 		} else if ("figure".equals(op)) {
 			ArrowDirection arrow = AgentOpReader.readArrow(raw);
 			String color = AgentOpReader.optionalString(raw, "color");
@@ -1686,7 +1703,7 @@ public final class AgentPlanner {
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
 					new FigureData(arrow, color == null ? FigureData.DEFAULT.color() : color,
 							FigureData.DEFAULT.strokeWidth()),
-					null, null, null);
+					null, null, null, null);
 		} else if ("loupe".equals(op)) {
 			Double magnification = AgentOpReader.optionalNumber(raw, "magnification");
 			double resolved = magnification == null
@@ -1697,12 +1714,18 @@ public final class AgentPlanner {
 					new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 							AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
 					AnnotationTextStyle.defaultStyle(), zIndex, 0,
-					null, null, null, resolved);
+					null, null, null, resolved, null);
+		} else if ("spotlight".equals(op)) {
+			SpotlightData spotlight = readSpotlight(raw, SpotlightData.DEFAULT);
+			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
+					AnnotationType.SPOTLIGHT, "", null, null, annotationPosition(geometry),
+					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
+					null, null, null, null, spotlight);
 		} else {
 			annotation = new AnnotationRegion(id, span.startMs(), span.endMs(),
 					AnnotationType.BLUR, "", null, null, annotationPosition(geometry),
 					annotationSize(geometry), AnnotationTextStyle.defaultStyle(), zIndex, 0,
-					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null);
+					null, (double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null, null);
 		}
 		List<AnnotationRegion> annotations = new ArrayList<>(draft.state.annotationRegions());
 		annotations.add(annotation);
@@ -1765,12 +1788,14 @@ public final class AgentPlanner {
 		} else {
 			loupeMagnification = Math.max(1.2, Math.min(4, magnification));
 		}
+		SpotlightData spotlight = readSpotlight(raw, annotation.spotlightData());
 		AnnotationRegion next = new AnnotationRegion(annotation.id(), startMs, endMs,
 				annotation.type(), text == null ? annotation.content() : text,
 				text == null ? annotation.textContent() : text, annotation.imageContent(),
 				annotationPosition(geometry), annotationSize(geometry), style,
 				annotation.zIndex(), annotation.trackIndex(), figure,
-				annotation.blurIntensity(), annotation.blurColor(), loupeMagnification);
+				annotation.blurIntensity(), annotation.blurColor(), loupeMagnification,
+				spotlight);
 		draft.state = draft.state.toBuilder().annotationRegions(draft.state.annotationRegions().stream()
 						.map(candidate -> candidate.id().equals(id) ? next : candidate).toList()).build();
 		draft.summary.add("updated " + shortId);

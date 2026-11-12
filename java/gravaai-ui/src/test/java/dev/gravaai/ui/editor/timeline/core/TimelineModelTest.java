@@ -22,7 +22,20 @@ class TimelineModelTest {
 
 	private static AnnotationRegion annotation(AnnotationType type, String content, Integer trackIndex) {
 		return new AnnotationRegion("a1", 200, 1200, type, content, null, null, null, null, null, 0,
-				trackIndex, null, null, null, null);
+				trackIndex, null, null, null, null, null);
+	}
+
+	@Test
+	@DisplayName("annotation blocks pick their variant from the region type")
+	void annotationVariantFollowsType() {
+		assertEquals(TimelineRenderItem.Variant.ANNOTATION,
+				TimelineModel.variant(annotation(AnnotationType.TEXT, "Hi", 0)));
+		assertEquals(TimelineRenderItem.Variant.LOUPE,
+				TimelineModel.variant(annotation(AnnotationType.LOUPE, "", 0)));
+		assertEquals(TimelineRenderItem.Variant.SPOTLIGHT,
+				TimelineModel.variant(annotation(AnnotationType.SPOTLIGHT, "", 0)));
+		assertEquals("Spotlight 60%", TimelineModel.getAnnotationLabel(
+				annotation(AnnotationType.SPOTLIGHT, "", 0)));
 	}
 
 	private static TimelineModel.ItemsRequest request(List<ZoomRegion> zooms, List<ClipRegion> clips,

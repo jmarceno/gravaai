@@ -30,7 +30,7 @@ class CompositorLoupeTest {
 	private static AnnotationSpec loupe(long startMs, long endMs, double magnification) {
 		return new AnnotationSpec("loupe", startMs, endMs, AnnotationSpec.Type.LOUPE, "", null,
 				new AnnotationSpec.Position(50, 50), new AnnotationSpec.Size(50, 50),
-				AnnotationSpec.defaultTextStyle(), 1, null, null, null, magnification);
+				AnnotationSpec.defaultTextStyle(), 1, null, null, null, magnification, null);
 	}
 
 	private static FrameInput input(double timeSeconds, RgbaFrame source,

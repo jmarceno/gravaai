@@ -394,6 +394,13 @@ public final class ProjectDocument {
 			if (region.type() == AnnotationType.LOUPE) {
 				node.put("loupeMagnification", region.loupeMagnificationOrDefault());
 			}
+			if (region.type() == AnnotationType.SPOTLIGHT) {
+				SpotlightData spotlight = region.spotlightDataOrDefault();
+				ObjectNode spotlightNode = Json.nodeFactory().objectNode();
+				spotlightNode.put("dimPercent", spotlight.dimPercent());
+				spotlightNode.put("featherPercent", spotlight.featherPercent());
+				node.set("spotlightData", spotlightNode);
+			}
 			array.add(node);
 		}
 		return array;

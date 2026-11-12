@@ -352,7 +352,7 @@ public final class AutoMaskController implements AutoMaskUiService, AutoCloseabl
 		return new AnnotationRegion(id, timed.startMs(), timed.endMs(), AnnotationType.BLUR, "",
 				null, null, new AnnotationPosition(x, y), new AnnotationSize(width, height),
 				AnnotationTextStyle.defaultStyle(), zIndex, lane, null,
-				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null);
+				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null, null);
 	}
 
 	/** The lowest lane with no block overlapping {@code [start, end)} (the annotation precedent). */

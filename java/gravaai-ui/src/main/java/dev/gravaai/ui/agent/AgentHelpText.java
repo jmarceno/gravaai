@@ -32,7 +32,7 @@ public final class AgentHelpText {
 			transcript   cut_words restore_words cut_fillers cut_pauses cut_range_src
 			speed        speed delete_speed
 			color        grade update_grade delete_grade — brightness/contrast/saturation/temperature/gamma over a span
-			annotations  text image figure blur update_annotation delete_annotation
+			annotations  text image figure blur spotlight update_annotation delete_annotation
 			elements     component delete_component element update_element delete_element asset delete_asset — animated JS components (title cards, lower thirds, Lottie, shaders, 3D, anything you can draw)
 			audio        audio update_audio delete_audio source_audio
 			captions     caption update_caption split_caption merge_captions delete_caption captions_style
@@ -97,8 +97,9 @@ public final class AgentHelpText {
 			image {from,to,path, x?,y?,w?,h?} — path must exist locally.
 			figure {from,to,arrow:up|down|left|right|up-right|up-left|down-right|down-left, x?,y?,w?,h?, color?}
 			blur {from,to, x?,y?,w?,h?}
+			spotlight {from,to, x?,y?,w?,h?, dim?, feather?} — dims the frame outside the rectangle while the region is active; dim 0–100 (default 60), feather 0–100 (default 25).
 			loupe {from,to, magnification?} — circular magnifying glass that follows the cursor (no x/y); magnification 1.2–4, default 2.
-			update_annotation {id, from?,to?,text?,color?,arrow?,x?,y?,w?,h?,magnification?}
+			update_annotation {id, from?,to?,text?,color?,arrow?,x?,y?,w?,h?,magnification?,dim?,feather?}
 			delete_annotation {id} | {all:true}
 			x,y is the centre and w,h the size, all as 0–1 fractions of the frame (defaults .5,.5,.3,.2).""".stripTrailing();
 

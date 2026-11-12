@@ -31,6 +31,7 @@ import dev.gravaai.core.project.GradeTarget;
 import dev.gravaai.core.project.Padding;
 import dev.gravaai.core.project.ProjectEditorState;
 import dev.gravaai.core.project.ProjectPersistence;
+import dev.gravaai.core.project.SpotlightData;
 import dev.gravaai.core.project.ZoomDepth;
 import dev.gravaai.core.project.ZoomFocus;
 import dev.gravaai.core.project.ZoomMode;
@@ -496,6 +497,23 @@ class AgentPlannerTest {
 		assertEquals(new AnnotationSize(60, 10), text.size());
 		assertEquals(ArrowDirection.UP_RIGHT,
 				result.state().annotationRegions().get(1).figureData().arrowDirection());
+	}
+
+	@Test
+	@DisplayName("adds a spotlight with its dim/feather and updates them")
+	void spotlightOps() {
+		Ok result = ok(apply(baseState(),
+				"[{\"op\":\"spotlight\",\"from\":1,\"to\":5,\"x\":0.4,\"y\":0.4,"
+						+ "\"w\":0.3,\"h\":0.2,\"dim\":40,\"feather\":10}]"));
+		AnnotationRegion spotlight = result.state().annotationRegions().get(0);
+		assertEquals(AnnotationType.SPOTLIGHT, spotlight.type());
+		assertEquals(new SpotlightData(40, 10), spotlight.spotlightData());
+		assertTrue(result.summary().contains("added spotlight"), result.summary());
+
+		Ok updated = ok(apply(result.state(),
+				"[{\"op\":\"update_annotation\",\"id\":\"a1\",\"dim\":75}]"));
+		assertEquals(new SpotlightData(75, 10),
+				updated.state().annotationRegions().get(0).spotlightData());
 	}
 
 	@Test

@@ -88,6 +88,7 @@ public final class PlaybackControls extends GridPane {
 		addMenu.item("Figure", actions::addFigureAnnotation);
 		addMenu.item("Image", actions::addImageAnnotation);
 		addMenu.item("Blur", actions::addBlurAnnotation);
+		addMenu.item("Spotlight", actions::addSpotlightAnnotation);
 		addMenu.item("Loupe", actions::addLoupeAnnotation);
 		addMenu.item("Color", actions::addColorGrade);
 		addMenu.item("Audio", actions::addAudioLayer);

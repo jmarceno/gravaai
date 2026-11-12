@@ -22,20 +22,27 @@ public record AnnotationSpec(
 		@Nullable Figure figure,
 		@Nullable Double blurIntensity,
 		@Nullable String blurColor,
-		@Nullable Double loupeMagnification) {
+		@Nullable Double loupeMagnification,
+		@Nullable Spotlight spotlight) {
 
-	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur" | "loupe"}). */
+	/** Annotation kinds (TS {@code "text" | "image" | "figure" | "blur" | "loupe" | "spotlight"}). */
 	public enum Type {
 		TEXT,
 		IMAGE,
 		FIGURE,
 		BLUR,
-		LOUPE
+		LOUPE,
+		SPOTLIGHT
 	}
 
 	/** The effective magnification of a loupe lens (never below 1). */
 	public double loupeMagnificationOrDefault() {
 		return loupeMagnification == null || loupeMagnification < 1 ? 2.0 : loupeMagnification;
+	}
+
+	/** The effective spotlight payload (defaults when absent). */
+	public Spotlight spotlightOrDefault() {
+		return spotlight == null ? Spotlight.DEFAULT : spotlight;
 	}
 
 	/** Center position in percent of the annotation coordinate rect. */
@@ -61,6 +68,17 @@ public record AnnotationSpec(
 
 	/** Figure payload: arrow direction, ARGB colour and stroke width in reference pixels. */
 	public record Figure(@Nullable String direction, int color, double strokeWidth) {
+	}
+
+	/**
+	 * Spotlight payload: {@code dimPercent} is the scrim opacity over the rest of the frame
+	 * (0–100) and {@code featherPercent} the softness of the bright area's edge as a percent of
+	 * the rectangle's short side (0–100, 0 for a crisp edge).
+	 */
+	public record Spotlight(double dimPercent, double featherPercent) {
+
+		/** Mirrors {@code dev.gravaai.core.project.SpotlightData.DEFAULT}. */
+		public static final Spotlight DEFAULT = new Spotlight(60.0, 25.0);
 	}
 
 	public AnnotationSpec {

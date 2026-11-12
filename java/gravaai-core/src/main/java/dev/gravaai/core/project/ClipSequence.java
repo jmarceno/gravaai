@@ -268,7 +268,7 @@ public final class ClipSequence {
 			return new AnnotationRegion(value.id(), startMs, endMs, value.type(), value.content(),
 					value.textContent(), value.imageContent(), value.position(), value.size(), value.style(),
 					value.zIndex(), value.trackIndex(), value.figureData(), value.blurIntensity(),
-					value.blurColor(), value.loupeMagnification());
+					value.blurColor(), value.loupeMagnification(), value.spotlightData());
 		}
 	};
 }

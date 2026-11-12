@@ -757,7 +757,8 @@ public final class ProjectPersistence {
 			AnnotationType type = "image".equals(rawType) ? AnnotationType.IMAGE
 					: "figure".equals(rawType) ? AnnotationType.FIGURE
 					: "blur".equals(rawType) ? AnnotationType.BLUR
-					: "loupe".equals(rawType) ? AnnotationType.LOUPE : AnnotationType.TEXT;
+					: "loupe".equals(rawType) ? AnnotationType.LOUPE
+					: "spotlight".equals(rawType) ? AnnotationType.SPOTLIGHT : AnnotationType.TEXT;
 
 			JsonNode positionNode = field(region, "position");
 			double positionX = isFiniteNumber(field(positionNode, "x"))
@@ -786,7 +787,8 @@ public final class ProjectPersistence {
 					isFiniteNumber(field(region, "blurIntensity"))
 							? clamp(field(region, "blurIntensity").doubleValue(), 1, 100) : 20,
 					text(field(region, "blurColor")),
-					normalizeLoupeMagnification(type, region)));
+					normalizeLoupeMagnification(type, region),
+					normalizeSpotlightData(type, region)));
 			index++;
 		}
 		return List.copyOf(regions);
@@ -804,6 +806,29 @@ public final class ProjectPersistence {
 			return AnnotationRegion.LOUPE_DEFAULT_MAGNIFICATION;
 		}
 		return clamp(field(region, "loupeMagnification").doubleValue(), 1.2, 4);
+	}
+
+	/**
+	 * The spotlight payload of an annotation: clamped for spotlights (defaulting when absent),
+	 * {@code null} for every other type. The record's constructor clamps, so this only has to
+	 * fall back to the defaults.
+	 */
+	private static @Nullable SpotlightData normalizeSpotlightData(AnnotationType type,
+			JsonNode region) {
+		if (type != AnnotationType.SPOTLIGHT) {
+			return null;
+		}
+		JsonNode spotlight = field(region, "spotlightData");
+		if (spotlight == null || !spotlight.isObject()) {
+			return SpotlightData.DEFAULT;
+		}
+		return new SpotlightData(
+				isFiniteNumber(field(spotlight, "dimPercent"))
+						? field(spotlight, "dimPercent").doubleValue()
+						: AnnotationRegion.SPOTLIGHT_DEFAULT_DIM_PERCENT,
+				isFiniteNumber(field(spotlight, "featherPercent"))
+						? field(spotlight, "featherPercent").doubleValue()
+						: AnnotationRegion.SPOTLIGHT_DEFAULT_FEATHER_PERCENT);
 	}
 
 	private static AnnotationTextStyle normalizeAnnotationStyle(JsonNode rawStyle) {

@@ -66,7 +66,7 @@ public final class PreviewFrameMapper {
 								new dev.gravaai.media.compose.AnnotationSpec.Position(x, y),
 								new dev.gravaai.media.compose.AnnotationSpec.Size(width, height),
 								spec.style(), spec.zIndex(), spec.figure(), spec.blurIntensity(),
-								spec.blurColor(), spec.loupeMagnification()));
+								spec.blurColor(), spec.loupeMagnification(), spec.spotlight()));
 			}
 			return new PreviewScene(background, backgroundBlur, layout, style, zoom, cursor,
 					cursorSpec, webcam, videoWallpaper, List.copyOf(next), captions, keystrokes, fade,

@@ -127,7 +127,20 @@ public final class TimelineModel {
 			return String.format(java.util.Locale.ROOT, "Loupe %.1f×",
 					region.loupeMagnificationOrDefault());
 		}
+		if (region.type() == AnnotationType.SPOTLIGHT) {
+			return String.format(java.util.Locale.ROOT, "Spotlight %.0f%%",
+					region.spotlightDataOrDefault().dimPercent());
+		}
 		return "Annotation";
+	}
+
+	/** The block styling variant for an annotation lane item. */
+	public static TimelineRenderItem.Variant variant(AnnotationRegion region) {
+		return switch (region.type()) {
+			case LOUPE -> TimelineRenderItem.Variant.LOUPE;
+			case SPOTLIGHT -> TimelineRenderItem.Variant.SPOTLIGHT;
+			default -> TimelineRenderItem.Variant.ANNOTATION;
+		};
 	}
 
 	/** Port of {@code getAudioLabel}: the file name without its extension. */
@@ -205,8 +218,7 @@ public final class TimelineModel {
 			items.add(new TimelineRenderItem(region.id(), TimelineRows.getAnnotationTrackRowId(trackIndex),
 					new Span(region.startMs(), region.endMs()), null, getAnnotationLabel(region),
 					null, null, null, null, null, null, null, null, null, null, null,
-					region.type() == AnnotationType.LOUPE ? TimelineRenderItem.Variant.LOUPE
-							: TimelineRenderItem.Variant.ANNOTATION));
+					variant(region)));
 		}
 
 		for (AudioRegion region : request.audioRegions()) {

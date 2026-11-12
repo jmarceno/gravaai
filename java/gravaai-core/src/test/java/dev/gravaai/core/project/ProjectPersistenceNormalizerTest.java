@@ -88,7 +88,7 @@ class ProjectPersistenceNormalizerTest {
 				null, null, AnnotationPosition.DEFAULT,
 				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
-				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, 2.5);
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, 2.5, null);
 		String json = ProjectDocument.writeAnnotationRegions(List.of(loupe)).toString();
 
 		ProjectEditorState normalized = normalize("{\"annotationRegions\":" + json + "}");
@@ -98,8 +98,51 @@ class ProjectPersistenceNormalizerTest {
 				new AnnotationSize(AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT,
 						AnnotationRegion.LOUPE_DEFAULT_DIAMETER_PERCENT),
 				AnnotationTextStyle.defaultStyle(), 1, 0, null,
-				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, 2.5)),
+				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, 2.5, null)),
 				normalized.annotationRegions());
+	}
+
+	@Test
+	@DisplayName("reads spotlight annotations with their payload and defaults it")
+	void readsSpotlightAnnotations() {
+		ProjectEditorState normalized = normalize("""
+				{"annotationRegions":[
+					{"id":"a1","startMs":100,"endMs":900,"type":"spotlight","content":"",
+						"spotlightData":{"dimPercent":45,"featherPercent":10}},
+					{"id":"a2","startMs":1000,"endMs":1500,"type":"spotlight","content":""}]}
+				""");
+		assertEquals(2, normalized.annotationRegions().size());
+		assertEquals(new SpotlightData(45, 10),
+				normalized.annotationRegions().get(0).spotlightData());
+		assertEquals(SpotlightData.DEFAULT,
+				normalized.annotationRegions().get(1).spotlightData());
+	}
+
+	@Test
+	@DisplayName("keeps the spotlight payload only on spotlights and round-trips it")
+	void spotlightPayloadStaysOnSpotlights() {
+		AnnotationRegion spotlight = new AnnotationRegion("a1", 100, 900, AnnotationType.SPOTLIGHT,
+				"", null, null, AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, null,
+				new SpotlightData(150, -5));
+		String json = ProjectDocument.writeAnnotationRegions(List.of(spotlight)).toString();
+
+		ProjectEditorState normalized = normalize("{\"annotationRegions\":" + json + "}");
+		// Out-of-range values clamp at write time through the record, and the payload survives.
+		assertEquals(List.of(new AnnotationRegion("a1", 100, 900, AnnotationType.SPOTLIGHT, "",
+				null, null, AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
+				AnnotationTextStyle.defaultStyle(), 1, 0, null,
+				(double) AnnotationRegion.BLUR_ANNOTATION_STRENGTH, null, null,
+				new SpotlightData(100, 0))),
+				normalized.annotationRegions());
+
+		// A non-spotlight annotation never carries the payload.
+		AnnotationRegion text = new AnnotationRegion("a2", 100, 900, AnnotationType.TEXT, "Hi",
+				"Hi", null, AnnotationPosition.DEFAULT, AnnotationSize.DEFAULT,
+				AnnotationTextStyle.defaultStyle(), 1, 0, null, null, null, null, null);
+		String textJson = ProjectDocument.writeAnnotationRegions(List.of(text)).toString();
+		ProjectEditorState textNormalized = normalize("{\"annotationRegions\":" + textJson + "}");
+		assertNull(textNormalized.annotationRegions().get(0).spotlightData());
 	}
 
 	@Test

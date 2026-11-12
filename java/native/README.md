@@ -35,21 +35,66 @@ startup and encodes on the GPU when the device works.
 
 ## Compositor backends
 
-Screen capture has two interchangeable helpers that share one command line
-(`<output-name> <fps>`) and one stream contract: a single
-`FORMAT <w> <h> <rgba|bgra> <transform>` line on stderr, then raw frames on stdout, with
-`pause`/`resume`/`stop` on stdin. The Java recording pipeline is therefore identical for both.
+Screen capture has two interchangeable helpers that share one command line and one stream
+contract: a single `FORMAT <w> <h> <rgba|bgra> <transform>` line on stderr, then raw frames on
+stdout, with `pause`/`resume`/`stop` on stdin. The Java recording pipeline is therefore
+identical for both.
+
+```
+gravaai-wayland-capture <output-name|window:<identifier>> <fps>
+gravaai-wayland-capture --list
+gravaai-wayland-capture --list-windows
+gravaai-portal-capture <ignored> <fps>
+gravaai-portal-capture --list
+```
 
 - `gravaai-wayland-capture` — direct capture over `ext-image-copy-capture`, used on COSMIC and
-  any compositor that advertises the protocol.
+  any compositor that advertises the protocol. `--list` enumerates monitors over `wl_output`;
+  `--list-windows` enumerates mapped toplevels over `ext-foreign-toplevel-list-v1` as
+  `WINDOW\t<identifier>\t<app_id>\t<title>`; `window:<identifier>` records one of them through
+  `ext-image-capture-source-v1`'s foreign-toplevel source. The identifier is the compositor's own
+  stable one, so a title change or a second window with the same title cannot be confused.
 - `gravaai-portal-capture` — `xdg-desktop-portal` ScreenCast into PipeWire, used on desktops
-  whose compositor only exposes the portal: KDE Plasma/KWin, GNOME and wlroots sessions. Here
-  the portal's own dialog picks the monitor, so the `<output-name>` argument is accepted and
-  ignored, and `--list` enumerates monitors over `wl_output`.
+  whose compositor only exposes the portal: KDE Plasma/KWin, GNOME and wlroots sessions. Its
+  first argument is accepted and ignored: the portal's own dialog picks the source, and
+  `--list` enumerates monitors over `wl_output` for the HUD.
 
 `dev.gravaai.platform.compositor.CaptureBackend` chooses between them from `XDG_SESSION_TYPE`
 and `XDG_CURRENT_DESKTOP`; anything unrecognised keeps the historical COSMIC behaviour, and
 `CompositorRecordingEnvironment` applies the choice to the recorder.
+
+### Monitors or windows
+
+Both helpers record either a whole monitor or **one window**, and both print `SOURCE <kind>` on
+stderr before the `FORMAT` line so the app knows which it got.
+
+- **Portal.** `SelectSources` asks for `types = 1|2` (monitor **and** window) instead of
+  monitor only, so the desktop's dialog offers both and the user's pick is the choice — on KDE
+  and GNOME the dialog *is* the picker, and `window:portal` in the HUD opens it. The helper reads
+  the stream's `source_type` back to say what was shared.
+- **COSMIC.** The HUD lists the compositor's toplevels and passes `window:<identifier>`.
+
+### Resizing and moving during a recording
+
+The encoder reads `rawvideo` at one fixed size, so a frame stream whose size changed mid-file
+cannot be encoded. A window can be resized at any moment, and moving it changes the content
+without changing the size. Both helpers therefore share `capture-canvas/`:
+
+- the canvas is fixed by the first frame's size (dimensions rounded down to even, because
+  `yuv420p` rejects odd ones);
+- every later frame is composed into it, aspect-preserved and centred, with black bars when the
+  window's shape changed;
+- a move needs no work at all: the compositor hands the window's own buffer, so its screen
+  position never enters the frame.
+
+The canvas is also where the pointer is mapped: the compositor reports the cursor inside the
+captured surface, in that surface's buffer pixels, and the canvas turns it into the 0..1 space of
+the frame the recording actually shows, so cursor effects and auto-zoom stay aligned across
+resizes. `capture_canvas_write_cursor` prints `CURSOR <x> <y>`; out-of-surface positions (the
+pointer left the window) are not reported.
+
+The canvas contract has its own checks: `build-native-helpers.sh --test` builds and runs
+`capture-canvas/canvas-test.c` (sizes, aspect fitting, bars, refuse-degenerate-input).
 
 What the portal helper does beyond the COSMIC contract:
 
@@ -57,9 +102,12 @@ What the portal helper does beyond the COSMIC contract:
   `$XDG_STATE_HOME/gravaai/portal-restore-token` (mode 0600). The desktop's dialog appears on the
   first recording only; later ones start silently. A rejected token is deleted and the dialog
   comes back.
-- **Hidden cursor.** It requests `cursor_mode=1`, so the frames carry no pointer and the editor
-  draws its own from the cursor helper's telemetry. With the cursor embedded the video showed
-  two pointers.
+- **Hidden cursor unless it can be measured.** It requests `cursor_mode=4` (metadata) when the
+  portal advertises it in `AvailableCursorModes`, and `cursor_mode=1` (hidden) otherwise, so the
+  frames never carry an embedded pointer the editor would duplicate. With metadata the helper
+  reads `SPA_META_Cursor` from each buffer and prints the same `CURSOR` lines the COSMIC helper
+  does — that reading is window-relative, which is the only correct pointer position for a
+  window stream (see "Pointer position").
 - **Ended from the desktop.** When the user stops sharing from the desktop's own indicator
   ("End" on KDE, the top-bar button on GNOME), the portal emits `Session.Closed` and the
   PipeWire stream disconnects. The helper prints `ENDED ...` and exits; `CosmicRecorder` sees a

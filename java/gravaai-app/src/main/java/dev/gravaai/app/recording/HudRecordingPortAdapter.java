@@ -691,6 +691,51 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	/**
+	 * The windows the session records directly, plus the portal's "pick a window" entry on a
+	 * portal desktop (where the desktop's own dialog is the only window picker there is).
+	 */
+	@Override
+	public List<WindowDevice> windowDevices() {
+		List<WindowDevice> windows = new ArrayList<>();
+		try {
+			for (SelectedSource window : wiring.capturePicker().windowSources()) {
+				windows.add(new WindowDevice(window.id(), window.name()));
+			}
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "listing windows failed: " + error);
+		}
+		if (windows.isEmpty() && wiring.capturePicker().usesPortalPicker()) {
+			windows.add(new WindowDevice(PORTAL_WINDOW_ID,
+					dev.gravaai.ui.i18n.UiI18n.t("launch:recording.windowPickerTitle")));
+		}
+		return windows;
+	}
+
+	/** Selects a window from the HUD's own list; a window that closed meanwhile is refused. */
+	@Override
+	public void selectWindow(String windowId) {
+		if (PORTAL_WINDOW_ID.equals(windowId)) {
+			// The desktop's dialog picks the window at capture time, so the selection is the
+			// synthetic source the portal helper resolves itself.
+			wiring.capturePicker().selectPortalWindow(
+					dev.gravaai.ui.i18n.UiI18n.t("launch:recording.windowPickerTitle"));
+			publish();
+			return;
+		}
+		SelectedSource window = null;
+		for (SelectedSource candidate : wiring.capturePicker().windowSources()) {
+			if (windowId.equals(candidate.id())) {
+				window = candidate;
+				break;
+			}
+		}
+		if (window == null || !wiring.capturePicker().selectWindow(window)) {
+			LOG.log(System.Logger.Level.WARNING, "window " + windowId + " is no longer available");
+		}
+		publish();
+	}
+
+	/**
 	 * Selects the monitor when there is exactly one, so the user is never asked to pick it.
 	 * False when there are several (or none could be listed) and the picker has to ask.
 	 */

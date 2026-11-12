@@ -46,6 +46,8 @@ final class CosmicVideoPipeline {
 	private static final System.Logger LOG = System.getLogger("gravaai.recording");
 
 	private static final Pattern FORMAT_LINE = Pattern.compile("^FORMAT (\\d+) (\\d+) (\\w+) (\\d+)$");
+	/** The compositor's pointer reading, normalized to the recorded frame. */
+	private static final Pattern CURSOR_LINE = Pattern.compile("^CURSOR (\\d+(?:\\.\\d+)?) (\\d+(?:\\.\\d+)?)$");
 	private static final int COPY_BUFFER_BYTES = 4 * 1024 * 1024;
 
 	private final RecordingProcesses processes;
@@ -83,8 +85,28 @@ final class CosmicVideoPipeline {
 				new SpawnOptions(true, true, true));
 	}
 
-	/** Resolves with the helper's FORMAT line, or throws with its error. */
+	/** Resolves with the helper's FORMAT line, or throws its error; pointer lines are ignored. */
 	CaptureFormat readCaptureFormat(SpawnedProcess capture) throws IOException {
+		return readCaptureFormat(capture, (cx, cy) -> {
+			// Only the caller that records cursor telemetry listens for these.
+		});
+	}
+
+	/**
+	 * Resolves with the helper's FORMAT line, or throws with its error, forwarding every pointer
+	 * position the helper reports.
+	 *
+	 * <p>The helpers print {@code CURSOR x y} for a window capture: the compositor measured the
+	 * pointer inside the surface it is capturing, so the value is already relative to the recorded
+	 * frame and needs no display geometry. Reporting it is optional, so a helper or backend that
+	 * cannot measure the pointer simply never sends a line. The compositor sends the first
+	 * position as soon as the stream is up, which can precede the FORMAT line — lines before it
+	 * are forwarded too, not treated as error text.
+	 *
+	 * @param cursor receives each normalized position, on the caller's thread or the drain thread
+	 */
+	CaptureFormat readCaptureFormat(SpawnedProcess capture, CaptureCursorListener cursor)
+			throws IOException {
 		InputStream helperErrors = capture.stderr();
 		if (helperErrors == null) {
 			throw new IOException("The screen capture helper did not expose stderr.");
@@ -97,16 +119,33 @@ final class CosmicVideoPipeline {
 			stderr.append(line).append('\n');
 			Matcher match = FORMAT_LINE.matcher(line);
 			if (match.matches()) {
-				Thread.ofPlatform().daemon().name("gravaai-capture-log").start(() -> drainLines(reader));
+				Thread.ofPlatform().daemon().name("gravaai-capture-log")
+						.start(() -> drainLines(reader, cursor));
 				return new CaptureFormat(
 						Integer.parseInt(match.group(1)),
 						Integer.parseInt(match.group(2)),
 						match.group(3),
 						Integer.parseInt(match.group(4)));
 			}
+			Matcher pointer = CURSOR_LINE.matcher(line);
+			if (pointer.matches()) {
+				cursor.onPoint(Double.parseDouble(pointer.group(1)),
+						Double.parseDouble(pointer.group(2)));
+			}
 		}
 		String text = stderr.toString().trim();
 		throw new IOException(text.isEmpty() ? "The screen capture helper exited early." : text);
+	}
+
+	/** Receives each pointer position a capture helper measures inside the recorded surface. */
+	@FunctionalInterface
+	interface CaptureCursorListener {
+
+		/**
+		 * @param cx normalized x inside the recorded frame (0..1)
+		 * @param cy normalized y inside the recorded frame (0..1)
+		 */
+		void onPoint(double cx, double cy);
 	}
 
 	/**
@@ -309,10 +348,16 @@ final class CosmicVideoPipeline {
 		}
 	}
 
-	private static void drainLines(BufferedReader reader) {
+	private static void drainLines(BufferedReader reader, CaptureCursorListener cursor) {
 		try {
 			String line;
 			while ((line = reader.readLine()) != null) {
+				Matcher point = CURSOR_LINE.matcher(line);
+				if (point.matches()) {
+					cursor.onPoint(Double.parseDouble(point.group(1)),
+							Double.parseDouble(point.group(2)));
+					continue;
+				}
 				LOG.log(System.Logger.Level.WARNING, "[cosmic-capture] helper: " + line.trim());
 			}
 		} catch (IOException error) {

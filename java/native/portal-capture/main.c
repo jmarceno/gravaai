@@ -1,6 +1,6 @@
-// Screen capture for compositors that only expose the xdg-desktop-portal ScreenCast
-// path (KDE Plasma/KWin, GNOME, wlroots). COSMIC and other compositors with
-// ext-image-copy-capture keep using gravaai-wayland-capture.
+// Screen and window capture for compositors that only expose the xdg-desktop-portal
+// ScreenCast path (KDE Plasma/KWin, GNOME, wlroots). COSMIC and other compositors
+// with ext-image-copy-capture keep using gravaai-wayland-capture.
 //
 // Usage: gravaai-portal-capture <output-name> <fps>
 //        gravaai-portal-capture --list   (prints OUTPUT <name> <x> <y> <w> <h>)
@@ -10,12 +10,21 @@
 //   - raw frames go to stdout,
 //   - one "FORMAT <width> <height> <rgba|bgra> <transform>" line goes to stderr
 //     before the first frame,
+//   - one "SOURCE <monitor|window>" line reports what the portal's dialog picked,
+//   - one "CURSOR <x> <y>" line reports the pointer inside a shared window (0..1),
 //   - stdin commands are "pause", "resume" and "stop" (EOF also stops).
 //
-// Unlike the COSMIC helper this one cannot be told which output to capture: the
-// portal's own dialog is the picker, so <output-name> is accepted and ignored.
-// The frames are repeated at a constant <fps> so the muxer sees a steady clock
-// even when nothing on screen changes.
+// Unlike the COSMIC helper this one cannot be told which surface to capture: the
+// portal's own dialog is the picker, so <output-name> is accepted and ignored. Both
+// monitors and windows are offered to that dialog, and its answer decides what is
+// captured. The frames are repeated at a constant <fps> so the muxer sees a steady
+// clock even when nothing on screen changes.
+//
+// A shared window can be resized while it is recorded. Its frames then come at
+// different sizes, which a fixed-size raw stream cannot carry, so every frame is
+// composed into a canvas fixed by the first frame (see capture-canvas.h). The
+// pointer position the compositor stamps into the buffers is mapped through the
+// same fit, so cursor telemetry follows the recorded frame across a resize.
 
 #define _GNU_SOURCE
 #include <dbus/dbus.h>
@@ -43,6 +52,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "capture-canvas.h"
 #include "xdg-output-unstable-v1-client.h"
 
 #define DEFAULT_FPS 60
@@ -418,7 +428,84 @@ static char *results_string(DBusMessageIter *dict, const char *key) {
 	return NULL;
 }
 
-/* results["streams"] is a(ua{sv}); take the first node id. */
+/* ScreenCast source types, as the portal and the compositors report them. */
+#define SOURCE_TYPE_MONITOR 1u
+#define SOURCE_TYPE_WINDOW 2u
+
+/* Cursor modes from org.freedesktop.portal.ScreenCast. */
+#define CURSOR_MODE_HIDDEN 1u
+#define CURSOR_MODE_METADATA 4u
+
+/* Which kind of surface the portal ended up sharing, known once Start returned. */
+static uint32_t stream_source_type = SOURCE_TYPE_MONITOR;
+/* True when the session asked for cursor metadata rather than just a hidden cursor. */
+static bool cursor_metadata_requested;
+
+/* Reads the ScreenCast.AvailableCursorModes property.
+ *
+ * Cursor metadata is the only way to learn where the pointer is inside a shared *window*: the
+ * portal reports neither a window's position nor its global bounds, so a global pointer reading
+ * cannot be normalized against it. Asking for an unsupported mode closes the session, so the
+ * request has to follow what this backend advertises. */
+static bool portal_offers_cursor_metadata(void) {
+	DBusMessage *message = dbus_message_new_method_call("org.freedesktop.portal.Desktop",
+			"/org/freedesktop/portal/desktop", "org.freedesktop.DBus.Properties", "Get");
+	if (message == NULL)
+		return false;
+	const char *interface = "org.freedesktop.portal.ScreenCast";
+	const char *property = "AvailableCursorModes";
+	dbus_message_append_args(message, DBUS_TYPE_STRING, &interface, DBUS_TYPE_STRING, &property,
+			DBUS_TYPE_INVALID);
+	DBusError error;
+	dbus_error_init(&error);
+	DBusMessage *reply = dbus_connection_send_with_reply_and_block(bus, message, 2000, &error);
+	dbus_message_unref(message);
+	if (reply == NULL) {
+		dbus_error_free(&error);
+		return false;
+	}
+	bool offered = false;
+	DBusMessageIter iter, variant;
+	if (dbus_message_iter_init(reply, &iter)) {
+		dbus_message_iter_recurse(&iter, &variant);
+		if (dbus_message_iter_get_arg_type(&variant) == DBUS_TYPE_UINT32) {
+			uint32_t modes = 0;
+			dbus_message_iter_get_basic(&variant, &modes);
+			offered = (modes & CURSOR_MODE_METADATA) != 0;
+		}
+	}
+	dbus_message_unref(reply);
+	return offered;
+}
+
+/* Reads the stream property dict the portal returned. Only `source_type` matters here: it tells
+ * the recorder whether the user picked a monitor or a window, which decides how the pointer
+ * telemetry is interpreted. Every property is optional in older portal versions, so a missing
+ * source_type keeps the monitor default. */
+static void read_stream_properties(DBusMessageIter *stream) {
+	if (!dbus_message_iter_next(stream))
+		return;
+	if (dbus_message_iter_get_arg_type(stream) != DBUS_TYPE_ARRAY)
+		return;
+	DBusMessageIter dict, entry;
+	dbus_message_iter_recurse(stream, &dict);
+	while (dbus_message_iter_get_arg_type(&dict) == DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter value;
+		const char *name = NULL;
+		dbus_message_iter_recurse(&dict, &entry);
+		dbus_message_iter_get_basic(&entry, &name);
+		if (name != NULL && !strcmp(name, "source_type")) {
+			dbus_message_iter_next(&entry);
+			dbus_message_iter_recurse(&entry, &value);
+			if (dbus_message_iter_get_arg_type(&value) == DBUS_TYPE_UINT32)
+				dbus_message_iter_get_basic(&value, &stream_source_type);
+		}
+		dbus_message_iter_next(&dict);
+	}
+}
+
+/* results["streams"] is a(ua{sv}); take the first node id and, when the portal reports them,
+ * the stream's source type and size. */
 static uint32_t results_stream_node(DBusMessageIter *dict) {
 	DBusMessageIter iter;
 	dbus_message_iter_recurse(dict, &iter);
@@ -438,6 +525,7 @@ static uint32_t results_stream_node(DBusMessageIter *dict) {
 				dbus_message_iter_recurse(&array, &stream);
 				if (dbus_message_iter_get_arg_type(&stream) == DBUS_TYPE_UINT32)
 					dbus_message_iter_get_basic(&stream, &node);
+				read_stream_properties(&stream);
 				return node;
 			}
 			return SPA_ID_INVALID;
@@ -490,7 +578,8 @@ static int open_portal_stream(void) {
 		return -1;
 	}
 
-	/* One monitor, cursor embedded so zoom/click effects stay meaningful. */
+	/* Monitors and windows: the desktop's own dialog is the picker, so it offers both and the
+	 * user's choice decides what is recorded. Requesting a single type would hide the other. */
 	snprintf(token, sizeof(token), "gravaai_ss_%d", (int)getpid());
 	message = dbus_message_new_method_call("org.freedesktop.portal.Desktop",
 			"/org/freedesktop/portal/desktop", "org.freedesktop.portal.ScreenCast",
@@ -499,12 +588,17 @@ static int open_portal_stream(void) {
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &session);
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "{sv}", &options);
 	add_string(&options, "handle_token", token);
-	add_uint32(&options, "types", 1); /* monitor */
+	add_uint32(&options, "types", SOURCE_TYPE_MONITOR | SOURCE_TYPE_WINDOW);
 	add_bool(&options, "multiple", FALSE);
 	/* 1 = hidden: the frames carry no cursor, and the editor draws its own from the telemetry
 	 * the cursor helper records. With 2 (embedded) the compositor burnt a second pointer into
-	 * the video at a position the app does not know about, which showed up as two mice. */
-	add_uint32(&options, "cursor_mode", 1);
+	 * the video at a position the app does not know about, which showed up as two mice.
+	 * 4 = metadata would be the ideal source for window-relative positions, but not every
+	 * backend advertises it; the helper reads it when it is present and falls back to the
+	 * cursor helper otherwise. */
+	add_uint32(&options, "cursor_mode",
+			(cursor_metadata_requested = portal_offers_cursor_metadata())
+					? CURSOR_MODE_METADATA : CURSOR_MODE_HIDDEN);
 	/* 2 = persist until revoked: ask the desktop to remember this selection, and hand back a
 	 * token in Start's results so the next recording can reuse it instead of re-prompting. */
 	add_uint32(&options, "persist_mode", 2);
@@ -569,9 +663,13 @@ static struct spa_hook stream_listener;
 
 static pthread_mutex_t frame_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Three packed frames: the newest complete one, the one the writer is streaming out, and a spare
- * the PipeWire callback packs into. With only two, a second frame arriving during one 8 MB write
- * was packed over the very buffer being written, which tore the recorded frame. */
+ * the PipeWire callback composes into. With only two, a second frame arriving during one 8 MB
+ * write was packed over the very buffer being written, which tore the recorded frame.
+ *
+ * Each one is canvas-sized, because the encoder reads a fixed-size stream (see capture-canvas.h)
+ * while a shared window can be resized mid-recording. */
 #define FRAME_BUFFERS 3
+static struct capture_canvas canvas;
 static unsigned char *buffers[FRAME_BUFFERS];
 static int latest_buffer = -1;
 static int writing_buffer = -1;
@@ -603,38 +701,46 @@ static void on_param_changed(void *data, uint32_t id, const struct spa_pod *para
 		return;
 
 	pthread_mutex_lock(&frame_lock);
-	if (frame_width != width || frame_height != height) {
-		/* A resize while the writer streams a frame would free memory under it; the writer only
-		 * dereferences a buffer it marked as writing, so wait for that to finish first. */
-		while (writing_buffer >= 0) {
-			pthread_mutex_unlock(&frame_lock);
-			usleep(1000);
-			pthread_mutex_lock(&frame_lock);
-		}
-		size_t size = (size_t)width * (size_t)height * 4u;
+	if (!frame_announced) {
+		/* The canvas is fixed by the first negotiated format; a later resize
+		 * only changes how the source is fitted into it. */
+		capture_canvas_init(&canvas, (uint32_t)width, (uint32_t)height);
+		buffer_bytes = canvas.bytes;
 		for (int i = 0; i < FRAME_BUFFERS; i++) {
-			unsigned char *resized = realloc(buffers[i], size);
-			if (resized == NULL) {
+			buffers[i] = calloc(1, buffer_bytes);
+			if (buffers[i] == NULL) {
 				pthread_mutex_unlock(&frame_lock);
 				return;
 			}
-			buffers[i] = resized;
 		}
-		buffer_bytes = size;
-		latest_buffer = -1;
+		frame_announced = true;
 	}
+	/* The size the compositor captures at now; a shared window changes it. */
 	frame_width = width;
 	frame_height = height;
-	bool first = !frame_announced;
-	if (first)
-		frame_announced = true;
+	bool first = latest_buffer < 0 && writing_buffer < 0;
 	pthread_mutex_unlock(&frame_lock);
 
 	if (first) {
 		/* No transform: the compositor already applies rotation. */
-		fprintf(stderr, "FORMAT %d %d %s 0\n", width, height, rgba ? "rgba" : "bgra");
+		fprintf(stderr, "FORMAT %u %u %s 0\n", canvas.width, canvas.height,
+			rgba ? "rgba" : "bgra");
 		fflush(stderr);
 	}
+}
+
+/* Cursor metadata: the compositor stamps the pointer position into the buffer, in the source's
+ * pixels. It is the only window-relative reading available through the portal, because a window
+ * stream reports neither its position nor its bounds. */
+static void read_cursor_metadata(struct spa_buffer *spa_buffer) {
+	const struct spa_meta_cursor *cursor = spa_buffer_find_meta_data(spa_buffer,
+			SPA_META_Cursor, sizeof(struct spa_meta_cursor));
+	if (cursor == NULL || !spa_meta_cursor_is_valid(cursor))
+		return;
+	if (!frame_announced)
+		return;
+	capture_canvas_write_cursor(&canvas, cursor->position.x, cursor->position.y,
+			(uint32_t)frame_width, (uint32_t)frame_height);
 }
 
 static void on_process(void *data) {
@@ -644,6 +750,7 @@ static void on_process(void *data) {
 		return;
 
 	struct spa_buffer *spa_buffer = buffer->buffer;
+	read_cursor_metadata(spa_buffer);
 	if (spa_buffer->n_datas > 0) {
 		struct spa_data *spa_data = &spa_buffer->datas[0];
 		struct spa_chunk *chunk = spa_data->chunk;
@@ -653,17 +760,12 @@ static void on_process(void *data) {
 			while (spare == latest_buffer || spare == writing_buffer)
 				spare++;
 			unsigned char *staging = buffers[spare];
-			if (staging != NULL && buffer_bytes > 0) {
+			if (staging != NULL && buffer_bytes > 0 && frame_width > 0 && frame_height > 0) {
 				int stride = chunk->stride > 0 ? chunk->stride : frame_width * 4;
-				/* Pack to a tight buffer: ffmpeg reads rawvideo without a stride. */
-				for (int y = 0; y < frame_height; y++) {
-					size_t offset = (size_t)y * (size_t)stride;
-					size_t row = (size_t)frame_width * 4u;
-					if (offset + row > (size_t)chunk->size)
-						break;
-					memcpy(staging + (size_t)y * row,
-							(const unsigned char *)spa_data->data + offset, row);
-				}
+				/* Pack and fit into the canvas in one pass: the source may be smaller,
+				 * larger or a different aspect than the first frame. */
+				capture_canvas_compose(&canvas, staging, (const unsigned char *)spa_data->data,
+						(size_t)stride, (uint32_t)frame_width, (uint32_t)frame_height);
 				/* Publish it: the writer picks up this frame next tick. */
 				latest_buffer = spare;
 			}
@@ -837,6 +939,12 @@ static int capture(int fps) {
 	if (open_portal_stream() != 0)
 		return 1;
 
+	/* Report what the portal's dialog picked before any frame arrives: the recorder uses it to
+	 * decide whether the pointer telemetry it sees is window-relative. */
+	fprintf(stderr, "SOURCE %s\n",
+			stream_source_type == SOURCE_TYPE_WINDOW ? "window" : "monitor");
+	fflush(stderr);
+
 	pw_init(NULL, NULL);
 	pw_loop = pw_main_loop_new(NULL);
 	struct pw_context *context = pw_context_new(pw_main_loop_get_loop(pw_loop), NULL, 0);
@@ -906,7 +1014,6 @@ static int capture(int fps) {
 	pthread_mutex_unlock(&frame_lock);
 	return 0;
 }
-
 int main(int argc, char *argv[]) {
 	if (argc >= 2 && !strcmp(argv[1], "--list"))
 		return list_outputs();

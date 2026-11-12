@@ -237,6 +237,17 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 		invoke(() -> delegate("selectScreen").selectScreen(screenId));
 	}
 
+	@Override
+	public List<WindowDevice> windowDevices() {
+		HudRecordingPort real = delegate.get();
+		return real == null ? List.of() : real.windowDevices();
+	}
+
+	@Override
+	public void selectWindow(String windowId) {
+		invoke(() -> delegate("selectWindow").selectWindow(windowId));
+	}
+
 	private HudRecordingPort delegate(String action) {
 		HudRecordingPort real = delegate.get();
 		if (real == null) {

@@ -33,12 +33,15 @@ public sealed interface CliCommand {
 	 * @param duration seconds to record, or empty to record until interrupted
 	 * @param out where to save, or empty for the recordings folder's own name
 	 * @param screen the output to capture, or empty for the first one
+	 * @param window the window to capture instead of a whole output: an identifier from
+	 *     {@code --list-windows}, or a title/app-id fragment to match, or empty to record a screen
 	 * @param systemAudio capture the default output's audio
 	 * @param microphone capture the default microphone
 	 * @param json emit NDJSON events on stdout
 	 */
 	record Record(Optional<Long> duration, Optional<Path> out, Optional<String> screen,
-			boolean systemAudio, boolean microphone, boolean json) implements CliCommand {
+			Optional<String> window, boolean systemAudio, boolean microphone, boolean json)
+			implements CliCommand {
 	}
 
 	/**
@@ -155,6 +158,7 @@ public sealed interface CliCommand {
 		Optional<Long> duration = Optional.empty();
 		Optional<Path> out = Optional.empty();
 		Optional<String> screen = Optional.empty();
+		Optional<String> window = Optional.empty();
 		boolean systemAudio = false;
 		boolean microphone = false;
 		boolean json = false;
@@ -182,6 +186,13 @@ public sealed interface CliCommand {
 					}
 					screen = Optional.of(args[index]);
 				}
+				case "--window" -> {
+					if (++index >= args.length) {
+						return Result.err(
+								"--window needs a window identifier, title or app id");
+					}
+					window = Optional.of(args[index]);
+				}
 				case "--duration" -> {
 					if (++index >= args.length) {
 						return Result.err("--duration needs a number of seconds");
@@ -200,7 +211,12 @@ public sealed interface CliCommand {
 			}
 			index++;
 		}
-		return Result.ok(new Record(duration, out, screen, systemAudio, microphone, json));
+		if (screen.isPresent() && window.isPresent()) {
+			// One take records one surface: refusing is honest, silently preferring one would
+			// record something the script did not ask for.
+			return Result.err("--screen and --window are mutually exclusive");
+		}
+		return Result.ok(new Record(duration, out, screen, window, systemAudio, microphone, json));
 	}
 
 	private static Result<Export> parseExport(String[] args) {

@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import dev.gravaai.core.concurrent.Threads;
 import dev.gravaai.services.recording.CosmicOutput;
 import dev.gravaai.services.recording.CosmicSources;
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.recording.ports.RecordingProcesses.SpawnOptions;
@@ -59,6 +60,19 @@ final class CosmicOutputPicker {
 		byte[] stdout = processIo.runAndCapture(List.of(
 				environment.captureHelper().toString(), "--list"));
 		return new ArrayList<>(CosmicSources.parseOutputs(new String(stdout, StandardCharsets.UTF_8)));
+	}
+
+	/**
+	 * Lists the mapped toplevels by running {@code gravaai-wayland-capture --list-windows}.
+	 *
+	 * <p>Empty on a compositor that does not expose foreign toplevels: the helper says so on
+	 * stderr, so window recording is simply not offered instead of failing at start.
+	 */
+	List<WindowSources.CaptureWindow> listWindows() throws IOException {
+		byte[] stdout = processIo.runAndCapture(List.of(
+				environment.captureHelper().toString(), "--list-windows"));
+		return new ArrayList<>(WindowSources.parseWindows(
+				new String(stdout, StandardCharsets.UTF_8)));
 	}
 
 	/**

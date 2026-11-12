@@ -310,6 +310,10 @@ public final class HudMenuWindow {
 	/**
 	 * The monitor list. On Wayland the HUD cannot stay above other windows, so clicking the screen
 	 * to record hid it behind them; choosing from a list keeps the HUD in front.
+	 *
+	 * <p>The window list is offered below the monitors: recording one window instead of the whole
+	 * screen is the point of that list, and both are the same decision ("what do I record?"), so
+	 * they belong in one panel rather than in two menus the user has to guess between.
 	 */
 	private void buildScreenMenu(HudRecordingPort.State state) {
 		startPanel(t("launch:recording.screenMenuTitle"));
@@ -319,13 +323,28 @@ public final class HudMenuWindow {
 			Label empty = new Label(t("launch:recording.noScreensFound"));
 			empty.getStyleClass().add("hud-menu-item-empty");
 			contentPane.getChildren().add(empty);
-			return;
 		}
 		for (HudRecordingPort.ScreenDevice screen : screens) {
 			boolean selected = screen.label().equals(state.sourceName());
 			contentPane.getChildren().add(menuItem(screen.label(), Icons.MonitorIcon, selected, screen.label(),
 					() -> {
 						port.selectScreen(screen.id());
+						close();
+					}));
+		}
+
+		List<HudRecordingPort.WindowDevice> windows = port.windowDevices();
+		if (windows.isEmpty()) {
+			return;
+		}
+		Label heading = new Label(t("launch:recording.windowMenuTitle"));
+		heading.getStyleClass().add("hud-menu-section");
+		contentPane.getChildren().add(heading);
+		for (HudRecordingPort.WindowDevice window : windows) {
+			boolean selected = window.label().equals(state.sourceName());
+			contentPane.getChildren().add(menuItem(window.label(), Icons.AppWindowIcon, selected,
+					window.label(), () -> {
+						port.selectWindow(window.id());
 						close();
 					}));
 		}

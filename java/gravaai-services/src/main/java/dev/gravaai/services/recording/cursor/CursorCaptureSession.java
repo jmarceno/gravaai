@@ -19,7 +19,6 @@ import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
 import dev.gravaai.services.recording.ports.RecordingProcesses;
 import dev.gravaai.services.sources.SelectedSource;
-import dev.gravaai.services.sources.WindowBounds;
 
 /**
  * Cursor position and mouse-button sampling during a recording, ported from
@@ -50,17 +49,29 @@ public final class CursorCaptureSession
 	private volatile boolean captureActive;
 	private volatile long captureStartTimeMs;
 	private volatile @Nullable CursorVisualType currentCursorVisualType;
+	/**
+	 * A pointer reading that arrived before {@link #start()} armed the session: the capture helper
+	 * reports its first position as soon as the stream is up, which precedes the recording-state
+	 * message that calls start(). Kept with the time it arrived so start() can tell it from a
+	 * leftover of a previous take.
+	 */
+	private volatile boolean hasPendingCapturePoint;
+	private volatile double pendingCapturePointX;
+	private volatile double pendingCapturePointY;
+	private volatile long pendingCapturePointAtMs;
+
+	/** How long a pre-start capture reading stays adoptable; older ones are previous-take leftovers. */
+	private static final long ADOPT_PENDING_AFTER_MS = 1000;
 
 	public CursorCaptureSession(
 			RecordingProcesses processes,
 			RecordingEnvironment environment,
 			CursorScreen screen,
 			Supplier<SelectedSource> selectedSource,
-			Supplier<WindowBounds> selectedWindowBounds,
 			Supplier<String> keystrokeCaptureModeSetting) {
 		this.helper = new CursorHelperSession(processes, environment, keystrokeCaptureModeSetting);
 		this.coordinates = new CursorCoordinateMapper(
-				screen, selectedSource, selectedWindowBounds, helper::isHelperActive);
+				screen, selectedSource, helper::isHelperActive);
 		this.sampler = new CursorSampler(this::captureTick);
 		this.interactions = new CursorInteractionTracker(samples, clock, coordinates);
 		helper.setListener(this);
@@ -82,7 +93,6 @@ public final class CursorCaptureSession
 	/** Starts sampling; called when the renderer reports the recording as started. */
 	public synchronized void start() {
 		sampler.stop();
-		captureActive = true;
 		samples.clear();
 		captureStartTimeMs = System.currentTimeMillis();
 		clock.setStartTimeMs(captureStartTimeMs);
@@ -91,6 +101,10 @@ public final class CursorCaptureSession
 		interactions.reset();
 		sampler.start();
 		helper.start();
+		// Arming comes last: a capture line that raced with start() between these statements
+		// lands in the pending buffer instead of being dropped, and is adopted below.
+		captureActive = true;
+		adoptPendingCapturePoint();
 	}
 
 	/** Stops sampling and the helper; snapshots the samples for persistence. */
@@ -98,6 +112,7 @@ public final class CursorCaptureSession
 		captureActive = false;
 		sampler.stop();
 		helper.stop();
+		hasPendingCapturePoint = false;
 		snapshotCursorTelemetryForPersistence();
 		samples.clearActive();
 	}
@@ -162,6 +177,62 @@ public final class CursorCaptureSession
 		} catch (RuntimeException error) {
 			// Geometry not ready yet.
 		}
+	}
+
+	/**
+	 * A pointer position the capture backend read inside the recorded surface (0..1 of the frame).
+	 *
+	 * <p>Called on the capture helper's stderr thread. The first reading after a recording starts
+	 * also backfills the samples taken before it, the same way the cursor helper's first position
+	 * does, so a take that starts with a still pointer is still anchored.
+	 */
+	@Override
+	public void onCaptureCursorPoint(double cx, double cy) {
+		if (!captureActive) {
+			// The helper reports its first position as soon as the capture stream is up, which
+			// precedes the recording-state message that calls start(). Keep it: a still pointer
+			// never sends a second line, so dropping this one would leave the whole take
+			// unanchored (a window recording falls back to the frame centre).
+			pendingCapturePointX = cx;
+			pendingCapturePointY = cy;
+			pendingCapturePointAtMs = System.currentTimeMillis();
+			hasPendingCapturePoint = true;
+			return;
+		}
+		applyCapturePoint(cx, cy);
+	}
+
+	/** Records one capture-stream reading and, when it is the first, backfills the samples. */
+	private void applyCapturePoint(double cx, double cy) {
+		boolean first = !coordinates.hasCapturePoint();
+		coordinates.recordCapturePoint(cx, cy);
+		if (!first) {
+			return;
+		}
+		try {
+			double[] point = coordinates.normalize();
+			synchronized (this) {
+				samples.backfill(point[0], point[1]);
+			}
+		} catch (RuntimeException error) {
+			// Geometry not ready yet.
+		}
+	}
+
+	/**
+	 * Adopts a pointer reading that arrived before start() armed the session.
+	 *
+	 * <p>Only a fresh one: a line the previous take's helper managed to emit while being torn
+	 * down is seconds old by the time the next recording starts and must not anchor it.
+	 */
+	private void adoptPendingCapturePoint() {
+		if (!hasPendingCapturePoint
+				|| System.currentTimeMillis() - pendingCapturePointAtMs > ADOPT_PENDING_AFTER_MS) {
+			hasPendingCapturePoint = false;
+			return;
+		}
+		hasPendingCapturePoint = false;
+		applyCapturePoint(pendingCapturePointX, pendingCapturePointY);
 	}
 
 	@Override

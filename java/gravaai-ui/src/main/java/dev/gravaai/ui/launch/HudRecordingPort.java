@@ -128,8 +128,30 @@ public interface HudRecordingPort {
 	/** Records the given monitor ({@link ScreenDevice#id()}) from now on. */
 	void selectScreen(String screenId);
 
+	/**
+	 * The windows that can be recorded directly.
+	 *
+	 * <p>Empty on a portal desktop, where the desktop's own sharing dialog is the picker: the HUD
+	 * then offers {@link #PORTAL_WINDOW_ID} instead of a list it cannot verify.
+	 */
+	List<WindowDevice> windowDevices();
+
+	/** Records the given window ({@link WindowDevice#id()}) from now on. */
+	void selectWindow(String windowId);
+
+	/**
+	 * The id of the "share a window through the desktop's dialog" entry, for portal desktops.
+	 *
+	 * <p>{@code dev.gravaai.services.recording.WindowSources} resolves it to the capture target the
+	 * portal helper understands.
+	 */
+	String PORTAL_WINDOW_ID = "window:portal";
+
 	/** A monitor the HUD lists: {@code id} is the capture source id, {@code label} its name. */
 	record ScreenDevice(String id, String label) {}
+
+	/** A window the HUD lists: {@code id} is the capture source id, {@code label} its title. */
+	record WindowDevice(String id, String label) {}
 
 	/** A PulseAudio source used as a microphone. */
 	record MicDevice(String id, String label) {}

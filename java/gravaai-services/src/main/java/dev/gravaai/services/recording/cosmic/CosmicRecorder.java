@@ -23,13 +23,13 @@ import dev.gravaai.services.recording.CosmicSession.CosmicMux;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxInput;
 import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
 import dev.gravaai.services.recording.CosmicSession.MeetingInfo;
-import dev.gravaai.services.recording.CosmicSources;
 import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.MicNoiseReduction;
 import dev.gravaai.services.recording.RecordingEvents;
 import dev.gravaai.services.recording.RecordingFrameRate;
 import dev.gravaai.services.recording.RecordingQuality;
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.AudioTrack;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.CaptureFormat;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.PauseState;
@@ -112,6 +112,8 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 	private final CosmicDiskGuard diskGuard;
 	private final CosmicSessionWatch sessionWatch;
 	private final CosmicTelemetryWriter telemetry;
+	/** The session the helper's own pointer readings are fed to, for the window-relative path. */
+	private final CursorTelemetrySource cursorTelemetry;
 	private final CosmicOutputPicker outputPicker;
 
 	private @Nullable CosmicRecording active;
@@ -156,6 +158,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		this.diskGuard = new CosmicDiskGuard();
 		this.sessionWatch = new CosmicSessionWatch(events, diskGuard);
 		this.telemetry = new CosmicTelemetryWriter(cursorTelemetry, keystrokes);
+		this.cursorTelemetry = cursorTelemetry;
 		this.outputPicker = new CosmicOutputPicker(environment, processes, processIo, diskGuard);
 	}
 
@@ -189,13 +192,13 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 
 	// ── Start ──────────────────────────────────────────────────────────────
 
-	/** Starts a screen recording of one COSMIC output. */
+	/** Starts a screen recording of one COSMIC output, or of one window. */
 	public synchronized StartResult startCosmicRecording(
 			SelectedSource source, RecordingOptions options) {
 		if (active != null) {
 			return StartResult.failed("A screen recording is already active.");
 		}
-		String outputName = CosmicSources.outputNameForSourceId(source == null ? null : source.id());
+		String captureTarget = WindowSources.captureTarget(source);
 		Path recordingsDir = this.recordingsDir.get();
 		String lowDisk = CosmicDiskGuard.checkFreeSpaceToStart(recordingsDir);
 		if (lowDisk != null) {
@@ -214,14 +217,14 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		int fps = currentCaptureFps();
 		SpawnedProcess capture;
 		try {
-			capture = video.startCapture(outputName, fps);
+			capture = video.startCapture(captureTarget, fps);
 		} catch (IOException error) {
 			audioTracks.killAll(audio);
 			return StartResult.failed(String.valueOf(error));
 		}
 		CaptureFormat format;
 		try {
-			format = video.readCaptureFormat(capture);
+			format = video.readCaptureFormat(capture, cursorTelemetry::onCaptureCursorPoint);
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);
@@ -251,9 +254,10 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 				CosmicSession.sessionManifestPath(recordingsDir, timestamp));
 		beginRecordingSession(recording);
 		sessionWatch.watchCaptureEnd(recording, capture, this::isActive);
-		LOG.log(System.Logger.Level.INFO, "Recording " + outputName + " " + format.width() + "x"
-				+ format.height() + " transform " + format.transform() + " encoded with "
-				+ videoCapture.encoderSpec().label() + " to " + outputPath);
+		LOG.log(System.Logger.Level.INFO, "Recording "
+				+ (captureTarget.isEmpty() ? "the portal's picked source" : captureTarget) + " "
+				+ format.width() + "x" + format.height() + " transform " + format.transform()
+				+ " encoded with " + videoCapture.encoderSpec().label() + " to " + outputPath);
 		return StartResult.ok();
 	}
 
@@ -508,6 +512,16 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 	/** Lists the COSMIC outputs by running {@code gravaai-wayland-capture --list}. */
 	public List<CosmicOutput> listCosmicOutputs() throws IOException {
 		return outputPicker.listOutputs();
+	}
+
+	/**
+	 * Lists the windows the capture helper can record.
+	 *
+	 * <p>A portal session has no window list of its own (the desktop's dialog is the picker), so
+	 * this answers empty there and the UI offers the portal's "pick a window" entry instead.
+	 */
+	public List<WindowSources.CaptureWindow> listCaptureWindows() throws IOException {
+		return outputPicker.listWindows();
 	}
 
 	/**

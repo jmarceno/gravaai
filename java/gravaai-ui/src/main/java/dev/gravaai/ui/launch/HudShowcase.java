@@ -266,6 +266,15 @@ public final class HudShowcase extends Application {
 		}
 
 		@Override
+		public List<WindowDevice> windowDevices() {
+			return List.of();
+		}
+
+		@Override
+		public void selectWindow(String windowId) {
+		}
+
+		@Override
 		public List<CameraDevice> cameraDevices() {
 			// Real V4L2 cameras, so the harness exercises the live preview.
 			return HudDevices.cameras();

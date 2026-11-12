@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.services.recording.CosmicOutput;
+import dev.gravaai.services.recording.WindowSources;
 
 /**
  * Ported from {@code electron/ipc/captureSelection.test.ts}. Only the Linux Wayland cases are
@@ -43,6 +44,24 @@ class CaptureSelectionTest {
 	private static SelectedSource window() {
 		return SelectedSource.window("window:101:0", "Document", "1", "Notes", "Document");
 	}
+
+	/** The helper's window list, as {@code --list-windows} reports it. */
+	private static final class FakeWindows implements CaptureSelection.CaptureWindows {
+
+		final List<WindowSources.CaptureWindow> windows = new ArrayList<>();
+		Exception failure;
+
+		@Override
+		public List<WindowSources.CaptureWindow> list() throws Exception {
+			if (failure != null) {
+				throw failure;
+			}
+			return List.copyOf(windows);
+		}
+	}
+
+	private static final WindowSources.CaptureWindow EDITOR =
+			new WindowSources.CaptureWindow("5f1c", "code", "main.rs - gravaai");
 
 	@Test
 	@DisplayName("rejects old X11 IDs on Wayland without enumerating portal sources")
@@ -95,5 +114,85 @@ class CaptureSelectionTest {
 				selection.validateCaptureSource(
 						SelectedSource.screen(SourceMapping.LINUX_PORTAL_SCREEN_SOURCE_ID, "System picker", null)));
 		assertEquals(1, outputs.calls);
+	}
+
+	@Test
+	@DisplayName("lists the compositor's windows as selectable sources")
+	void listsWindows() {
+		FakeWindows windows = new FakeWindows();
+		windows.windows.add(EDITOR);
+		CaptureSelection selection =
+				new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND), windows);
+
+		List<SelectedSource> sources = selection.listCaptureWindowSources();
+
+		assertEquals(1, sources.size());
+		assertEquals("window:5f1c", sources.get(0).id());
+		assertEquals("main.rs - gravaai", sources.get(0).name());
+		assertEquals(SourceType.WINDOW, sources.get(0).sourceType());
+	}
+
+	@Test
+	@DisplayName("a closed window is refused instead of substituted")
+	void refusesAClosedWindow() {
+		FakeWindows windows = new FakeWindows();
+		windows.windows.add(EDITOR);
+		CaptureSelection selection =
+				new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND), windows);
+
+		assertEquals("window:5f1c",
+				selection.validateCaptureSource(CaptureSelection.asWindowSource(EDITOR)).id());
+		windows.windows.clear();
+		assertNull(selection.validateCaptureSource(CaptureSelection.asWindowSource(EDITOR)));
+	}
+
+	@Test
+	@DisplayName("a window that is listed again is rebuilt from the live entry")
+	void revalidatesWindowsFromTheLiveList() {
+		FakeWindows windows = new FakeWindows();
+		windows.windows.add(EDITOR);
+		CaptureSelection selection =
+				new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND), windows);
+
+		// A stale name from an earlier list must not survive revalidation.
+		SelectedSource stale = SelectedSource.window("window:5f1c", "old title", null, "code", "old title");
+		assertEquals("main.rs - gravaai",
+				selection.validateCaptureSource(stale).name());
+	}
+
+	@Test
+	@DisplayName("the portal window source needs no list: the dialog decides")
+	void acceptsThePortalWindowSource() {
+		CaptureSelection selection = new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND));
+
+		SelectedSource validated = selection.validateCaptureSource(
+				CaptureSelection.portalWindowSource("Share a window…"));
+		assertEquals("window:portal", validated.id());
+		assertEquals(SourceType.WINDOW, validated.sourceType());
+	}
+
+	@Test
+	@DisplayName("window capture is not offered outside Wayland")
+	void doesNotListWindowsOffWayland() {
+		FakeWindows windows = new FakeWindows();
+		windows.windows.add(EDITOR);
+		CaptureSelection selection =
+				new CaptureSelection(new FakeOutputs(), DesktopSession.detect(X11), windows);
+
+		assertEquals(List.of(), selection.listCaptureWindowSources());
+		assertNull(selection.validateCaptureSource(CaptureSelection.asWindowSource(EDITOR)));
+	}
+
+	@Test
+	@DisplayName("a failed window listing is an empty list, not an error")
+	void handlesWindowListingFailures() {
+		FakeWindows windows = new FakeWindows();
+		windows.windows.add(EDITOR);
+		windows.failure = new IllegalStateException("helper missing");
+		CaptureSelection selection =
+				new CaptureSelection(new FakeOutputs(), DesktopSession.detect(WAYLAND), windows);
+
+		assertEquals(List.of(), selection.listCaptureWindowSources());
+		assertNull(selection.validateCaptureSource(CaptureSelection.asWindowSource(EDITOR)));
 	}
 }

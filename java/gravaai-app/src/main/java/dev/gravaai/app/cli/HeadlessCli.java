@@ -129,6 +129,9 @@ public final class HeadlessCli {
 			  --out <file.mp4>       where to save; default: the recordings folder
 			  --screen <name>        which output to record; default: the first. A wrong name lists
 			                         the available outputs
+			  --window <match>       record one window instead of a whole output: its identifier,
+			                         or part of its title or app id. Ambiguous matches are refused,
+			                         and it cannot be combined with --screen
 			  --system-audio         capture the default output's audio
 			  --mic                  capture the default microphone
 			  --json                 NDJSON events on stdout

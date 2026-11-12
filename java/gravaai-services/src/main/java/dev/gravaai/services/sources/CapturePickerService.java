@@ -111,6 +111,26 @@ public final class CapturePickerService {
 		return sources.getScreenSources(displayInfos());
 	}
 
+	/** The windows the HUD lists (empty on a portal compositor, where its dialog is the picker). */
+	public List<SelectedSource> windowSources() {
+		return sources.getWindowSources();
+	}
+
+	/** True when the desktop's own sharing dialog is the picker, not an in-app list. */
+	public boolean usesPortalPicker() {
+		return session.isWayland() && session.captureBackend() == CaptureBackend.PORTAL;
+	}
+
+	/** Selects one window from {@link #windowSources()}; false when it is gone. */
+	public boolean selectWindow(SelectedSource window) {
+		return sources.selectWindow(window);
+	}
+
+	/** Selects the dialog's "share a window" source on a portal desktop. */
+	public void selectPortalWindow(String label) {
+		sources.selectPortalWindow(label);
+	}
+
 	/** Selects one monitor from {@link #screenSources()}; false when it is gone. */
 	public boolean selectScreen(String sourceId) {
 		if (sourceId == null || cursorCaptureActive.get()) {

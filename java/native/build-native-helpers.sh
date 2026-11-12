@@ -17,7 +17,7 @@
 # clean checkout needs only the system -dev packages below. Nothing hardware-accelerated
 # is involved (plan §1.1.1).
 #
-# Usage: ./build-native-helpers.sh [--clean]
+# Usage: ./build-native-helpers.sh [--clean] [--test]
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,7 +27,17 @@ gen="$here/wayland-cursor/build"
 say() { printf '[build-native-helpers] %s\n' "$*"; }
 die() { printf '[build-native-helpers] error: %s\n' "$*" >&2; exit 1; }
 
-if [[ "${1:-}" == "--clean" ]]; then
+clean=0
+run_tests=0
+for arg in "$@"; do
+	case "$arg" in
+		--clean) clean=1 ;;
+		--test) run_tests=1 ;;
+		*) die "unknown argument: $arg (usage: $0 [--clean] [--test])" ;;
+	esac
+done
+
+if ((clean)); then
 	say "removing the helper binaries and staged models in $out"
 	rm -f "$out"/gravaai-*
 	rm -rf "$out/models"
@@ -62,10 +72,13 @@ cc "${cc_flags[@]}" -I"$gen" -o "$out/gravaai-wayland-cursor" \
 	"$here/wayland-cursor/main.c" "$gen"/*.c "${wl_flags[@]}"
 
 # wayland-capture reuses the protocol bindings generated for the cursor helper, like
-# electron/native/wayland-cursor/build.sh does.
+# electron/native/wayland-cursor/build.sh does. Both capture helpers share the frame
+# canvas that keeps a window recording encodable across a resize, and that maps the
+# compositor's cursor readings into the recorded frame.
 say "building gravaai-wayland-capture"
-cc "${cc_flags[@]}" -I"$gen" -o "$out/gravaai-wayland-capture" \
-	"$here/wayland-capture/main.c" "$gen"/*.c "${wl_flags[@]}"
+cc "${cc_flags[@]}" -I"$gen" -I"$here/capture-canvas" -o "$out/gravaai-wayland-capture" \
+	"$here/wayland-capture/main.c" "$here/capture-canvas/capture-canvas.c" "$gen"/*.c \
+	"${wl_flags[@]}"
 
 # gravaai-ctl is plain C: it only talks to the control socket over libc.
 say "building gravaai-ctl"
@@ -80,8 +93,9 @@ if pkg-config --exists dbus-1 libpipewire-0.3 2>/dev/null; then
 	pipewire_flags=($(pkg-config --cflags --libs dbus-1 libpipewire-0.3))
 	# Reuse the xdg-output bindings generated above; the portal helper lists outputs the
 	# same way the COSMIC helper does.
-	cc "${cc_flags[@]}" -I"$gen" -o "$out/gravaai-portal-capture" \
-		"$here/portal-capture/main.c" "$gen/xdg-output-unstable-v1.c" \
+	cc "${cc_flags[@]}" -I"$gen" -I"$here/capture-canvas" -o "$out/gravaai-portal-capture" \
+		"$here/portal-capture/main.c" "$here/capture-canvas/capture-canvas.c" \
+		"$gen/xdg-output-unstable-v1.c" \
 		"${wl_flags[@]}" "${pipewire_flags[@]}"
 
 	# The pointer position on portal-only desktops comes from the compositor's own scripting
@@ -109,6 +123,20 @@ fi
 say "staging rnnoise models"
 rm -rf "$out/models"
 cp -a "$here/models" "$out/models"
+
+if ((run_tests)); then
+	# The canvas contract is pure C with no compositor dependency, so it can run anywhere.
+	# It is what keeps a window recording encodable across a resize; the Java tests cover
+	# the other half of that contract.
+	say "building and running the capture-canvas checks"
+	canvas_test="$out/canvas-test"
+	rm -f "$canvas_test"
+	cc -O2 -Wall -Wextra -Wno-unused-parameter -I"$here/capture-canvas" \
+		-o "$canvas_test" "$here/capture-canvas/canvas-test.c" \
+		"$here/capture-canvas/capture-canvas.c" -lm
+	"$canvas_test"
+	rm -f "$canvas_test"
+fi
 
 say "done -> $out"
 ls -l "$out"

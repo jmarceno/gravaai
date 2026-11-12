@@ -221,7 +221,7 @@ public final class RecordingWiring implements AutoCloseable {
 		};
 
 		CursorCaptureSession cursorSession = new CursorCaptureSession(
-				processes, environment, cursorScreen, selectedSource, () -> null, keystrokeMode);
+				processes, environment, cursorScreen, selectedSource, keystrokeMode);
 		CosmicRecorder cosmic = new CosmicRecorder(
 				recordingsDir, processes, environment, events, cursorSession, cursorSession,
 				micNoiseReduction, frameRate, videoQuality);
@@ -232,7 +232,14 @@ public final class RecordingWiring implements AutoCloseable {
 				LOG.log(System.Logger.Level.WARNING, "Could not list COSMIC outputs: " + error);
 				return List.of();
 			}
-		}, session);
+		}, session, () -> {
+			try {
+				return cosmic.listCaptureWindows();
+			} catch (IOException error) {
+				LOG.log(System.Logger.Level.WARNING, "Could not list capture windows: " + error);
+				return List.of();
+			}
+		});
 
 		SourceService.SourceSelectorUi selectorUi = new SourceService.SourceSelectorUi() {
 			@Override

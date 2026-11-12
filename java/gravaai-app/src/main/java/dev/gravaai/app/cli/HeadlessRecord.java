@@ -1,11 +1,15 @@
 package dev.gravaai.app.cli;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -31,6 +35,7 @@ import dev.gravaai.services.recording.RecordingFrameRate;
 import dev.gravaai.services.recording.RecordingLibrary;
 import dev.gravaai.services.recording.RecordingQuality;
 import dev.gravaai.services.recording.RecordingSessionManifest;
+import dev.gravaai.services.recording.WindowSources;
 import dev.gravaai.services.recording.cursor.CursorCaptureSession;
 import dev.gravaai.services.recording.cosmic.CosmicRecorder;
 import dev.gravaai.services.recording.cosmic.CosmicRecorder.RecordingOptions;
@@ -98,7 +103,7 @@ final class HeadlessRecord {
 			// breaks the cycle the same way RecordingWiring does, without a second list path.
 			AtomicReference<SelectedSource> selected = new AtomicReference<>();
 			try (CursorCaptureSession cursorSession = new CursorCaptureSession(processes,
-					environment, new HelperDisplay(environment), selected::get, () -> null,
+					environment, new HelperDisplay(environment), selected::get,
 					() -> stringOf(settings.readSetting(
 							KeystrokeCapture.KEYSTROKE_CAPTURE_MODE_SETTING)));
 					CosmicRecorder recorder = new CosmicRecorder(() -> recordingsDir, processes,
@@ -122,18 +127,31 @@ final class HeadlessRecord {
 	private int record(CliCommand.Record request, CosmicRecorder recorder,
 			CursorCaptureSession cursorSession, AtomicReference<SelectedSource> selected)
 			throws IOException {
-		List<CosmicOutput> outputs = recorder.listCosmicOutputs();
-		Optional<CosmicOutput> target = pickOutput(outputs, request.screen());
-		if (target.isEmpty()) {
-			return fail(outputs.isEmpty()
-					? "no screen outputs found; the capture helper reported none (is a Wayland "
-							+ "session running?)"
-					: "no output named \"" + request.screen().orElse("") + "\"; available: "
-							+ outputs.stream().map(CosmicOutput::name).toList());
+		SelectedSource source;
+		String label;
+		if (request.window().isPresent()) {
+			SelectedSource window = pickWindow(recorder, request.window().get());
+			if (window == null) {
+				return fail("no window matches \"" + request.window().get() + "\"");
+			}
+			source = window;
+			label = window.name();
+		} else {
+			List<CosmicOutput> outputs = recorder.listCosmicOutputs();
+			Optional<CosmicOutput> target = pickOutput(outputs, request.screen());
+			if (target.isEmpty()) {
+				return fail(outputs.isEmpty()
+						? "no screen outputs found; the capture helper reported none (is a Wayland "
+								+ "session running?)"
+						: "no output named \"" + request.screen().orElse("") + "\"; available: "
+								+ outputs.stream().map(CosmicOutput::name).toList());
+			}
+			source = CaptureSelection.createCosmicScreenSource(target.get(), displayInfos(outputs));
+			label = target.get().name();
 		}
-		selected.set(CaptureSelection.createCosmicScreenSource(target.get(), displayInfos(outputs)));
+		selected.set(source);
 
-		StartResult started = recorder.startCosmicRecording(selected.get(),
+		StartResult started = recorder.startCosmicRecording(source,
 				new RecordingOptions(request.systemAudio(), request.microphone(), null, null,
 						false));
 		if (!started.success()) {
@@ -144,11 +162,12 @@ final class HeadlessRecord {
 		cursorSession.start();
 
 		events.emit("record_start", Map.of(
-				"screen", target.get().name(),
+				"source", label,
+				"window", source.sourceType() == dev.gravaai.services.sources.SourceType.WINDOW,
 				"durationSeconds", request.duration().orElse(0L),
 				"systemAudio", request.systemAudio(),
 				"microphone", request.microphone()));
-		events.note("recording " + target.get().name() + " ("
+		events.note("recording " + label + " ("
 				+ request.duration().map(seconds -> seconds + " s").orElse("until interrupted")
 				+ ")");
 
@@ -228,6 +247,54 @@ final class HeadlessRecord {
 			}
 		}
 		return interrupted.get();
+	}
+
+	/**
+	 * The window a {@code --window} request names.
+	 *
+	 * <p>The argument is matched against the compositor's stable identifiers first (the exact
+	 * spelling {@code --list-windows} reports, with or without the {@code window:} prefix), then
+	 * against each window's title and app id. A title can repeat, so an ambiguous match is refused
+	 * instead of picking one of the candidates: a script that records the wrong window is worse
+	 * than a script that stops.
+	 *
+	 * @return the window source, or null when nothing matches
+	 * @throws IOException when several windows match, listing them
+	 */
+	private static @Nullable SelectedSource pickWindow(CosmicRecorder recorder, String requested)
+			throws IOException {
+		List<WindowSources.CaptureWindow> windows = recorder.listCaptureWindows();
+		if (windows.isEmpty()) {
+			return null;
+		}
+		String wanted = requested;
+		if (requested.startsWith(WindowSources.WINDOW_SOURCE_PREFIX)) {
+			String identifier = WindowSources.windowIdentifier(requested);
+			if (identifier != null) {
+				wanted = identifier;
+			}
+		}
+		for (WindowSources.CaptureWindow window : windows) {
+			if (window.identifier().equals(wanted)) {
+				return CaptureSelection.asWindowSource(window);
+			}
+		}
+		String needle = wanted.toLowerCase(Locale.ROOT);
+		List<WindowSources.CaptureWindow> matches = new ArrayList<>();
+		for (WindowSources.CaptureWindow window : windows) {
+			boolean titleMatches = window.title().toLowerCase(Locale.ROOT).contains(needle);
+			boolean appMatches = window.appId() != null
+					&& window.appId().toLowerCase(Locale.ROOT).contains(needle);
+			if (titleMatches || appMatches) {
+				matches.add(window);
+			}
+		}
+		if (matches.size() > 1) {
+			throw new IOException("several windows match \"" + requested + "\": "
+					+ matches.stream().map(WindowSources::label).toList()
+					+ " (use an identifier from --list-windows)");
+		}
+		return matches.size() == 1 ? CaptureSelection.asWindowSource(matches.getFirst()) : null;
 	}
 
 	/** The requested output by name, the first one when unnamed, or empty when the name is gone. */

@@ -9,9 +9,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import dev.gravaai.platform.compositor.CaptureBackend;
 import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.platform.process.ProcessRunner;
 import dev.gravaai.services.recording.RecordingPaths;
+import dev.gravaai.services.recording.WindowSources;
 
 /**
  * The source service (Appendix A {@code SourceService}), ported from the Linux Wayland parts of
@@ -125,6 +127,10 @@ public final class SourceService {
 	public List<SelectedSource> getDesktopSources(List<String> types) {
 		boolean includeScreens = types == null || types.contains("screen");
 		if (session.isWayland()) {
+			// Listing sources here would probe the compositor before the user asked for
+			// anything, which is what "never enumerate Wayland sources before recording"
+			// forbids. The desktop's dialog is the picker, so the sentinel stands for every
+			// kind it can share: monitors and windows alike.
 			if (types != null && !includeScreens) {
 				return List.of();
 			}
@@ -134,6 +140,19 @@ public final class SourceService {
 		// The Java app targets Linux Wayland only: Electron's desktopCapturer has no replacement
 		// and the window list is not ported (plan §2.3).
 		return List.of();
+	}
+
+	/**
+	 * The windows the session can record directly, for the HUD's window list.
+	 *
+	 * <p>Empty on a portal compositor: the desktop's own dialog is where a window is chosen there,
+	 * so the HUD offers that entry instead of a list it cannot verify.
+	 */
+	public List<SelectedSource> getWindowSources() {
+		if (!session.isWayland() || session.captureBackend() == CaptureBackend.PORTAL) {
+			return List.of();
+		}
+		return captureSelection.listCaptureWindowSources();
 	}
 
 	/**
@@ -158,6 +177,42 @@ public final class SourceService {
 		setSelectedSource(candidate);
 		broadcastSelectedSourceChange();
 		return selectedSource;
+	}
+
+	/**
+	 * Selects a window the session records directly, from the HUD's own window list.
+	 *
+	 * <p>The selection goes through the same validation as {@link #selectSource}, so a window that
+	 * closed between listing and selecting is refused instead of recording something else.
+	 */
+	public boolean selectWindow(SelectedSource window) {
+		if (cursorCaptureActive.get() || !WindowSources.isWindowSourceId(window.id())) {
+			return false;
+		}
+		for (SelectedSource available : getWindowSources()) {
+			if (!available.id().equals(window.id())) {
+				continue;
+			}
+			setSelectedSource(available);
+			broadcastSelectedSourceChange();
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Selects the desktop dialog's "share a window" source.
+	 *
+	 * <p>There is no window to resolve here: on a portal compositor the dialog is the picker, so
+	 * the recorder starts the helper and the portal decides which window is shared.
+	 */
+	public void selectPortalWindow(String label) {
+		if (cursorCaptureActive.get()) {
+			return;
+		}
+		SelectedSource window = CaptureSelection.portalWindowSource(label);
+		setSelectedSource(window);
+		broadcastSelectedSourceChange();
 	}
 
 	/** {@code open-source-selector}. */

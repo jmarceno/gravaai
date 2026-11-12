@@ -68,6 +68,9 @@ final class AgentEditorViews {
 					+ " (remove lets the project background show through the card)"),
 			Map.entry("webcam.highQualityMaskWhilePlaying", "true keeps the precise segmentation"
 					+ " model running during playback (slower)"),
+			Map.entry("webcam.eyeContact", "true redirects the speaker's gaze into the camera"
+					+ " (analyses the webcam once; glasses frames are never bent)"),
+			Map.entry("webcam.eyeContactAngle", "1-25 degrees of gaze lift (default 15)"),
 			Map.entry("webcam.maskPrecision", "0-1 (background effect edge crispness)"),
 			Map.entry("webcam.maskOffset", "-5-5 percent of the card (grows or shrinks the"
 					+ " background effect cut-out)"),

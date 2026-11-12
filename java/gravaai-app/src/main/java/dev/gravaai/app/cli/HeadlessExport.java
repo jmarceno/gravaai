@@ -203,7 +203,9 @@ final class HeadlessExport {
 						prepared.durationSeconds(), 0, wallpaperRoot.orElse(null),
 						prepared.frameRate(),
 						new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
-						prepared.outputWidth(), prepared.outputHeight());
+						prepared.outputWidth(), prepared.outputHeight())
+						.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(source.state(),
+								java.util.Optional.ofNullable(prepared.webcamPath())));
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 						factory, elements)) {

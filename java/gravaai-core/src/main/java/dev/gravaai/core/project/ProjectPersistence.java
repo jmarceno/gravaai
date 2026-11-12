@@ -1397,7 +1397,13 @@ public final class ProjectPersistence {
 						? clamp(field(webcamNode, "maskOffset").doubleValue(), -10, 10)
 						: WebcamOverlaySettings.DEFAULT_WEBCAM_MASK_OFFSET,
 				booleanOr(field(webcamNode, "smartFraming"),
-						WebcamOverlaySettings.DEFAULT_WEBCAM_SMART_FRAMING));
+						WebcamOverlaySettings.DEFAULT_WEBCAM_SMART_FRAMING),
+				booleanOr(field(webcamNode, "eyeContact"),
+						WebcamOverlaySettings.DEFAULT_WEBCAM_EYE_CONTACT),
+				isFiniteNumber(field(webcamNode, "eyeContactAngle"))
+						? WebcamOverlaySettings.clampEyeContactAngle(
+								field(webcamNode, "eyeContactAngle").doubleValue())
+						: WebcamOverlaySettings.DEFAULT_WEBCAM_EYE_CONTACT_ANGLE);
 	}
 
 	// ---------------------------------------------------------------------

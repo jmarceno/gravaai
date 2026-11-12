@@ -180,10 +180,12 @@ public final class EditorSession implements AutoCloseable {
 		this.document = document;
 		this.mediaSource = mediaSource;
 		this.store = new EditorStore(document.editor());
+		this.eyeContactState = store.state();
 		// Cheap audio-master clock; the media/audio attach happens in attachMedia() after the window
 		// is visible (P2.11 startup budget).
 		this.engine = new PlaybackEngine(PlaybackEngine.Dependencies.production(
-				DecoderFrameSourceProvider.ffmpegBacked(), new AudioMediaClock(), true));
+				DecoderFrameSourceProvider.ffmpegBacked().withDecoratedDecoders(this::decorateDecoder),
+				new AudioMediaClock(), true));
 		this.playback = new PlaybackControllerPort(engine);
 		// Decode the bundled clicks off-thread: the first audition and the first playback are warm.
 		ClickSounds.preload();
@@ -206,6 +208,7 @@ public final class EditorSession implements AutoCloseable {
 			syncClickSound();
 			syncKeySound();
 			syncAudioCleanup();
+			syncEyeContact(false);
 		});
 		this.waveformExecutor = Threads.daemon("gravaai-waveforms");
 		this.waveforms = new CachingWaveformProvider(this::waveformCachePath,
@@ -235,6 +238,9 @@ public final class EditorSession implements AutoCloseable {
 		this.dataSource.smartFramingPlan(this::smartFramingPlan);
 		// The cleanup badge of a lane shows where its denoised copy stands.
 		this.dataSource.cleanupRenderStatus(this::cleanupRenderStatus);
+		// The eye-contact strip of the Camera layout track follows the webcam analysis.
+		this.dataSource.eyeContactStrip(this::eyeContactStrip);
+		ownedResources.add(gazeCache.addListener(this::onGazeChanged));
 		// A cleaned track's rendered copy lands some time after the user switches noise
 		// reduction on: the badge follows the render, and the preview reopens its audio on the
 		// copy when it is there.
@@ -244,6 +250,186 @@ public final class EditorSession implements AutoCloseable {
 				this.dataSource.notifyChanged();
 			}
 		}));
+	}
+
+	// ── eye contact ──────────────────────────────────────────────────────────
+
+	/** The webcam analysis behind eye contact, shared with the exports. */
+	private final dev.gravaai.services.gaze.GazeCache gazeCache =
+			dev.gravaai.services.gaze.GazeCache.shared();
+	/** The media the engine plays; the decode worker reads it to recognise the webcam. */
+	private volatile Optional<PlaybackMedia> previewMedia = Optional.empty();
+	/** The state the decode worker corrects with (the store itself is FX-thread state). */
+	private volatile ProjectEditorState eyeContactState;
+	/** The eye-contact settings last applied to the preview, to refresh only on a real change. */
+	private String appliedEyeContact = "";
+	/** The analysis phase last seen for the preview's webcam. */
+	private volatile dev.gravaai.services.gaze.GazeCache.Phase lastGazePhase =
+			dev.gravaai.services.gaze.GazeCache.Phase.IDLE;
+	/** Bumped on every analysis change: the strip cache keys on it. */
+	private final java.util.concurrent.atomic.AtomicLong gazeVersion =
+			new java.util.concurrent.atomic.AtomicLong();
+	private volatile Optional<EyeStripCache> eyeStripCache = Optional.empty();
+
+	private record EyeStripCache(ProjectEditorState state, long version,
+			Optional<dev.gravaai.ui.editor.timeline.EyeContactStrip> strip) {}
+
+	/**
+	 * Wraps the preview's webcam decoder so each frame is corrected on the decode worker, the
+	 * frame-exact result the export computes. Other media decode untouched.
+	 */
+	private dev.gravaai.media.playback.VideoFrameDecoder decorateDecoder(String path,
+			dev.gravaai.media.playback.VideoFrameDecoder decoder) {
+		Optional<PlaybackMedia> media = previewMedia;
+		if (media.isEmpty() || !path.equals(media.get().webcamPath())
+				|| !gazeCache.isAvailable()) {
+			return decoder;
+		}
+		Path webcam = Path.of(path);
+		double offsetSeconds = media.get().webcamTimeOffsetMs() / 1000.0;
+		return new dev.gravaai.media.playback.FilteredVideoFrameDecoder(decoder,
+				new dev.gravaai.media.gaze.EyeContactFilter(() -> gazeCache.ready(webcam),
+						seconds -> dev.gravaai.media.compose.ProjectEditorInputs.eyeContactAngleAt(
+								eyeContactState, seconds * 1000),
+						dev.gravaai.media.onnx.OnnxWebGpuPlugin::probe),
+				// The preview maps the webcam straight off the timeline (minus its start offset).
+				seconds -> seconds + offsetSeconds);
+	}
+
+	/** The preview's webcam recording, when the playing media has one. */
+	private Optional<Path> previewWebcam() {
+		return previewMedia.flatMap(media -> Optional.ofNullable(media.webcamPath())).map(Path::of);
+	}
+
+	/**
+	 * Follows the eye-contact settings: starts the webcam analysis the first time eye contact is
+	 * asked for and re-decodes the preview's webcam when the correction changes.
+	 *
+	 * @param force refresh even when the settings did not change (new media)
+	 */
+	private void syncEyeContact(boolean force) {
+		ProjectEditorState state = store.state();
+		eyeContactState = state;
+		String signature = eyeContactSignature(state);
+		if (!force && signature.equals(appliedEyeContact)) {
+			return;
+		}
+		appliedEyeContact = signature;
+		Optional<Path> webcam = previewWebcam();
+		if (webcam.isPresent() && gazeCache.isAvailable()
+				&& dev.gravaai.media.compose.ProjectEditorInputs.eyeContactWanted(state)) {
+			gazeCache.ensure(webcam.get());
+		}
+		gazeVersion.incrementAndGet();
+		engine.refreshWebcam();
+	}
+
+	/** Everything the correction reads from the project, as one comparable string. */
+	private static String eyeContactSignature(ProjectEditorState state) {
+		var webcam = state.webcam();
+		StringBuilder signature = new StringBuilder();
+		if (webcam != null) {
+			signature.append(webcam.enabled()).append('|').append(webcam.eyeContact()).append('|')
+					.append(webcam.eyeContactAngle());
+		}
+		for (var segment : state.cameraLayoutSegments()) {
+			segment.style().eyeContact().ifPresent(angle -> signature.append('|')
+					.append(segment.startMs()).append('-').append(segment.endMs()).append(':')
+					.append(angle));
+		}
+		return signature.toString();
+	}
+
+	/** The analysis moved: repaint the strip, and re-decode the preview once it is ready. */
+	private void onGazeChanged() {
+		if (closed) {
+			return;
+		}
+		gazeVersion.incrementAndGet();
+		Optional<Path> webcam = previewWebcam();
+		if (webcam.isPresent()) {
+			var phase = gazeCache.status(webcam.get()).phase();
+			var previous = lastGazePhase;
+			lastGazePhase = phase;
+			if (phase == dev.gravaai.services.gaze.GazeCache.Phase.READY
+					&& previous != dev.gravaai.services.gaze.GazeCache.Phase.READY) {
+				engine.refreshWebcam();
+			}
+		}
+		dataSource.notifyChanged();
+	}
+
+	/**
+	 * The Camera-track eye-contact strip, cached per project state and analysis change (the
+	 * timeline repaints far more often than either moves).
+	 */
+	private Optional<dev.gravaai.ui.editor.timeline.EyeContactStrip> eyeContactStrip() {
+		ProjectEditorState state = store.state();
+		long version = gazeVersion.get();
+		Optional<EyeStripCache> cached = eyeStripCache;
+		if (cached.isPresent() && cached.get().state() == state
+				&& cached.get().version() == version) {
+			return cached.get().strip();
+		}
+		Optional<dev.gravaai.ui.editor.timeline.EyeContactStrip> strip = buildEyeContactStrip(state);
+		eyeStripCache = Optional.of(new EyeStripCache(state, version, strip));
+		return strip;
+	}
+
+	private Optional<dev.gravaai.ui.editor.timeline.EyeContactStrip> buildEyeContactStrip(
+			ProjectEditorState state) {
+		Optional<Path> webcam = previewWebcam();
+		if (webcam.isEmpty() || !gazeCache.isAvailable()
+				|| !dev.gravaai.media.compose.ProjectEditorInputs.eyeContactWanted(state)) {
+			return Optional.empty();
+		}
+		var status = gazeCache.status(webcam.get());
+		switch (status.phase()) {
+			case FAILED -> {
+				return Optional.of(new dev.gravaai.ui.editor.timeline.EyeContactStrip(
+						dev.gravaai.ui.editor.timeline.EyeContactStrip.State.FAILED, 0, List.of()));
+			}
+			case IDLE, ANALYSING -> {
+				return Optional.of(new dev.gravaai.ui.editor.timeline.EyeContactStrip(
+						dev.gravaai.ui.editor.timeline.EyeContactStrip.State.ANALYSING,
+						status.progress(), List.of()));
+			}
+			case READY -> {
+				// Falls through to the spans below.
+			}
+		}
+		Optional<dev.gravaai.media.gaze.GazeTrack> track = gazeCache.ready(webcam.get());
+		if (track.isEmpty()) {
+			return Optional.empty();
+		}
+		double offsetSeconds = previewMedia.map(PlaybackMedia::webcamTimeOffsetMs).orElse(0L)
+				/ 1000.0;
+		long total = timelineDurationMs();
+		long step = 100;
+		List<dev.gravaai.ui.editor.timeline.EyeContactStrip.Span> spans = new ArrayList<>();
+		int runKind = 0;
+		long runStart = 0;
+		for (long t = 0; t <= total; t += step) {
+			int kindHere = 0;
+			if (dev.gravaai.media.compose.ProjectEditorInputs.eyeContactAngleAt(state, t) > 0) {
+				double weight = track.get().weightAt(t / 1000.0 - offsetSeconds);
+				kindHere = weight >= 0.7 ? 2 : weight >= 0.05 ? 1 : 0;
+			}
+			if (kindHere != runKind) {
+				if (runKind != 0) {
+					spans.add(new dev.gravaai.ui.editor.timeline.EyeContactStrip.Span(runStart, t,
+							runKind == 2));
+				}
+				runKind = kindHere;
+				runStart = t;
+			}
+		}
+		if (runKind != 0) {
+			spans.add(new dev.gravaai.ui.editor.timeline.EyeContactStrip.Span(runStart, total,
+					runKind == 2));
+		}
+		return Optional.of(new dev.gravaai.ui.editor.timeline.EyeContactStrip(
+				dev.gravaai.ui.editor.timeline.EyeContactStrip.State.READY, 1, spans));
 	}
 
 	/**
@@ -396,8 +582,10 @@ public final class EditorSession implements AutoCloseable {
 		}
 		LOG.log(System.Logger.Level.INFO, "editor media resolved: " + media.videoPath());
 		// Video first: the preview only needs the decoded frame; audio is attached afterwards.
+		previewMedia = Optional.of(media);
 		LOG.log(System.Logger.Level.INFO, "editor engine setMedia start");
 		engine.setMedia(media);
+		syncEyeContact(true);
 		playbackClips = media.clips();
 		// setMedia emits the initial frame for the preview; no seek here (it forces a ring fill
 		// and can block on slow decoders - the preview can play/seek once the user asks).
@@ -459,7 +647,9 @@ public final class EditorSession implements AutoCloseable {
 					"editor media replace: no resolvable media for " + mediaSource.videoPath());
 			return;
 		}
+		previewMedia = Optional.of(media);
 		engine.setMedia(media);
+		syncEyeContact(true);
 		playbackClips = media.clips();
 		PlaybackAudioTrack previous = audioTrack;
 		PlaybackAudioTrack audio = null;

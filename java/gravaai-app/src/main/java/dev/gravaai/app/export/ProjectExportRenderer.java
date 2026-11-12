@@ -165,7 +165,9 @@ public final class ProjectExportRenderer implements ExportQueue.Renderer {
 				prepared.videoPath(), prepared.webcamPath(), cursorSamples,
 				prepared.durationSeconds(), 0, wallpaperRoot, prepared.frameRate(),
 				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
-				prepared.outputWidth(), prepared.outputHeight());
+				prepared.outputWidth(), prepared.outputHeight())
+				.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(state,
+						java.util.Optional.ofNullable(prepared.webcamPath())));
 		dev.gravaai.media.superres.@Nullable SuperResolutionEngine engine = null;
 		try {
 			engine = superResolution.get();

@@ -47,6 +47,7 @@
 		"filterVideo": "MP4-video",
 		"alreadyRunning": "Er wordt al geëxporteerd.",
 		"preparingNoiseReduction": "Ruisonderdrukking wordt voorbereid… de export start zodra die klaar is.",
+		"preparingEyeContact": "Webcam wordt geanalyseerd voor oogcontact… de export start zodra die klaar is.",
 		"exportedTo": "Succesvol geëxporteerd naar {{path}}",
 		"pipelineUnavailable": "De exportpipeline is niet beschikbaar.",
 		"queue": {

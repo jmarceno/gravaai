@@ -25,6 +25,12 @@ public interface FrameSource extends AutoCloseable {
 		return frameAt(sourceSeconds);
 	}
 
+	/**
+	 * Drops every frame decoded so far, so the next request decodes afresh. For a per-frame edit
+	 * applied during decoding that has just changed; sources without one ignore it.
+	 */
+	default void invalidate() {}
+
 	/** The media duration in seconds; 0 when unknown. */
 	double durationSeconds();
 

@@ -334,7 +334,8 @@ public final class RecordingImportController {
 				base.positionX(), base.positionY(), base.size(), base.width(), base.height(),
 				base.reactToZoom(), base.roundness(), base.cornerRadius(), base.shadow(),
 				base.margin(), base.backgroundEffect(), base.highQualityMaskWhilePlaying(),
-				base.maskPrecision(), base.maskOffset(), base.smartFraming());
+				base.maskPrecision(), base.maskOffset(), base.smartFraming(), base.eyeContact(),
+				base.eyeContactAngle());
 	}
 
 	private static @Nullable List<RecordingImportService.VisibleRange> serviceRanges(

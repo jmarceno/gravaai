@@ -72,6 +72,11 @@ YUNET_SHA256="8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
 # PP-OCRv4 mobile det+rec from RapidOCR's model zoo, Apache-2.0 (PaddleOCR derived).
 PPOCR_DET_SHA256="d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9"
 PPOCR_REC_SHA256="48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b"
+# Eye contact (models/gaze/notices/README.md): face mesh, glasses frames, eye-warp nets.
+GAZE_FACE_MESH_SHA256="d16e5a55e6a480284d468ee32469692464049518c311662ab3956681de31e3e9"
+GAZE_GLASSES_SHA256="ba95d0f5d48679a934e089f07a2b042d6251b7e49cad5af53b3f0b715c8697b4"
+GAZE_EYE_WARP_L_SHA256="0b5c58e959be39f9f646b14228d47519a9a02d729b630412d21efd117a501f0f"
+GAZE_EYE_WARP_R_SHA256="93dc83b2aa72af7c2a6f891007665595f943e6f6e497ba868f682c31d7a3fd71"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cache="${GRAVAAI_NATIVE_CACHE:-/media/jmarceno/scratch/gravaai-native}"
@@ -79,6 +84,8 @@ downloads="$cache/downloads"
 out="$here/build/onnxruntime"
 models_out="$here/build/models/segmentation"
 detection_out="$here/build/models/detection"
+gaze_out="$here/build/models/gaze"
+gaze_src="$here/models/gaze"
 model_src="$here/models/segmentation/selfie-segmenter.onnx"
 modnet_src="$here/models/segmentation/modnet.onnx"
 yunet_src="$here/models/detection/face_detection_yunet_2023mar.onnx"
@@ -191,7 +198,7 @@ else
 fi
 
 # Stage the bundled models (committed in the repo; shas pinned above).
-mkdir -p "$models_out" "$detection_out"
+mkdir -p "$models_out" "$detection_out" "$gaze_out"
 stage_model() {
 	# stage_model <source> <destination directory> <file name> <sha256>
 	local src="$1" dir="$2" name="$3" want="$4" got
@@ -206,4 +213,8 @@ stage_model "$modnet_src" "$models_out" "modnet.onnx" "$MODNET_SHA256"
 stage_model "$yunet_src" "$detection_out" "face_detection_yunet_2023mar.onnx" "$YUNET_SHA256"
 stage_model "$ppocr_det_src" "$detection_out" "ch_PP-OCRv4_det_infer.onnx" "$PPOCR_DET_SHA256"
 stage_model "$ppocr_rec_src" "$detection_out" "ch_PP-OCRv4_rec_infer.onnx" "$PPOCR_REC_SHA256"
+stage_model "$gaze_src/face_landmarks.onnx" "$gaze_out" "face_landmarks.onnx" "$GAZE_FACE_MESH_SHA256"
+stage_model "$gaze_src/glasses_frames.onnx" "$gaze_out" "glasses_frames.onnx" "$GAZE_GLASSES_SHA256"
+stage_model "$gaze_src/eye_warp_L.onnx" "$gaze_out" "eye_warp_L.onnx" "$GAZE_EYE_WARP_L_SHA256"
+stage_model "$gaze_src/eye_warp_R.onnx" "$gaze_out" "eye_warp_R.onnx" "$GAZE_EYE_WARP_R_SHA256"
 say "done"

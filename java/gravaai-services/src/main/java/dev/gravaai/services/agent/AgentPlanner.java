@@ -1279,7 +1279,7 @@ public final class AgentPlanner {
 
 	/**
 	 * {@code camera_layout {from, to?, layout, transition?, transitionOut?, size?, width?,
-	 * height?, roundness?, shadow?}}: the camera uses {@code layout} from {@code from} until
+	 * height?, roundness?, shadow?, margin?, eyeContact?}}: the camera uses {@code layout} from {@code from} until
 	 * {@code to} (default: the next Camera layout switch or the end). Whatever the track had in
 	 * that range is replaced.
 	 */

@@ -385,6 +385,18 @@ public final class DecoderFrameSource implements FrameSource {
 	}
 
 	/** Releases every buffered ring frame (the decoder's pooled buffers become reusable). */
+	@Override
+	public void invalidate() {
+		synchronized (lock) {
+			if (closed) {
+				return;
+			}
+			releaseRingLocked();
+			// A seek makes the worker drop the frame it is decoding and start again from here.
+			requestSeekLocked(lastReturnedPtsUs >= 0 ? lastReturnedPtsUs / 1_000_000.0 : 0);
+		}
+	}
+
 	private void releaseRingLocked() {
 		VideoFrame frame;
 		while ((frame = ring.pollFirst()) != null) {

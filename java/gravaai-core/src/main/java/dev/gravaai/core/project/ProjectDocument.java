@@ -671,6 +671,8 @@ public final class ProjectDocument {
 		node.put("maskPrecision", webcam.maskPrecision());
 		node.put("maskOffset", webcam.maskOffset());
 		node.put("smartFraming", webcam.smartFraming());
+		node.put("eyeContact", webcam.eyeContact());
+		node.put("eyeContactAngle", webcam.eyeContactAngle());
 		return node;
 	}
 }

@@ -313,6 +313,29 @@ public final class PlaybackEngine implements PlaybackController {
 		}
 	}
 
+	/**
+	 * Re-decodes the webcam after its per-frame edit changed (eye contact switched or its angle
+	 * moved, or the analysis just finished): drops the frames decoded so far and, when paused,
+	 * redraws the current frame. While playing the change shows a few frames later.
+	 */
+	public void refreshWebcam() {
+		FrameSource webcam;
+		boolean paused;
+		double at;
+		synchronized (lock) {
+			if (closed || media == null || webcamSource == null) {
+				return;
+			}
+			webcam = webcamSource;
+			paused = state != PlaybackState.PLAYING;
+			at = timelineLocked();
+		}
+		webcam.invalidate();
+		if (paused) {
+			seek(at);
+		}
+	}
+
 	@Override
 	public void seek(double timelineSeconds) {
 		FramePlan plan;

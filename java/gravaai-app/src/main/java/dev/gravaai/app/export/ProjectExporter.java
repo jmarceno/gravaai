@@ -130,7 +130,11 @@ public final class ProjectExporter {
 		dev.gravaai.services.denoise.DenoiseCache denoise =
 				dev.gravaai.services.denoise.DenoiseCache.shared();
 		List<Path> pending = pendingDenoise(session, preferences, denoise);
-		if (pending.isEmpty()) {
+		// Eye contact reads a per-frame analysis of the webcam; run it here too, so the export
+		// thread never waits on it with a frozen progress bar.
+		dev.gravaai.services.gaze.GazeCache gaze = dev.gravaai.services.gaze.GazeCache.shared();
+		java.util.Optional<Path> pendingGaze = pendingGaze(session, gaze);
+		if (pending.isEmpty() && pendingGaze.isEmpty()) {
 			return startExportNow(session, preferences, model, owner, superResolution);
 		}
 		int waitRun = model.beginExportRun();
@@ -139,12 +143,15 @@ public final class ProjectExporter {
 		model.setProgress(null);
 		model.setError(null);
 		Toast preparing = showToast(owner,
-				dev.gravaai.ui.i18n.UiI18n.t("dialogs:export.preparingNoiseReduction"));
+				dev.gravaai.ui.i18n.UiI18n.t(pending.isEmpty()
+						? "dialogs:export.preparingEyeContact"
+						: "dialogs:export.preparingNoiseReduction"));
 		if (preparing != null) {
 			preparing.variant(Toast.Variant.DEFAULT);
 		}
-		java.util.concurrent.CompletableFuture<?>[] renders = pending.stream()
-				.map(denoise::ensure).toArray(java.util.concurrent.CompletableFuture<?>[]::new);
+		java.util.concurrent.CompletableFuture<?>[] renders = java.util.stream.Stream.concat(
+				pending.stream().map(denoise::ensure), pendingGaze.stream().map(gaze::ensure))
+				.toArray(java.util.concurrent.CompletableFuture<?>[]::new);
 		java.util.concurrent.CompletableFuture.allOf(renders).whenComplete((done, error) ->
 				javafx.application.Platform.runLater(() -> {
 					if (!model.isCurrentRun(waitRun) || !model.isExporting()) {
@@ -158,6 +165,18 @@ public final class ProjectExporter {
 					startExportNow(session, preferences, model, owner, superResolution);
 				}));
 		return true;
+	}
+
+	/** The webcam recording when the project asks for eye contact and it is not analysed yet. */
+	private static java.util.Optional<Path> pendingGaze(EditorSession session,
+			dev.gravaai.services.gaze.GazeCache gaze) {
+		Path webcam = session.webcamPath();
+		if (webcam == null || !gaze.isAvailable() || !dev.gravaai.media.compose.ProjectEditorInputs
+				.eyeContactWanted(session.store().state())) {
+			return java.util.Optional.empty();
+		}
+		return gaze.ready(webcam).isPresent() ? java.util.Optional.empty()
+				: java.util.Optional.of(webcam);
 	}
 
 	/** The cleaned source tracks of this export that have no rendered copy yet. */
@@ -224,7 +243,9 @@ public final class ProjectExporter {
 					cursorSamples, prepared.durationSeconds(), 0,
 					wallpaperRoot, prepared.frameRate(),
 					new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
-					prepared.outputWidth(), prepared.outputHeight());
+					prepared.outputWidth(), prepared.outputHeight())
+					.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(session.store().state(),
+							java.util.Optional.ofNullable(prepared.webcamPath())));
 			CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 					prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(), factory,
 					elementHooks, superResolution);
@@ -470,7 +491,9 @@ public final class ProjectExporter {
 				cursorSamples, prepared.durationSeconds(), 0,
 				stageWallpapers(session), prepared.frameRate(),
 				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
-				prepared.outputWidth(), prepared.outputHeight());
+				prepared.outputWidth(), prepared.outputHeight())
+				.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(session.store().state(),
+						java.util.Optional.ofNullable(prepared.webcamPath())));
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 						prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 						factory, hooks)) {

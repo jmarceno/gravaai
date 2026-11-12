@@ -332,6 +332,7 @@ public final class EditorShellView extends VBox {
 			inspector.setSourceAudioTracks(timelineView::sourceAudioTracks);
 			// ... and shows the same cleaned-copy state as the lane's CLEAN badge.
 			inspector.setCleanupRenderStatus(timelineView::cleanupRenderStatus);
+			inspector.setEyeContactStatus(timelineView::eyeContactStrip);
 		}
 		if (autoMask != null) {
 			inspector.setAutoMaskService(autoMask);

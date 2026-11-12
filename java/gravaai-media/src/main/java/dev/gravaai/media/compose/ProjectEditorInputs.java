@@ -461,6 +461,38 @@ public final class ProjectEditorInputs {
 	}
 
 	/**
+	 * The eye-contact lift, in degrees, at a timeline time; 0 means no correction. A Camera layout
+	 * segment's {@code eyeContact} override wins (0 switches it off there, a positive angle on);
+	 * elsewhere the project's switch and angle apply.
+	 */
+	public static double eyeContactAngleAt(ProjectEditorState editor, double timelineMs) {
+		var webcam = editor.webcam();
+		if (webcam == null || !webcam.enabled()) {
+			return 0;
+		}
+		Optional<CameraLayoutSegment> active = CameraLayoutSegment.at(
+				editor.cameraLayoutSegments(), timelineMs);
+		if (active.isPresent() && active.get().style().eyeContact().isPresent()) {
+			return active.get().style().eyeContact().getAsDouble();
+		}
+		return webcam.eyeContact() ? webcam.eyeContactAngle() : 0;
+	}
+
+	/** Whether any part of the timeline asks for eye contact (the analysis is worth running). */
+	public static boolean eyeContactWanted(ProjectEditorState editor) {
+		var webcam = editor.webcam();
+		if (webcam == null || !webcam.enabled()) {
+			return false;
+		}
+		if (webcam.eyeContact() && webcam.eyeContactAngle() > 0) {
+			return true;
+		}
+		List<CameraLayoutSegment> segments = editor.cameraLayoutSegments();
+		return segments != null && segments.stream().anyMatch(segment ->
+				segment.style().eyeContact().orElse(0) > 0);
+	}
+
+	/**
 	 * The first {@link CameraLayoutSegment#SMOOTH_MS} after a block with a smooth switch-out ends
 	 * into a gap: the camera glides from the block's styled spec back to the project's, so the
 	 * compositor slides the split divider back instead of cutting. When another block touches the

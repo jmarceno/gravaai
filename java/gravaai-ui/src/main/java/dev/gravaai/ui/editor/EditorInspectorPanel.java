@@ -1718,6 +1718,7 @@ public final class EditorInspectorPanel extends VBox {
 			Label effectCaption = new Label("Background");
 			effectCaption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 			camera.getChildren().add(new VBox(8, effectCaption, backgroundEffect));
+			camera.getChildren().add(eyeContactControls(java.util.Optional.empty(), webcam));
 		} else {
 			// A block can also take the camera full frame or hide it; the Webcam panel is the only
 			// editor for blocks, so the full layout list lives here.
@@ -1731,6 +1732,7 @@ public final class EditorInspectorPanel extends VBox {
 				rebuild();
 			}));
 			camera.getChildren().add(row("Layout", blockLayout));
+			camera.getChildren().add(eyeContactControls(java.util.Optional.of(scope), webcam));
 		}
 
 		WebcamPositionPreset preset = framingPreset(scope, webcam);
@@ -1870,6 +1872,118 @@ public final class EditorInspectorPanel extends VBox {
 					value -> applyWebcam(json -> json.put("maskOffset", value))));
 		}
 		return root;
+	}
+
+	// ---------------------------------------------------------------------
+	// Eye contact
+	// ---------------------------------------------------------------------
+
+	private java.util.function.Supplier<java.util.Optional<
+			dev.gravaai.ui.editor.timeline.EyeContactStrip>> eyeContactStatus =
+					java.util.Optional::empty;
+	private java.util.Optional<Label> eyeContactStatusLabel = java.util.Optional.empty();
+	private java.util.Optional<javafx.animation.Timeline> eyeContactTimer = java.util.Optional.empty();
+
+	/** Where the webcam analysis behind eye contact stands (the Camera track strip's state). */
+	public void setEyeContactStatus(java.util.function.Supplier<java.util.Optional<
+			dev.gravaai.ui.editor.timeline.EyeContactStrip>> status) {
+		this.eyeContactStatus = java.util.Objects.requireNonNull(status, "status");
+		refreshEyeContactStatus();
+	}
+
+	/**
+	 * The eye-contact controls: in the project scope a switch and the gaze lift; in a block scope
+	 * a Project / On / Off choice (the block's override) and its own lift. A status line says
+	 * whether the webcam is still being analysed.
+	 */
+	private Node eyeContactControls(java.util.Optional<CameraLayoutSegment> scope,
+			WebcamOverlaySettings webcam) {
+		VBox box = new VBox(8);
+		DoubleFunction<String> degrees = value -> Math.round(value) + "°";
+		double max = WebcamOverlaySettings.MAX_EYE_CONTACT_ANGLE;
+		if (scope.isEmpty()) {
+			Switch on = Switch.xs("Eye contact");
+			on.setChecked(webcam.eyeContact());
+			on.onCheckedChange(value -> {
+				applyWebcam(json -> json.put("eyeContact", value));
+				rebuild();
+			});
+			box.getChildren().add(on);
+			if (webcam.eyeContact()) {
+				box.getChildren().add(slider("Gaze lift", webcam.eyeContactAngle(), 1, max, 1,
+						degrees, value -> applyWebcam(json -> json.put("eyeContactAngle", value))));
+			}
+		} else {
+			CameraLayoutSegment segment = scope.get();
+			java.util.OptionalDouble override = segment.style().eyeContact();
+			boolean on = override.isPresent() && override.getAsDouble() > 0;
+			ChoiceGroup mode = choice("project", "Project", "on", "On", "off", "Off");
+			mode.setValue(override.isEmpty() ? "project" : on ? "on" : "off");
+			mode.setAccessibleText("Eye contact in this block");
+			mode.onValueChange(value -> {
+				java.util.OptionalDouble next = switch (value) {
+					case "on" -> java.util.OptionalDouble.of(on ? override.getAsDouble()
+							: webcam.eyeContactAngle());
+					case "off" -> java.util.OptionalDouble.of(0);
+					default -> java.util.OptionalDouble.empty();
+				};
+				if (!next.equals(override)) {
+					store.apply(new CameraLayoutCommands.SetStyle(segment.id(), "eyeContact", next));
+					rebuild();
+				}
+			});
+			Label caption = new Label("Eye contact");
+			caption.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+			box.getChildren().add(new VBox(8, caption, mode));
+			if (on) {
+				box.getChildren().add(slider("Gaze lift", override.getAsDouble(), 1, max, 1, degrees,
+						value -> store.apply(new CameraLayoutCommands.SetStyle(segment.id(),
+								"eyeContact", java.util.OptionalDouble.of(value)))));
+			}
+		}
+		Label status = new Label();
+		status.setWrapText(true);
+		status.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
+		box.getChildren().add(status);
+		eyeContactStatusLabel = java.util.Optional.of(status);
+		refreshEyeContactStatus();
+		startEyeContactTimer();
+		return box;
+	}
+
+	private void refreshEyeContactStatus() {
+		if (eyeContactStatusLabel.isEmpty()) {
+			return;
+		}
+		Label label = eyeContactStatusLabel.get();
+		String text = eyeContactStatus.get().map(strip -> switch (strip.state()) {
+			case ANALYSING -> "Analysing the webcam for eye contact… "
+					+ Math.round(strip.progress() * 100) + "%";
+			case FAILED -> "The webcam could not be analysed, so the eyes stay as recorded.";
+			case READY -> "Corrected where the Camera track shows the blue line; it fades out on"
+					+ " blinks, head turns and when you look away.";
+		}).orElse("");
+		label.setText(text);
+		label.setVisible(!text.isEmpty());
+		label.setManaged(!text.isEmpty());
+	}
+
+	/** Polls the analysis twice a second while the eye-contact controls are on screen. */
+	private void startEyeContactTimer() {
+		eyeContactTimer.ifPresent(javafx.animation.Timeline::stop);
+		javafx.animation.Timeline timer = new javafx.animation.Timeline(
+				new javafx.animation.KeyFrame(javafx.util.Duration.millis(500), event -> {
+					boolean showing = eyeContactStatusLabel
+							.map(label -> label.getScene() != null).orElse(false);
+					if (!showing) {
+						eyeContactTimer.ifPresent(javafx.animation.Timeline::stop);
+						return;
+					}
+					refreshEyeContactStatus();
+				}));
+		timer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+		eyeContactTimer = java.util.Optional.of(timer);
+		timer.play();
 	}
 
 	/**

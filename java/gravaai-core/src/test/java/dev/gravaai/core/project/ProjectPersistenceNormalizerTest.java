@@ -236,6 +236,25 @@ class ProjectPersistenceNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("defaults eye contact to off at 15 degrees, round-trips it and clamps the angle")
+	void webcamEyeContactDefaultsAndClamp() {
+		WebcamOverlaySettings untouched = normalize("{\"webcam\":{\"enabled\":true}}").webcam();
+		assertFalse(untouched.eyeContact());
+		assertEquals(15, untouched.eyeContactAngle(), 1e-9);
+		WebcamOverlaySettings on = normalize(
+				"{\"webcam\":{\"eyeContact\":true,\"eyeContactAngle\":20}}").webcam();
+		assertTrue(on.eyeContact());
+		assertEquals(20, on.eyeContactAngle(), 1e-9);
+		assertEquals(WebcamOverlaySettings.MAX_EYE_CONTACT_ANGLE, normalize(
+				"{\"webcam\":{\"eyeContactAngle\":90}}").webcam().eyeContactAngle(), 1e-9);
+		assertEquals(0, normalize("{\"webcam\":{\"eyeContactAngle\":-4}}").webcam()
+				.eyeContactAngle(), 1e-9);
+		assertEquals(15, normalize("{\"webcam\":{\"eyeContactAngle\":\"x\"}}").webcam()
+				.eyeContactAngle(), 1e-9);
+		assertFalse(normalize("{\"webcam\":{\"eyeContact\":\"yes\"}}").webcam().eyeContact());
+	}
+
+	@Test
 	@DisplayName("defaults the webcam blur mask controls and clamps them to their slider ranges")
 	void webcamMaskControlsDefaultAndClamp() {
 		// A project saved before the controls existed keeps the shipped edge shape.

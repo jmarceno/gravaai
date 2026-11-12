@@ -102,6 +102,13 @@ class ProjectDocumentTest {
 			if (!webcam.has("smartFraming")) {
 				webcam.put("smartFraming", WebcamOverlaySettings.DEFAULT_WEBCAM_SMART_FRAMING);
 			}
+			if (!webcam.has("eyeContact")) {
+				webcam.put("eyeContact", WebcamOverlaySettings.DEFAULT_WEBCAM_EYE_CONTACT);
+			}
+			if (!webcam.has("eyeContactAngle")) {
+				webcam.put("eyeContactAngle",
+						WebcamOverlaySettings.DEFAULT_WEBCAM_EYE_CONTACT_ANGLE);
+			}
 		}
 
 		assertEquals(2, saved.get("version").intValue());

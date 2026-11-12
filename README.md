@@ -60,6 +60,7 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 - Rendered cursor with size, smoothing, motion blur, click bounce and loop mode
 - Webcam mirror, size, position, split screen (camera beside or above/below the video), roundness, shadow and zoom-reactive scaling
 - Smart framing (opt-in per project): the camera eases to another corner or shrinks when the cursor or the zoom focus would sit under it, gliding back once the way is clear, with the moves marked on the timeline's Camera track
+- Eye contact (opt-in per project or per Camera layout block): the speaker's gaze is lifted into the lens on the local GPU, fading out on blinks, head turns and glances away; glasses frames are segmented and left exactly as recorded, and a strip on the Camera track shows where the eyes are corrected
 - Wallpapers, colors, gradients, padding, rounded corners, blur and shadows
 - Auto-captions with a local Whisper model
 - Chapters and markers: press **M** to drop a named marker at the playhead, drag it on the ruler,

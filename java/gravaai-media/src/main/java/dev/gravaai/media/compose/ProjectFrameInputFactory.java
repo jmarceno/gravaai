@@ -54,6 +54,10 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 	private final MediaFrameReader videoFrames;
 	private final @Nullable MediaFrameReader webcamFrames;
 	private final @Nullable WebcamSegmenter webcamSegmenter;
+	/** Edits each decoded webcam frame once (eye contact); {@link WebcamFrameFilter#NONE} by default. */
+	private WebcamFrameFilter webcamFilter = WebcamFrameFilter.NONE;
+	/** The frame the filter last edited, so a frame re-served by the reader is not edited twice. */
+	private @Nullable RgbaFrame lastFilteredWebcamFrame;
 	// Masks cache per requested webcam media time: consecutive timeline frames inside one decoded
 	// webcam frame re-request the same time (the reader's buffers rotate, so frame identity is
 	// not a stable key).
@@ -187,6 +191,12 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 			webcamSeconds = WebcamSync.getWebcamMediaTargetTimeSeconds(sourceTime,
 					webcamFrames.durationSeconds(), (double) webcamTimeOffsetMs);
 			webcamFrame = webcamFrames.decodeForward(webcamSeconds);
+			if (webcamFrame != null && webcamFrame != lastFilteredWebcamFrame) {
+				// The reader re-serves the same frame object while the timeline stays inside one
+				// webcam frame; editing it again would apply the correction twice.
+				webcamFilter.apply(webcamFrame, webcamFrames.lastPtsSeconds(), timelineSeconds);
+				lastFilteredWebcamFrame = webcamFrame;
+			}
 		}
 		RgbaFrame webcamMask = webcamFrame != null && webcamSpec.segmentsPerson()
 				? webcamMask(webcamSeconds, webcamFrame)
@@ -212,6 +222,16 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 				ProjectEditorInputs.sceneSpec(editor, timelineMs),
 				grade,
 				sourceTime);
+	}
+
+	/**
+	 * Installs the per-frame webcam edit (eye contact). The factory takes ownership and closes it
+	 * with the decoders. Call before the first frame.
+	 */
+	public ProjectFrameInputFactory withWebcamFilter(WebcamFrameFilter filter) {
+		webcamFilter.close();
+		webcamFilter = Objects.requireNonNull(filter, "filter");
+		return this;
 	}
 
 	/**
@@ -318,5 +338,6 @@ public final class ProjectFrameInputFactory implements FrameAtTime.FrameInputFac
 		if (webcamSegmenter != null) {
 			webcamSegmenter.close();
 		}
+		webcamFilter.close();
 	}
 }

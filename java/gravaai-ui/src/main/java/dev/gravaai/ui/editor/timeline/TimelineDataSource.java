@@ -47,6 +47,14 @@ public interface TimelineDataSource {
 		return "";
 	}
 
+	/**
+	 * The eye-contact strip of the Camera layout track; empty when no part of the timeline asks
+	 * for eye contact.
+	 */
+	default java.util.Optional<EyeContactStrip> eyeContactStrip() {
+		return java.util.Optional.empty();
+	}
+
 	/** Filmstrip thumbnails for the clip row (empty provider keeps the placeholder cells). */
 	default @Nullable FilmstripProvider filmstripProvider() {
 		return FilmstripProvider.empty();

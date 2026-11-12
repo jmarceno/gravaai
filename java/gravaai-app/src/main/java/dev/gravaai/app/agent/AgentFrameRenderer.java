@@ -96,7 +96,9 @@ final class AgentFrameRenderer {
 				session.elementDiagnostics(), () -> state);
 				ProjectFrameInputFactory factory = new ProjectFrameInputFactory(state, videoPath,
 				webcamPath, cursorSamples, editedMs / 1000.0, 0, wallpaperRoot, FRAME_RATE,
-				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE), width, height);
+				new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE), width, height)
+				.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(state,
+						java.util.Optional.ofNullable(webcamPath)));
 				CompositorExportFrameProvider provider = new CompositorExportFrameProvider(width,
 						height, FRAME_RATE, factory, elements)) {
 			ByteBuffer buffer = ByteBuffer.allocate(width * height * 4);

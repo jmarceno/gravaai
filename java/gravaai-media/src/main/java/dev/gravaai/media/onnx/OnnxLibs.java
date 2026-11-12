@@ -146,6 +146,14 @@ public final class OnnxLibs {
 		return resolveBundledModel("detection", "ch_PP-OCRv4_rec_infer.onnx");
 	}
 
+	/**
+	 * Resolves one of the bundled eye-contact models ({@code models/gaze/}): the face mesh, the
+	 * per-eye warp nets and the glasses-frame segmenter.
+	 */
+	public static Path resolveGazeModelFile(String fileName) {
+		return resolveBundledModel("gaze", fileName);
+	}
+
 	private static Path resolveSegmentationModel(String fileName) {
 		return resolveBundledModel("segmentation", fileName);
 	}

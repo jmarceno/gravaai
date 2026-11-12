@@ -207,6 +207,12 @@ public final class TimelineView extends Region {
 	private static final Color SMART_FRAMING_MOVE_BAND = Color.web("#2fe6d0", 0.22);
 	private static final Color SMART_FRAMING_RETURN = Color.web("#9fb3bd");
 	private static final Color SMART_FRAMING_RETURN_BAND = Color.web("#9fb3bd", 0.18);
+	/** Eye-contact strip: corrected, faded, analysing (track + progress) and failed. */
+	private static final Color EYE_CONTACT_ON = Color.web("#7aa2ff");
+	private static final Color EYE_CONTACT_FADED = Color.web("#7aa2ff", 0.35);
+	private static final Color EYE_CONTACT_TRACK = Color.web("#9fb3bd", 0.25);
+	private static final Color EYE_CONTACT_PROGRESS = Color.web("#9fb3bd", 0.8);
+	private static final Color EYE_CONTACT_FAILED = Color.web("#ff6b6b");
 	private static final double PLAYHEAD_CAP_WIDTH = 8;
 	private static final double PLAYHEAD_CAP_HEIGHT = 8;
 	private static final double PLAYHEAD_TAG_HEIGHT = 15;
@@ -2398,6 +2404,7 @@ public final class TimelineView extends Region {
 		drawInteractionOverlays(graphics);
 		drawCutPreview(graphics, width);
 		drawSmartFramingMoves(graphics, width);
+		drawEyeContactStrip(graphics, width);
 		graphics.restore();
 		// Track headers (mock .tlheads) live in the fixed gutter and scroll with the lanes.
 		graphics.save();
@@ -3208,6 +3215,10 @@ public final class TimelineView extends Region {
 		}
 		// Label between the switch diamonds; a dot marks a segment with its own size or style.
 		String label = segment.style().isInherit() ? item.label() : item.label() + " •";
+		// An eye marks a segment that overrides eye contact: filled on, hollow off.
+		if (segment.style().eyeContact().isPresent()) {
+			label += segment.style().eyeContact().getAsDouble() > 0 ? " ◉" : " ○";
+		}
 		double labelWidth = blockWidth - (gapAfter ? 44 : 22);
 		if (labelWidth > 12) {
 			graphics.setFont(BLOCK_FONT);
@@ -3275,6 +3286,49 @@ public final class TimelineView extends Region {
 			} else {
 				graphics.setFill(diamond);
 				graphics.fillPolygon(xs, ys, 4);
+			}
+		}
+	}
+
+	/**
+	 * The eye-contact strip along the bottom of the Camera layout track: blue where the eyes are
+	 * corrected (pale where the correction fades for a blink, a head turn or a look away), a gray
+	 * progress bar over the whole track while the webcam is analysed, red when that failed.
+	 */
+	private void drawEyeContactStrip(GraphicsContext graphics, double width) {
+		java.util.Optional<EyeContactStrip> found = dataSource.eyeContactStrip();
+		RowLayout row = rowById(TimelineConstants.CAMERA_LAYOUT_ROW_ID);
+		if (found.isEmpty() || row == null) {
+			return;
+		}
+		EyeContactStrip strip = found.get();
+		double y = row.top() + row.height() - 4;
+		double height = 2.5;
+		double startX = Math.max(GUTTER_WIDTH, xForTime(0));
+		double endX = Math.min(width, xForTime(Math.max(0, dataSource.totalDurationMs())));
+		switch (strip.state()) {
+			case ANALYSING -> {
+				graphics.setFill(EYE_CONTACT_TRACK);
+				graphics.fillRect(startX, y, Math.max(0, endX - startX), height);
+				double doneX = Math.min(endX, xForTime(
+						dataSource.totalDurationMs() * Math.clamp(strip.progress(), 0, 1)));
+				graphics.setFill(EYE_CONTACT_PROGRESS);
+				graphics.fillRect(startX, y, Math.max(0, doneX - startX), height);
+			}
+			case FAILED -> {
+				graphics.setFill(EYE_CONTACT_FAILED);
+				graphics.fillRect(startX, y, Math.max(0, endX - startX), height);
+			}
+			case READY -> {
+				for (EyeContactStrip.Span span : strip.spans()) {
+					double x0 = Math.max(GUTTER_WIDTH, xForTime(span.startMs()));
+					double x1 = Math.min(width, xForTime(span.endMs()));
+					if (x1 <= x0) {
+						continue;
+					}
+					graphics.setFill(span.full() ? EYE_CONTACT_ON : EYE_CONTACT_FADED);
+					graphics.fillRect(x0, y, Math.max(1, x1 - x0), height);
+				}
 			}
 		}
 	}
@@ -3535,6 +3589,11 @@ public final class TimelineView extends Region {
 	/** The source-audio tracks currently rendered (the inspector's Audio section reads this). */
 	public List<TimelineSourceAudioTrack> sourceAudioTracks() {
 		return sourceAudioTracks;
+	}
+
+	/** The eye-contact strip of the Camera track (the inspector shows the same state). */
+	public java.util.Optional<EyeContactStrip> eyeContactStrip() {
+		return dataSource.eyeContactStrip();
 	}
 
 	/** The render state of a source lane's denoised copy (the inspector shows it too). */

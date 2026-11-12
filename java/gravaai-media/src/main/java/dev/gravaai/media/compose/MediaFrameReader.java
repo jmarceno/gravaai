@@ -128,6 +128,23 @@ public final class MediaFrameReader implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * The next frame in decode order, for callers that walk every frame of the file once (the
+	 * eye-contact analysis). Starts at the first frame; {@link #lastPtsSeconds()} is the returned
+	 * frame's timestamp. Null at end of file or for unreadable media.
+	 */
+	public @Nullable RgbaFrame decodeNext() {
+		if (!Files.isReadable(path)) {
+			return null;
+		}
+		return convert(ensureOpen().next());
+	}
+
+	/** Presentation time of the frame the last decode returned, in seconds. */
+	public double lastPtsSeconds() {
+		return lastPtsUs / 1_000_000.0;
+	}
+
 	private @Nullable RgbaFrame convert(@Nullable DecodedFrame frame) {
 		if (frame == null) {
 			lastFrame = null;

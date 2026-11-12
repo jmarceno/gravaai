@@ -125,7 +125,9 @@ final class AgentExportRunner {
 					prepared.videoPath(), prepared.webcamPath(), cursorSamples,
 					prepared.durationSeconds(), 0, wallpaperRoot, prepared.frameRate(),
 					new LazyWebcamSegmenter(WebcamMaskQuality.PRECISE),
-					prepared.outputWidth(), prepared.outputHeight());
+					prepared.outputWidth(), prepared.outputHeight())
+					.withWebcamFilter(dev.gravaai.services.gaze.EyeContactFilters.forRender(state,
+							java.util.Optional.ofNullable(prepared.webcamPath())));
 					CompositorExportFrameProvider provider = new CompositorExportFrameProvider(
 							prepared.outputWidth(), prepared.outputHeight(), prepared.frameRate(),
 							factory, elements)) {

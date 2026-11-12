@@ -39,7 +39,9 @@ public record WebcamPresetSettings(
 		boolean highQualityMaskWhilePlaying,
 		double maskPrecision,
 		double maskOffset,
-		boolean smartFraming) {
+		boolean smartFraming,
+		boolean eyeContact,
+		double eyeContactAngle) {
 
 	public static WebcamPresetSettings from(WebcamOverlaySettings webcam) {
 		return new WebcamPresetSettings(webcam.enabled(), webcam.timeOffsetMs(), webcam.mirror(),
@@ -47,14 +49,16 @@ public record WebcamPresetSettings(
 				webcam.positionY(), webcam.size(), webcam.width(), webcam.height(),
 				webcam.reactToZoom(), webcam.roundness(), webcam.cornerRadius(), webcam.shadow(),
 				webcam.margin(), webcam.backgroundEffect(), webcam.highQualityMaskWhilePlaying(),
-				webcam.maskPrecision(), webcam.maskOffset(), webcam.smartFraming());
+				webcam.maskPrecision(), webcam.maskOffset(), webcam.smartFraming(),
+				webcam.eyeContact(), webcam.eyeContactAngle());
 	}
 
 	public WebcamOverlaySettings toOverlaySettings() {
 		return new WebcamOverlaySettings(null, enabled, null, timeOffsetMs, mirror, cropRegion,
 				corner, positionPreset, positionX, positionY, size, width, height, reactToZoom,
 				roundness, cornerRadius, shadow, margin, backgroundEffect,
-				highQualityMaskWhilePlaying, maskPrecision, maskOffset, smartFraming);
+				highQualityMaskWhilePlaying, maskPrecision, maskOffset, smartFraming, eyeContact,
+				eyeContactAngle);
 	}
 
 	public ObjectNode toJson() {
@@ -87,6 +91,8 @@ public record WebcamPresetSettings(
 		node.put("maskPrecision", maskPrecision);
 		node.put("maskOffset", maskOffset);
 		node.put("smartFraming", smartFraming);
+		node.put("eyeContact", eyeContact);
+		node.put("eyeContactAngle", eyeContactAngle);
 		return node;
 	}
 }

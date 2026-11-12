@@ -47,6 +47,7 @@
 		"filterVideo": "Vidéo MP4",
 		"alreadyRunning": "Un export est déjà en cours.",
 		"preparingNoiseReduction": "Préparation de la réduction du bruit… l’export démarre dès qu’elle est prête.",
+		"preparingEyeContact": "Analyse de la webcam pour le contact visuel… l’export démarre dès qu’elle est prête.",
 		"exportedTo": "Exporté avec succès vers {{path}}",
 		"pipelineUnavailable": "Le pipeline d'export n'est pas disponible.",
 		"queue": {

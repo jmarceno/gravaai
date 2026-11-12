@@ -116,11 +116,16 @@ the large PII model downloads on first use into the user profile, pinned by URL 
 | `models/detection/ch_PP-OCRv4_rec_infer.onnx` | 10,857,958 B | Apache-2.0 | [RapidOCR model zoo](https://huggingface.co/SWHL/RapidOCR) (PaddleOCR PP-OCRv4) |
 | `models/segmentation/selfie-segmenter.onnx` | 462,352 B | Apache-2.0 | MediaPipe selfie segmenter (ONNX conversion) |
 | `models/segmentation/modnet.onnx` | 25,888,640 B | Apache-2.0 | [Xenova/modnet](https://huggingface.co/Xenova/modnet) |
+| `models/gaze/face_landmarks.onnx` | 4,920,979 B | Apache-2.0 | [MediaPipe Face Mesh V2 (ONNX)](https://huggingface.co/fernandotonon/QtMeshEditor-facemesh-onnx) |
+| `models/gaze/glasses_frames.onnx` | 12,866,195 B | MIT | [mantasu/glasses-detector](https://github.com/mantasu/glasses-detector) (frames, medium) |
+| `models/gaze/eye_warp_L.onnx` | 1,018,224 B | none stated | [WangWilly/gaze-correction-cam](https://github.com/WangWilly/gaze-correction-cam) |
+| `models/gaze/eye_warp_R.onnx` | 1,018,259 B | none stated | [WangWilly/gaze-correction-cam](https://github.com/WangWilly/gaze-correction-cam) |
 | `privacy/models/gliner-multi-pii-v1/model.onnx` (downloaded) | 579,717,643 B | Apache-2.0 | [onnx-community/gliner_multi_pii-v1](https://huggingface.co/onnx-community/gliner_multi_pii-v1) `onnx/model_fp16.onnx` |
 | `privacy/models/gliner-multi-pii-v1/tokenizer.json` (downloaded) | 16,331,948 B | Apache-2.0 | same checkpoint |
 
 Licence texts for the bundled detection models ship beside them under
-`java/native/models/detection/notices/`. The GLiNER asset's licence is the checkpoint's own
+`java/native/models/detection/notices/`. The eye-contact models are described, with their hashes, in
+`java/native/models/gaze/notices/README.md`. The GLiNER asset's licence is the checkpoint's own
 (Apache-2.0), and the download row in *Editor → Auto mask* records the pinned hash.
 
 ## Inference runtime

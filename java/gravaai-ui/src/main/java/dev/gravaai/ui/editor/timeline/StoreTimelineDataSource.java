@@ -75,6 +75,20 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return smartFramingPlan.get();
 	}
 
+	private volatile Supplier<java.util.Optional<EyeContactStrip>> eyeContactStrip =
+			java.util.Optional::empty;
+
+	/** Supplies the eye-contact strip of the Camera layout track (the app owns the analysis). */
+	public StoreTimelineDataSource eyeContactStrip(Supplier<java.util.Optional<EyeContactStrip>> strip) {
+		this.eyeContactStrip = Objects.requireNonNull(strip, "strip");
+		return this;
+	}
+
+	@Override
+	public java.util.Optional<EyeContactStrip> eyeContactStrip() {
+		return eyeContactStrip.get();
+	}
+
 	private volatile java.util.function.Function<String, String> cleanupRenderStatus = id -> "";
 
 	/** Supplies the render state of each cleaned lane's denoised copy (the app owns the cache). */

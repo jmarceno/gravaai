@@ -156,6 +156,12 @@ public final class ProcessRunner {
 				|| !"bin".equals(parent.getFileName().toString())) {
 			return;
 		}
+		// /usr/bin/parec has a sibling /usr/lib too: system prefixes resolve through ld.so.conf and
+		// must not get their own (on some distributions 32-bit) library directory forced first.
+		Path prefix = parent.getParent();
+		if (prefix == null || isSystemPrefix(prefix)) {
+			return;
+		}
 		Path libraryDirectory = parent.resolveSibling("lib");
 		if (!Files.isDirectory(libraryDirectory)) {
 			return;
@@ -164,6 +170,15 @@ public final class ProcessRunner {
 		String value = libraryDirectory.toString();
 		builder.environment().put("LD_LIBRARY_PATH",
 				existing == null || existing.isBlank() ? value : value + ":" + existing);
+	}
+
+	/** The directories whose {@code bin} belongs to the distribution, not to a bundled payload. */
+	private static final List<Path> SYSTEM_PREFIXES = List.of(Path.of("/"), Path.of("/usr"),
+			Path.of("/usr/local"));
+
+	/** True when {@code prefix} (the directory holding {@code bin}) is a system prefix. */
+	static boolean isSystemPrefix(Path prefix) {
+		return SYSTEM_PREFIXES.contains(prefix.normalize());
 	}
 
 	@Override

@@ -232,8 +232,8 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		// starts there.
 		long videoStartedAtMs = System.currentTimeMillis();
 
-		// The encoder is chosen here (hardware when this machine can run one) and, if it dies
-		// immediately, restarted on libx264 before a single frame is lost.
+		// The encoder is chosen here (hardware when this machine can run one); a session the driver
+		// rejects on the first frames is moved onto libx264 by the copy thread.
 		VideoCapture videoCapture;
 		try {
 			videoCapture = video.startVideo(capture, format, videoPath, fps, currentVideoQuality());
@@ -242,9 +242,8 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 			audioTracks.killAll(audio);
 			return StartResult.failed(String.valueOf(error));
 		}
-		SpawnedProcess encoder = videoCapture.encoder();
-		video.drainPipeline(capture, encoder);
-		video.startCopying(capture, encoder);
+		// The encoder's stderr is drained by the pipeline; the helper's by readCaptureFormat.
+		video.startCopying(videoCapture);
 
 		CosmicRecording recording = new CosmicRecording(
 				videoCapture, audio, outputPath, videoStartedAtMs, options.keepSpeakerTracks(),

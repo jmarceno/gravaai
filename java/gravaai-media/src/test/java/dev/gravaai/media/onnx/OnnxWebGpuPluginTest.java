@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -36,14 +37,14 @@ class OnnxWebGpuPluginTest {
 		assertEquals(first.provider(), second.provider(),
 				"the keeper registration is process-wide: a second probe must not change it");
 		if (first.provider().hardware()) {
-			assertNotNull(first.device());
-			assertNull(first.detail());
+			assertTrue(first.device().isPresent());
+			assertTrue(first.detail().isEmpty());
 			assertNotNull(first.provider().device().name());
 			assertFalse(first.provider().device().name().isBlank());
 			assertEquals(OnnxExecutionProvider.Kind.WEBGPU, first.provider().kind());
 		} else {
 			assertEquals(OnnxExecutionProvider.CPU, first.provider());
-			assertNotNull(first.detail(), "a CPU selection must say why");
+			assertTrue(first.detail().isPresent(), "a CPU selection must say why");
 		}
 	}
 
@@ -56,13 +57,13 @@ class OnnxWebGpuPluginTest {
 		OnnxWebGpuPlugin.resetForTests();
 		var selection = OnnxWebGpuPlugin.probe();
 		Assumptions.assumeTrue(selection.provider().hardware(),
-				"no WebGPU device on this machine: " + selection.detail());
+				"no WebGPU device on this machine: " + selection.detail().orElse(""));
 
-		OnnxEpDevice device = selection.device();
-		assertNotNull(device);
+		assertTrue(selection.device().isPresent());
+		OnnxEpDevice device = selection.device().get();
 		assertFalse(device.handle().address() == 0, "the device handle must point at the EP device");
 		assertFalse(device.epName().isBlank());
-		assertEquals(OnnxExecutionProvider.Kind.WEBGPU, device.kind());
+		assertEquals(java.util.Optional.of(OnnxExecutionProvider.Kind.WEBGPU), device.kind());
 		assertEquals(0, device.adapterIndex(), "the first adapter is the one Dawn reported");
 	}
 }

@@ -39,16 +39,16 @@ public record OnnxExecutionProvider(Kind kind, Device device) {
 		}
 
 		/**
-		 * The kind for a runtime provider name, or {@code null} when it is neither of ours (a
-		 * different runtime build, or a provider we never append).
+		 * The kind for a runtime provider name, or empty when it is neither of ours (a different
+		 * runtime build, or a provider we never append).
 		 */
-		public static Kind fromRuntimeName(String name) {
+		public static java.util.Optional<Kind> fromRuntimeName(String name) {
 			for (Kind kind : values()) {
 				if (kind.runtimeName.equals(name)) {
-					return kind;
+					return java.util.Optional.of(kind);
 				}
 			}
-			return null;
+			return java.util.Optional.empty();
 		}
 	}
 

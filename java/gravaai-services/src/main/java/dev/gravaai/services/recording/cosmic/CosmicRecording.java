@@ -37,11 +37,18 @@ final class CosmicRecording {
 	/**
 	 * The capture helper feeding the encoder, the encoder itself and the path it writes.
 	 *
-	 * @param encoderSpec the encoder that actually started (a hardware session that died at once was
-	 *     already replaced by libx264, so this is what ran)
+	 * @param encoder the encoder process; a hardware session that fails in its first seconds is
+	 *     replaced by libx264 inside it, so callers always reach the process that is running
+	 * @param frameBytes the size of one raw frame on the helper's stdout, or 0 when the pixel
+	 *     format is unknown (the copy then cannot realign a replacement encoder and never swaps)
 	 */
-	record VideoCapture(SpawnedProcess capture, SpawnedProcess encoder, Path videoPath,
-			VideoEncoderSpec encoderSpec) {
+	record VideoCapture(SpawnedProcess capture, RecordingEncoder encoder, Path videoPath,
+			long frameBytes) {
+
+		/** The encoder running now (what the logs and the tray name). */
+		VideoEncoderSpec encoderSpec() {
+			return encoder.spec();
+		}
 	}
 
 	/** One parec process writing raw PCM to its own file. */
@@ -154,8 +161,13 @@ final class CosmicRecording {
 		return outputPath;
 	}
 
+	/**
+	 * The wall-clock time the video's first frame stands for. When a failed hardware session was
+	 * replaced, the replacement rewrote the file from that moment, so the audio tracks and the
+	 * cursor telemetry must line up with it instead of with the original start.
+	 */
 	long startedAtMs() {
-		return startedAtMs;
+		return video == null ? startedAtMs : video.encoder().restartedAtMs().orElse(startedAtMs);
 	}
 
 	boolean keepSpeakerTracks() {

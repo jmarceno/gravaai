@@ -6,8 +6,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
-import org.jspecify.annotations.Nullable;
-
 /**
  * The process-wide WebGPU plugin-EP registration: one library load, one keeper environment, one
  * device list for the whole JVM.
@@ -42,12 +40,12 @@ public final class OnnxWebGpuPlugin {
 	public static final String REGISTRATION_NAME = "webgpu";
 
 	private static final Object LOCK = new Object();
-	private static @Nullable Selection probed;
-	private static boolean probeStarted;
+	/** The one probe result of this process; empty until the first {@link #probe()}. */
+	private static Optional<Selection> probed = Optional.empty();
 
 	/** Kept alive for the process lifetime: its env owns the plugin devices sessions use. */
-	private static @Nullable OnnxRuntimeApi keeper;
-	private static @Nullable MemorySegment keeperEnv;
+	private static Optional<OnnxRuntimeApi> keeper = Optional.empty();
+	private static Optional<MemorySegment> keeperEnv = Optional.empty();
 
 	private OnnxWebGpuPlugin() {}
 
@@ -55,20 +53,31 @@ public final class OnnxWebGpuPlugin {
 	 * One probe of this process's GPU provider.
 	 *
 	 * @param provider the provider sessions should run on: the first WebGPU device, or CPU
-	 * @param device   the probed device when {@code provider} is WebGPU, else null
-	 * @param detail   why the GPU is not in use, for logs and the settings panel; null when it is
+	 * @param device   the probed device when {@code provider} is WebGPU, else empty
+	 * @param detail   why the GPU is not in use, for logs and the settings panel; empty when it is
 	 */
-	public record Selection(OnnxExecutionProvider provider, @Nullable OnnxEpDevice device,
-			@Nullable String detail) {
+	public record Selection(OnnxExecutionProvider provider, Optional<OnnxEpDevice> device,
+			Optional<String> detail) {
 
 		public Selection {
-			if (provider.hardware() && device == null) {
+			if (provider.hardware() && device.isEmpty()) {
 				throw new IllegalArgumentException("a hardware provider needs its device");
 			}
 		}
 
+		/** The CPU provider, with the reason the GPU is not in use. */
 		public static Selection cpu(String detail) {
-			return new Selection(OnnxExecutionProvider.CPU, null, detail);
+			return new Selection(OnnxExecutionProvider.CPU, Optional.empty(), Optional.of(detail));
+		}
+
+		/** The CPU provider with nothing to explain (tests that force the CPU path). */
+		public static Selection cpu() {
+			return new Selection(OnnxExecutionProvider.CPU, Optional.empty(), Optional.empty());
+		}
+
+		/** The provider of a probed GPU device. */
+		public static Selection gpu(OnnxEpDevice device) {
+			return new Selection(device.provider(), Optional.of(device), Optional.empty());
 		}
 	}
 
@@ -80,20 +89,19 @@ public final class OnnxWebGpuPlugin {
 	 */
 	public static Selection probe() {
 		synchronized (LOCK) {
-			if (probeStarted) {
-				return probed;
+			if (probed.isEmpty()) {
+				probed = Optional.of(probeOnce());
 			}
-			probeStarted = true;
-			probed = probeOnce();
-			return probed;
+			return probed.get();
 		}
 	}
 
 	private static Selection probeOnce() {
-		Path library = resolveLibrary();
-		if (library == null) {
+		Optional<Path> resolved = resolveLibrary();
+		if (resolved.isEmpty()) {
 			return Selection.cpu("the WebGPU plugin is not installed beside the bundled runtime");
 		}
+		Path library = resolved.get();
 		OnnxRuntimeApi api = OnnxRuntimeApi.bind();
 		try {
 			MemorySegment env = api.createEnv("gravaai-webgpu-ep");
@@ -105,11 +113,11 @@ public final class OnnxWebGpuPlugin {
 				// environment is left holding a device list nothing will use.
 				api.close();
 				LOG.log(System.Logger.Level.INFO, "WebGPU EP registered but no GPU device: "
-						+ selection.detail());
+						+ selection.detail().orElse("no reason given"));
 				return selection;
 			}
-			keeper = api;
-			keeperEnv = env;
+			keeper = Optional.of(api);
+			keeperEnv = Optional.of(env);
 			LOG.log(System.Logger.Level.INFO,
 					() -> "WebGPU EP active on " + selection.provider().label());
 			return selection;
@@ -123,30 +131,30 @@ public final class OnnxWebGpuPlugin {
 			}
 			LOG.log(System.Logger.Level.INFO,
 					"WebGPU EP unavailable, using the CPU provider: " + error);
-			return Selection.cpu(error.getMessage() == null ? error.toString() : error.getMessage());
+			return Selection.cpu(Optional.ofNullable(error.getMessage()).orElse(error.toString()));
 		}
 	}
 
 	/**
-	 * The plugin library beside the loaded runtime, or null when it was not staged (a build made
+	 * The plugin library beside the loaded runtime, or empty when it was not staged (a build made
 	 * before the plugin existed, or a checkout that skipped the download).
 	 */
-	private static @Nullable Path resolveLibrary() {
+	private static Optional<Path> resolveLibrary() {
 		Path directory;
 		try {
 			directory = OnnxLibs.ensureLoadedDirectory();
 		} catch (RuntimeException error) {
 			// The runtime itself is missing: let the caller's CPU open() report that instead.
-			return null;
+			return Optional.empty();
 		}
 		Path library = directory.resolve(LIBRARY_NAME);
-		return Files.isRegularFile(library) ? library : null;
+		return Files.isRegularFile(library) ? Optional.of(library) : Optional.empty();
 	}
 
-	/** The keeper environment's native handle, for diagnostics; null until a GPU probe succeeds. */
+	/** The keeper environment's native handle, for diagnostics; empty until a GPU probe succeeds. */
 	static Optional<MemorySegment> keeperEnv() {
 		synchronized (LOCK) {
-			return Optional.ofNullable(probeStarted ? keeperEnv : null);
+			return keeperEnv;
 		}
 	}
 
@@ -157,14 +165,11 @@ public final class OnnxWebGpuPlugin {
 	 */
 	static void resetForTests() {
 		synchronized (LOCK) {
-			OnnxRuntimeApi toClose = keeper;
-			keeper = null;
-			keeperEnv = null;
-			probed = null;
-			probeStarted = false;
-			if (toClose != null) {
-				toClose.close();
-			}
+			Optional<OnnxRuntimeApi> toClose = keeper;
+			keeper = Optional.empty();
+			keeperEnv = Optional.empty();
+			probed = Optional.empty();
+			toClose.ifPresent(OnnxRuntimeApi::close);
 		}
 	}
 }

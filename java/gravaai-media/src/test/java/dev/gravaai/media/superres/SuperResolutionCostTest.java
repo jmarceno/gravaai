@@ -52,14 +52,14 @@ class SuperResolutionCostTest {
 		double[] scales = {5.0, 4.0, 3.5};
 		// CPU first (the documented baseline), then whatever provider this machine offers, so one
 		// run reports both sides of the card's "re-measure per zoom depth" requirement.
-		measure(new dev.gravaai.media.onnx.OnnxWebGpuPlugin.Selection(
-				dev.gravaai.media.onnx.OnnxExecutionProvider.CPU, null, null), model, frame, source,
+		measure(dev.gravaai.media.onnx.OnnxWebGpuPlugin.Selection.cpu(), model, frame, source,
 				box, scales);
 		var selection = dev.gravaai.media.onnx.OnnxWebGpuPlugin.probe();
 		if (selection.provider().hardware()) {
 			measure(selection, model, frame, source, box, scales);
 		} else {
-			System.out.println("SUPERRES-SIZE no GPU device: " + selection.detail());
+			System.out.println("SUPERRES-SIZE no GPU device: "
+					+ selection.detail().orElse("no reason given"));
 		}
 	}
 

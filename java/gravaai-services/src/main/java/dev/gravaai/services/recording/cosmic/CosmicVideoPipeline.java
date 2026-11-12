@@ -37,9 +37,9 @@ import dev.gravaai.services.recording.ports.SpawnedProcess;
  * rotated output is saved upright. The encoder is a hardware one when this machine and the bundled
  * ffmpeg can run it, libx264 otherwise (card "GPU hardware encoding for export and recording").
  *
- * <p>A hardware encoder that dies during the first second never had a usable frame: the capture
- * helper keeps producing, so that recording restarts its encoder on libx264 and loses nothing but
- * the frames that never encoded.
+ * <p>A hardware session the driver rejects fails on the first frame, after the copy already
+ * started. The copy thread then moves that recording onto libx264 ({@link RecordingEncoder}),
+ * realigned to the next frame boundary of the helper's stream, so the recording keeps going.
  */
 final class CosmicVideoPipeline {
 
@@ -47,13 +47,6 @@ final class CosmicVideoPipeline {
 
 	private static final Pattern FORMAT_LINE = Pattern.compile("^FORMAT (\\d+) (\\d+) (\\w+) (\\d+)$");
 	private static final int COPY_BUFFER_BYTES = 4 * 1024 * 1024;
-
-	/**
-	 * How long to watch a fresh hardware encoder for an immediate exit. Driver/encoder init failures
-	 * happen within milliseconds, so this is a short poll rather than a wait: a healthy encoder adds
-	 * no noticeable delay to the recording start.
-	 */
-	private static final long EARLY_EXIT_PROBE_MS = 400;
 
 	private final RecordingProcesses processes;
 	private final RecordingEnvironment environment;
@@ -119,38 +112,28 @@ final class CosmicVideoPipeline {
 	/**
 	 * Starts ffmpeg on the raw frames and on the helper's stdout, at the chosen quality.
 	 *
-	 * <p>The encoder that actually runs is carried on the returned capture, which is what the HUD
-	 * and the logs report.
+	 * <p>Nothing waits here for the session to prove itself: a hardware encoder opens its session on
+	 * the first frame, and holding the copy back would stall the helper and shift the video against
+	 * the audio tracks. The copy thread replaces a session that fails early instead.
 	 */
 	CosmicRecording.VideoCapture startVideo(SpawnedProcess capture, CaptureFormat format,
 			Path videoPath, int fps, RecordingQuality quality) throws IOException {
-		VideoEncoderSpec spec = encoderProbe.select(true);
-		SpawnedProcess encoder = startEncoder(format, videoPath, fps, quality, spec);
-		if (spec.hardware() && failsImmediately(encoder)) {
-			LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " recording encoder exited"
-					+ " immediately; restarting this recording on libx264");
-			encoder.destroy();
-			spec = VideoEncoderSpec.SOFTWARE;
-			encoder = startEncoder(format, videoPath, fps, quality, spec);
-		}
-		return new CosmicRecording.VideoCapture(capture, encoder, videoPath, spec);
+		RecordingEncoder encoder = RecordingEncoder.start(encoderProbe.select(true), spec -> {
+			SpawnedProcess process = startEncoder(format, videoPath, fps, quality, spec);
+			processIo.drainInto(process.stderr(), "[cosmic-capture] ffmpeg:");
+			return process;
+		});
+		return new CosmicRecording.VideoCapture(capture, encoder, videoPath, frameBytes(format));
 	}
 
-	/** True when a freshly spawned encoder already exited (it never reached the first frame). */
-	private static boolean failsImmediately(SpawnedProcess encoder) {
-		long deadline = System.nanoTime() + EARLY_EXIT_PROBE_MS * 1_000_000L;
-		while (System.nanoTime() < deadline) {
-			if (!encoder.isAlive()) {
-				return true;
-			}
-			try {
-				Thread.sleep(20);
-			} catch (InterruptedException interrupted) {
-				Thread.currentThread().interrupt();
-				return false;
-			}
-		}
-		return false;
+	/** Bytes of one tightly packed raw frame the helper writes, or 0 for an unknown layout. */
+	static long frameBytes(CaptureFormat format) {
+		long bytesPerPixel = switch (format.pixelFormat()) {
+			case "rgba", "bgra", "rgb0", "bgr0", "argb", "abgr", "0rgb", "0bgr" -> 4;
+			case "rgb24", "bgr24" -> 3;
+			default -> 0;
+		};
+		return bytesPerPixel * Math.max(0, format.width()) * Math.max(0, format.height());
 	}
 
 	private SpawnedProcess startEncoder(CaptureFormat format, Path videoPath, int fps,
@@ -160,15 +143,9 @@ final class CosmicVideoPipeline {
 				new SpawnOptions(true, false, true));
 	}
 
-	/** The encoder's stderr and the helper's remaining stderr are logged in the background. */
-	void drainPipeline(SpawnedProcess capture, SpawnedProcess encoder) {
-		processIo.drainInto(encoder.stderr(), "[cosmic-capture] ffmpeg:");
-		processIo.drainInto(capture.stderr(), "[cosmic-capture] helper:");
-	}
-
 	/** Frames go straight through, so the encoder sees exactly the helper's byte stream. */
-	void startCopying(SpawnedProcess capture, SpawnedProcess encoder) {
-		Thread.ofPlatform().daemon().name("gravaai-av-copy").start(() -> copyFrames(capture, encoder));
+	void startCopying(CosmicRecording.VideoCapture video) {
+		Thread.ofPlatform().daemon().name("gravaai-av-copy").start(() -> copyFrames(video));
 	}
 
 	/**
@@ -265,26 +242,70 @@ final class CosmicVideoPipeline {
 		};
 	}
 
-	/** FFmpeg filter that lines a raw track up with the recording's reference start. */
-	private static void copyFrames(SpawnedProcess capture, SpawnedProcess encoder) {
-		InputStream captureStdout = capture.stdout();
+	/**
+	 * Copies the helper's frames into the encoder until the helper ends.
+	 *
+	 * <p>When a write fails while the encoder may still fall back, the copy moves onto the libx264
+	 * replacement and drops bytes up to the next frame boundary of the helper's stream (the failed
+	 * process may have taken half a frame), so the replacement starts on a whole frame.
+	 */
+	static void copyFrames(CosmicRecording.VideoCapture video) {
+		InputStream captureStdout = video.capture().stdout();
+		RecordingEncoder encoder = video.encoder();
 		OutputStream encoderStdin = encoder.stdin();
 		if (captureStdout == null || encoderStdin == null) {
 			LOG.log(System.Logger.Level.WARNING, "Frame copy has no pipe to work with");
 			return;
 		}
-		try (ReadableByteChannel input = Channels.newChannel(captureStdout);
-				WritableByteChannel output = Channels.newChannel(encoderStdin)) {
+		long frameBytes = video.frameBytes();
+		ReadableByteChannel input = Channels.newChannel(captureStdout);
+		WritableByteChannel output = Channels.newChannel(encoderStdin);
+		try {
 			ByteBuffer buffer = ByteBuffer.allocateDirect(COPY_BUFFER_BYTES);
+			// Offset of buffer[0] in the helper's stream, and bytes still to drop before a frame
+			// boundary after a swap.
+			long bufferOffset = 0;
+			long skip = 0;
 			while (input.read(buffer) != -1) {
 				buffer.flip();
 				while (buffer.hasRemaining()) {
-					output.write(buffer);
+					if (skip > 0) {
+						int dropped = (int) Math.min(skip, buffer.remaining());
+						buffer.position(buffer.position() + dropped);
+						skip -= dropped;
+						continue;
+					}
+					try {
+						output.write(buffer);
+					} catch (IOException writeFailure) {
+						if (frameBytes <= 0 || !encoder.canFallBack()) {
+							throw writeFailure;
+						}
+						LOG.log(System.Logger.Level.WARNING, "The " + encoder.spec().codec()
+								+ " recording encoder failed (" + writeFailure.getMessage()
+								+ "); moving this recording to libx264");
+						closeQuietly(output);
+						output = Channels.newChannel(encoder.fallBack());
+						long position = bufferOffset + buffer.position();
+						skip = (frameBytes - position % frameBytes) % frameBytes;
+					}
 				}
+				bufferOffset += buffer.limit();
 				buffer.clear();
 			}
 		} catch (IOException error) {
 			LOG.log(System.Logger.Level.WARNING, "Frame copy ended: " + error);
+		} finally {
+			closeQuietly(input);
+			closeQuietly(output);
+		}
+	}
+
+	private static void closeQuietly(java.nio.channels.Channel channel) {
+		try {
+			channel.close();
+		} catch (IOException error) {
+			// Already closed: the process on the other end exited.
 		}
 	}
 

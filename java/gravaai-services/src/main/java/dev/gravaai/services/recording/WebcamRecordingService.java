@@ -54,6 +54,13 @@ public final class WebcamRecordingService {
 	/** The webcam's constant-quality factor: the value every webcam take used before the GPU path. */
 	static final int WEBCAM_CRF = 18;
 
+	/**
+	 * Frames within which a failed hardware webcam session is replaced by libx264 (one second of
+	 * camera). The session fails on its first frames when it fails at all; later failures end the
+	 * take as before.
+	 */
+	static final long FALLBACK_WINDOW_FRAMES = WEBCAM_FRAME_RATE;
+
 	/** Receives every captured frame (HUD preview) on the capture thread. */
 	public interface FrameListener {
 		void onFrame(ByteBuffer rgbaTopFirst, WebcamFormat format, long wallClockMs);
@@ -532,7 +539,6 @@ public final class WebcamRecordingService {
 		private boolean finished;
 		/** Frames written to {@link #process}; the early-failure window is measured in frames. */
 		private long framesWritten;
-		private long processStartedAtMs;
 
 		FfmpegCliWebcamEncoder(
 				RecordingProcesses processes,
@@ -567,7 +573,6 @@ public final class WebcamRecordingService {
 			this.stdin = process.stdin();
 			this.spec = next;
 			this.framesWritten = 0;
-			this.processStartedAtMs = System.currentTimeMillis();
 			drain(process.stderr());
 		}
 
@@ -591,29 +596,65 @@ public final class WebcamRecordingService {
 
 		@Override
 		public void writeFrame(ByteBuffer rgbaTopFirst) throws IOException {
-			// A hardware encoder that died in its first second never had a usable frame: this
-			// recording restarts on libx264 and keeps going, instead of losing the webcam take.
-			if (spec.hardware() && framesWritten == 0 && !process.isAlive()
-					&& System.currentTimeMillis() - processStartedAtMs < 1_000) {
-				LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " webcam encoder exited"
-						+ " before its first frame; restarting it on libx264");
-				process.destroyForcibly();
-				java.nio.file.Files.deleteIfExists(outputPath);
-				startProcess(VideoEncoderSpec.SOFTWARE);
+			// A hardware session opens on the first frame, so a driver that rejects it shows up as a
+			// dead process or a broken pipe within the first frames: this take moves onto libx264
+			// instead of losing the webcam track.
+			if (canFallBack() && !process.isAlive()) {
+				fallBack(rgbaTopFirst, "exited");
 			}
+			try {
+				writeTo(sink(), rgbaTopFirst);
+			} catch (IOException failure) {
+				if (!canFallBack()) {
+					throw failure;
+				}
+				fallBack(rgbaTopFirst, String.valueOf(failure));
+				writeTo(sink(), rgbaTopFirst);
+			}
+			framesWritten++;
+		}
+
+		/** True while a failed hardware session may still be replaced without a visible seam. */
+		private boolean canFallBack() {
+			return spec.hardware() && framesWritten < FALLBACK_WINDOW_FRAMES;
+		}
+
+		/**
+		 * Restarts the take on libx264. The frames the failed session swallowed are replayed as
+		 * copies of the current one: the encoder runs at a fixed rate, so the webcam track keeps
+		 * its frame count, and with it its timing against the screen video.
+		 */
+		private void fallBack(ByteBuffer frame, String reason) throws IOException {
+			long lost = framesWritten;
+			LOG.log(System.Logger.Level.WARNING, "The " + spec.codec() + " webcam encoder failed ("
+					+ reason + ") after " + lost + " frames; restarting this take on libx264");
+			process.destroyForcibly();
+			java.nio.file.Files.deleteIfExists(outputPath);
+			startProcess(VideoEncoderSpec.SOFTWARE);
+			OutputStream sink = sink();
+			for (long index = 0; index < lost; index++) {
+				writeTo(sink, frame);
+				framesWritten++;
+			}
+		}
+
+		private OutputStream sink() throws IOException {
 			OutputStream sink = stdin;
 			if (sink == null) {
 				throw new IOException("The webcam encoder has no stdin pipe");
 			}
-			int start = rgbaTopFirst.position();
-			byte[] chunk = new byte[Math.min(rgbaTopFirst.remaining(), 1 << 20)];
-			while (rgbaTopFirst.hasRemaining()) {
-				int length = Math.min(rgbaTopFirst.remaining(), chunk.length);
-				rgbaTopFirst.get(chunk, 0, length);
+			return sink;
+		}
+
+		/** Writes one frame without moving the caller's buffer (it may be written again). */
+		private static void writeTo(OutputStream sink, ByteBuffer frame) throws IOException {
+			ByteBuffer view = frame.duplicate();
+			byte[] chunk = new byte[Math.min(view.remaining(), 1 << 20)];
+			while (view.hasRemaining()) {
+				int length = Math.min(view.remaining(), chunk.length);
+				view.get(chunk, 0, length);
 				sink.write(chunk, 0, length);
 			}
-			rgbaTopFirst.position(start);
-			framesWritten++;
 		}
 
 		@Override

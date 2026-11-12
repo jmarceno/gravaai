@@ -214,4 +214,27 @@ class VideoEncoderProbeTest {
 		int index = args.indexOf(flag);
 		return index < 0 || index + 1 >= args.size() ? "" : args.get(index + 1);
 	}
+
+	@Test
+	@DisplayName("each GPU candidate proves itself with a tiny encode into the null muxer")
+	void verificationEncodeShape() {
+		VideoEncoderSpec vaapi = new VideoEncoderSpec("h264_vaapi", VideoEncoderSpec.Family.VAAPI);
+		List<String> command = VideoEncoderProbe.verificationCommand(
+				java.nio.file.Path.of("/native/ffmpeg"), vaapi);
+		assertEquals("/native/ffmpeg", command.getFirst());
+		assertTrue(command.contains("-init_hw_device"), command.toString());
+		assertTrue(command.indexOf("-init_hw_device") < command.indexOf("-i"), command.toString());
+		assertEquals("lavfi", command.get(command.indexOf("-f") + 1), command.toString());
+		assertEquals("3", command.get(command.indexOf("-frames:v") + 1), command.toString());
+		assertEquals("format=nv12,hwupload", command.get(command.indexOf("-vf") + 1));
+		assertEquals("h264_vaapi", command.get(command.indexOf("-c:v") + 1));
+		assertEquals("CQP", command.get(command.indexOf("-rc_mode") + 1), command.toString());
+		assertEquals(List.of("-f", "null", "-"), command.subList(command.size() - 3, command.size()));
+
+		VideoEncoderSpec nvenc = new VideoEncoderSpec("h264_nvenc", VideoEncoderSpec.Family.NVENC);
+		List<String> host = VideoEncoderProbe.verificationCommand(
+				java.nio.file.Path.of("/native/ffmpeg"), nvenc);
+		assertFalse(host.contains("-vf"), "host-frame encoders need no upload: " + host);
+		assertEquals("yuv420p", host.get(host.indexOf("-pix_fmt") + 1), host.toString());
+	}
 }

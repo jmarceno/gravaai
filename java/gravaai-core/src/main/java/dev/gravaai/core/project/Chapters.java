@@ -9,8 +9,9 @@ import java.util.Locale;
  *
  * <p>YouTube only honours a chapter list whose first timestamp is {@code 00:00}, so a project whose
  * first chapter starts later gets an implicit {@code 00:00 Intro} entry: the alternative is
- * silently exporting a list YouTube then throws away. Duplicate timestamps collapse (the first
- * title wins) and chapters that would start at or after the end of the edit are dropped.
+ * silently exporting a list YouTube then throws away. Chapters that print the same timestamp
+ * collapse (the first title wins) and chapters that would start at or after the end of the edit
+ * are dropped.
  */
 public final class Chapters {
 
@@ -33,7 +34,7 @@ public final class Chapters {
 			long timelineDurationMs) {
 		long duration = Math.max(0, timelineDurationMs);
 		List<Chapter> chapters = new ArrayList<>();
-		long previousStart = Long.MIN_VALUE;
+		long previousSecond = Long.MIN_VALUE;
 		for (MarkerTimeline.Fragment fragment : fragments) {
 			if (!fragment.marker().chapter()) {
 				continue;
@@ -42,11 +43,16 @@ public final class Chapters {
 			if (startMs >= duration && duration > 0) {
 				continue;
 			}
-			if (startMs == previousStart) {
+			// The sidecar prints whole seconds ({@link #timestamp}): two chapters that would print the
+			// same timestamp collapse (the first title wins), and a chapter inside the opening half
+			// second is the 00:00 chapter itself rather than a second "00:00" line after the Intro.
+			long second = Math.round(startMs / 1000.0);
+			if (second == previousSecond) {
 				continue;
 			}
-			previousStart = startMs;
-			chapters.add(new Chapter(startMs, TimelineMarker.cleanName(fragment.marker().name())));
+			previousSecond = second;
+			chapters.add(new Chapter(second == 0 ? 0 : startMs,
+					TimelineMarker.cleanName(fragment.marker().name())));
 		}
 		if (chapters.isEmpty()) {
 			return List.of();

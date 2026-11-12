@@ -1,8 +1,7 @@
 package dev.gravaai.media.onnx;
 
 import java.util.List;
-
-import org.jspecify.annotations.Nullable;
+import java.util.Optional;
 
 /**
  * Picks the execution provider a session should run on from the devices ONNX Runtime enumerated.
@@ -53,21 +52,14 @@ public final class OnnxProviderSelection {
 			return OnnxWebGpuPlugin.Selection.cpu(
 					"ONNX Runtime enumerated no execution-provider devices");
 		}
-		OnnxEpDevice chosen = firstWebGpu(devices);
-		if (chosen == null) {
-			return OnnxWebGpuPlugin.Selection.cpu(
-					"no WebGPU device (the Vulkan loader may be missing, or no GPU driver)");
-		}
-		return new OnnxWebGpuPlugin.Selection(chosen.provider(), chosen, null);
+		return firstWebGpu(devices)
+				.map(OnnxWebGpuPlugin.Selection::gpu)
+				.orElseGet(() -> OnnxWebGpuPlugin.Selection.cpu(
+						"no WebGPU device (the Vulkan loader may be missing, or no GPU driver)"));
 	}
 
-	/** The first WebGPU device, or null when none is enumerable. */
-	public static @Nullable OnnxEpDevice firstWebGpu(List<OnnxEpDevice> devices) {
-		for (OnnxEpDevice device : devices) {
-			if (device.webGpu()) {
-				return device;
-			}
-		}
-		return null;
+	/** The first WebGPU device on a real GPU, or empty when none is enumerable. */
+	public static Optional<OnnxEpDevice> firstWebGpu(List<OnnxEpDevice> devices) {
+		return devices.stream().filter(OnnxEpDevice::webGpu).findFirst();
 	}
 }

@@ -2654,17 +2654,17 @@ public final class EditorInspectorPanel extends VBox {
 			failure.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-danger;");
 			body.getChildren().add(failure);
 		}
-		if (state.provider() != null) {
+		if (state.provider().isPresent()) {
 			// Which provider an export will actually use is a promise the app has to keep: the
 			// GPU path is the point of the feature and the CPU is the honest fallback.
 			HBox provider = new HBox(8);
 			provider.setAlignment(Pos.CENTER_LEFT);
-			Label providerLabel = new Label("Runs on " + state.provider());
+			Label providerLabel = new Label("Runs on " + state.provider().get());
 			providerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 			provider.getChildren().add(providerLabel);
 			body.getChildren().add(provider);
-			if (!state.hardwareAccelerated() && state.providerDetail() != null) {
-				Label reason = new Label(state.providerDetail());
+			if (!state.hardwareAccelerated() && state.providerDetail().isPresent()) {
+				Label reason = new Label(state.providerDetail().get());
 				reason.setWrapText(true);
 				reason.setStyle("-fx-font-size: 12px; -fx-text-fill: -g-muted;");
 				body.getChildren().add(reason);

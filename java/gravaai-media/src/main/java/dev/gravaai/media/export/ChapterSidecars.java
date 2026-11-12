@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 import dev.gravaai.core.project.Chapters;
@@ -132,16 +131,5 @@ public final class ChapterSidecars {
 		Path metadata = exportFile.resolveSibling(exportFile.getFileName() + METADATA_SUFFIX);
 		Files.writeString(metadata, ffmetadata(chapters, durationMs), StandardCharsets.UTF_8);
 		return Optional.of(metadata);
-	}
-
-	/** The chapter count line used in export summaries ({@code "3 chapters"}). */
-	static String describe(int chapterCount) {
-		return chapterCount + (chapterCount == 1 ? " chapter" : " chapters");
-	}
-
-	/** Locale-stable debug string for a chapter (tests/diagnostics). */
-	static String debugLine(Chapters.Chapter chapter) {
-		return String.format(Locale.ROOT, "%s %s", Chapters.timestamp(chapter.startMs()),
-				chapter.title());
 	}
 }

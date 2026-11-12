@@ -69,7 +69,7 @@ class SuperResolutionGpuTest {
 
 		var selection = OnnxWebGpuPlugin.probe();
 		Assumptions.assumeTrue(selection.provider().hardware(),
-				"no WebGPU device on this machine: " + selection.detail());
+				"no WebGPU device on this machine: " + selection.detail().orElse(""));
 
 		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, selection)) {
 			assertEquals(OnnxExecutionProvider.Kind.WEBGPU, engine.provider().kind(),
@@ -89,7 +89,7 @@ class SuperResolutionGpuTest {
 
 		var selection = OnnxWebGpuPlugin.probe();
 		Assumptions.assumeTrue(selection.provider().hardware(),
-				"no WebGPU device on this machine: " + selection.detail());
+				"no WebGPU device on this machine: " + selection.detail().orElse(""));
 
 		RgbaFrame frame = testFrame(960, 540);
 		Rect source = Rect.makeXYWH(0, 0, 960, 540);
@@ -134,7 +134,7 @@ class SuperResolutionGpuTest {
 
 		var selection = OnnxWebGpuPlugin.probe();
 		Assumptions.assumeTrue(selection.provider().hardware(),
-				"no WebGPU device on this machine: " + selection.detail());
+				"no WebGPU device on this machine: " + selection.detail().orElse(""));
 
 		RgbaFrame frame = testFrame(960, 540);
 		var transform = new ZoomTransform.AppliedTransform(5, -4 * 960, -4 * 540);
@@ -147,7 +147,7 @@ class SuperResolutionGpuTest {
 			gpu = red(windowOf(engine, frame, transform, canvasWidth, canvasHeight));
 			assertTrue(engine.hardwareAccelerated(), "the reference run must be the GPU one");
 		}
-		var cpuSelection = new OnnxWebGpuPlugin.Selection(OnnxExecutionProvider.CPU, null, null);
+		var cpuSelection = OnnxWebGpuPlugin.Selection.cpu();
 		try (SuperResolutionEngine engine = SuperResolutionEngine.open(model, cpuSelection)) {
 			cpu = red(windowOf(engine, frame, transform, canvasWidth, canvasHeight));
 			assertEquals(OnnxExecutionProvider.Kind.CPU, engine.provider().kind());

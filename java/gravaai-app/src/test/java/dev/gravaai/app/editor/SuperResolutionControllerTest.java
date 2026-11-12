@@ -77,8 +77,8 @@ class SuperResolutionControllerTest {
 		SuperResolutionUiService.State state = controller.service().state();
 		assertFalse(state.enabled());
 		assertFalse(state.modelInstalled());
-		assertNull(state.provider(), "the provider is probed only when exports could use it");
-		assertNull(state.providerDetail());
+		assertTrue(state.provider().isEmpty(), "the provider is probed only when exports could use it");
+		assertTrue(state.providerDetail().isEmpty());
 	}
 
 	@Test
@@ -95,27 +95,28 @@ class SuperResolutionControllerTest {
 			controller.refresh();
 			// The probe may be asynchronous (a virtual thread); wait briefly for the row.
 			long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
-			while (service.state().provider() == null && System.nanoTime() < deadline) {
+			while (service.state().provider().isEmpty() && System.nanoTime() < deadline) {
 				Thread.sleep(20);
 			}
-			String provider = service.state().provider();
-			assertNotNull(provider, "an installed model must get a provider row");
+			assertTrue(service.state().provider().isPresent(),
+					"an installed model must get a provider row");
+			String provider = service.state().provider().get();
 			assertTrue(provider.equals("CPU") || provider.startsWith("WebGPU"),
 					"unexpected provider label: " + provider);
 			assertEquals(!provider.equals("CPU"), service.state().hardwareAccelerated());
 			if (!service.state().hardwareAccelerated()) {
-				assertNotNull(service.state().providerDetail(),
+				assertTrue(service.state().providerDetail().isPresent(),
 						"the CPU fallback must say why it was chosen");
 			}
 
 			// A toggle flips only the toggle: the provider is a machine property and stays.
 			service.setEnabled(true);
 			assertTrue(service.state().enabled());
-			assertEquals(provider, service.state().provider());
+			assertEquals(java.util.Optional.of(provider), service.state().provider());
 
 			service.setEnabled(false);
 			assertFalse(service.state().enabled());
-			assertEquals(provider, service.state().provider());
+			assertEquals(java.util.Optional.of(provider), service.state().provider());
 			assertFalse(published.isEmpty(), "the panel must have been told about each change");
 		} finally {
 			try (var stream = java.nio.file.Files.walk(profile)) {

@@ -151,4 +151,17 @@ class MarkerTimelineTest {
 		assertEquals(marker("m", 100, "Name", true), marker.withChapter(true));
 		assertFalse(marker.withChapter(true).equals(marker));
 	}
+
+	@Test
+	@DisplayName("chapters that print the same second collapse, and the opening half second is 00:00")
+	void chaptersCollapseOnTheDisplayedSecond() {
+		List<Chapters.Chapter> chapters = Chapters.build(List.of(
+				marker("open", 300, "Opening", true),
+				marker("close", 5000, "Topic", true),
+				marker("same", 5400, "Same second", true)), CLIPS, 3000);
+		assertEquals(List.of(
+				new Chapters.Chapter(0, "Opening"),
+				new Chapters.Chapter(2000, "Topic")), chapters);
+		assertEquals("00:00 Opening\n00:02 Topic\n", Chapters.sidecarText(chapters));
+	}
 }

@@ -41,8 +41,8 @@ class OnnxProviderSelectionTest {
 		var selection = OnnxProviderSelection.select(List.of(cpuDevice(), gpu));
 
 		assertEquals(OnnxExecutionProvider.Kind.WEBGPU, selection.provider().kind());
-		assertSame(gpu, selection.device(), "the probed handle is the one sessions get");
-		assertNull(selection.detail(), "a GPU selection has nothing to explain");
+		assertSame(gpu, selection.device().orElseThrow(), "the probed handle is the one sessions get");
+		assertTrue(selection.detail().isEmpty(), "a GPU selection has nothing to explain");
 		assertTrue(selection.provider().hardware());
 	}
 
@@ -52,8 +52,8 @@ class OnnxProviderSelectionTest {
 		var selection = OnnxProviderSelection.select(List.of(cpuDevice()));
 
 		assertEquals(OnnxExecutionProvider.Kind.CPU, selection.provider().kind());
-		assertNull(selection.device());
-		assertNotNull(selection.detail(), "the panel must be able to say why the CPU is used");
+		assertTrue(selection.device().isEmpty());
+		assertTrue(selection.detail().isPresent(), "the panel must be able to say why the CPU is used");
 		assertFalse(selection.provider().hardware());
 	}
 
@@ -63,7 +63,7 @@ class OnnxProviderSelectionTest {
 		var selection = OnnxProviderSelection.select(List.of());
 
 		assertEquals(OnnxExecutionProvider.CPU, selection.provider());
-		assertNotNull(selection.detail());
+		assertTrue(selection.detail().isPresent());
 	}
 
 	@Test
@@ -77,8 +77,8 @@ class OnnxProviderSelectionTest {
 
 		assertEquals(OnnxExecutionProvider.Kind.CPU, selection.provider().kind(),
 				"a provider we never append must not be picked just because it is a GPU");
-		assertNull(OnnxProviderSelection.firstWebGpu(List.of(unknown)));
-		assertNull(unknown.kind());
+		assertTrue(OnnxProviderSelection.firstWebGpu(List.of(unknown)).isEmpty());
+		assertTrue(unknown.kind().isEmpty());
 		assertThrows(IllegalStateException.class, unknown::provider);
 	}
 
@@ -88,7 +88,8 @@ class OnnxProviderSelectionTest {
 		OnnxEpDevice first = webGpu(0x1002, 0x67FF, 0);
 		OnnxEpDevice second = webGpu(0x8086, 0x1234, 1);
 
-		assertSame(first, OnnxProviderSelection.firstWebGpu(List.of(cpuDevice(), first, second)));
+		assertSame(first,
+				OnnxProviderSelection.firstWebGpu(List.of(cpuDevice(), first, second)).orElseThrow());
 	}
 
 	@Test
@@ -107,7 +108,8 @@ class OnnxProviderSelectionTest {
 	@DisplayName("a hardware selection cannot exist without its device")
 	void hardwareSelectionNeedsDevice() {
 		assertThrows(IllegalArgumentException.class, () -> new OnnxWebGpuPlugin.Selection(
-				webGpu(0x1002, 0x67FF, 0).provider(), null, null));
+				webGpu(0x1002, 0x67FF, 0).provider(), java.util.Optional.empty(),
+				java.util.Optional.empty()));
 	}
 
 	@Test
@@ -116,5 +118,16 @@ class OnnxProviderSelectionTest {
 		assertEquals("AMD GPU 0x1234", GpuDeviceNames.describe(0x1002, 0x1234));
 		assertEquals("Intel GPU 0x2222", GpuDeviceNames.describe(0x8086, 0x2222));
 		assertEquals("GPU", GpuDeviceNames.describe(0, 0));
+	}
+
+	@Test
+	@DisplayName("a WebGPU device on a software adapter is not taken for a GPU")
+	void ignoresSoftwareAdapters() {
+		OnnxEpDevice software = new OnnxEpDevice(OnnxExecutionProvider.Kind.WEBGPU.runtimeName(),
+				0, "Mesa", MemorySegment.NULL, 0, OnnxExecutionProvider.Device.CPU);
+
+		assertFalse(software.webGpu(), "lavapipe/SwiftShader must not be reported as a GPU");
+		assertEquals(OnnxExecutionProvider.CPU, OnnxProviderSelection.select(List.of(software))
+				.provider());
 	}
 }

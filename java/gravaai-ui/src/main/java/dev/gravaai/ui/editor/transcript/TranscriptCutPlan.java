@@ -1,11 +1,10 @@
 package dev.gravaai.ui.editor.transcript;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import dev.gravaai.core.editor.TranscriptCut;
@@ -81,10 +80,7 @@ public record TranscriptCutPlan(List<TranscriptCut.SourceRange> ranges, Set<Stri
 			List<ClipRegion> clips, long minPauseMs, long keepMs) {
 		List<TranscriptCut.SourceRange> spoken = new ArrayList<>();
 		for (TranscriptWords.Word word : words) {
-			TranscriptCut.SourceRange span = timelineSpanMs(word, clips);
-			if (span != null) {
-				spoken.add(span);
-			}
+			timelineSpanMs(word, clips).ifPresent(spoken::add);
 		}
 		spoken.sort(Comparator.comparingLong(TranscriptCut.SourceRange::startMs));
 		List<TranscriptCut.SourceRange> pauses = TranscriptCut.pauseRanges(spoken, minPauseMs,
@@ -95,9 +91,9 @@ public record TranscriptCutPlan(List<TranscriptCut.SourceRange> ranges, Set<Stri
 
 	/**
 	 * The word's span in timeline milliseconds, clamped to the clip that holds it (a word whose
-	 * edge was cut only counts from the footage that remains). Null when no clip holds its centre.
+	 * edge was cut only counts from the footage that remains). Empty when no clip holds its centre.
 	 */
-	static TranscriptCut.@Nullable SourceRange timelineSpanMs(TranscriptWords.Word word,
+	static Optional<TranscriptCut.SourceRange> timelineSpanMs(TranscriptWords.Word word,
 			List<ClipRegion> clips) {
 		double midpointMs = (word.startMs() + word.endMs()) / 2.0;
 		for (ClipRegion clip : clips) {
@@ -111,9 +107,11 @@ public record TranscriptCutPlan(List<TranscriptCut.SourceRange> ranges, Set<Stri
 					+ (Math.max(word.startMs(), clipStartMs) - clipStartMs) / speed);
 			long endMs = Math.round(clip.startMs()
 					+ (Math.min(word.endMs(), clipEndMs) - clipStartMs) / speed);
-			return endMs > startMs ? new TranscriptCut.SourceRange(startMs, endMs) : null;
+			return endMs > startMs
+					? Optional.of(new TranscriptCut.SourceRange(startMs, endMs))
+					: Optional.empty();
 		}
-		return null;
+		return Optional.empty();
 	}
 
 	/** Maps timeline spans back to source ranges, one range per clip they cover. */

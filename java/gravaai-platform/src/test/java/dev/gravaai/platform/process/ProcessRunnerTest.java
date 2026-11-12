@@ -210,4 +210,12 @@ class ProcessRunnerTest {
 		}
 		return !ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
 	}
+
+	@Test
+	void systemPrefixesKeepTheInheritedLibraryPath() {
+		assertTrue(ProcessRunner.isSystemPrefix(Path.of("/usr")));
+		assertTrue(ProcessRunner.isSystemPrefix(Path.of("/usr/local")));
+		assertTrue(ProcessRunner.isSystemPrefix(Path.of("/")));
+		assertFalse(ProcessRunner.isSystemPrefix(Path.of("/tmp/.mount_gravaai/ffmpeg")));
+	}
 }

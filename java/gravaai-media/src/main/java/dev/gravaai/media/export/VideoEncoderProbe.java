@@ -18,18 +18,21 @@ import dev.gravaai.platform.process.ProcessRunner;
  * Which H.264 encoders the bundled ffmpeg can run, and which one a job should use
  * (card "GPU hardware encoding for export and recording").
  *
- * <p>The answer comes from one {@code ffmpeg -encoders} run per JVM plus the device prerequisites
- * the vendor encoders need (VA-API has to see a render node). Presence proves the encoder was
- * compiled in, not that the card can run it — a driver that rejects the session only shows up when
- * the job starts, which is exactly what the per-job fallback in {@link Mp4Encoder} and the
- * recording pipeline handle.
+ * <p>The answer comes from one {@code ffmpeg -encoders} run per JVM, the device prerequisites the
+ * vendor encoders need (VA-API has to see a render node), and one tiny verification encode per
+ * candidate ({@link #verificationCommand}), because a listed encoder only proves it was compiled
+ * in. A driver that later rejects a real session (a GPU reset, a resolution the card cannot take)
+ * is still handled by the per-job fallback in {@link Mp4Encoder} and the recording pipeline.
  *
  * <p>The probe is an interface so tests can hand the pipeline a fixed answer and never open a GPU
  * device.
  */
 public interface VideoEncoderProbe {
 
-	/** The encoders this ffmpeg build can start, best first. Never empty: libx264 is the floor. */
+	/**
+	 * The encoders jobs may use, best first: at most one verified GPU encoder, then libx264. Never
+	 * empty: libx264 is the floor.
+	 */
 	List<VideoEncoderSpec> available();
 
 	/** The encoder jobs should start with. */
@@ -93,11 +96,17 @@ public interface VideoEncoderProbe {
 		return () -> copy;
 	}
 
-	/** The real probe: {@code ffmpeg -encoders} parsed once, then device prerequisites. */
+	/**
+	 * The real probe: {@code ffmpeg -encoders} parsed once, then device prerequisites and a
+	 * verification encode per candidate.
+	 */
 	final class FfmpegProbe implements VideoEncoderProbe {
 
 		/** The {@code -encoders} probe is a short read-only query; it must never stall a job start. */
 		private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(10);
+		/** One tiny verification encode; a healthy driver answers in well under a second. */
+		private static final Duration VERIFY_TIMEOUT = Duration.ofSeconds(15);
+		private static final System.Logger LOG = System.getLogger(VideoEncoderProbe.class.getName());
 
 		private final Path ffmpeg;
 		private volatile @Nullable List<VideoEncoderSpec> cached;
@@ -132,10 +141,38 @@ public interface VideoEncoderProbe {
 				if (family == VideoEncoderSpec.Family.VAAPI && !VaapiDevices.present()) {
 					continue;
 				}
-				specs.add(new VideoEncoderSpec(family.codec(), family));
+				VideoEncoderSpec spec = new VideoEncoderSpec(family.codec(), family);
+				// Compiled in is not the same as usable: an NVIDIA box also has a render node (so
+				// VA-API would win the order and shadow NVENC), and cards such as Navi 24 have a
+				// VA-API device without an H.264 encode entrypoint. Those only fail once the
+				// encoder session opens, which for a live recording is after frames already flow,
+				// so every candidate proves itself on a few tiny frames first. The first one that
+				// does is the only GPU encoder jobs use (their fallback is always libx264), so the
+				// rest are never started: startup pays one tiny encode on a working machine.
+				if (encodes(spec)) {
+					specs.add(spec);
+					break;
+				} else {
+					LOG.log(System.Logger.Level.INFO, spec.codec()
+							+ " is compiled in but could not encode on this machine; skipping it");
+				}
 			}
 			specs.add(VideoEncoderSpec.SOFTWARE);
 			return List.copyOf(specs);
+		}
+
+		/** True when {@code spec} encodes a few small synthetic frames without an error. */
+		private boolean encodes(VideoEncoderSpec spec) {
+			ProcessResult result;
+			try {
+				result = ProcessRunner.run(verificationCommand(ffmpeg, spec), VERIFY_TIMEOUT);
+			} catch (IOException | InterruptedException error) {
+				if (error instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+				return false;
+			}
+			return result.succeeded();
 		}
 
 		/** The encoder names in {@code ffmpeg -encoders}; empty when the CLI cannot be run. */
@@ -155,6 +192,31 @@ public interface VideoEncoderProbe {
 			}
 			return parseEncoders(result.stdout());
 		}
+	}
+
+	/**
+	 * The command that proves {@code spec} can open an encoder session here: three 256x144 frames
+	 * from {@code lavfi}, through the same upload tail and constant-quality rate control a recording
+	 * uses, into the null muxer. Nothing is written to disk.
+	 */
+	static List<String> verificationCommand(Path ffmpeg, VideoEncoderSpec spec) {
+		List<String> command = new ArrayList<>();
+		command.add(ffmpeg.toString());
+		command.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostdin"));
+		command.addAll(spec.deviceArguments());
+		command.addAll(List.of("-f", "lavfi", "-i", "color=c=black:s=256x144:r=30",
+				"-frames:v", "3"));
+		List<String> upload = VideoEncoderArguments.appendUpload(List.of(), spec);
+		if (!upload.isEmpty()) {
+			command.addAll(List.of("-vf", String.join(",", upload)));
+		} else {
+			command.addAll(List.of("-pix_fmt", "yuv420p"));
+		}
+		command.addAll(List.of("-c:v", spec.codec()));
+		command.addAll(VideoEncoderArguments.rateControl(spec,
+				dev.gravaai.core.editor.ExportPreferences.ExportEncodingMode.FAST, 0, 23, true));
+		command.addAll(List.of("-f", "null", "-"));
+		return List.copyOf(command);
 	}
 
 	/**

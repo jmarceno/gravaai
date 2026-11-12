@@ -40,15 +40,4 @@ public record Mp4ExportRequest(int width, int height, int frameRate, int bitrate
 	public long totalFrames() {
 		return (long) Math.ceil(durationSeconds * frameRate);
 	}
-
-	/** The chapter list as the {@code ffmetadata} payload, or empty when there are none. */
-	public boolean hasChapters() {
-		return !chapters.isEmpty();
-	}
-
-	/** The chapters written as {@code ffmetadata}, or null when there is nothing to embed. */
-	public ChapterSidecars.@org.jspecify.annotations.Nullable Payload chapterPayload() {
-		return hasChapters() ? new ChapterSidecars.Payload(chapters) : null;
-	}
 }
-

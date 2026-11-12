@@ -5,6 +5,8 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -47,14 +49,19 @@ public final class SuperResolutionController {
 	/** Cancels an install in flight when the user toggles it back off mid-download. */
 	private final AtomicBoolean installing = new AtomicBoolean();
 	/**
-	 * Guards the one provider probe per JVM: {@link OnnxWebGpuPlugin} registers the plugin into a
-	 * process-wide ORT registry, so a second probe must never re-register it.
+	 * The one provider probe per JVM, shared by every controller: {@code OnnxWebGpuPlugin}
+	 * registers the plugin into a process-wide ORT registry, so it is probed once and every window
+	 * reads the same answer. It completes once a window first needs it and the probe has run.
 	 */
+	private static final CompletableFuture<ProbedProvider> PROVIDER_PROBE = new CompletableFuture<>();
+	/** Set by the window that starts the one probe. */
 	private static final AtomicBoolean PROVIDER_PROBE_STARTED = new AtomicBoolean();
-	/** The probed provider label ("WebGPU · AMD Radeon RX 560" / "CPU"), null until it lands. */
-	private static volatile @Nullable String probedProvider;
-	/** Why the CPU is in use when no GPU device was found, null when on GPU or not probed yet. */
-	private static volatile @Nullable String probedProviderDetail;
+
+	/**
+	 * A probe answer: the provider label ("WebGPU · AMD Radeon RX 560" / "CPU") and, on the CPU,
+	 * why no GPU is used.
+	 */
+	private record ProbedProvider(String label, Optional<String> detail) {}
 
 	private volatile SuperResolutionUiService.State state;
 
@@ -253,8 +260,14 @@ public final class SuperResolutionController {
 			boolean failed, boolean enabled, boolean installed) {
 		// Every mutation keeps the probed provider: it is a property of the machine, not of the
 		// install, and dropping it would blank the row on every toggle.
+		Optional<ProbedProvider> probed = probedProvider();
 		return new SuperResolutionUiService.State(enabled, installed, percent, message, failed,
-				probedProvider, probedProviderDetail);
+				probed.map(ProbedProvider::label), probed.flatMap(ProbedProvider::detail));
+	}
+
+	/** The finished probe answer, if a probe ran and completed. */
+	private static Optional<ProbedProvider> probedProvider() {
+		return PROVIDER_PROBE.isDone() ? Optional.of(PROVIDER_PROBE.join()) : Optional.empty();
 	}
 
 	/** Re-reads the setting and the model from disk (the window's initial state). */
@@ -271,48 +284,41 @@ public final class SuperResolutionController {
 	 * <p>Only when the feature can matter (the model is installed or the user turned the toggle on):
 	 * the probe loads the plugin and creates a Vulkan device, and an untouched machine must not pay
 	 * that at editor open. Off the FX thread on purpose — it touches the GPU driver. The result is
-	 * process-wide (the plugin registration is), so the first window that needs it pays and every
-	 * later one reuses the label.</p>
+	 * process-wide (the plugin registration is), so the first window that needs it starts the probe
+	 * and every window, including one that asked while it was still running, gets the answer.</p>
 	 */
 	private void probeProviderAsync() {
 		if (!state.modelInstalled() && !state.enabled()) {
 			return;
 		}
-		String known = probedProvider;
-		if (known != null) {
-			publishProvider(known, probedProviderDetail);
-			return;
+		if (PROVIDER_PROBE_STARTED.compareAndSet(false, true)) {
+			Threads.startVirtual("gravaai-superres-provider-probe",
+					() -> PROVIDER_PROBE.complete(probeProvider()));
 		}
-		if (!PROVIDER_PROBE_STARTED.compareAndSet(false, true)) {
-			return;
-		}
-		Threads.startVirtual("gravaai-superres-provider-probe", () -> {
-			String provider;
-			String detail;
-			try {
-				var selection = dev.gravaai.media.onnx.OnnxWebGpuPlugin.probe();
-				provider = selection.provider().label();
-				detail = selection.detail();
-			} catch (RuntimeException error) {
-				// The probe itself never throws for a missing driver, but a broken native binding
-				// must still not take the Settings panel down.
-				LOG.log(System.Logger.Level.WARNING, "execution provider probe failed: " + error);
-				provider = dev.gravaai.media.onnx.OnnxExecutionProvider.CPU.label();
-				detail = error.getMessage() == null ? error.toString() : error.getMessage();
-			}
-			probedProvider = provider;
-			probedProviderDetail = detail;
-			publishProvider(provider, detail);
-		});
+		PROVIDER_PROBE.thenAccept(probed -> publishProvider(probed.label(), probed.detail()));
 	}
 
-	private void publishProvider(String provider, @Nullable String detail) {
+	/** One provider probe; never throws, so the shared future always completes. */
+	private static ProbedProvider probeProvider() {
+		try {
+			var selection = dev.gravaai.media.onnx.OnnxWebGpuPlugin.probe();
+			return new ProbedProvider(selection.provider().label(), selection.detail());
+		} catch (RuntimeException | LinkageError error) {
+			// The probe itself never throws for a missing driver, but a broken native binding
+			// must still not take the Settings panel down.
+			LOG.log(System.Logger.Level.WARNING, "execution provider probe failed: " + error);
+			return new ProbedProvider(dev.gravaai.media.onnx.OnnxExecutionProvider.CPU.label(),
+					Optional.of(Optional.ofNullable(error.getMessage()).orElse(error.toString())));
+		}
+	}
+
+	private void publishProvider(String provider, Optional<String> detail) {
 		SuperResolutionUiService.State current = state;
-		if (provider.equals(current.provider()) && java.util.Objects.equals(detail,
-				current.providerDetail())) {
+		if (current.provider().equals(Optional.of(provider))
+				&& current.providerDetail().equals(detail)) {
 			return;
 		}
-		state = current.withProvider(provider, detail);
+		state = current.withProvider(Optional.of(provider), detail);
 		publish();
 	}
 

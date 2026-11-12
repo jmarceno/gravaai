@@ -15,7 +15,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -46,23 +47,29 @@ class CosmicEncoderSelectionTest {
 	private static final class FakeProcess implements SpawnedProcess {
 
 		private final CountDownLatch exited = new CountDownLatch(1);
-		private final boolean diesImmediately;
+		private final InputStream stdout;
+		private final OutputStream stdin;
 
 		FakeProcess(boolean diesImmediately) {
-			this.diesImmediately = diesImmediately;
+			this(InputStream.nullInputStream(), OutputStream.nullOutputStream());
 			if (diesImmediately) {
 				exited.countDown();
 			}
 		}
 
+		FakeProcess(InputStream stdout, OutputStream stdin) {
+			this.stdout = stdout;
+			this.stdin = stdin;
+		}
+
 		@Override
 		public OutputStream stdin() {
-			return OutputStream.nullOutputStream();
+			return stdin;
 		}
 
 		@Override
 		public InputStream stdout() {
-			return InputStream.nullInputStream();
+			return stdout;
 		}
 
 		@Override
@@ -101,6 +108,8 @@ class CosmicEncoderSelectionTest {
 
 		final List<List<String>> commands = new ArrayList<>();
 		final AtomicInteger encoderStarts = new AtomicInteger();
+		/** Stdins handed to successive encoder starts; a null-output stdin once it runs out. */
+		final java.util.ArrayDeque<OutputStream> encoderStdins = new java.util.ArrayDeque<>();
 		final boolean hardwareEncoderDiesImmediately;
 
 		Commands(boolean hardwareEncoderDiesImmediately) {
@@ -118,7 +127,9 @@ class CosmicEncoderSelectionTest {
 				// The first encoder start is the hardware attempt when it is meant to die.
 				boolean dies = hardwareEncoderDiesImmediately && start == 1
 						&& command.contains("h264_vaapi");
-				return new FakeProcess(dies);
+				OutputStream stdin = encoderStdins.pollFirst();
+				return stdin == null ? new FakeProcess(dies)
+						: new FakeProcess(InputStream.nullInputStream(), stdin);
 			}
 			return new FakeProcess(false);
 		}
@@ -171,32 +182,144 @@ class CosmicEncoderSelectionTest {
 		assertEquals("h264_vaapi", pipeline.selectedEncoder().codec());
 	}
 
-	@Test
-	@DisplayName("a hardware encoder that dies at once is replaced by libx264 before any frame")
-	void immediateHardwareDeathFallsBack() throws Exception {
-		Commands processes = new Commands(true);
-		CosmicVideoPipeline pipeline = pipeline(processes, HARDWARE_PROBE);
-		FakeProcess capture = new FakeProcess(false);
-		CosmicRecording.VideoCapture video = pipeline.startVideo(capture,
-				new CaptureFormat(1920, 1080, "bgra", 0), temp.resolve("out.mkv"), 60,
-				RecordingQuality.HIGH);
-		assertEquals("libx264", video.encoderSpec().codec(),
-				"the recording must end up on libx264: " + processes.commands);
-		assertEquals(2, processes.encoderStarts.get(), processes.commands.toString());
-		assertEquals("libx264", processes.commands.getLast().get(
-				processes.commands.getLast().indexOf("-c:v") + 1), processes.commands.toString());
+	/** Five frames of a 4x2 BGRA capture, each frame filled with its own index. */
+	private static final CaptureFormat TINY = new CaptureFormat(4, 2, "bgra", 0);
+	private static final int TINY_FRAME = 4 * 2 * 4;
+	private static final int TINY_FRAMES = 5;
+
+	private static byte[] tinyFrames() {
+		byte[] stream = new byte[TINY_FRAME * TINY_FRAMES];
+		for (int index = 0; index < stream.length; index++) {
+			stream[index] = (byte) (index / TINY_FRAME);
+		}
+		return stream;
+	}
+
+	/** Hands the helper's stream out in small reads, like a pipe that is drained as it fills. */
+	private static InputStream trickle(byte[] bytes, int chunk) {
+		return new InputStream() {
+			private int position;
+
+			@Override
+			public int read() {
+				return position < bytes.length ? bytes[position++] & 0xFF : -1;
+			}
+
+			@Override
+			public int read(byte[] target, int offset, int length) {
+				if (position >= bytes.length) {
+					return -1;
+				}
+				int count = Math.min(Math.min(length, chunk), bytes.length - position);
+				System.arraycopy(bytes, position, target, offset, count);
+				position += count;
+				return count;
+			}
+		};
+	}
+
+	/** An encoder stdin that dies after {@code limit} bytes, like a session rejected mid-frame. */
+	private static OutputStream diesAfter(int limit) {
+		return new OutputStream() {
+			private int written;
+
+			@Override
+			public void write(int value) throws IOException {
+				write(new byte[] {(byte) value}, 0, 1);
+			}
+
+			@Override
+			public void write(byte[] bytes, int offset, int length) throws IOException {
+				if (written + length > limit) {
+					throw new IOException("Broken pipe");
+				}
+				written += length;
+			}
+		};
 	}
 
 	@Test
-	@DisplayName("a hardware encoder that survives its first frames is kept")
-	void healthyHardwareIsKept() throws Exception {
+	@DisplayName("the encoder starts without waiting, so the copy never stalls the helper")
+	void startDoesNotWait() throws Exception {
 		Commands processes = new Commands(false);
 		CosmicVideoPipeline pipeline = pipeline(processes, HARDWARE_PROBE);
-		CosmicRecording.VideoCapture video = pipeline.startVideo(new FakeProcess(false),
-				new CaptureFormat(1920, 1080, "bgra", 0), temp.resolve("out.mkv"), 60,
-				RecordingQuality.HIGH);
+		CosmicRecording.VideoCapture video = pipeline.startVideo(new FakeProcess(false), TINY,
+				temp.resolve("out.mkv"), 60, RecordingQuality.HIGH);
 		assertEquals("h264_vaapi", video.encoderSpec().codec());
 		assertEquals(1, processes.encoderStarts.get(), processes.commands.toString());
+		assertEquals(TINY_FRAME, video.frameBytes());
+	}
+
+	@Test
+	@DisplayName("a hardware session that fails on its first frames moves to libx264 on a frame boundary")
+	void earlyHardwareFailureFallsBackAligned() throws Exception {
+		Commands processes = new Commands(false);
+		ByteArrayOutputStream software = new ByteArrayOutputStream();
+		// The hardware encoder takes 40 bytes (one frame and a quarter) and then dies.
+		processes.encoderStdins.add(diesAfter(40));
+		processes.encoderStdins.add(software);
+		CosmicVideoPipeline pipeline = pipeline(processes, HARDWARE_PROBE);
+		FakeProcess capture = new FakeProcess(trickle(tinyFrames(), 24), OutputStream.nullOutputStream());
+		CosmicRecording.VideoCapture video = pipeline.startVideo(capture, TINY,
+				temp.resolve("out.mkv"), 60, RecordingQuality.HIGH);
+
+		CosmicVideoPipeline.copyFrames(video);
+
+		assertEquals("libx264", video.encoderSpec().codec());
+		assertTrue(video.encoder().restartedAtMs().isPresent());
+		assertEquals(2, processes.encoderStarts.get(), processes.commands.toString());
+		assertEquals("libx264", processes.commands.getLast().get(
+				processes.commands.getLast().indexOf("-c:v") + 1), processes.commands.toString());
+		byte[] received = software.toByteArray();
+		assertEquals(0, received.length % TINY_FRAME, "the replacement must get whole frames");
+		assertEquals(3 * TINY_FRAME, received.length);
+		// The replacement starts on frame 2: frame 1 was half-consumed by the failed session.
+		assertEquals(2, received[0]);
+		assertEquals(TINY_FRAMES - 1, received[received.length - 1]);
+	}
+
+	@Test
+	@DisplayName("a libx264 failure is not retried: the copy just ends")
+	void softwareFailureIsNotRetried() throws Exception {
+		Commands processes = new Commands(false);
+		processes.encoderStdins.add(diesAfter(40));
+		CosmicVideoPipeline pipeline = pipeline(processes,
+				VideoEncoderProbe.of(List.of(VideoEncoderSpec.SOFTWARE)));
+		FakeProcess capture = new FakeProcess(trickle(tinyFrames(), 24), OutputStream.nullOutputStream());
+		CosmicRecording.VideoCapture video = pipeline.startVideo(capture, TINY,
+				temp.resolve("out.mkv"), 60, RecordingQuality.HIGH);
+
+		CosmicVideoPipeline.copyFrames(video);
+
+		assertEquals("libx264", video.encoderSpec().codec());
+		assertTrue(video.encoder().restartedAtMs().isEmpty());
+		assertEquals(1, processes.encoderStarts.get(), processes.commands.toString());
+	}
+
+	@Test
+	@DisplayName("a healthy hardware encoder receives the whole stream")
+	void healthyHardwareIsKept() throws Exception {
+		Commands processes = new Commands(false);
+		ByteArrayOutputStream hardware = new ByteArrayOutputStream();
+		processes.encoderStdins.add(hardware);
+		CosmicVideoPipeline pipeline = pipeline(processes, HARDWARE_PROBE);
+		FakeProcess capture = new FakeProcess(trickle(tinyFrames(), 24), OutputStream.nullOutputStream());
+		CosmicRecording.VideoCapture video = pipeline.startVideo(capture, TINY,
+				temp.resolve("out.mkv"), 60, RecordingQuality.HIGH);
+
+		CosmicVideoPipeline.copyFrames(video);
+
+		assertEquals("h264_vaapi", video.encoderSpec().codec());
+		assertEquals(1, processes.encoderStarts.get(), processes.commands.toString());
+		assertEquals(TINY_FRAME * TINY_FRAMES, hardware.size());
+	}
+
+	@Test
+	@DisplayName("the raw frame size follows the helper's pixel format")
+	void frameBytesPerFormat() {
+		assertEquals(1920L * 1080 * 4,
+				CosmicVideoPipeline.frameBytes(new CaptureFormat(1920, 1080, "rgba", 0)));
+		assertEquals(0, CosmicVideoPipeline.frameBytes(new CaptureFormat(1920, 1080, "nv12", 0)));
 	}
 
 	@Test

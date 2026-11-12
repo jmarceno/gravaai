@@ -1,6 +1,7 @@
 package dev.gravaai.media.onnx;
 
 import java.lang.foreign.MemorySegment;
+import java.util.Optional;
 
 /**
  * One execution-provider device as ONNX Runtime enumerated it: which provider it belongs to, what
@@ -33,21 +34,24 @@ public record OnnxEpDevice(String epName, int hardwareType, String hardwareVendo
 	}
 
 	/** The provider family this device belongs to, if it is one this app ships. */
-	public OnnxExecutionProvider.Kind kind() {
+	public Optional<OnnxExecutionProvider.Kind> kind() {
 		return OnnxExecutionProvider.Kind.fromRuntimeName(epName);
 	}
 
-	/** Whether this is a WebGPU device on a real GPU (not a software adapter reported as one). */
+	/**
+	 * Whether this is a WebGPU device on a real GPU. A software Vulkan adapter (lavapipe,
+	 * SwiftShader) reports a CPU hardware type and is not taken: it would claim "GPU" while
+	 * running slower than the CPU provider.
+	 */
 	public boolean webGpu() {
-		return kind() == OnnxExecutionProvider.Kind.WEBGPU;
+		return kind().filter(OnnxExecutionProvider.Kind.WEBGPU::equals).isPresent()
+				&& hardwareType == HARDWARE_TYPE_GPU;
 	}
 
 	/** The provider and device a session on this handle will run on. */
 	public OnnxExecutionProvider provider() {
-		OnnxExecutionProvider.Kind kind = kind();
-		if (kind == null) {
-			throw new IllegalStateException("unknown execution provider: " + epName);
-		}
+		OnnxExecutionProvider.Kind kind = kind().orElseThrow(
+				() -> new IllegalStateException("unknown execution provider: " + epName));
 		return new OnnxExecutionProvider(kind, device);
 	}
 }

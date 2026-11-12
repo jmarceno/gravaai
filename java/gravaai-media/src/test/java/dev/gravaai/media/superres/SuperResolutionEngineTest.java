@@ -39,7 +39,7 @@ class SuperResolutionEngineTest {
 	private static final Rect BOX = Rect.makeXYWH(0, 0, 1920, 1080);
 
 	private static final OnnxWebGpuPlugin.Selection CPU_ONLY =
-			new OnnxWebGpuPlugin.Selection(OnnxExecutionProvider.CPU, null, null);
+			OnnxWebGpuPlugin.Selection.cpu();
 
 	private static Path modelFile() {
 		String configured = System.getProperty("gravaai.superres.model");

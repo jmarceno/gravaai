@@ -146,10 +146,15 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 	 */
 	public MemorySegment createSession(MemorySegment env, java.nio.file.Path modelFile,
 			int threads, OnnxExecutionProvider provider, OnnxEpDevice device) {
+		return createSessionOn(env, modelFile, threads, provider, java.util.Optional.of(device));
+	}
+
+	private MemorySegment createSessionOn(MemorySegment env, java.nio.file.Path modelFile,
+			int threads, OnnxExecutionProvider provider, java.util.Optional<OnnxEpDevice> device) {
 		if (threads < 0) {
 			throw new IllegalArgumentException("threads must not be negative: " + threads);
 		}
-		if (provider.hardware() && device == null) {
+		if (provider.hardware() && device.isEmpty()) {
 			throw new IllegalArgumentException(
 					"provider " + provider.kind() + " needs a probed device");
 		}
@@ -168,7 +173,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 					// Disabled, such a model fails session creation loudly and the engine's CPU
 					// reopen path takes over.
 					setConfigEntry(options, DISABLE_CPU_EP_FALLBACK, "1");
-					appendProvider(arena, options, env, device);
+					appendProvider(arena, options, env, device.get());
 				} else if (threads > 0) {
 					applyThreads(options, threads);
 				}
@@ -196,7 +201,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 			throw new IllegalArgumentException(
 					"provider " + provider.kind() + " needs a probed device");
 		}
-		return createSession(env, modelFile, threads, provider, null);
+		return createSessionOn(env, modelFile, threads, provider, java.util.Optional.empty());
 	}
 
 	/** Writes one session config entry ({@code OrtSessionOptionsAppendSessionConfigEntry}). */
@@ -779,7 +784,7 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 				: OrtApi.HardwareDevice_DeviceId.invoke(OrtApi.HardwareDevice_DeviceId(api),
 						hardware);
 		String metadataVendor = "";
-		String cardIndex = null;
+		java.util.Optional<String> cardIndex = java.util.Optional.empty();
 		if (hardware.address() != 0) {
 			metadataVendor = readMetadataString(() -> OrtApi.HardwareDevice_Vendor.invoke(
 					OrtApi.HardwareDevice_Vendor(api), hardware));
@@ -793,8 +798,8 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 		// The plugin exposes the Dawn adapter index as card_idx; the documented session option uses
 		// exactly that value to select the physical adapter. Absent metadata means adapter 0.
 		int adapterIndex = 0;
-		if (cardIndex != null) {
-			String reported = cardIndex;
+		if (cardIndex.isPresent()) {
+			String reported = cardIndex.get();
 			try {
 				adapterIndex = Integer.parseInt(reported.trim());
 			} catch (NumberFormatException ignored) {
@@ -805,18 +810,18 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 		return new OnnxEpDevice(epName, hardwareType, metadataVendor, handle, adapterIndex, device);
 	}
 
-	/** Reads one value from an {@code OrtKeyValuePairs} (ORT-owned, never freed), or null. */
-	private @Nullable String keyValue(MemorySegment pairs, String key) {
+	/** Reads one value from an {@code OrtKeyValuePairs} (ORT-owned, never freed), if present. */
+	private java.util.Optional<String> keyValue(MemorySegment pairs, String key) {
 		if (pairs.address() == 0) {
-			return null;
+			return java.util.Optional.empty();
 		}
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment value = OrtApi.GetKeyValue.invoke(OrtApi.GetKeyValue(api), pairs,
 					cString(arena, key));
 			if (value.address() == 0) {
-				return null;
+				return java.util.Optional.empty();
 			}
-			return readCString(value, MAX_METADATA_BYTES);
+			return java.util.Optional.of(readCString(value, MAX_METADATA_BYTES));
 		}
 	}
 
@@ -831,20 +836,24 @@ public final class OnnxRuntimeApi implements AutoCloseable {
 
 	/**
 	 * The provider name a session actually runs on, read from the device bound to its first input,
-	 * or {@code null} when the runtime has no answer (an older session, a failed query).
+	 * or empty when the runtime has no answer (an older session, a failed query).
 	 */
-	public @Nullable String sessionInputProvider(MemorySegment session) {
+	public java.util.Optional<String> sessionInputProvider(MemorySegment session) {
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment out = arena.allocate(ValueLayout.ADDRESS);
-			checkStatus(OrtApi.SessionGetEpDeviceForInputs.invoke(
-					OrtApi.SessionGetEpDeviceForInputs(api), session, out, 1),
-					"SessionGetEpDeviceForInputs");
+			try {
+				checkStatus(OrtApi.SessionGetEpDeviceForInputs.invoke(
+						OrtApi.SessionGetEpDeviceForInputs(api), session, out, 1),
+						"SessionGetEpDeviceForInputs");
+			} catch (IllegalStateException unanswered) {
+				return java.util.Optional.empty();
+			}
 			MemorySegment device = out.get(ValueLayout.ADDRESS, 0);
 			if (device.address() == 0) {
-				return null;
+				return java.util.Optional.empty();
 			}
-			return readMetadataString(() -> OrtApi.EpDevice_EpName.invoke(
-					OrtApi.EpDevice_EpName(api), device));
+			return java.util.Optional.of(readMetadataString(() -> OrtApi.EpDevice_EpName.invoke(
+					OrtApi.EpDevice_EpName(api), device)));
 		}
 	}
 

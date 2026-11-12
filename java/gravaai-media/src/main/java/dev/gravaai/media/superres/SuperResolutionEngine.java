@@ -69,7 +69,6 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	private final Path modelFile;
 	/** The provider the current session runs on; {@link #session} must match it. */
 	private OnnxExecutionProvider provider;
-	private @Nullable OnnxEpDevice device;
 	private MemorySegment session;
 	private MemorySegment memoryInfo;
 	private String inputName;
@@ -87,13 +86,12 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	private long totalInferenceNanos;
 
 	private SuperResolutionEngine(OnnxRuntimeApi api, MemorySegment env, Path modelFile,
-			OnnxExecutionProvider provider, @Nullable OnnxEpDevice device, MemorySegment session,
+			OnnxExecutionProvider provider, MemorySegment session,
 			MemorySegment memoryInfo, String inputName, String outputName) {
 		this.api = api;
 		this.env = env;
 		this.modelFile = modelFile;
 		this.provider = provider;
-		this.device = device;
 		this.session = session;
 		this.memoryInfo = memoryInfo;
 		this.inputName = inputName;
@@ -128,14 +126,15 @@ public final class SuperResolutionEngine implements AutoCloseable {
 		MemorySegment session = null;
 		MemorySegment memoryInfo = null;
 		OnnxExecutionProvider provider = selection.provider();
-		OnnxEpDevice device = selection.device();
+		java.util.Optional<OnnxEpDevice> device = selection.device();
 		try {
 			env = api.createEnv();
-			if (device != null) {
+			if (device.isPresent()) {
 				MemorySegment gpuSession = null;
 				try {
-					gpuSession = api.createSession(env, modelFile, THREADS, provider, device);
-					assertSessionOn(api, gpuSession, provider, device);
+					gpuSession = api.createSession(env, modelFile, THREADS, provider,
+							device.get());
+					assertSessionOn(api, gpuSession, provider, device.get());
 					session = gpuSession;
 				} catch (RuntimeException gpuFailure) {
 					// Presence is not proof: a rejected append or a session that silently landed on
@@ -146,7 +145,6 @@ public final class SuperResolutionEngine implements AutoCloseable {
 						api.releaseSession(gpuSession);
 					}
 					provider = OnnxExecutionProvider.CPU;
-					device = null;
 				}
 			}
 			if (session == null) {
@@ -160,7 +158,7 @@ public final class SuperResolutionEngine implements AutoCloseable {
 				throw new IllegalArgumentException(modelFile + " must have exactly one input and"
 						+ " one output");
 			}
-			return new SuperResolutionEngine(api, env, modelFile, provider, device, session,
+			return new SuperResolutionEngine(api, env, modelFile, provider, session,
 					memoryInfo, inputName, outputName);
 		} catch (RuntimeException error) {
 			if (memoryInfo != null) {
@@ -184,13 +182,14 @@ public final class SuperResolutionEngine implements AutoCloseable {
 	 */
 	private static void assertSessionOn(OnnxRuntimeApi api, MemorySegment session,
 			OnnxExecutionProvider expected, OnnxEpDevice device) {
-		String actual = api.sessionInputProvider(session);
-		if (actual == null) {
+		java.util.Optional<String> reported = api.sessionInputProvider(session);
+		if (reported.isEmpty()) {
 			// The runtime had no answer: keep the GPU session (the inference itself is the proof).
 			LOG.log(System.Logger.Level.DEBUG,
 					"session did not report its execution provider; assuming requested");
 			return;
 		}
+		String actual = reported.get();
 		if (!actual.equals(device.epName())) {
 			throw new IllegalStateException("session bound to " + actual + " instead of "
 					+ expected.kind().runtimeName());
@@ -343,7 +342,6 @@ public final class SuperResolutionEngine implements AutoCloseable {
 			session = cpuSession;
 			memoryInfo = cpuMemoryInfo;
 			provider = OnnxExecutionProvider.CPU;
-			device = null;
 		} catch (RuntimeException error) {
 			// Nothing left to fall back to: stop retrying and let every remaining deep-zoom frame
 			// draw the source. The null handles make close() a no-op.

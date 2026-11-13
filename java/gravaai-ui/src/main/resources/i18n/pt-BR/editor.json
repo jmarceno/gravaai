@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "Expandir linha do tempo",
 		"collapse": "Recolher linha do tempo",
-		"inkBand": "Desenho {{start}}–{{end}} · {{count}} traços"
+		"inkBand": "Desenho {{start}}–{{end}} · {{count}} traços",
+		"mutedBand": "Mudo {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "Abrir pasta de gravações"
 }

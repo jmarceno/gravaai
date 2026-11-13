@@ -3,6 +3,7 @@ package dev.gravaai.services.recording.cosmic;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import dev.gravaai.services.recording.CosmicSession.CosmicAudioRole;
+import dev.gravaai.services.recording.MicGate;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.AudioTrack;
 import dev.gravaai.services.recording.cosmic.CosmicRecording.PauseState;
 import dev.gravaai.services.recording.ports.RecordingEnvironment;
@@ -65,16 +67,18 @@ final class CosmicAudioTracks {
 	}
 
 	/** Starts one parec per requested device and waits briefly for each to produce data. */
-	List<AudioTrack> start(Path recordingsDir, long timestamp, Options options, PauseState pauseState) {
+	List<AudioTrack> start(Path recordingsDir, long timestamp, Options options, PauseState pauseState,
+			@Nullable MicGate micGate) {
 		List<AudioTrack> audio = new ArrayList<>();
 		if (options.capturesSystemAudio()) {
 			pulseSources.unmuteDefaultMonitor();
 			audio.add(startTrack(recordingsDir, timestamp, PulseAudioSources.DEFAULT_MONITOR,
-					CosmicAudioRole.SYSTEM, pauseState));
+					CosmicAudioRole.SYSTEM, pauseState, null));
 		}
 		if (options.capturesMicrophone()) {
 			String device = pulseSources.resolveMicrophone(options.microphoneLabel());
-			audio.add(startTrack(recordingsDir, timestamp, device, CosmicAudioRole.MIC, pauseState));
+			audio.add(startTrack(recordingsDir, timestamp, device, CosmicAudioRole.MIC, pauseState,
+					micGate));
 		}
 		CompletableFuture<Void> allFirstData = CompletableFuture.allOf(
 				audio.stream().map(AudioTrack::firstData).toArray(CompletableFuture[]::new));
@@ -95,7 +99,8 @@ final class CosmicAudioTracks {
 			long timestamp,
 			String device,
 			CosmicAudioRole role,
-			PauseState pauseState) {
+			PauseState pauseState,
+			@Nullable MicGate micGate) {
 		Path file = recordingsDir.resolve(".recording-" + timestamp + "." + role.wire() + ".pcm");
 		OutputStream output;
 		try {
@@ -121,13 +126,19 @@ final class CosmicAudioTracks {
 		}
 		AudioTrack track = new AudioTrack(process, role, file, output);
 		Thread.ofPlatform().daemon().name("gravaai-audio-" + role.wire())
-				.start(() -> drainAudio(process, track, pauseState));
+				.start(() -> drainAudio(process, track, pauseState, micGate));
 		processIo.onExit(process).thenRun(track::completeWithoutData);
 		LOG.log(System.Logger.Level.INFO, "Recording audio from " + device);
 		return track;
 	}
 
-	private static void drainAudio(SpawnedProcess process, AudioTrack track, PauseState pauseState) {
+	/**
+	 * Writes every chunk to the track file. While the recording is paused chunks are dropped, like
+	 * the video's frames; while the mic gate is muted they are written as silence, so the file
+	 * offset keeps matching the capture clock and the timeline never desyncs.
+	 */
+	private static void drainAudio(SpawnedProcess process, AudioTrack track, PauseState pauseState,
+			@Nullable MicGate micGate) {
 		byte[] buffer = new byte[8192];
 		InputStream stdout = process.stdout();
 		if (stdout == null) {
@@ -135,6 +146,7 @@ final class CosmicAudioTracks {
 			track.completeWithoutData();
 			return;
 		}
+		boolean gated = micGate != null;
 		try (InputStream in = stdout) {
 			int read;
 			while ((read = in.read(buffer)) != -1) {
@@ -142,6 +154,9 @@ final class CosmicAudioTracks {
 					track.markFirstData(System.currentTimeMillis() - (long) (read / AUDIO_BYTES_PER_MS));
 				}
 				if (!pauseState.paused().get()) {
+					if (gated && micGate != null && micGate.isMuted()) {
+						Arrays.fill(buffer, 0, read, (byte) 0);
+					}
 					track.file().write(buffer, 0, read);
 				}
 			}

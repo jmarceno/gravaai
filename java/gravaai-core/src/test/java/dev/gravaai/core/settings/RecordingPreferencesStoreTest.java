@@ -38,10 +38,10 @@ class RecordingPreferencesStoreTest {
 	@DisplayName("preserves concurrent microphone and webcam preference updates")
 	void preservesConcurrentUpdates() {
 		CompletableFuture.allOf(
-				store.update(new RecordingPreferencesPatch(true, null, null, null, null)),
-				store.update(new RecordingPreferencesPatch(null, "preferred-mic", null, null, null)),
-				store.update(new RecordingPreferencesPatch(null, null, null, true, null)),
-				store.update(new RecordingPreferencesPatch(null, null, null, null, "preferred-camera")))
+				store.update(new RecordingPreferencesPatch(true, null, null, null, null, null)),
+				store.update(new RecordingPreferencesPatch(null, "preferred-mic", null, null, null, null)),
+				store.update(new RecordingPreferencesPatch(null, null, null, true, null, null)),
+				store.update(new RecordingPreferencesPatch(null, null, null, null, "preferred-camera", null)))
 				.join();
 
 		Map<String, JsonNode> contents = store.read().join();
@@ -58,7 +58,7 @@ class RecordingPreferencesStoreTest {
 		CompletableFuture<?>[] updates = new CompletableFuture<?>[6];
 		for (int index = 0; index < updates.length; index++) {
 			updates[index] = store.update(
-					new RecordingPreferencesPatch(null, null, null, null, "camera-" + index));
+					new RecordingPreferencesPatch(null, null, null, null, "camera-" + index, null));
 		}
 		CompletableFuture.allOf(updates).join();
 
@@ -71,7 +71,7 @@ class RecordingPreferencesStoreTest {
 		Files.writeString(file, "{\"microphoneEnabled\":false,\"futureSetting\":{\"nested\":1}}",
 				StandardCharsets.UTF_8);
 
-		store.update(new RecordingPreferencesPatch(null, null, null, true, null)).join();
+		store.update(new RecordingPreferencesPatch(null, null, null, true, null, null)).join();
 
 		Map<String, JsonNode> contents = store.read().join();
 		assertEquals(3, contents.size());
@@ -84,7 +84,7 @@ class RecordingPreferencesStoreTest {
 	@DisplayName("waits for pending updates before reading")
 	void readWaitsForPendingUpdates() {
 		CompletableFuture<Void> update =
-				store.update(new RecordingPreferencesPatch(true, null, null, null, null));
+				store.update(new RecordingPreferencesPatch(true, null, null, null, null, null));
 
 		assertTrue(store.read().join().get("microphoneEnabled").booleanValue());
 		update.join();
@@ -96,10 +96,10 @@ class RecordingPreferencesStoreTest {
 		Files.createDirectory(file);
 
 		assertThrows(CompletionException.class,
-				() -> store.update(new RecordingPreferencesPatch(true, null, null, null, null)).join());
+				() -> store.update(new RecordingPreferencesPatch(true, null, null, null, null, null)).join());
 
 		Files.delete(file);
-		store.update(new RecordingPreferencesPatch(null, null, null, true, null)).join();
+		store.update(new RecordingPreferencesPatch(null, null, null, true, null, null)).join();
 		assertTrue(store.read().join().get("webcamEnabled").booleanValue());
 	}
 }

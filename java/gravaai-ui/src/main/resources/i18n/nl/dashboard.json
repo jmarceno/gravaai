@@ -208,7 +208,8 @@
 			"actionTogglePause": "Pauzeren / hervatten",
 			"actionCancelRecording": "Opname annuleren",
 			"actionToggleMeeting": "Vergadering starten / stoppen",
-			"actionToggleDraw": "Op het scherm tekenen"
+			"actionToggleDraw": "Op het scherm tekenen",
+			"actionPushToTalk": "Push-to-talk"
 		}
 	}
 }

@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +60,8 @@ final class CursorHelperSession {
 	private final RecordingProcesses processes;
 	private final RecordingEnvironment environment;
 	private final Supplier<String> keystrokeCaptureModeSetting;
+	/** True when key lines are wanted beyond the keystroke capture setting (push-to-talk's hold). */
+	private final BooleanSupplier keysWanted;
 
 	private volatile KeystrokeCapture.@Nullable KeystrokeRecorder keystrokeRecorder;
 	private volatile @Nullable SpawnedProcess helper;
@@ -68,10 +71,12 @@ final class CursorHelperSession {
 	CursorHelperSession(
 			RecordingProcesses processes,
 			RecordingEnvironment environment,
-			Supplier<String> keystrokeCaptureModeSetting) {
+			Supplier<String> keystrokeCaptureModeSetting,
+			BooleanSupplier keysWanted) {
 		this.processes = processes;
 		this.environment = environment;
 		this.keystrokeCaptureModeSetting = keystrokeCaptureModeSetting;
+		this.keysWanted = keysWanted;
 	}
 
 	void setListener(Listener listener) {
@@ -97,11 +102,11 @@ final class CursorHelperSession {
 		}
 	}
 
-	/** Starts the helper, asking for key presses only when the setting asks for them. */
+	/** Starts the helper, asking for key presses when the setting or the mic gate needs them. */
 	synchronized void start() {
 		stop();
-		// Privacy first: keys are off unless the user picked a mode, and only the sidecar next
-		// to the video is ever written.
+		// Privacy first: keys are off unless the user picked a mode — or enabled push-to-talk,
+		// which needs the key's press and release to gate the microphone.
 		KeystrokeCaptureMode mode =
 				KeystrokeCapture.normalizeKeystrokeCaptureMode(keystrokeCaptureModeSetting.get());
 		keystrokeRecorder = mode == KeystrokeCaptureMode.OFF
@@ -110,7 +115,7 @@ final class CursorHelperSession {
 		KeystrokeCapture.setActiveKeystrokeRecorder(keystrokeRecorder);
 		List<String> command = new ArrayList<>();
 		command.add(environment.cursorHelper().toString());
-		if (keystrokeRecorder != null) {
+		if (keystrokeRecorder != null || keysWanted.getAsBoolean()) {
 			command.add("--keys");
 		}
 		try {
@@ -164,7 +169,7 @@ final class CursorHelperSession {
 			target.onPosition(Long.parseLong(position.group(1)), Long.parseLong(position.group(2)));
 			return;
 		}
-		if (keystrokeRecorder != null && line.startsWith("KEY:")) {
+		if ((keystrokeRecorder != null || keysWanted.getAsBoolean()) && line.startsWith("KEY:")) {
 			target.onKeyLine(line);
 			return;
 		}

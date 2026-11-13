@@ -8,6 +8,7 @@ import dev.gravaai.services.recording.CursorTelemetry;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.InkTelemetry;
+import dev.gravaai.services.recording.PushToTalkTelemetry;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
@@ -42,6 +43,7 @@ final class CosmicTelemetryWriter {
 		persistCursor(outputPath, appliedShiftMs);
 		persistKeystrokes(outputPath, appliedShiftMs);
 		persistInk(outputPath, appliedShiftMs);
+		persistPushToTalk(outputPath, appliedShiftMs);
 	}
 
 	private void persistInk(String outputPath, long shiftMs) {
@@ -54,6 +56,20 @@ final class CosmicTelemetryWriter {
 			}
 		} catch (IOException error) {
 			LOG.log(System.Logger.Level.WARNING, "Failed to save ink: " + error);
+		}
+	}
+
+	private void persistPushToTalk(String outputPath, long shiftMs) {
+		try {
+			PushToTalkTelemetry.Recording spans =
+					cursorTelemetry.takeMicMuteSpans().shifted(shiftMs);
+			PushToTalkTelemetry.write(outputPath, spans);
+			if (!spans.isEmpty()) {
+				LOG.log(System.Logger.Level.INFO,
+						"Saved " + spans.spans().size() + " mic mute spans (push to talk)");
+			}
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.WARNING, "Failed to save push-to-talk spans: " + error);
 		}
 	}
 

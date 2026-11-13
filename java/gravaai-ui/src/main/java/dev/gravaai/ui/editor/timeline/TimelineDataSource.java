@@ -70,6 +70,11 @@ public interface TimelineDataSource {
 		return java.util.List.of();
 	}
 
+	/** Where a push-to-talk recording's microphone was muted, on the edited timeline. */
+	default java.util.List<MicMuteMark> micMuteMarks() {
+		return java.util.List.of();
+	}
+
 	/** Agent highlight spans (shell for {@code AgentTimelineHighlights.tsx}, P3 fills it). */
 	default java.util.List<AgentHighlight> agentHighlights() {
 		return java.util.List.of();

@@ -223,6 +223,12 @@ public final class HudMenuWindow {
 						port.setMicrophoneEnabled(false);
 						close();
 					}));
+			contentPane.getChildren().add(menuItem(
+					t("launch:recording.pushToTalk"),
+					state.microphonePushToTalk() ? Icons.MicrophoneIcon : Icons.MicrophoneSlashIcon,
+					state.microphonePushToTalk(),
+					t("launch:recording.pushToTalkTooltip"),
+					() -> port.setMicrophonePushToTalk(!state.microphonePushToTalk())));
 		} else {
 			contentPane.getChildren().add(note(t("launch:recording.selectMicToEnable")));
 		}

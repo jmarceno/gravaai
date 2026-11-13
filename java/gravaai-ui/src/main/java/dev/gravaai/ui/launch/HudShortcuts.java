@@ -28,6 +28,9 @@ public final class HudShortcuts {
 
 		/** Enters or leaves draw mode (the live ink overlay). */
 		void toggleDraw();
+
+		/** Flips the mic between live and muted (push to talk). */
+		void toggleTalk();
 	}
 
 	private HudShortcuts() {}
@@ -72,6 +75,11 @@ public final class HudShortcuts {
 			case TOGGLE_DRAW -> {
 				if (state.recording()) {
 					actions.toggleDraw();
+				}
+			}
+			case PUSH_TO_TALK -> {
+				if (state.recording()) {
+					actions.toggleTalk();
 				}
 			}
 		}

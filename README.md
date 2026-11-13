@@ -74,6 +74,20 @@ or click sounds, and the zoom suggestions offer one zoom per drawing session fra
 drew. Every recording also keeps a `<video>.ink.json` sidecar next to the video with each stroke's
 timing and position.
 
+### Push to talk
+
+Turn on **Push to talk** in the HUD's microphone menu and the mic is muted unless you hold the
+**Super + Alt + V** shortcut: the recording keeps its length (silence is written for the muted
+stretches, so the timeline stays in sync) and the HUD's mic icon shows live vs muted. Release —
+or let go of one of the modifiers — and the mic mutes again; the shortcut press is the fallback
+toggle where the keyboard telemetry is unavailable, and clicking the HUD's mic icon flips it too.
+Click capture already needs your user in the `input` group, which is the same access the hold
+detection reads.
+
+In the editor, the muted stretches are gray bands on the mic lane of the source audio — hover for
+the span, click to seek — and a `<video>.ptt.json` sidecar next to the video records them.
+
+
 ### Editing
 
 - Drag-and-drop timeline with trims, speed regions and extra audio tracks

@@ -28,6 +28,11 @@ public final class RecordingPaths {
 		return videoPath + StorageFiles.KEYSTROKE_TELEMETRY_SUFFIX;
 	}
 
+	/** Push-to-talk mute spans next to the video: {@code <video>.ptt.json}. */
+	public static String getPushToTalkPathForVideo(String videoPath) {
+		return videoPath + StorageFiles.PUSH_TO_TALK_TELEMETRY_SUFFIX;
+	}
+
 	/** The window id of a {@code window:<id>:<n>} source id, or null. */
 	public static @Nullable Integer parseWindowId(String sourceId) {
 		if (sourceId == null) {

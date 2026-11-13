@@ -47,6 +47,11 @@ class HudShortcutsTest {
 		public void toggleDraw() {
 			calls.add("draw");
 		}
+
+		@Override
+		public void toggleTalk() {
+			calls.add("talk");
+		}
 	};
 
 	@DisplayName("toggle-draw only acts while recording")
@@ -57,6 +62,17 @@ class HudShortcutsTest {
 		dispatch(GlobalShortcutAction.TOGGLE_DRAW, state(HudRecordingPort.Phase.RECORDING, "Screen", false, false));
 		dispatch(GlobalShortcutAction.TOGGLE_DRAW, state(HudRecordingPort.Phase.PAUSED, "Screen", false, false));
 		assertEquals(List.of("draw", "draw"), calls);
+	}
+
+	@DisplayName("push-to-talk only acts while recording")
+	@Test
+	void pushToTalk() {
+		dispatch(GlobalShortcutAction.PUSH_TO_TALK, state(HudRecordingPort.Phase.IDLE, "Screen", false, false));
+		assertEquals(List.of(), calls);
+		dispatch(GlobalShortcutAction.PUSH_TO_TALK,
+				state(HudRecordingPort.Phase.RECORDING, "Screen", false, false));
+		dispatch(GlobalShortcutAction.PUSH_TO_TALK, state(HudRecordingPort.Phase.PAUSED, "Screen", false, false));
+		assertEquals(List.of("talk", "talk"), calls);
 	}
 
 	@DisplayName("toggle-recording records, cancels a countdown, or asks for a source")
@@ -120,7 +136,7 @@ class HudShortcutsTest {
 		assertEquals(List.of("meeting"), calls);
 		calls.clear();
 		HudRecordingPort.State audioOnly = new HudRecordingPort.State(HudRecordingPort.Phase.IDLE, false, null,
-				false, false, false, null, null, 3, true, false, false, false);
+				false, false, false, null, null, 3, true, false, false, false, false);
 		dispatch(GlobalShortcutAction.TOGGLE_RECORDING, audioOnly);
 		assertEquals(List.of("toggle"), calls);
 	}
@@ -132,6 +148,6 @@ class HudShortcutsTest {
 	private static HudRecordingPort.State state(HudRecordingPort.Phase phase, String source,
 			boolean countdownActive, boolean meeting) {
 		return new HudRecordingPort.State(phase, countdownActive, source, false, false, false, null, null, 3,
-				meeting, true, false, false);
+				meeting, true, false, false, false);
 	}
 }

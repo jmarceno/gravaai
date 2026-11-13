@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,16 +29,20 @@ import dev.gravaai.services.recording.cosmic.CosmicRecorder.StartResult;
 import dev.gravaai.services.recording.cosmic.CosmicRecorder.StopResult;
 import dev.gravaai.services.recording.CountdownDelayStore;
 import dev.gravaai.services.recording.CountdownService;
+import dev.gravaai.services.recording.PushToTalkKeys;
 import dev.gravaai.services.recording.RecordingEvents;
 import dev.gravaai.services.recording.RecordingService;
 import dev.gravaai.services.recording.RecordingSessionManifest;
 import dev.gravaai.services.recording.WebcamRecordingService;
 import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingProcesses;
+import dev.gravaai.services.shortcuts.GlobalShortcutAction;
+import dev.gravaai.services.shortcuts.GlobalShortcuts;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceService;
 import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.ui.launch.HudRecordingPort;
+import dev.gravaai.ui.launch.HudRecordingPort.MicTalkState;
 import dev.gravaai.ui.overlays.ink.InkPreferences;
 import tools.jackson.databind.JsonNode;
 
@@ -95,10 +100,11 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 			@Nullable String microphoneDeviceId,
 			boolean systemAudioEnabled,
 			boolean webcamEnabled,
-			@Nullable String webcamDeviceId) {
+			@Nullable String webcamDeviceId,
+			boolean microphonePushToTalk) {
 
 		static Preferences defaults() {
-			return new Preferences(false, null, false, false, null);
+			return new Preferences(false, null, false, false, null, false);
 		}
 	}
 
@@ -109,6 +115,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	private final RecordingPreferencesStore preferencesStore;
 	private final CountdownDelayStore countdownDelayStore;
 	private final DrawModeController drawMode;
+	private final PushToTalkController pushToTalk;
 	/** Devices are enumerated lazily and cached briefly: the HUD menu is the only consumer. */
 	private record CachedDevices(long atMs, List<MicDevice> microphones, List<CameraDevice> cameras) {
 	}
@@ -173,6 +180,8 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 						});
 					}
 				});
+		this.pushToTalk = new PushToTalkController(wiring.cursorSession(),
+				() -> wiring.recording().isRecordingActive());
 	}
 
 	/** Builds the adapter on the FX thread; loads preferences and subscriptions asynchronously. */
@@ -215,7 +224,8 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				meetingMode,
 				recordScreen,
 				floatingWebcamPreview,
-				picking);
+				picking,
+				current.microphonePushToTalk());
 	}
 
 	@Override
@@ -291,7 +301,10 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 					current.microphoneEnabled(),
 					current.microphoneDeviceId(),
 					microphoneLabel(current.microphoneDeviceId()),
-					meetingMode);
+					meetingMode,
+					current.microphoneEnabled() && current.microphonePushToTalk()
+							? pushToTalkKeys().orElse(null)
+							: null);
 			StartResult result;
 			WebcamRecordingService.WebcamRecording webcam = null;
 			if (audioOnly) {
@@ -580,39 +593,50 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 	@Override
 	public void setMicrophoneEnabled(boolean enabled) {
-		updatePreferences(new RecordingPreferencesPatch(enabled, null, null, null, null),
+		updatePreferences(new RecordingPreferencesPatch(enabled, null, null, null, null, null),
 				new Preferences(enabled, preferences.microphoneDeviceId(),
 						preferences.systemAudioEnabled(), preferences.webcamEnabled(),
-						preferences.webcamDeviceId()));
+						preferences.webcamDeviceId(), preferences.microphonePushToTalk()));
 	}
 
 	@Override
 	public void setSystemAudioEnabled(boolean enabled) {
-		updatePreferences(new RecordingPreferencesPatch(null, null, enabled, null, null),
+		updatePreferences(new RecordingPreferencesPatch(null, null, enabled, null, null, null),
 				new Preferences(preferences.microphoneEnabled(), preferences.microphoneDeviceId(),
-						enabled, preferences.webcamEnabled(), preferences.webcamDeviceId()));
+						enabled, preferences.webcamEnabled(), preferences.webcamDeviceId(),
+						preferences.microphonePushToTalk()));
 	}
 
 	@Override
 	public void setWebcamEnabled(boolean enabled) {
-		updatePreferences(new RecordingPreferencesPatch(null, null, null, enabled, null),
+		updatePreferences(new RecordingPreferencesPatch(null, null, null, enabled, null, null),
 				new Preferences(preferences.microphoneEnabled(), preferences.microphoneDeviceId(),
-						preferences.systemAudioEnabled(), enabled, preferences.webcamDeviceId()));
+						preferences.systemAudioEnabled(), enabled, preferences.webcamDeviceId(),
+						preferences.microphonePushToTalk()));
 	}
 
 	@Override
 	public void setMicrophoneDeviceId(String deviceId) {
-		updatePreferences(new RecordingPreferencesPatch(null, deviceId, null, null, null),
+		updatePreferences(new RecordingPreferencesPatch(null, deviceId, null, null, null, null),
 				new Preferences(preferences.microphoneEnabled(), deviceId,
 						preferences.systemAudioEnabled(), preferences.webcamEnabled(),
-						preferences.webcamDeviceId()));
+						preferences.webcamDeviceId(), preferences.microphonePushToTalk()));
 	}
 
 	@Override
 	public void setWebcamDeviceId(String deviceId) {
-		updatePreferences(new RecordingPreferencesPatch(null, null, null, null, deviceId),
+		updatePreferences(new RecordingPreferencesPatch(null, null, null, null, deviceId, null),
 				new Preferences(preferences.microphoneEnabled(), preferences.microphoneDeviceId(),
-						preferences.systemAudioEnabled(), preferences.webcamEnabled(), deviceId));
+						preferences.systemAudioEnabled(), preferences.webcamEnabled(), deviceId,
+						preferences.microphonePushToTalk()));
+	}
+
+	@Override
+	public void setMicrophonePushToTalk(boolean enabled) {
+		updatePreferences(new RecordingPreferencesPatch(null, null, null, null, null, enabled),
+				new Preferences(preferences.microphoneEnabled(), preferences.microphoneDeviceId(),
+						preferences.systemAudioEnabled(), preferences.webcamEnabled(),
+						preferences.webcamDeviceId(), enabled));
 	}
 
 	@Override
@@ -849,12 +873,13 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		Thread.ofVirtual().name("gravaai-recording-prefs-load").start(() -> {
 			try {
 				Map<String, JsonNode> store = preferencesStore.read().join();
-				Preferences loaded = new Preferences(
-						booleanValue(store.get("microphoneEnabled"), false),
-						textValue(store.get("microphoneDeviceId")),
-						booleanValue(store.get("systemAudioEnabled"), false),
-						booleanValue(store.get("webcamEnabled"), false),
-						textValue(store.get("webcamDeviceId")));
+			Preferences loaded = new Preferences(
+					booleanValue(store.get("microphoneEnabled"), false),
+					textValue(store.get("microphoneDeviceId")),
+					booleanValue(store.get("systemAudioEnabled"), false),
+					booleanValue(store.get("webcamEnabled"), false),
+					textValue(store.get("webcamDeviceId")),
+					booleanValue(store.get("microphonePushToTalk"), false));
 				Platform.runLater(() -> {
 					preferences = loaded;
 					publish();
@@ -888,6 +913,41 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	@Override
 	public void toggleDraw() {
 		onFx(drawMode::toggle);
+	}
+
+	// ── push to talk ──────────────────────────────────────────────────────
+
+	@Override
+	public MicTalkState micTalkState() {
+		return pushToTalk.state();
+	}
+
+	@Override
+	public AutoCloseable onMicTalkStateChanged(Consumer<MicTalkState> listener) {
+		return pushToTalk.onMicTalkStateChanged(listener);
+	}
+
+	@Override
+	public void toggleTalk() {
+		onFx(pushToTalk::toggle);
+	}
+
+	/**
+	 * The push-to-talk key as the interaction helper reports it, from the global-shortcuts config.
+	 * Empty when the action is unbound (or bound to a key evdev cannot report), so the recording
+	 * simply does not gate its mic.
+	 */
+	private Optional<PushToTalkKeys> pushToTalkKeys() {
+		try {
+			JsonNode config = settings.readSetting(GlobalShortcuts.GLOBAL_SHORTCUTS_SETTING);
+			return PushToTalkKeys.fromBinding(GlobalShortcuts
+					.normalizeGlobalShortcutsConfig(config)
+					.bindings()
+					.get(GlobalShortcutAction.PUSH_TO_TALK));
+		} catch (RuntimeException error) {
+			LOG.log(System.Logger.Level.WARNING, "could not read the push-to-talk key: " + error);
+			return Optional.empty();
+		}
 	}
 
 	private void publish() {

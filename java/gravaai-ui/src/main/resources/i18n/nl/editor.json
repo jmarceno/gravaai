@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "Tijdlijn uitvouwen",
 		"collapse": "Tijdlijn samenvouwen",
-		"inkBand": "Tekening {{start}}–{{end}} · {{count}} streken"
+		"inkBand": "Tekening {{start}}–{{end}} · {{count}} streken",
+		"mutedBand": "Gedempt {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "Opnamemap openen"
 }

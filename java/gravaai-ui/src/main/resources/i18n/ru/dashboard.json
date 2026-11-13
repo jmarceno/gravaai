@@ -208,7 +208,8 @@
 			"actionTogglePause": "Пауза / продолжить",
 			"actionCancelRecording": "Отменить запись",
 			"actionToggleMeeting": "Начать / остановить встречу",
-			"actionToggleDraw": "Рисовать на экране"
+			"actionToggleDraw": "Рисовать на экране",
+			"actionPushToTalk": "Рация (нажать и говорить)"
 		}
 	}
 }

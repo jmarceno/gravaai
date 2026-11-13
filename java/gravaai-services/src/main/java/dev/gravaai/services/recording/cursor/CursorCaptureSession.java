@@ -16,6 +16,8 @@ import dev.gravaai.services.recording.CursorTelemetry.CursorVisualType;
 import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.InkLog;
 import dev.gravaai.services.recording.InkTelemetry;
+import dev.gravaai.services.recording.MicGate;
+import dev.gravaai.services.recording.PushToTalkTelemetry;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.services.recording.KeystrokeTypes.KeyModifier;
@@ -51,6 +53,7 @@ public final class CursorCaptureSession
 	private final CursorSampleBuffer samples = new CursorSampleBuffer();
 	private final CursorCaptureClock clock = new CursorCaptureClock();
 	private final InkLog ink;
+	private final MicGate micGate;
 
 	private volatile boolean captureActive;
 	private volatile long captureStartTimeMs;
@@ -101,13 +104,15 @@ public final class CursorCaptureSession
 			CursorScreen screen,
 			Supplier<SelectedSource> selectedSource,
 			Supplier<String> keystrokeCaptureModeSetting) {
-		this.helper = new CursorHelperSession(processes, environment, keystrokeCaptureModeSetting);
+		this.helper = new CursorHelperSession(processes, environment, keystrokeCaptureModeSetting,
+				this::gateWantsKeys);
 		this.coordinates = new CursorCoordinateMapper(
 				screen, selectedSource, helper::isHelperActive);
 		this.sampler = new CursorSampler(this::captureTick);
 		this.interactions = new CursorInteractionTracker(samples, clock, coordinates);
 		helper.setListener(this);
 		this.ink = new InkLog(clock::getCursorCaptureElapsedMs, this::recordedFrameBounds);
+		this.micGate = new MicGate(clock::getCursorCaptureElapsedMs);
 	}
 
 	/** The live ink of the recording in progress; the draw overlay feeds it. */
@@ -115,9 +120,25 @@ public final class CursorCaptureSession
 		return ink;
 	}
 
+	/** The mic gate of the recording in progress; the recorder configures it at start. */
+	@Override
+	public MicGate micGate() {
+		return micGate;
+	}
+
+	/** The helper should read keys when keystroke capture is on or the mic gate needs the hold. */
+	private boolean gateWantsKeys() {
+		return micGate.isActive();
+	}
+
 	@Override
 	public InkTelemetry.InkRecording takeRecordedInk() {
 		return ink.take();
+	}
+
+	@Override
+	public PushToTalkTelemetry.Recording takeMicMuteSpans() {
+		return micGate.take();
 	}
 
 	/** Port of {@code normalizeHookMouseButton}. */
@@ -143,6 +164,7 @@ public final class CursorCaptureSession
 		coordinates.reset();
 		interactions.reset();
 		ink.reset();
+		micGate.beginRecording();
 		sampler.start();
 		helper.start();
 		captureActive = true;
@@ -303,6 +325,7 @@ public final class CursorCaptureSession
 		// Modifier state is always tracked so a Ctrl released during a pause cannot stick;
 		// presses are only stored while recording.
 		helper.feedKeyLine(line, clock.getCursorCaptureElapsedMs(), isSamplingLive());
+		micGate.onKeyLine(line);
 	}
 
 	@Override

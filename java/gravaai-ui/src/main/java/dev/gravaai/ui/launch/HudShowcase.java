@@ -97,7 +97,7 @@ public final class HudShowcase extends Application {
 			state = new State(state.phase(), state.countdownActive(), state.sourceName(),
 					state.microphoneEnabled(), state.systemAudioEnabled(), true, state.microphoneDeviceId(),
 					path, state.countdownDelay(), state.meetingMode(), state.recordScreen(), false,
-					state.picking());
+					state.picking(), state.microphonePushToTalk());
 			notifyCurrent();
 		}
 
@@ -107,7 +107,7 @@ public final class HudShowcase extends Application {
 			String path = cameras.isEmpty() ? null : cameras.get(0).path();
 			phase = Phase.RECORDING;
 			state = new State(Phase.RECORDING, false, "Built-in Display", true, false, true, null, path, 3,
-					false, true, true, false);
+					false, true, true, false, false);
 			notifyCurrent();
 		}
 
@@ -122,7 +122,8 @@ public final class HudShowcase extends Application {
 			state = new State(state.phase(), state.countdownActive(), state.sourceName(),
 					state.microphoneEnabled(), state.systemAudioEnabled(), state.webcamEnabled(),
 					state.microphoneDeviceId(), state.webcamDeviceId(), state.countdownDelay(),
-					state.meetingMode(), state.recordScreen(), state.floatingWebcamPreview(), picking);
+					state.meetingMode(), state.recordScreen(), state.floatingWebcamPreview(), picking,
+					state.microphonePushToTalk());
 			notifyCurrent();
 		}
 
@@ -132,7 +133,7 @@ public final class HudShowcase extends Application {
 					state.microphoneEnabled(), state.systemAudioEnabled(), state.webcamEnabled(),
 					state.microphoneDeviceId(), state.webcamDeviceId(), state.countdownDelay(),
 					state.meetingMode(), state.recordScreen(), state.floatingWebcamPreview(),
-					state.picking());
+					state.picking(), state.microphonePushToTalk());
 			notifyCurrent();
 		}
 
@@ -146,7 +147,7 @@ public final class HudShowcase extends Application {
 			state = new State(phase, state.countdownActive(), state.sourceName(), state.microphoneEnabled(),
 					state.systemAudioEnabled(), state.webcamEnabled(), state.microphoneDeviceId(),
 					state.webcamDeviceId(), state.countdownDelay(), state.meetingMode(), state.recordScreen(),
-					state.floatingWebcamPreview(), state.picking());
+					state.floatingWebcamPreview(), state.picking(), state.microphonePushToTalk());
 			for (Consumer<State> listener : listeners) {
 				listener.accept(state);
 			}

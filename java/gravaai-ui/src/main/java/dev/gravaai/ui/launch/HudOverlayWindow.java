@@ -84,6 +84,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private @Nullable HudMenuWindow menuWindow;
 	private @Nullable AutoCloseable subscription;
 	private @Nullable AutoCloseable drawSubscription;
+	private @Nullable AutoCloseable micTalkSubscription;
 	private @Nullable PauseTransition hintTimer;
 	/** A content change arrived while the stage was hidden; re-fit it when shown. */
 	private boolean resizePending;
@@ -163,6 +164,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 				bar.retranslate();
 			}
 		});
+		micTalkSubscription = port.onMicTalkStateChanged(micTalk -> applyState(port.state()));
 		applyState(port.state());
 		stage.toFront();
 		long built = System.nanoTime();
@@ -204,6 +206,14 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 				LOG.log(System.Logger.Level.DEBUG, "closing the HUD draw subscription failed: " + error);
 			}
 			drawSubscription = null;
+		}
+		if (micTalkSubscription != null) {
+			try {
+				micTalkSubscription.close();
+			} catch (Exception error) {
+				LOG.log(System.Logger.Level.DEBUG, "closing the HUD mic subscription failed: " + error);
+			}
+			micTalkSubscription = null;
 		}
 		if (menuWindow != null) {
 			menuWindow.dispose();
@@ -267,6 +277,11 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			@Override
 			public void toggleDraw() {
 				port.toggleDraw();
+			}
+
+			@Override
+			public void toggleTalk() {
+				port.toggleTalk();
 			}
 		});
 	}

@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "展开时间轴",
 		"collapse": "折叠时间轴",
-		"inkBand": "绘制 {{start}}–{{end}} · {{count}} 笔"
+		"inkBand": "绘制 {{start}}–{{end}} · {{count}} 笔",
+		"mutedBand": "已静音 {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "打开录制文件夹"
 }

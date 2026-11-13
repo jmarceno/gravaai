@@ -81,5 +81,9 @@ public final class RecordingPreferencesStore {
 		if (patch.webcamDeviceId() != null) {
 			store.put("webcamDeviceId", Json.nodeFactory().stringNode(patch.webcamDeviceId()));
 		}
+		if (patch.microphonePushToTalk() != null) {
+			store.put("microphonePushToTalk",
+					Json.nodeFactory().booleanNode(patch.microphonePushToTalk()));
+		}
 	}
 }

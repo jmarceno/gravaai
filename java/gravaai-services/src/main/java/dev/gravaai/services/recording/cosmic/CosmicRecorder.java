@@ -25,7 +25,9 @@ import dev.gravaai.services.recording.CosmicSession.CosmicMuxResult;
 import dev.gravaai.services.recording.CosmicSession.MeetingInfo;
 import dev.gravaai.services.recording.CursorTelemetrySource;
 import dev.gravaai.services.recording.KeystrokeSource;
+import dev.gravaai.services.recording.MicGate;
 import dev.gravaai.services.recording.MicNoiseReduction;
+import dev.gravaai.services.recording.PushToTalkKeys;
 import dev.gravaai.services.recording.RecordingEvents;
 import dev.gravaai.services.recording.RecordingFrameRate;
 import dev.gravaai.services.recording.RecordingQuality;
@@ -67,7 +69,18 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 			boolean capturesMicrophone,
 			@Nullable String microphoneDeviceId,
 			@Nullable String microphoneLabel,
-			boolean keepSpeakerTracks) {
+			boolean keepSpeakerTracks,
+			@Nullable PushToTalkKeys pushToTalk) {
+
+		public RecordingOptions(
+				boolean capturesSystemAudio,
+				boolean capturesMicrophone,
+				@Nullable String microphoneDeviceId,
+				@Nullable String microphoneLabel,
+				boolean keepSpeakerTracks) {
+			this(capturesSystemAudio, capturesMicrophone, microphoneDeviceId, microphoneLabel,
+					keepSpeakerTracks, null);
+		}
 	}
 
 	/**
@@ -209,11 +222,12 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		Path videoPath = recordingsDir.resolve(".recording-" + timestamp + ".video.mkv");
 
 		PauseState pauseState = PauseState.running();
+		MicGate micGate = configureMicGate(options);
 		List<AudioTrack> audio = audioTracks.start(recordingsDir, timestamp,
 				new CosmicAudioTracks.Options(
 						options.capturesSystemAudio(), options.capturesMicrophone(),
 						options.microphoneLabel()),
-				pauseState);
+				pauseState, micGate);
 		int fps = currentCaptureFps();
 		SpawnedProcess capture;
 		try {
@@ -290,7 +304,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 				new CosmicAudioTracks.Options(
 						options.capturesSystemAudio(), options.capturesMicrophone(),
 						options.microphoneLabel()),
-				pauseState);
+				pauseState, null);
 		List<Long> starts = new ArrayList<>();
 		for (AudioTrack track : audio) {
 			if (!track.awaitingFirstData()) {
@@ -479,6 +493,12 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		}
 		active = null;
 		sessionWatch.stopDiskCheck();
+		// A cancelled recording's mute spans are thrown away with it, and the gate switches off
+		// (a take without a stop would leave it armed for key capture).
+		MicGate gate = cursorTelemetry.micGate();
+		if (gate != null) {
+			gate.take();
+		}
 		VideoCapture video = recording.video();
 		if (video != null) {
 			video.capture().destroy();
@@ -545,6 +565,22 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 	}
 
 	// ── Internals ──────────────────────────────────────────────────────────
+
+	/**
+	 * Arms the capture session's mic gate for this recording when it asked for push-to-talk with a
+	 * microphone; otherwise the gate is switched off, so a take without push-to-talk never inherits
+	 * the previous one's state.
+	 */
+	private @Nullable MicGate configureMicGate(RecordingOptions options) {
+		MicGate gate = cursorTelemetry.micGate();
+		if (gate == null) {
+			return null;
+		}
+		PushToTalkKeys keys =
+				options.capturesMicrophone() ? options.pushToTalk() : null;
+		gate.configure(keys);
+		return gate.isActive() ? gate : null;
+	}
 
 	private MicNoiseReduction currentMicNoiseReduction() {
 		MicNoiseReduction level = micNoiseReductionSetting.get();

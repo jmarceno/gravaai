@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "Zeitleiste erweitern",
 		"collapse": "Zeitleiste reduzieren",
-		"inkBand": "Zeichnung {{start}}–{{end}} · {{count}} Striche"
+		"inkBand": "Zeichnung {{start}}–{{end}} · {{count}} Striche",
+		"mutedBand": "Stumm {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "Aufnahmeordner öffnen"
 }

@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "Развернуть таймлайн",
 		"collapse": "Свернуть таймлайн",
-		"inkBand": "Рисунок {{start}}–{{end}} · штрихов: {{count}}"
+		"inkBand": "Рисунок {{start}}–{{end}} · штрихов: {{count}}",
+		"mutedBand": "Без звука {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "Открыть папку с записями"
 }

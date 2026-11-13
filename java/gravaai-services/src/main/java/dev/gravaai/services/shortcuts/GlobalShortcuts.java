@@ -97,7 +97,7 @@ public final class GlobalShortcuts {
 	}
 
 	/** Port of {@code normalizeGlobalShortcutsConfig}: missing or invalid parts keep the defaults. */
-	public static GlobalShortcutsConfig normalizeGlobalShortcutsConfig(JsonNode value) {
+	public static GlobalShortcutsConfig normalizeGlobalShortcutsConfig(@Nullable JsonNode value) {
 		JsonNode raw = value != null && value.isObject() ? value : null;
 		JsonNode rawBindings =
 				raw != null && raw.get("bindings") != null && raw.get("bindings").isObject()
@@ -276,6 +276,7 @@ public final class GlobalShortcuts {
 		bindings.put(GlobalShortcutAction.CANCEL_RECORDING, null);
 		bindings.put(GlobalShortcutAction.TOGGLE_MEETING, superAlt("m"));
 		bindings.put(GlobalShortcutAction.TOGGLE_DRAW, superAlt("d"));
+		bindings.put(GlobalShortcutAction.PUSH_TO_TALK, superAlt("v"));
 		return new GlobalShortcutsConfig(true, bindings);
 	}
 
@@ -291,6 +292,7 @@ public final class GlobalShortcuts {
 		labels.put(GlobalShortcutAction.CANCEL_RECORDING, "Cancel recording");
 		labels.put(GlobalShortcutAction.TOGGLE_MEETING, "Start / stop meeting");
 		labels.put(GlobalShortcutAction.TOGGLE_DRAW, "Draw on screen");
+		labels.put(GlobalShortcutAction.PUSH_TO_TALK, "Push to talk");
 		return Map.copyOf(labels);
 	}
 

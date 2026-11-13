@@ -39,12 +39,13 @@ public interface HudRecordingPort {
 			boolean meetingMode,
 			boolean recordScreen,
 			boolean floatingWebcamPreview,
-			boolean picking) {
+			boolean picking,
+			boolean microphonePushToTalk) {
 
 		/** An idle HUD before any service event arrived. */
 		public static State idle() {
 			return new State(Phase.IDLE, false, null, false, false, false, null, null, 3, false, true,
-					false, false);
+					false, false, false);
 		}
 
 		public boolean recording() {
@@ -111,6 +112,36 @@ public interface HudRecordingPort {
 
 	/** Enters or leaves draw mode; ignored when it is unavailable. */
 	default void toggleDraw() {
+	}
+
+	// ── push to talk (mic gating) ──────────────────────────────────────────
+
+	/**
+	 * The mic's push-to-talk state.
+	 *
+	 * @param available a recording gates its microphone right now
+	 * @param live the mic is unmuted (the shortcut is held or was toggled on)
+	 */
+	record MicTalkState(boolean available, boolean live) {
+		public static final MicTalkState UNAVAILABLE = new MicTalkState(false, false);
+	}
+
+	/** The mic state; a port without push-to-talk reports it unavailable. */
+	default MicTalkState micTalkState() {
+		return MicTalkState.UNAVAILABLE;
+	}
+
+	/** Pushes mic state changes to the HUD (FX thread). Close the handle to unsubscribe. */
+	default AutoCloseable onMicTalkStateChanged(Consumer<MicTalkState> listener) {
+		return () -> { };
+	}
+
+	/** Flips the mic between live and muted; ignored when push-to-talk is not active. */
+	default void toggleTalk() {
+	}
+
+	/** Gates the microphone on push-to-talk from now on (the HUD mic menu's toggle). */
+	default void setMicrophonePushToTalk(boolean enabled) {
 	}
 
 	// ── launch options (persisted by the app) ──────────────────────────────

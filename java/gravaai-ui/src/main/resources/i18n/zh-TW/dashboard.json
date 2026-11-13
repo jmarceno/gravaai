@@ -208,7 +208,8 @@
 			"actionTogglePause": "暫停 / 繼續",
 			"actionCancelRecording": "取消錄製",
 			"actionToggleMeeting": "開始 / 停止會議",
-			"actionToggleDraw": "在螢幕上繪製"
+			"actionToggleDraw": "在螢幕上繪製",
+			"actionPushToTalk": "按住說話"
 		}
 	}
 }

@@ -208,7 +208,8 @@
 			"actionTogglePause": "Pause / resume",
 			"actionCancelRecording": "Cancel recording",
 			"actionToggleMeeting": "Start / stop meeting",
-			"actionToggleDraw": "Draw on screen"
+			"actionToggleDraw": "Draw on screen",
+			"actionPushToTalk": "Push to talk"
 		}
 	}
 }

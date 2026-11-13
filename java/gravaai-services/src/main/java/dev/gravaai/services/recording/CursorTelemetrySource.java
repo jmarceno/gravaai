@@ -2,6 +2,8 @@ package dev.gravaai.services.recording;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 
 /**
@@ -51,5 +53,21 @@ public interface CursorTelemetrySource {
 	 */
 	default InkTelemetry.InkRecording takeRecordedInk() {
 		return InkTelemetry.InkRecording.EMPTY;
+	}
+
+	/**
+	 * The mic gate of the recording in progress: the recorder configures it at start from the
+	 * push-to-talk option and the audio drain reads it. A source without a gate reports null.
+	 */
+	default @Nullable MicGate micGate() {
+		return null;
+	}
+
+	/**
+	 * Takes the mic's muted stretches of the recording (push-to-talk), clearing them. A source
+	 * without a gate has none.
+	 */
+	default PushToTalkTelemetry.Recording takeMicMuteSpans() {
+		return PushToTalkTelemetry.Recording.EMPTY;
 	}
 }

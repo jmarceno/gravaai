@@ -13,7 +13,13 @@ public enum GlobalShortcutAction {
 	CANCEL_RECORDING("cancel-recording"),
 	TOGGLE_MEETING("toggle-meeting"),
 	/** Enters or leaves draw mode (the live ink overlay) while recording a screen or an area. */
-	TOGGLE_DRAW("toggle-draw");
+	TOGGLE_DRAW("toggle-draw"),
+	/**
+	 * Push to talk: while a recording gates its microphone, holding this unmutes it. The press
+	 * and release come from the interaction helper's key telemetry; where that is unavailable a
+	 * press flips the mic instead.
+	 */
+	PUSH_TO_TALK("push-to-talk");
 
 	private final String wire;
 

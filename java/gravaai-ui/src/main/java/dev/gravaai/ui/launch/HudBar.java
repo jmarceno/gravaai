@@ -276,11 +276,23 @@ public final class HudBar extends HBox {
 		status.getChildren().addAll(dot, timerLabel, pausedLabel);
 		row.getChildren().add(status);
 
-		Button micState = iconButton(next.microphoneEnabled() ? Icons.MicrophoneIcon : Icons.MicrophoneSlashIcon,
-				next.microphoneEnabled() ? "fill" : "regular", 16,
-				t("launch:recording.micToggleDisabledTip"), null, () -> {
-				});
-		micState.setDisable(true);
+		Button micState;
+		HudRecordingPort.MicTalkState talk = port.micTalkState();
+		if (talk.available()) {
+			// Push to talk: the icon follows the live/muted mic and clicking it flips the mic,
+			// the same fallback the shortcut press has.
+			micState = iconButton(talk.live() ? Icons.MicrophoneIcon : Icons.MicrophoneSlashIcon,
+					talk.live() ? "fill" : "regular", 16,
+					talk.live() ? t("launch:recording.micLiveTip") : t("launch:recording.micMutedTip"),
+					talk.live() ? "hud-mic--live" : null, port::toggleTalk);
+			micState.setAriaPressed(talk.live());
+		} else {
+			micState = iconButton(next.microphoneEnabled() ? Icons.MicrophoneIcon : Icons.MicrophoneSlashIcon,
+					next.microphoneEnabled() ? "fill" : "regular", 16,
+					t("launch:recording.micToggleDisabledTip"), null, () -> {
+					});
+			micState.setDisable(true);
+		}
 		row.getChildren().add(micState);
 		row.getChildren().add(separator());
 

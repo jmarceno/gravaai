@@ -144,7 +144,8 @@
 	"timeline": {
 		"expand": "Espandi timeline",
 		"collapse": "Comprimi timeline",
-		"inkBand": "Disegno {{start}}–{{end}} · {{count}} tratti"
+		"inkBand": "Disegno {{start}}–{{end}} · {{count}} tratti",
+		"mutedBand": "Silenziato {{start}}–{{end}}"
 	},
 	"openRecordingsFolder": "Apri cartella registrazioni"
 }

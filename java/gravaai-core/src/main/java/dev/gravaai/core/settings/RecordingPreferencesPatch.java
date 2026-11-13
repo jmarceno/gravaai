@@ -15,4 +15,5 @@ public record RecordingPreferencesPatch(
 		@Nullable String microphoneDeviceId,
 		@Nullable Boolean systemAudioEnabled,
 		@Nullable Boolean webcamEnabled,
-		@Nullable String webcamDeviceId) {}
+		@Nullable String webcamDeviceId,
+		@Nullable Boolean microphonePushToTalk) {}

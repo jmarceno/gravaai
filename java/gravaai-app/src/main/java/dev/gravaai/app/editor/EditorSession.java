@@ -66,11 +66,13 @@ import dev.gravaai.media.playback.PlaybackMediaLoader;
 import dev.gravaai.services.projects.ProjectManager;
 import dev.gravaai.services.projects.ProjectMediaSources;
 import dev.gravaai.services.recording.InkTelemetry;
+import dev.gravaai.services.recording.PushToTalkTelemetry;
 import dev.gravaai.services.recording.KeystrokePresses;
 import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.ui.editor.preview.PlaybackControllerPort;
 import dev.gravaai.ui.editor.timeline.InkMark;
+import dev.gravaai.ui.editor.timeline.MicMuteMark;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
 import dev.gravaai.ui.editor.timeline.CachingWaveformProvider;
 import dev.gravaai.ui.editor.timeline.StoreTimelineCommands;
@@ -244,6 +246,8 @@ public final class EditorSession implements AutoCloseable {
 		this.dataSource.eyeContactStrip(this::eyeContactStrip);
 		// The pen bands of the clip row: where the presenter drew on screen while recording.
 		this.dataSource.inkMarks(this::inkMarks);
+		// The mic lane's muted bands: where push-to-talk kept the microphone muted.
+		this.dataSource.micMuteMarks(this::micMuteMarks);
 		// Suggest-zooms frames each draw session once instead of zooming on every pen press.
 		this.dataSource.inkFocus(this::inkFocus);
 		ownedResources.add(gazeCache.addListener(this::onGazeChanged));
@@ -422,6 +426,61 @@ public final class EditorSession implements AutoCloseable {
 		}
 		List<InkMark> marks = InkMark.project(source.get().sessions(), state.clipRegions());
 		inkMarksCache = Optional.of(new InkMarksCache(state, video, marks));
+		return marks;
+	}
+
+	/** The push-to-talk sidecar of one source video, read once. */
+	private record MicMuteSource(String videoPath, List<MicMuteMark.Session> spans) {
+	}
+
+	/** The push-to-talk sidecar of the current source video, read once per video. */
+	private Optional<MicMuteSource> micMuteSource() {
+		String video = videoPath();
+		if (video == null || video.isBlank()) {
+			return Optional.empty();
+		}
+		Optional<MicMuteSource> known = micMuteSource.filter(source -> source.videoPath().equals(video));
+		if (known.isPresent()) {
+			return known;
+		}
+		PushToTalkTelemetry.Recording ptt = PushToTalkTelemetry.read(video);
+		List<MicMuteMark.Session> spans = ptt.spans().stream()
+				.map(span -> new MicMuteMark.Session(span.startMs(), span.endMs()))
+				.toList();
+		Optional<MicMuteSource> read = Optional.of(new MicMuteSource(video, spans));
+		micMuteSource = read;
+		return read;
+	}
+
+	/** The mic lane's muted bands for one project state. */
+	private record MicMuteMarksCache(ProjectEditorState state, String videoPath,
+			List<MicMuteMark> marks) {
+	}
+
+	private volatile Optional<MicMuteSource> micMuteSource = Optional.empty();
+	private volatile Optional<MicMuteMarksCache> micMuteMarksCache = Optional.empty();
+
+	/**
+	 * The mic lane's muted bands, cached per project state: the sidecar is read once per source
+	 * video and projected through the clips (cuts and speed) whenever the edit changes.
+	 */
+	private List<MicMuteMark> micMuteMarks() {
+		String video = videoPath();
+		if (video == null || video.isBlank()) {
+			return List.of();
+		}
+		ProjectEditorState state = store.state();
+		Optional<MicMuteMarksCache> cached = micMuteMarksCache;
+		if (cached.isPresent() && cached.get().state() == state
+				&& cached.get().videoPath().equals(video)) {
+			return cached.get().marks();
+		}
+		Optional<MicMuteSource> source = micMuteSource();
+		if (source.isEmpty()) {
+			return List.of();
+		}
+		List<MicMuteMark> marks = MicMuteMark.project(source.get().spans(), state.clipRegions());
+		micMuteMarksCache = Optional.of(new MicMuteMarksCache(state, video, marks));
 		return marks;
 	}
 

@@ -213,6 +213,10 @@ public final class TimelineView extends Region {
 	private static final Color INK_BAND = Color.web("#ffb020");
 	private static final Color INK_BAND_FILL = Color.web("#ffb020", 0.16);
 	private static final Color INK_TAG_TEXT = Color.web("#1b1407");
+	/** Push-to-talk mute bands on the mic lane: a cold gray-blue, apart from the edit colors. */
+	private static final Color MIC_MUTED_BAND = Color.web("#94a7b8", 0.75);
+	private static final Color MIC_MUTED_FILL = Color.web("#94a7b8", 0.14);
+	private static final Color MIC_MUTED_TAG_TEXT = Color.web("#10161c");
 	private static final Color EYE_CONTACT_FADED = Color.web("#7aa2ff", 0.35);
 	private static final Color EYE_CONTACT_TRACK = Color.web("#9fb3bd", 0.25);
 	private static final Color EYE_CONTACT_PROGRESS = Color.web("#9fb3bd", 0.8);
@@ -392,6 +396,8 @@ public final class TimelineView extends Region {
 	/** Hit boxes of the pen bands, by index into {@link TimelineDataSource#inkMarks()}. */
 	private final Map<Integer, BlockBounds> inkBounds = new LinkedHashMap<>();
 	private int hoveredInkIndex = -1;
+	private final Map<Integer, BlockBounds> mutedBounds = new LinkedHashMap<>();
+	private int hoveredMutedIndex = -1;
 	private @Nullable String dragMarkerId;
 	private double dragMarkerMs;
 	private boolean markerDragged;
@@ -1020,6 +1026,12 @@ public final class TimelineView extends Region {
 			setCurrentTimeMs(ink.get().startMs());
 			return;
 		}
+		Optional<MicMuteMark> muted = micMuteMarkAt(x, y);
+		if (muted.isPresent()) {
+			commands.seek(muted.get().startMs());
+			setCurrentTimeMs(muted.get().startMs());
+			return;
+		}
 		Optional<String> cameraSwitch = cameraSwitchAt(x, y);
 		if (cameraSwitch.isPresent()) {
 			commands.toggleCameraLayoutTransition(cameraSwitch.get());
@@ -1631,6 +1643,15 @@ public final class TimelineView extends Region {
 			redraw();
 		}
 		if (overInk >= 0) {
+			canvas.setCursor(Cursor.HAND);
+			return;
+		}
+		int overMuted = micMuteIndexAt(x, y);
+		if (overMuted != hoveredMutedIndex) {
+			hoveredMutedIndex = overMuted;
+			redraw();
+		}
+		if (overMuted >= 0) {
 			canvas.setCursor(Cursor.HAND);
 			return;
 		}
@@ -2582,6 +2603,9 @@ public final class TimelineView extends Region {
 
 	private void drawRows(GraphicsContext graphics, double width) {
 		ProjectEditorState project = dataSource.project();
+		// The mic lane's mute tags register their hit boxes as their items draw (one pass per
+		// item over the same marks), so the map resets once per paint, not per item.
+		mutedBounds.clear();
 		for (RowLayout row : rowLayouts) {
 			if (TimelineConstants.CLIP_ROW_ID.equals(row.id())) {
 				drawClips(graphics, row, width);
@@ -3648,7 +3672,73 @@ public final class TimelineView extends Region {
 		if (muted) {
 			graphics.setGlobalAlpha(1);
 		}
+		if (TimelineRows.getSourceAudioTrackId(item.rowId())
+				.equals(dev.gravaai.core.project.SourceAudioTrackSettings.MIC)) {
+			drawMicMuteBands(graphics, display, y, height, width);
+		}
 		blockBounds.put(item.id(), new BlockBounds(x, y, blockWidth, height));
+	}
+
+	/**
+	 * The push-to-talk mute bands over the mic lane: where the recording's microphone was muted,
+	 * so chosen silence reads as chosen. A light wash with a solid tag at the span's start that
+	 * names the stretch when hovered; clicking the tag seeks to it.
+	 */
+	private void drawMicMuteBands(GraphicsContext graphics, Span display, double y, double height,
+			double width) {
+		List<MicMuteMark> marks = dataSource.micMuteMarks();
+		for (int index = 0; index < marks.size(); index++) {
+			MicMuteMark mark = marks.get(index);
+			double from = Math.max(mark.startMs(), display.start());
+			double to = Math.min(mark.endMs(), display.end());
+			if (to <= from) {
+				continue;
+			}
+			double x0 = Math.max(GUTTER_WIDTH, xForTime(from));
+			double x1 = Math.min(width, xForTime(to));
+			if (x1 <= x0) {
+				continue;
+			}
+			graphics.setFill(MIC_MUTED_FILL);
+			graphics.fillRect(x0, y, x1 - x0, height);
+			boolean hovered = index == hoveredMutedIndex;
+			String label = hovered ? micMuteLabel(mark) : "⊘";
+			graphics.setFont(SMALL_FONT);
+			double tagWidth = textWidth(label, SMALL_FONT) + 8;
+			double tagHeight = 13;
+			graphics.setFill(MIC_MUTED_BAND);
+			graphics.fillRoundRect(x0, y + 2, tagWidth, tagHeight, 3, 3);
+			graphics.setFill(MIC_MUTED_TAG_TEXT);
+			graphics.fillText(label, x0 + 4, y + 2 + tagHeight - 3.5);
+			// Only the tag is clickable, like the pen bands: the lane keeps its own clicks.
+			mutedBounds.put(index, new BlockBounds(x0, y + 2, tagWidth, tagHeight));
+		}
+	}
+
+	private static String micMuteLabel(MicMuteMark mark) {
+		return dev.gravaai.ui.i18n.UiI18n.t("editor:timeline.mutedBand", java.util.Map.of(
+				"start", formatClock(mark.startMs()),
+				"end", formatClock(mark.endMs())));
+	}
+
+	/** The mute tag under a content point, if any. */
+	private Optional<MicMuteMark> micMuteMarkAt(double x, double y) {
+		List<MicMuteMark> marks = dataSource.micMuteMarks();
+		for (Map.Entry<Integer, BlockBounds> entry : mutedBounds.entrySet()) {
+			if (entry.getValue().contains(x, y) && entry.getKey() < marks.size()) {
+				return Optional.of(marks.get(entry.getKey()));
+			}
+		}
+		return Optional.empty();
+	}
+
+	private int micMuteIndexAt(double x, double y) {
+		for (Map.Entry<Integer, BlockBounds> entry : mutedBounds.entrySet()) {
+			if (entry.getValue().contains(x, y)) {
+				return entry.getKey();
+			}
+		}
+		return -1;
 	}
 
 	/**

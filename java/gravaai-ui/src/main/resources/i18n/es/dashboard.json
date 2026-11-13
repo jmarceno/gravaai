@@ -208,7 +208,8 @@
 			"actionTogglePause": "Pausar / reanudar",
 			"actionCancelRecording": "Cancelar grabación",
 			"actionToggleMeeting": "Iniciar / detener reunión",
-			"actionToggleDraw": "Dibujar en la pantalla"
+			"actionToggleDraw": "Dibujar en la pantalla",
+			"actionPushToTalk": "Pulsar para hablar"
 		}
 	}
 }

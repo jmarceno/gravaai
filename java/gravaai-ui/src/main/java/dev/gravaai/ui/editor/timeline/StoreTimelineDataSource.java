@@ -115,6 +115,19 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return inkMarks.get();
 	}
 
+	private volatile Supplier<List<MicMuteMark>> micMuteMarks = List::of;
+
+	/** Supplies the mic lane's muted bands (the app reads the recording's push-to-talk sidecar). */
+	public StoreTimelineDataSource micMuteMarks(Supplier<List<MicMuteMark>> marks) {
+		this.micMuteMarks = Objects.requireNonNull(marks, "marks");
+		return this;
+	}
+
+	@Override
+	public List<MicMuteMark> micMuteMarks() {
+		return micMuteMarks.get();
+	}
+
 	private volatile java.util.function.Function<String, String> cleanupRenderStatus = id -> "";
 
 	/** Supplies the render state of each cleaned lane's denoised copy (the app owns the cache). */

@@ -70,7 +70,7 @@ class GlobalShortcutsTest {
 				bindings.get(GlobalShortcutAction.TOGGLE_MEETING));
 		assertNull(bindings.get(GlobalShortcutAction.CANCEL_RECORDING));
 		assertFalse(bindings.containsKey(null));
-		assertEquals(5, bindings.size());
+		assertEquals(6, bindings.size());
 	}
 
 	@Test

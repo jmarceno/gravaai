@@ -116,6 +116,11 @@
 	-fx-min-width: 56px;
 }
 
+/* Push-to-talk mic, live: the same accent the spinner uses, so "on air" reads at a glance. */
+.hud-bar .button.hud-mic--live {
+	-g-icon-color: -g-accent;
+}
+
 .hud-paused-label {
 	-fx-font-size: 12px;
 	-fx-text-fill: -g-muted;

@@ -141,6 +141,7 @@ public final class RecordingLibrary {
 				|| name.equals(video + ".cursor.json")
 				|| name.equals(video + ".keys.json")
 				|| name.equals(video + StorageFiles.INK_TELEMETRY_SUFFIX)
+				|| name.equals(video + StorageFiles.PUSH_TO_TALK_TELEMETRY_SUFFIX)
 				|| (name.startsWith(stem + ".") && COMPANION_NAME.matcher(name).find())
 				|| name.equals(stem + RecordingAudioManifest.SUFFIX)
 				|| name.equals(stem + ".gravaai-session.json")

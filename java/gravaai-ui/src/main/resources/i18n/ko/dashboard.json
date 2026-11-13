@@ -208,7 +208,8 @@
 			"actionTogglePause": "일시정지 / 계속",
 			"actionCancelRecording": "녹화 취소",
 			"actionToggleMeeting": "회의 시작 / 중지",
-			"actionToggleDraw": "화면에 그리기"
+			"actionToggleDraw": "화면에 그리기",
+			"actionPushToTalk": "푸시 투 토크"
 		}
 	}
 }

@@ -157,6 +157,31 @@ class MicGateTest {
 	}
 
 	@Test
+	@DisplayName("the HUD's flip still works after evdev took over the shortcut")
+	void hudFlipWorksAfterEvdev() {
+		gate.configure(keys("v"));
+		gate.beginRecording();
+		pressCombo(KEY_V);
+		assertTrue(gate.isMuted());
+
+		clock.set(200);
+		gate.flip();
+		assertFalse(gate.isMuted());
+		clock.set(500);
+		gate.flip();
+		assertTrue(gate.isMuted());
+
+		// A later hold and release of the shortcut takes over again.
+		holdDown(KEY_V);
+		assertFalse(gate.isMuted());
+		releaseCombo();
+		assertTrue(gate.isMuted());
+
+		clock.set(900);
+		assertEquals(List.of(new MutedSpan(0, 200), new MutedSpan(500, 900)), gate.take().spans());
+	}
+
+	@Test
 	@DisplayName("a pause does not stick the mute state and frozen spans collapse")
 	void pauseAware() {
 		gate.configure(keys("v"));

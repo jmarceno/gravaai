@@ -234,6 +234,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 			capture = video.startCapture(captureTarget, fps);
 		} catch (IOException error) {
 			audioTracks.killAll(audio);
+			disarmMicGate();
 			return StartResult.failed(String.valueOf(error));
 		}
 		CaptureFormat format;
@@ -252,6 +253,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);
+			disarmMicGate();
 			return StartResult.failed(
 					error.getMessage() == null ? String.valueOf(error) : error.getMessage());
 		}
@@ -267,6 +269,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		} catch (IOException error) {
 			capture.destroy();
 			audioTracks.killAll(audio);
+			disarmMicGate();
 			return StartResult.failed(String.valueOf(error));
 		}
 		// The encoder's stderr is drained by the pipeline; the helper's by readCaptureFormat.
@@ -313,6 +316,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		}
 		if (starts.isEmpty()) {
 			audioTracks.killAll(audio);
+			disarmMicGate();
 			return StartResult.failed("No audio device produced any sound data.");
 		}
 		CosmicRecording recording = new CosmicRecording(
@@ -495,10 +499,7 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 		sessionWatch.stopDiskCheck();
 		// A cancelled recording's mute spans are thrown away with it, and the gate switches off
 		// (a take without a stop would leave it armed for key capture).
-		MicGate gate = cursorTelemetry.micGate();
-		if (gate != null) {
-			gate.take();
-		}
+		disarmMicGate();
 		VideoCapture video = recording.video();
 		if (video != null) {
 			video.capture().destroy();
@@ -580,6 +581,17 @@ public final class CosmicRecorder implements CosmicMux, AutoCloseable {
 				options.capturesMicrophone() ? options.pushToTalk() : null;
 		gate.configure(keys);
 		return gate.isActive() ? gate : null;
+	}
+
+	/**
+	 * Switches the mic gate off and drops its spans: the recording failed to start or was
+	 * cancelled, so nothing it gated survives and the helper stops asking for key presses.
+	 */
+	private void disarmMicGate() {
+		MicGate gate = cursorTelemetry.micGate();
+		if (gate != null) {
+			gate.take();
+		}
 	}
 
 	private MicNoiseReduction currentMicNoiseReduction() {

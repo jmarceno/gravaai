@@ -140,6 +140,14 @@ public interface HudRecordingPort {
 	default void toggleTalk() {
 	}
 
+	/**
+	 * The push-to-talk global shortcut was pressed. Where the key's hold is tracked this is
+	 * ignored (the hold owns the mic); otherwise it flips the mic like {@link #toggleTalk()}.
+	 */
+	default void pushToTalkShortcut() {
+		toggleTalk();
+	}
+
 	/** Gates the microphone on push-to-talk from now on (the HUD mic menu's toggle). */
 	default void setMicrophonePushToTalk(boolean enabled) {
 	}

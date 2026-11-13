@@ -142,6 +142,17 @@ public final class MicGate {
 		}
 	}
 
+	/**
+	 * The HUD's mic button: an explicit flip by the user, honoured whether or not the key
+	 * telemetry is available (a later hold and release of the shortcut takes over again).
+	 */
+	public synchronized void flip() {
+		if (active) {
+			comboHeld = false;
+			setMuted(!muted);
+		}
+	}
+
 	/** Takes the muted spans and switches the gate off (the recording is over). */
 	public synchronized PushToTalkTelemetry.Recording take() {
 		closeOpenSpan();

@@ -281,7 +281,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 
 			@Override
 			public void toggleTalk() {
-				port.toggleTalk();
+				port.pushToTalkShortcut();
 			}
 		});
 	}

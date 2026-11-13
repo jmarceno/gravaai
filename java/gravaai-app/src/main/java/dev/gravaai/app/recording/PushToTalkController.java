@@ -44,9 +44,15 @@ final class PushToTalkController {
 		return () -> listeners.remove(listener);
 	}
 
-	/** The HUD mic icon or the desktop shortcut asked for a flip (the gate's toggle fallback). */
-	void toggle() {
+	/** The desktop shortcut fired a press (the gate's toggle fallback while evdev is silent). */
+	void shortcutPress() {
 		cursorSession.micGate().onShortcutPress();
+		publish();
+	}
+
+	/** The HUD mic icon was clicked: always flips the mic. */
+	void flip() {
+		cursorSession.micGate().flip();
 		publish();
 	}
 

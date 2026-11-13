@@ -929,7 +929,12 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 	@Override
 	public void toggleTalk() {
-		onFx(pushToTalk::toggle);
+		onFx(pushToTalk::flip);
+	}
+
+	@Override
+	public void pushToTalkShortcut() {
+		onFx(pushToTalk::shortcutPress);
 	}
 
 	/**

@@ -102,7 +102,7 @@ public final class InkLog {
 		}
 		String id = UUID.randomUUID().toString();
 		long now = clockMs.getAsLong();
-		OpenStroke stroke = new OpenStroke(id, tool, color.toLowerCase(),
+		OpenStroke stroke = new OpenStroke(id, tool, color.toLowerCase(java.util.Locale.ROOT),
 				bounds.get().normalizeLength(widthPx), now);
 		addPoint(stroke, bounds.get(), now, globalX, globalY);
 		onScreen.put(id, stroke);

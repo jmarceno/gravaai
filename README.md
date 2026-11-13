@@ -49,6 +49,31 @@ On GNOME the cursor extension is installed on the first recording; Wayland only 
 - Webcam overlay
 - Recording opens straight into the editor
 
+### Draw on screen
+
+While a screen or an area recording runs, enter draw mode with the HUD's pen button, the
+**Super + Alt + D** shortcut or `gravaai-ctl toggle-draw`: a transparent overlay takes over the
+pointer, and everything you draw is recorded into the video exactly where you drew it, live.
+
+- Tools: pen, highlighter, arrow, rectangle and ellipse; hold **Shift** for a straight pen line
+- **1**–**6** pick a colour (red, yellow, green, blue, white, black), **[** and **]** make the
+  line thinner and thicker
+- **Ctrl + Z** undoes the last stroke, **Backspace** clears the screen, **Esc** (or the shortcut
+  again, or the palette's ✕) leaves draw mode and fades the ink out
+- Disappearing ink (**D**): each stroke fades away 3 s after it is drawn
+- The floating palette starts top-centre and can be dragged by its grip; **Tab** hides it while
+  the keys keep working, and the tool, colour, width and palette state are remembered next time
+- Area recordings keep the ink — and the palette — inside the recorded area
+- Drawing works while the recording is paused too; the ink just sits on screen until you resume
+- Window capture can't show ink (the overlay isn't part of the window's buffer), so the pen button
+  is disabled there
+
+In the editor, each drawing session is an amber band on the timeline — hover to see how long it
+ran and how many strokes it made, click to seek to it — pen presses never trigger click effects
+or click sounds, and the zoom suggestions offer one zoom per drawing session framed on what you
+drew. Every recording also keeps a `<video>.ink.json` sidecar next to the video with each stroke's
+timing and position.
+
 ### Editing
 
 - Drag-and-drop timeline with trims, speed regions and extra audio tracks

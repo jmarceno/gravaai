@@ -56,8 +56,9 @@ import dev.gravaai.ui.overlays.OverlayStage;
  *
  * <p>The stage is requested at the monitor's full bounds, but window managers may clamp it (COSMIC
  * keeps XWayland windows inside the work area), so the canvases follow the stage's real size and
- * strokes are reported in screen coordinates taken from the events themselves. Staying on top is a
- * desktop difference and belongs to the {@link InkStacking} passed in.
+ * strokes are reported in screen coordinates taken from the events themselves. When an area is
+ * recorded, ink and the palette are kept inside that rectangle, because only the area is captured.
+ * Staying on top is a desktop difference and belongs to the {@link InkStacking} passed in.
  *
  * <p>FX thread only.
  */
@@ -189,8 +190,8 @@ public final class InkOverlay {
 		// The window manager decides the final bounds; the canvases follow whatever it chose.
 		stage.widthProperty().addListener((observable, was, now) -> resize());
 		stage.heightProperty().addListener((observable, was, now) -> resize());
-		stage.xProperty().addListener((observable, was, now) -> applyAreaClip());
-		stage.yProperty().addListener((observable, was, now) -> applyAreaClip());
+		stage.xProperty().addListener((observable, was, now) -> followWindowManager());
+		stage.yProperty().addListener((observable, was, now) -> followWindowManager());
 		stage.setOnHidden(event -> {
 			active = false;
 			log.endSession();
@@ -219,10 +220,34 @@ public final class InkOverlay {
 		}
 		palette.applyCss();
 		palette.autosize();
-		palette.relocate(Math.round((width - palette.getWidth()) / 2), 16);
+		placePalette();
 		applyAreaClip();
 		redrawBase();
 		redrawLive();
+	}
+
+	/**
+	 * The window manager moved or resized the stage against the requested bounds: the canvases and
+	 * the palette follow the real bounds, because the area is fixed on the monitor underneath.
+	 */
+	private void followWindowManager() {
+		applyAreaClip();
+		placePalette();
+	}
+
+	/** Hangs the palette top-centre of what is recorded: the area, or the whole stage. */
+	private void placePalette() {
+		if (palette.getWidth() <= 0 || !(stage.getWidth() > 0)) {
+			return;
+		}
+		InkPalettePlacement.Position position = InkPalettePlacement.initial(stageBounds(), area,
+				palette.getWidth(), palette.getHeight());
+		palette.relocate(Math.round(position.x()), Math.round(position.y()));
+	}
+
+	/** The stage's real bounds in screen coordinates. */
+	private Rectangle2D stageBounds() {
+		return new Rectangle2D(stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight());
 	}
 
 	/** Keeps the canvases inside the recorded area, mapped into the stage's real position. */
@@ -490,7 +515,10 @@ public final class InkOverlay {
 			event.consume();
 		});
 		grip.setOnMouseDragged(event -> {
-			palette.relocate(event.getSceneX() - paletteDragX, event.getSceneY() - paletteDragY);
+			InkPalettePlacement.Position position = InkPalettePlacement.dragged(stageBounds(), area,
+					palette.getWidth(), palette.getHeight(),
+					event.getSceneX() - paletteDragX, event.getSceneY() - paletteDragY);
+			palette.relocate(Math.round(position.x()), Math.round(position.y()));
 			event.consume();
 		});
 		palette.getChildren().add(grip);

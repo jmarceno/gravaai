@@ -46,7 +46,16 @@ public final class InkTelemetry {
 
 	/** What a stroke was drawn with. */
 	public enum InkTool {
-		PEN("pen");
+		/** Freehand line; also a straight line when Shift is held. */
+		PEN("pen"),
+		/** Wide translucent freehand marker. */
+		HIGHLIGHTER("highlighter"),
+		/** A straight arrow; its two points are tail and head. */
+		ARROW("arrow"),
+		/** An outlined rectangle; its two points are opposite corners. */
+		RECTANGLE("rectangle"),
+		/** An outlined ellipse inside the box of its two points. */
+		ELLIPSE("ellipse");
 
 		private final String wire;
 
@@ -56,6 +65,11 @@ public final class InkTelemetry {
 
 		public String wire() {
 			return wire;
+		}
+
+		/** True for the tools drawn from two points (a press and a release). */
+		public boolean isShape() {
+			return this == ARROW || this == RECTANGLE || this == ELLIPSE;
 		}
 
 		/** The tool a wire spelling names; empty for an unknown one. */
@@ -108,6 +122,10 @@ public final class InkTelemetry {
 		}
 	}
 
+	/** The box a draw session's ink covers, normalized to the frame. */
+	public record InkBounds(double minX, double minY, double maxX, double maxY) {
+	}
+
 	/** Everything one recording's sidecar holds. */
 	public record InkRecording(List<InkSession> sessions, List<InkStroke> strokes) {
 
@@ -136,6 +154,34 @@ public final class InkTelemetry {
 									.toList()))
 					.toList();
 			return new InkRecording(movedSessions, movedStrokes);
+		}
+
+		/**
+		 * The box the strokes of {@code session} cover (0..1 of the frame), or empty when the
+		 * session holds no stroke.
+		 */
+		public Optional<InkBounds> bounds(InkSession session) {
+			double minX = Double.POSITIVE_INFINITY;
+			double minY = Double.POSITIVE_INFINITY;
+			double maxX = Double.NEGATIVE_INFINITY;
+			double maxY = Double.NEGATIVE_INFINITY;
+			for (InkStroke stroke : strokes) {
+				if (!session.contains(stroke.startMs())) {
+					continue;
+				}
+				double half = stroke.width() / 2;
+				for (InkPoint point : stroke.points()) {
+					minX = Math.min(minX, point.x() - half);
+					minY = Math.min(minY, point.y() - half);
+					maxX = Math.max(maxX, point.x() + half);
+					maxY = Math.max(maxY, point.y() + half);
+				}
+			}
+			if (!(maxX >= minX)) {
+				return Optional.empty();
+			}
+			return Optional.of(new InkBounds(Math.max(0, minX), Math.max(0, minY), Math.min(1, maxX),
+					Math.min(1, maxY)));
 		}
 
 		/** How many strokes started inside {@code session}. */

@@ -109,6 +109,13 @@
 		"undo": "Отменить (Ctrl+Z)",
 		"clear": "Очистить (Backspace)",
 		"color": "Цвет",
-		"width": "Толщина линии"
+		"width": "Толщина линии",
+		"pen": "Перо (P, Shift — прямая линия)",
+		"highlighter": "Маркер (H)",
+		"arrow": "Стрелка (A)",
+		"rectangle": "Прямоугольник (R)",
+		"ellipse": "Эллипс (E)",
+		"disappearing": "Исчезающие чернила (D)",
+		"hidePalette": "Скрыть палитру (Tab — показать)"
 	}
 }

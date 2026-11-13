@@ -109,6 +109,13 @@
 		"undo": "실행 취소 (Ctrl+Z)",
 		"clear": "지우기 (Backspace)",
 		"color": "색상",
-		"width": "선 굵기"
+		"width": "선 굵기",
+		"pen": "펜 (P, Shift로 직선)",
+		"highlighter": "형광펜 (H)",
+		"arrow": "화살표 (A)",
+		"rectangle": "사각형 (R)",
+		"ellipse": "타원 (E)",
+		"disappearing": "사라지는 잉크 (D)",
+		"hidePalette": "팔레트 숨기기 (Tab으로 다시 표시)"
 	}
 }

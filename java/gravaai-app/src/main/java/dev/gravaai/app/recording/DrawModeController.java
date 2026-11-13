@@ -20,6 +20,7 @@ import dev.gravaai.services.sources.CaptureArea;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.ui.launch.HudRecordingPort.DrawState;
 import dev.gravaai.ui.overlays.ink.InkOverlay;
+import dev.gravaai.ui.overlays.ink.InkPreferences;
 import dev.gravaai.ui.overlays.ink.InkStacking;
 
 /**
@@ -44,8 +45,19 @@ final class DrawModeController {
 
 	private Optional<InkOverlay> overlay = Optional.empty();
 
+	/** Where the palette's last state is kept between draw sessions. */
+	interface PreferencesStore {
+		InkPreferences load();
+
+		void save(InkPreferences preferences);
+	}
+
+	private final PreferencesStore preferences;
+
 	DrawModeController(CursorCaptureSession cursorSession, BooleanSupplier recordingActive,
-			Supplier<@Nullable SelectedSource> selectedSource, DesktopSession desktop) {
+			Supplier<@Nullable SelectedSource> selectedSource, DesktopSession desktop,
+			PreferencesStore preferences) {
+		this.preferences = preferences;
 		this.cursorSession = cursorSession;
 		this.recordingActive = recordingActive;
 		this.selectedSource = selectedSource;
@@ -85,7 +97,7 @@ final class DrawModeController {
 				: Optional.of(new Rectangle2D(frame.get().x(), frame.get().y(),
 						frame.get().width(), frame.get().height()));
 		overlay = Optional.of(InkOverlay.open(cursorSession.ink(), stacking, monitor.get(), areaRect,
-				this::onOverlayClosed));
+				preferences.load(), preferences::save, this::onOverlayClosed));
 		LOG.log(System.Logger.Level.INFO, "draw mode on");
 		publish();
 	}

@@ -57,6 +57,23 @@ class AgentEditorViewsTest {
 	}
 
 	@Test
+	@DisplayName("timeline lists draw sessions with their strokes and the box the ink covers")
+	void timelineListsDrawSessions() throws Exception {
+		ProjectEditorState state = load("03-zoom-motion-blur.gravaai");
+		var stroke = new dev.gravaai.services.recording.InkTelemetry.InkStroke("s",
+				dev.gravaai.services.recording.InkTelemetry.InkTool.ARROW, "#ffffff", 0.02, 300, 400, 900,
+				java.util.List.of(new dev.gravaai.services.recording.InkTelemetry.InkPoint(300, 0.2, 0.3),
+						new dev.gravaai.services.recording.InkTelemetry.InkPoint(400, 0.4, 0.5)));
+		var ink = new dev.gravaai.services.recording.InkTelemetry.InkRecording(
+				java.util.List.of(new dev.gravaai.services.recording.InkTelemetry.InkSession(200, 900)),
+				java.util.List.of(stroke));
+		String text = AgentEditorViews.timeline(state, 2000, null, null, 4, ink);
+		assertTrue(text.contains("drawing: 1 sessions"), text);
+		assertTrue(text.contains("1 strokes box 0.19,0.29–0.41,0.51"), text);
+		assertTrue(AgentEditorViews.timeline(state, 2000, null, null, 4).contains("drawing: none"));
+	}
+
+	@Test
 	@DisplayName("timeline honours the from/to window")
 	void timelineHonoursWindow() throws Exception {
 		ProjectEditorState state = load("03-zoom-motion-blur.gravaai");

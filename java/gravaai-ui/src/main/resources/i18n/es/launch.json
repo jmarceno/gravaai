@@ -109,6 +109,13 @@
 		"undo": "Deshacer (Ctrl+Z)",
 		"clear": "Borrar (Retroceso)",
 		"color": "Color",
-		"width": "Grosor de línea"
+		"width": "Grosor de línea",
+		"pen": "Lápiz (P, Mayús para línea recta)",
+		"highlighter": "Resaltador (H)",
+		"arrow": "Flecha (A)",
+		"rectangle": "Rectángulo (R)",
+		"ellipse": "Elipse (E)",
+		"disappearing": "Tinta que desaparece (D)",
+		"hidePalette": "Ocultar paleta (Tab la muestra)"
 	}
 }

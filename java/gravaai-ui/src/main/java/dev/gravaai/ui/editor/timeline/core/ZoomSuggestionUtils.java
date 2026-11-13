@@ -116,7 +116,25 @@ public final class ZoomSuggestionUtils {
 	/** Port of the {@code buildInteractionZoomSuggestions} params object. */
 	public record SuggestionParams(List<CursorTelemetryPoint> cursorTelemetry, double totalMs,
 			double defaultDurationMs, List<Span> reservedSpans, double spacingMs, double mergeGapMs,
-			double padMs) {
+			double padMs, List<InkFocus> inkFocus) {
+
+		public SuggestionParams {
+			inkFocus = inkFocus == null ? List.of() : List.copyOf(inkFocus);
+		}
+
+		public SuggestionParams(List<CursorTelemetryPoint> cursorTelemetry, double totalMs,
+				double defaultDurationMs, List<Span> reservedSpans, double spacingMs, double mergeGapMs,
+				double padMs) {
+			this(cursorTelemetry, totalMs, defaultDurationMs, reservedSpans, spacingMs, mergeGapMs, padMs,
+					List.of());
+		}
+
+		/** The same parameters with the recording's draw sessions, each one zoom on its ink. */
+		public SuggestionParams withInk(List<InkFocus> ink) {
+			return new SuggestionParams(cursorTelemetry, totalMs, defaultDurationMs, reservedSpans, spacingMs,
+					mergeGapMs, padMs, ink);
+		}
+
 		public SuggestionParams(List<CursorTelemetryPoint> cursorTelemetry, double totalMs,
 				double defaultDurationMs, List<Span> reservedSpans) {
 			this(cursorTelemetry, totalMs, defaultDurationMs, reservedSpans, 0,
@@ -338,15 +356,89 @@ public final class ZoomSuggestionUtils {
 		return all;
 	}
 
-	/** Port of {@code buildInteractionZoomSuggestions}. */
+	/**
+	 * One draw session of live ink (a span of drawing on screen during the recording) and the box
+	 * its strokes cover, normalized to the frame. It becomes a single zoom framing the drawing
+	 * instead of one zoom per pen press.
+	 */
+	public record InkFocus(double startMs, double endMs, double minX, double minY, double maxX,
+			double maxY) {
+
+		ZoomFocus focus() {
+			return new ZoomFocus((minX + maxX) / 2, (minY + maxY) / 2);
+		}
+	}
+
+	/**
+	 * The ink zooms, placed first: a draw session is the strongest signal of where the presenter
+	 * wants attention. Each one runs from just before the first stroke to just after the session.
+	 */
+	static List<SuggestedZoomRegion> inkSuggestions(List<InkFocus> ink, double totalMs, double padMs,
+			List<Span> reserved) {
+		List<SuggestedZoomRegion> suggestions = new ArrayList<>();
+		for (InkFocus session : ink) {
+			double start = Math.max(0, session.startMs() - padMs / 3);
+			double end = Math.min(totalMs, session.endMs() + padMs / 3);
+			if (end <= start || overlapsAny(reserved, start, end)) {
+				continue;
+			}
+			reserved.add(new Span(start, end));
+			suggestions.add(new SuggestedZoomRegion(start, end, session.focus()));
+		}
+		return suggestions;
+	}
+
+	/**
+	 * The draw sessions of a recording that fall inside {@code [startMs, startMs + durationMs)},
+	 * moved to start at 0 like the telemetry handed to the builder. Sessions without strokes are
+	 * skipped: there is nothing to frame.
+	 */
+	public static List<InkFocus> inkFocus(dev.gravaai.services.recording.InkTelemetry.InkRecording ink,
+			long startMs, long durationMs) {
+		List<InkFocus> focus = new ArrayList<>();
+		for (var session : ink.sessions()) {
+			if (session.endMs() <= startMs || session.startMs() >= startMs + durationMs) {
+				continue;
+			}
+			ink.bounds(session).ifPresent(box -> focus.add(new InkFocus(
+					Math.max(0, session.startMs() - startMs),
+					Math.min(durationMs, session.endMs() - startMs),
+					box.minX(), box.minY(), box.maxX(), box.maxY())));
+		}
+		return focus;
+	}
+
+	private static boolean overlapsAny(List<Span> spans, double start, double end) {
+		for (Span span : spans) {
+			if (end > span.start() && start < span.end()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Port of {@code buildInteractionZoomSuggestions}, plus one zoom per draw session. */
 	public static SuggestionResult buildInteractionZoomSuggestions(SuggestionParams params) {
 		double totalMs = params.totalMs();
-		List<Span> reservedSpans = params.reservedSpans() == null ? List.of() : params.reservedSpans();
-		double mergeGapMs = params.mergeGapMs();
-		double padMs = params.padMs();
 		if (totalMs <= 0) {
 			return new SuggestionResult(SuggestionStatus.NO_SLOTS, List.of());
 		}
+		List<Span> reserved = new ArrayList<>(params.reservedSpans() == null ? List.of() : params.reservedSpans());
+		List<SuggestedZoomRegion> ink = inkSuggestions(params.inkFocus(), totalMs, params.padMs(), reserved);
+		SuggestionResult clicks = buildClickSuggestions(params, reserved);
+		if (ink.isEmpty()) {
+			return clicks;
+		}
+		List<SuggestedZoomRegion> all = new ArrayList<>(ink);
+		all.addAll(clicks.suggestions());
+		all.sort(Comparator.comparingDouble(SuggestedZoomRegion::startMs));
+		return new SuggestionResult(SuggestionStatus.OK, all, clicks.loupeSuggestions());
+	}
+
+	private static SuggestionResult buildClickSuggestions(SuggestionParams params, List<Span> reservedSpans) {
+		double totalMs = params.totalMs();
+		double mergeGapMs = params.mergeGapMs();
+		double padMs = params.padMs();
 		List<CursorTelemetryPoint> normalized = normalizeCursorTelemetry(
 				params.cursorTelemetry() == null ? List.of() : params.cursorTelemetry(), totalMs);
 		if (normalized.isEmpty()) {

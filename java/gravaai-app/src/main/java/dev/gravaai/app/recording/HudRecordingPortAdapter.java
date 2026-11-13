@@ -38,6 +38,7 @@ import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceService;
 import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.ui.launch.HudRecordingPort;
+import dev.gravaai.ui.overlays.ink.InkPreferences;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -148,7 +149,30 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		this.drawMode = new DrawModeController(wiring.cursorSession(),
 				() -> wiring.recording().isRecordingActive(),
 				() -> wiring.sources().getSelectedSource(),
-				DesktopSession.current());
+				DesktopSession.current(),
+				new DrawModeController.PreferencesStore() {
+					@Override
+					public InkPreferences load() {
+						try {
+							return InkPreferences.fromJson(settings.readSetting(InkPreferences.SETTING));
+						} catch (RuntimeException error) {
+							LOG.log(System.Logger.Level.WARNING, "could not read the ink palette: " + error);
+							return InkPreferences.DEFAULT;
+						}
+					}
+
+					@Override
+					public void save(InkPreferences preferences) {
+						// Off the FX thread: a palette click must not wait on the disk.
+						Thread.ofVirtual().name("gravaai-ink-preferences").start(() -> {
+							try {
+								settings.writeSetting(InkPreferences.SETTING, preferences.toJson());
+							} catch (java.io.IOException | RuntimeException error) {
+								LOG.log(System.Logger.Level.WARNING, "could not save the ink palette: " + error);
+							}
+						});
+					}
+				});
 	}
 
 	/** Builds the adapter on the FX thread; loads preferences and subscriptions asynchronously. */

@@ -109,6 +109,13 @@
 		"undo": "Annuler (Ctrl+Z)",
 		"clear": "Effacer (Retour arrière)",
 		"color": "Couleur",
-		"width": "Épaisseur du trait"
+		"width": "Épaisseur du trait",
+		"pen": "Stylo (P, Maj pour une ligne droite)",
+		"highlighter": "Surligneur (H)",
+		"arrow": "Flèche (A)",
+		"rectangle": "Rectangle (R)",
+		"ellipse": "Ellipse (E)",
+		"disappearing": "Encre éphémère (D)",
+		"hidePalette": "Masquer la palette (Tab la réaffiche)"
 	}
 }

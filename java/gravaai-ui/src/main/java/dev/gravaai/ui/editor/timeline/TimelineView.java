@@ -1771,7 +1771,7 @@ public final class TimelineView extends Region {
 		}
 		return ZoomSuggestionUtils.buildInteractionZoomSuggestions(
 				new ZoomSuggestionUtils.SuggestionParams(dataSource.cursorTelemetry(), total,
-						Math.min(1_000, total), reserved));
+						Math.min(1_000, total), reserved).withInk(dataSource.inkFocus()));
 	}
 
 	/** How many zooms and loupes one suggest-zooms run actually added. */

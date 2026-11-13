@@ -109,6 +109,13 @@
 		"undo": "Ongedaan maken (Ctrl+Z)",
 		"clear": "Wissen (Backspace)",
 		"color": "Kleur",
-		"width": "Lijndikte"
+		"width": "Lijndikte",
+		"pen": "Pen (P, Shift voor een rechte lijn)",
+		"highlighter": "Markeerstift (H)",
+		"arrow": "Pijl (A)",
+		"rectangle": "Rechthoek (R)",
+		"ellipse": "Ellips (E)",
+		"disappearing": "Verdwijnende inkt (D)",
+		"hidePalette": "Palet verbergen (Tab toont het weer)"
 	}
 }

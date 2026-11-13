@@ -206,7 +206,9 @@ final class AgentEditorPort implements AgentDispatcher.EditorPort {
 				session.elementDiagnostics().timings(state));
 		return switch (view) {
 			case "timeline" -> AgentEditorViews.timeline(state, sourceMs, number(args, "from"),
-					number(args, "to"), rev);
+					number(args, "to"), rev, session.videoPath() == null
+							? dev.gravaai.services.recording.InkTelemetry.InkRecording.EMPTY
+							: dev.gravaai.services.recording.InkTelemetry.read(session.videoPath()));
 			case "transcript" -> AgentEditorViews.transcript(state, sourceMs, number(args, "from"),
 					number(args, "to"), rev);
 			case "settings" -> AgentEditorViews.settings(state,

@@ -109,6 +109,13 @@
 		"undo": "Rückgängig (Strg+Z)",
 		"clear": "Löschen (Rücktaste)",
 		"color": "Farbe",
-		"width": "Linienstärke"
+		"width": "Linienstärke",
+		"pen": "Stift (P, Umschalt für gerade Linie)",
+		"highlighter": "Textmarker (H)",
+		"arrow": "Pfeil (A)",
+		"rectangle": "Rechteck (R)",
+		"ellipse": "Ellipse (E)",
+		"disappearing": "Verschwindende Tinte (D)",
+		"hidePalette": "Palette ausblenden (Tab zeigt sie wieder)"
 	}
 }

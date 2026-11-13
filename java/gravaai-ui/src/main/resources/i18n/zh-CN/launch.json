@@ -109,6 +109,13 @@
 		"undo": "撤销 (Ctrl+Z)",
 		"clear": "清除 (Backspace)",
 		"color": "颜色",
-		"width": "线条粗细"
+		"width": "线条粗细",
+		"pen": "笔 (P，按住 Shift 画直线)",
+		"highlighter": "荧光笔 (H)",
+		"arrow": "箭头 (A)",
+		"rectangle": "矩形 (R)",
+		"ellipse": "椭圆 (E)",
+		"disappearing": "自动消失的墨迹 (D)",
+		"hidePalette": "隐藏调色板 (Tab 重新显示)"
 	}
 }

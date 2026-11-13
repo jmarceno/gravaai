@@ -263,6 +263,16 @@ final class AgentEditorViews {
 	 */
 	static String timeline(ProjectEditorState state, long sourceDurationMs, @Nullable Double from,
 			@Nullable Double to, long rev) {
+		return timeline(state, sourceDurationMs, from, to, rev,
+				dev.gravaai.services.recording.InkTelemetry.InkRecording.EMPTY);
+	}
+
+	/**
+	 * The timeline view, with the recording's draw sessions (live ink drawn on screen while
+	 * recording) so the agent can frame what the presenter drew.
+	 */
+	static String timeline(ProjectEditorState state, long sourceDurationMs, @Nullable Double from,
+			@Nullable Double to, long rev, dev.gravaai.services.recording.InkTelemetry.InkRecording ink) {
 		AgentIds ids = AgentIds.of(state);
 		long editedMs = editedDurationMs(state, sourceDurationMs);
 		long fromMs = Math.max(0, Math.round((from == null ? 0 : from) * 1000));
@@ -473,8 +483,39 @@ final class AgentEditorViews {
 						+ fragment.marker().name());
 			}
 		}
+		appendInk(lines, state, ink, fromMs, toMs);
 		lines.add("rev " + rev);
 		return String.join("\n", lines);
+	}
+
+	/**
+	 * One line per draw session on the edited timeline: where it plays, its source span, its
+	 * strokes and the box the ink covers (0..1 of the frame), so "zoom on what I drew" can be
+	 * answered with a zoom focused on the box centre.
+	 */
+	private static void appendInk(List<String> lines, ProjectEditorState state,
+			dev.gravaai.services.recording.InkTelemetry.InkRecording ink, long fromMs, long toMs) {
+		if (ink.isEmpty()) {
+			lines.add("drawing: none");
+			return;
+		}
+		lines.add("drawing: " + ink.sessions().size() + " sessions (live ink, part of the video)");
+		for (var session : ink.sessions()) {
+			var box = ink.bounds(session);
+			for (var mark : dev.gravaai.ui.editor.timeline.InkMark.project(
+					List.of(new dev.gravaai.ui.editor.timeline.InkMark.Session(session.startMs(),
+							session.endMs(), ink.strokeCount(session))),
+					state.clipRegions())) {
+				if (!overlaps(mark.startMs(), mark.endMs(), fromMs, toMs)) {
+					continue;
+				}
+				lines.add("  " + seconds(mark.startMs()) + "–" + seconds(mark.endMs())
+						+ " src " + seconds(session.startMs()) + "–" + seconds(session.endMs())
+						+ " " + mark.strokes() + " strokes"
+						+ box.map(b -> String.format(Locale.ROOT, " box %.2f,%.2f–%.2f,%.2f",
+								b.minX(), b.minY(), b.maxX(), b.maxY())).orElse(""));
+			}
+		}
 	}
 
 	/**

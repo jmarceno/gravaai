@@ -109,6 +109,13 @@
 		"undo": "復原 (Ctrl+Z)",
 		"clear": "清除 (Backspace)",
 		"color": "顏色",
-		"width": "線條粗細"
+		"width": "線條粗細",
+		"pen": "筆 (P，按住 Shift 畫直線)",
+		"highlighter": "螢光筆 (H)",
+		"arrow": "箭頭 (A)",
+		"rectangle": "矩形 (R)",
+		"ellipse": "橢圓 (E)",
+		"disappearing": "自動消失的墨跡 (D)",
+		"hidePalette": "隱藏調色盤 (Tab 重新顯示)"
 	}
 }

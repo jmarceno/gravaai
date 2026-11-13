@@ -60,6 +60,11 @@ public interface TimelineDataSource {
 		return FilmstripProvider.empty();
 	}
 
+	/** The draw sessions in the same time base as {@link #cursorTelemetry()}, for suggest-zooms. */
+	default java.util.List<dev.gravaai.ui.editor.timeline.core.ZoomSuggestionUtils.InkFocus> inkFocus() {
+		return java.util.List.of();
+	}
+
 	/** Where the presenter drew on screen while recording, on the edited timeline. */
 	default java.util.List<InkMark> inkMarks() {
 		return java.util.List.of();

@@ -288,7 +288,9 @@ public final class RecordingImportController {
 		}
 		ZoomSuggestionUtils.SuggestionResult result = ZoomSuggestionUtils
 				.buildInteractionZoomSuggestions(new ZoomSuggestionUtils.SuggestionParams(
-						telemetry, duration, Math.min(1000, duration), List.of()));
+						telemetry, duration, Math.min(1000, duration), List.of())
+						.withInk(ZoomSuggestionUtils.inkFocus(
+								dev.gravaai.services.recording.InkTelemetry.read(media.path()), start, duration)));
 		for (ZoomSuggestionUtils.SuggestedZoomRegion suggestion : result.suggestions()) {
 			String id = session.store().nextId("zoom", zoomIds);
 			zoomIds.add(id);

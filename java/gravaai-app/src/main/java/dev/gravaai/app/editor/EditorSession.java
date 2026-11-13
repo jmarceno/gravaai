@@ -244,6 +244,8 @@ public final class EditorSession implements AutoCloseable {
 		this.dataSource.eyeContactStrip(this::eyeContactStrip);
 		// The pen bands of the clip row: where the presenter drew on screen while recording.
 		this.dataSource.inkMarks(this::inkMarks);
+		// Suggest-zooms frames each draw session once instead of zooming on every pen press.
+		this.dataSource.inkFocus(this::inkFocus);
 		ownedResources.add(gazeCache.addListener(this::onGazeChanged));
 		// A cleaned track's rendered copy lands some time after the user switches noise
 		// reduction on: the badge follows the render, and the preview reopens its audio on the
@@ -364,7 +366,33 @@ public final class EditorSession implements AutoCloseable {
 	}
 
 	/** The ink sidecar of one source video, read once. */
-	private record InkSource(String videoPath, List<InkMark.Session> sessions) {
+	private record InkSource(String videoPath, InkTelemetry.InkRecording ink, List<InkMark.Session> sessions) {
+	}
+
+	/** The ink sidecar of the current source video, read once per video. */
+	private Optional<InkSource> inkSource() {
+		String video = videoPath();
+		if (video == null || video.isBlank()) {
+			return Optional.empty();
+		}
+		Optional<InkSource> known = inkSource.filter(source -> source.videoPath().equals(video));
+		if (known.isPresent()) {
+			return known;
+		}
+		InkTelemetry.InkRecording ink = InkTelemetry.read(video);
+		List<InkMark.Session> sessions = ink.sessions().stream()
+				.map(session -> new InkMark.Session(session.startMs(), session.endMs(), ink.strokeCount(session)))
+				.toList();
+		Optional<InkSource> read = Optional.of(new InkSource(video, ink, sessions));
+		inkSource = read;
+		return read;
+	}
+
+	/** Draw sessions for suggest-zooms, in source time like the cursor telemetry it gets. */
+	private List<ZoomSuggestionUtils.InkFocus> inkFocus() {
+		return inkSource()
+				.map(source -> ZoomSuggestionUtils.inkFocus(source.ink(), 0, Long.MAX_VALUE / 2))
+				.orElse(List.of());
 	}
 
 	/** The pen bands for one project state. */
@@ -388,15 +416,9 @@ public final class EditorSession implements AutoCloseable {
 		if (cached.isPresent() && cached.get().state() == state && cached.get().videoPath().equals(video)) {
 			return cached.get().marks();
 		}
-		Optional<InkSource> source = inkSource.filter(known -> known.videoPath().equals(video));
+		Optional<InkSource> source = inkSource();
 		if (source.isEmpty()) {
-			InkTelemetry.InkRecording ink = InkTelemetry.read(video);
-			List<InkMark.Session> sessions = ink.sessions().stream()
-					.map(session -> new InkMark.Session(session.startMs(), session.endMs(),
-							ink.strokeCount(session)))
-					.toList();
-			source = Optional.of(new InkSource(video, sessions));
-			inkSource = source;
+			return List.of();
 		}
 		List<InkMark> marks = InkMark.project(source.get().sessions(), state.clipRegions());
 		inkMarksCache = Optional.of(new InkMarksCache(state, video, marks));

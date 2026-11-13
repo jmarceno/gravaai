@@ -109,6 +109,13 @@
 		"undo": "Undo (Ctrl+Z)",
 		"clear": "Clear (Backspace)",
 		"color": "Colour",
-		"width": "Line width"
+		"width": "Line width",
+		"pen": "Pen (P, Shift for a straight line)",
+		"highlighter": "Highlighter (H)",
+		"arrow": "Arrow (A)",
+		"rectangle": "Rectangle (R)",
+		"ellipse": "Ellipse (E)",
+		"disappearing": "Disappearing ink (D)",
+		"hidePalette": "Hide palette (Tab shows it again)"
 	}
 }

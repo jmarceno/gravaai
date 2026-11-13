@@ -109,6 +109,13 @@
 		"undo": "Desfazer (Ctrl+Z)",
 		"clear": "Limpar (Backspace)",
 		"color": "Cor",
-		"width": "Espessura da linha"
+		"width": "Espessura da linha",
+		"pen": "Caneta (P, Shift para linha reta)",
+		"highlighter": "Marca-texto (H)",
+		"arrow": "Seta (A)",
+		"rectangle": "Retângulo (R)",
+		"ellipse": "Elipse (E)",
+		"disappearing": "Tinta que desaparece (D)",
+		"hidePalette": "Ocultar paleta (Tab mostra de novo)"
 	}
 }

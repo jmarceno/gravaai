@@ -109,6 +109,13 @@
 		"undo": "Annulla (Ctrl+Z)",
 		"clear": "Cancella (Backspace)",
 		"color": "Colore",
-		"width": "Spessore della linea"
+		"width": "Spessore della linea",
+		"pen": "Penna (P, Maiusc per una linea retta)",
+		"highlighter": "Evidenziatore (H)",
+		"arrow": "Freccia (A)",
+		"rectangle": "Rettangolo (R)",
+		"ellipse": "Ellisse (E)",
+		"disappearing": "Inchiostro che svanisce (D)",
+		"hidePalette": "Nascondi tavolozza (Tab la mostra)"
 	}
 }

@@ -89,6 +89,19 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return eyeContactStrip.get();
 	}
 
+	private volatile Supplier<List<ZoomSuggestionUtils.InkFocus>> inkFocus = List::of;
+
+	/** Supplies the draw sessions suggest-zooms frames (the app reads the ink sidecar). */
+	public StoreTimelineDataSource inkFocus(Supplier<List<ZoomSuggestionUtils.InkFocus>> focus) {
+		this.inkFocus = Objects.requireNonNull(focus, "focus");
+		return this;
+	}
+
+	@Override
+	public List<ZoomSuggestionUtils.InkFocus> inkFocus() {
+		return inkFocus.get();
+	}
+
 	private volatile Supplier<List<InkMark>> inkMarks = List::of;
 
 	/** Supplies the pen bands of the clip row (the app reads the recording's ink sidecar). */

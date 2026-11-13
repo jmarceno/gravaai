@@ -27,7 +27,8 @@ public record DesktopSession(SessionType type, DesktopEnvironment environment) {
 	 * Wayland compositor, so the session type wins over the desktop name here.
 	 */
 	private static final DesktopProfile X11_HISTORICAL = new DesktopProfile(
-			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL);
+			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL,
+			OverlayStacking.KEEP_ABOVE);
 
 	/**
 	 * Classifies a process environment once.
@@ -67,6 +68,11 @@ public record DesktopSession(SessionType type, DesktopEnvironment environment) {
 	/** How Gravaai's own shortcut bindings reach this session. */
 	public ShortcutStrategy shortcutStrategy() {
 		return profile().shortcuts();
+	}
+
+	/** How a full-screen overlay stays above other windows in this session. */
+	public OverlayStacking overlayStacking() {
+		return profile().overlayStacking();
 	}
 
 	/** True for a Wayland session, the only kind where portal capture applies. */

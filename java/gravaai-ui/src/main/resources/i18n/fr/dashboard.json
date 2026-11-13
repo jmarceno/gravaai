@@ -207,7 +207,8 @@
 			"actionToggleRecording": "Démarrer / arrêter l'enregistrement",
 			"actionTogglePause": "Pause / reprise",
 			"actionCancelRecording": "Annuler l'enregistrement",
-			"actionToggleMeeting": "Démarrer / arrêter la réunion"
+			"actionToggleMeeting": "Démarrer / arrêter la réunion",
+			"actionToggleDraw": "Dessiner à l'écran"
 		}
 	}
 }

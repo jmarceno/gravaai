@@ -101,5 +101,14 @@
 		"failedToStart": "無法開始錄製：{{error}}",
 		"failedToStartGeneric": "無法開始錄製",
 		"pickFailed": "未選擇任何螢幕。請重新選擇螢幕再試。"
+	},
+	"ink": {
+		"draw": "在螢幕上繪製",
+		"drawUnavailable": "錄製螢幕或區域時可以繪製",
+		"stopDrawing": "停止繪製 (Esc)",
+		"undo": "復原 (Ctrl+Z)",
+		"clear": "清除 (Backspace)",
+		"color": "顏色",
+		"width": "線條粗細"
 	}
 }

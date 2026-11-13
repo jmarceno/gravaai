@@ -9,6 +9,7 @@ import java.util.List;
 import dev.gravaai.core.json.Json;
 import dev.gravaai.media.compose.CursorSample;
 import dev.gravaai.services.recording.CursorTelemetry;
+import dev.gravaai.services.recording.InkTelemetry;
 import dev.gravaai.services.recording.RecordingPaths;
 
 /**
@@ -30,8 +31,10 @@ public final class CursorTelemetryLoader {
 			if (!Files.isRegularFile(telemetry)) {
 				return List.of();
 			}
-			var points = CursorTelemetry.normalizeCursorTelemetrySamples(
-					Json.parseJsonWithByteOrderMark(Files.readString(telemetry)));
+			// Pen presses on the live ink overlay are strokes, not clicks.
+			var points = InkTelemetry.cursorTelemetryWithoutInkClicks(videoPath,
+					CursorTelemetry.normalizeCursorTelemetrySamples(
+							Json.parseJsonWithByteOrderMark(Files.readString(telemetry))));
 			List<CursorSample> samples = new ArrayList<>(points.size());
 			for (var point : points) {
 				samples.add(new CursorSample(point.timeMs() / 1000.0, point.cx(), point.cy(),

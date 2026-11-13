@@ -7,12 +7,13 @@ import java.util.List;
 import dev.gravaai.services.recording.CursorTelemetry;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.CursorTelemetrySource;
+import dev.gravaai.services.recording.InkTelemetry;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes.KeystrokeEvent;
 
 /**
- * Writes the cursor and key-press sidecars next to a finished screen recording, ported from
+ * Writes the cursor, key-press and ink sidecars next to a finished screen recording, ported from
  * {@code electron/ipc/cursor/telemetry.ts} and {@code electron/ipc/keyboard/keystrokeCapture.ts}.
  *
  * <p>The cursor clock starts when the renderer reports the recording as started, a little after
@@ -40,6 +41,20 @@ final class CosmicTelemetryWriter {
 		long appliedShiftMs = shiftMs > 0 && shiftMs < MAX_SHIFT_MS ? shiftMs : 0;
 		persistCursor(outputPath, appliedShiftMs);
 		persistKeystrokes(outputPath, appliedShiftMs);
+		persistInk(outputPath, appliedShiftMs);
+	}
+
+	private void persistInk(String outputPath, long shiftMs) {
+		try {
+			InkTelemetry.InkRecording ink = cursorTelemetry.takeRecordedInk().shifted(shiftMs);
+			InkTelemetry.write(outputPath, ink);
+			if (!ink.isEmpty()) {
+				LOG.log(System.Logger.Level.INFO, "Saved " + ink.sessions().size() + " draw sessions, "
+						+ ink.strokes().size() + " strokes");
+			}
+		} catch (IOException error) {
+			LOG.log(System.Logger.Level.WARNING, "Failed to save ink: " + error);
+		}
 	}
 
 	private void persistCursor(String outputPath, long shiftMs) {

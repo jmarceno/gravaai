@@ -42,7 +42,22 @@ class HudShortcutsTest {
 		public void toggleMeetingMode() {
 			calls.add("meeting");
 		}
+
+		@Override
+		public void toggleDraw() {
+			calls.add("draw");
+		}
 	};
+
+	@DisplayName("toggle-draw only acts while recording")
+	@Test
+	void toggleDraw() {
+		dispatch(GlobalShortcutAction.TOGGLE_DRAW, state(HudRecordingPort.Phase.IDLE, "Screen", false, false));
+		assertEquals(List.of(), calls);
+		dispatch(GlobalShortcutAction.TOGGLE_DRAW, state(HudRecordingPort.Phase.RECORDING, "Screen", false, false));
+		dispatch(GlobalShortcutAction.TOGGLE_DRAW, state(HudRecordingPort.Phase.PAUSED, "Screen", false, false));
+		assertEquals(List.of("draw", "draw"), calls);
+	}
 
 	@DisplayName("toggle-recording records, cancels a countdown, or asks for a source")
 	@Test

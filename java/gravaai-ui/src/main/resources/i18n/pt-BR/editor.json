@@ -143,7 +143,8 @@
 	},
 	"timeline": {
 		"expand": "Expandir linha do tempo",
-		"collapse": "Recolher linha do tempo"
+		"collapse": "Recolher linha do tempo",
+		"inkBand": "Desenho {{start}}–{{end}} · {{count}} traços"
 	},
 	"openRecordingsFolder": "Abrir pasta de gravações"
 }

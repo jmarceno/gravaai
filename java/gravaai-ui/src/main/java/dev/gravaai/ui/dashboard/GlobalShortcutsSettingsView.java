@@ -179,7 +179,8 @@ public final class GlobalShortcutsSettingsView extends VBox {
 			GlobalShortcutAction.CANCEL_RECORDING,
 					"dashboard:settings.shortcuts.actionCancelRecording",
 			GlobalShortcutAction.TOGGLE_MEETING,
-					"dashboard:settings.shortcuts.actionToggleMeeting");
+					"dashboard:settings.shortcuts.actionToggleMeeting",
+			GlobalShortcutAction.TOGGLE_DRAW, "dashboard:settings.shortcuts.actionToggleDraw");
 
 	/** The translated row label of one action (the service keeps the English COSMIC label). */
 	private static String actionLabel(GlobalShortcutAction action) {

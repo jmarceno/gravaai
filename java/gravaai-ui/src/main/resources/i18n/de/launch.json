@@ -101,5 +101,14 @@
 		"failedToStart": "Die Aufzeichnung konnte nicht gestartet werden: {{error}}",
 		"failedToStartGeneric": "Die Aufnahme konnte nicht gestartet werden",
 		"pickFailed": "Es wurde kein Bildschirm ausgewählt. Wähle einen Bildschirm und versuche es erneut."
+	},
+	"ink": {
+		"draw": "Auf dem Bildschirm zeichnen",
+		"drawUnavailable": "Zeichnen funktioniert bei Aufnahme eines Bildschirms oder Bereichs",
+		"stopDrawing": "Zeichnen beenden (Esc)",
+		"undo": "Rückgängig (Strg+Z)",
+		"clear": "Löschen (Rücktaste)",
+		"color": "Farbe",
+		"width": "Linienstärke"
 	}
 }

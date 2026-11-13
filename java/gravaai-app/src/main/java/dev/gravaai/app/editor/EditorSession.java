@@ -65,10 +65,12 @@ import dev.gravaai.media.playback.PlaybackMedia;
 import dev.gravaai.media.playback.PlaybackMediaLoader;
 import dev.gravaai.services.projects.ProjectManager;
 import dev.gravaai.services.projects.ProjectMediaSources;
+import dev.gravaai.services.recording.InkTelemetry;
 import dev.gravaai.services.recording.KeystrokePresses;
 import dev.gravaai.services.recording.KeystrokeTelemetry;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.ui.editor.preview.PlaybackControllerPort;
+import dev.gravaai.ui.editor.timeline.InkMark;
 import dev.gravaai.ui.editor.timeline.PlaybackSeek;
 import dev.gravaai.ui.editor.timeline.CachingWaveformProvider;
 import dev.gravaai.ui.editor.timeline.StoreTimelineCommands;
@@ -240,6 +242,8 @@ public final class EditorSession implements AutoCloseable {
 		this.dataSource.cleanupRenderStatus(this::cleanupRenderStatus);
 		// The eye-contact strip of the Camera layout track follows the webcam analysis.
 		this.dataSource.eyeContactStrip(this::eyeContactStrip);
+		// The pen bands of the clip row: where the presenter drew on screen while recording.
+		this.dataSource.inkMarks(this::inkMarks);
 		ownedResources.add(gazeCache.addListener(this::onGazeChanged));
 		// A cleaned track's rendered copy lands some time after the user switches noise
 		// reduction on: the badge follows the render, and the preview reopens its audio on the
@@ -357,6 +361,46 @@ public final class EditorSession implements AutoCloseable {
 			}
 		}
 		dataSource.notifyChanged();
+	}
+
+	/** The ink sidecar of one source video, read once. */
+	private record InkSource(String videoPath, List<InkMark.Session> sessions) {
+	}
+
+	/** The pen bands for one project state. */
+	private record InkMarksCache(ProjectEditorState state, String videoPath, List<InkMark> marks) {
+	}
+
+	private volatile Optional<InkSource> inkSource = Optional.empty();
+	private volatile Optional<InkMarksCache> inkMarksCache = Optional.empty();
+
+	/**
+	 * The clip row's pen bands, cached per project state: the sidecar is read once per source
+	 * video and projected through the clips (cuts and speed) whenever the edit changes.
+	 */
+	private List<InkMark> inkMarks() {
+		String video = videoPath();
+		if (video == null || video.isBlank()) {
+			return List.of();
+		}
+		ProjectEditorState state = store.state();
+		Optional<InkMarksCache> cached = inkMarksCache;
+		if (cached.isPresent() && cached.get().state() == state && cached.get().videoPath().equals(video)) {
+			return cached.get().marks();
+		}
+		Optional<InkSource> source = inkSource.filter(known -> known.videoPath().equals(video));
+		if (source.isEmpty()) {
+			InkTelemetry.InkRecording ink = InkTelemetry.read(video);
+			List<InkMark.Session> sessions = ink.sessions().stream()
+					.map(session -> new InkMark.Session(session.startMs(), session.endMs(),
+							ink.strokeCount(session)))
+					.toList();
+			source = Optional.of(new InkSource(video, sessions));
+			inkSource = source;
+		}
+		List<InkMark> marks = InkMark.project(source.get().sessions(), state.clipRegions());
+		inkMarksCache = Optional.of(new InkMarksCache(state, video, marks));
+		return marks;
 	}
 
 	/**

@@ -154,6 +154,16 @@ final class CursorCoordinateMapper {
 			// the cursor at a spot that belongs to another surface's layout.
 			return new double[] {0.5, 0.5};
 		}
+		double[] cursor = cursorLogical();
+		Optional<FrameBounds> bounds = frameBounds(source, cursor[0], cursor[1]);
+		if (bounds.isEmpty()) {
+			return new double[] {0.5, 0.5};
+		}
+		return bounds.get().normalize(cursor[0], cursor[1]);
+	}
+
+	/** The pointer in global logical pixels: the helper's fresh reading, else the screen API's. */
+	private double[] cursorLogical() {
 		CursorScreen.Point fallback;
 		try {
 			fallback = screen.cursorScreenPoint();
@@ -162,10 +172,29 @@ final class CursorCoordinateMapper {
 		}
 		boolean cacheFresh = cacheFresh();
 		double primaryScale = primaryScale();
+		return new double[] {
+				cacheFresh ? linuxCursorX / primaryScale : fallback.x(),
+				cacheFresh ? linuxCursorY / primaryScale : fallback.y()};
+	}
 
-		double cursorX = cacheFresh ? linuxCursorX / primaryScale : fallback.x();
-		double cursorY = cacheFresh ? linuxCursorY / primaryScale : fallback.y();
+	/**
+	 * The frame the current recording records, in global logical pixels, or empty for a window
+	 * (its global position is not exposed on Wayland) or when no display resolves. The live ink
+	 * overlay normalizes its strokes through this, so ink and cursor telemetry share one mapping.
+	 */
+	Optional<FrameBounds> recordedFrameBounds() {
+		SelectedSource source = selectedSource.get();
+		boolean windowSource = WindowSources.isWindowSourceId(source == null ? null : source.id())
+				|| captureSurface.equals(Optional.of(WindowSources.CaptureSurface.WINDOW));
+		if (windowSource) {
+			return Optional.empty();
+		}
+		double[] cursor = cursorLogical();
+		return frameBounds(source, cursor[0], cursor[1]);
+	}
 
+	private Optional<FrameBounds> frameBounds(SelectedSource source, double cursorX, double cursorY) {
+		double primaryScale = primaryScale();
 		// Areas are fixed rectangles, so they normalize like a window that never moves.
 		var area = SourceArea.getSourceArea(source);
 		double boundsX;
@@ -180,9 +209,9 @@ final class CursorCoordinateMapper {
 			boundsHeight = area.height();
 			scale = primaryScale;
 		} else {
-			CursorScreen.Display display = captureDisplay(source, cacheFresh, cursorX, cursorY);
+			CursorScreen.Display display = captureDisplay(source, cacheFresh(), cursorX, cursorY);
 			if (display == null) {
-				return new double[] {0.5, 0.5};
+				return Optional.empty();
 			}
 			boundsX = display.x();
 			boundsY = display.y();
@@ -190,11 +219,8 @@ final class CursorCoordinateMapper {
 			boundsHeight = display.height();
 			scale = display.scaleFactor() > 0 ? display.scaleFactor() : 1;
 		}
-		double width = Math.max(1, boundsWidth / scale);
-		double height = Math.max(1, boundsHeight / scale);
-		double cx = CursorTelemetry.clamp((cursorX - boundsX / scale) / width, 0, 1);
-		double cy = CursorTelemetry.clamp((cursorY - boundsY / scale) / height, 0, 1);
-		return new double[] {cx, cy};
+		return Optional.of(new FrameBounds(boundsX / scale, boundsY / scale,
+				Math.max(1, boundsWidth / scale), Math.max(1, boundsHeight / scale)));
 	}
 
 	/**

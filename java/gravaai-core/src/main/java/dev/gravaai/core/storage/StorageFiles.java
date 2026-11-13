@@ -44,6 +44,8 @@ public final class StorageFiles {
 	/** Cursor/keystroke telemetry files written next to a recording. */
 	public static final String CURSOR_TELEMETRY_SUFFIX = ".cursor.json";
 	public static final String KEYSTROKE_TELEMETRY_SUFFIX = ".keys.json";
+	/** Live ink drawn on screen during a recording (draw sessions and strokes). */
+	public static final String INK_TELEMETRY_SUFFIX = ".ink.json";
 	public static final int CURSOR_TELEMETRY_VERSION = 2;
 	public static final int CURSOR_SAMPLE_INTERVAL_MS = 33;
 	public static final int MAX_CURSOR_SAMPLES = 60 * 60 * 30; // 1 hour @ 30Hz
@@ -91,6 +93,11 @@ public final class StorageFiles {
 	/** Port of getKeystrokePathForVideo in electron/ipc/utils.ts. */
 	public static Path keystrokeTelemetryPath(String videoPath) {
 		return Path.of(videoPath + KEYSTROKE_TELEMETRY_SUFFIX);
+	}
+
+	/** The ink sidecar next to a recording: {@code <video>.ink.json}. */
+	public static Path inkTelemetryPath(String videoPath) {
+		return Path.of(videoPath + INK_TELEMETRY_SUFFIX);
 	}
 
 	/** Port of isAutoRecordingPath: recordings the app made, not files the user imported. */

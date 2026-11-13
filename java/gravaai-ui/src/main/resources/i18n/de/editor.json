@@ -143,7 +143,8 @@
 	},
 	"timeline": {
 		"expand": "Zeitleiste erweitern",
-		"collapse": "Zeitleiste reduzieren"
+		"collapse": "Zeitleiste reduzieren",
+		"inkBand": "Zeichnung {{start}}–{{end}} · {{count}} Striche"
 	},
 	"openRecordingsFolder": "Aufnahmeordner öffnen"
 }

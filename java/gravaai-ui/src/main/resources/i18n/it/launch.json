@@ -101,5 +101,14 @@
 		"failedToStart": "Avvio della registrazione non riuscito: {{error}}",
 		"failedToStartGeneric": "Avvio della registrazione non riuscito",
 		"pickFailed": "Nessuno schermo è stato selezionato. Scegli lo schermo e riprova."
+	},
+	"ink": {
+		"draw": "Disegna sullo schermo",
+		"drawUnavailable": "Il disegno funziona quando registri uno schermo o un'area",
+		"stopDrawing": "Smetti di disegnare (Esc)",
+		"undo": "Annulla (Ctrl+Z)",
+		"clear": "Cancella (Backspace)",
+		"color": "Colore",
+		"width": "Spessore della linea"
 	}
 }

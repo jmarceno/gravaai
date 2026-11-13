@@ -44,4 +44,12 @@ public interface CursorTelemetrySource {
 	 */
 	default void onCaptureSurface(WindowSources.CaptureSurface surface) {
 	}
+
+	/**
+	 * Takes the ink drawn on screen during the recording (the pen is pointer input too), clearing
+	 * it. A source without a live pen has none.
+	 */
+	default InkTelemetry.InkRecording takeRecordedInk() {
+		return InkTelemetry.InkRecording.EMPTY;
+	}
 }

@@ -14,6 +14,8 @@ import dev.gravaai.services.recording.CursorTelemetry.CursorInteractionType;
 import dev.gravaai.services.recording.CursorTelemetry.CursorTelemetryPoint;
 import dev.gravaai.services.recording.CursorTelemetry.CursorVisualType;
 import dev.gravaai.services.recording.CursorTelemetrySource;
+import dev.gravaai.services.recording.InkLog;
+import dev.gravaai.services.recording.InkTelemetry;
 import dev.gravaai.services.recording.KeystrokeSource;
 import dev.gravaai.services.recording.KeystrokeTypes;
 import dev.gravaai.services.recording.KeystrokeTypes.KeyModifier;
@@ -48,6 +50,7 @@ public final class CursorCaptureSession
 	private final CursorCoordinateMapper coordinates;
 	private final CursorSampleBuffer samples = new CursorSampleBuffer();
 	private final CursorCaptureClock clock = new CursorCaptureClock();
+	private final InkLog ink;
 
 	private volatile boolean captureActive;
 	private volatile long captureStartTimeMs;
@@ -104,6 +107,17 @@ public final class CursorCaptureSession
 		this.sampler = new CursorSampler(this::captureTick);
 		this.interactions = new CursorInteractionTracker(samples, clock, coordinates);
 		helper.setListener(this);
+		this.ink = new InkLog(clock::getCursorCaptureElapsedMs, this::recordedFrameBounds);
+	}
+
+	/** The live ink of the recording in progress; the draw overlay feeds it. */
+	public InkLog ink() {
+		return ink;
+	}
+
+	@Override
+	public InkTelemetry.InkRecording takeRecordedInk() {
+		return ink.take();
 	}
 
 	/** Port of {@code normalizeHookMouseButton}. */
@@ -128,6 +142,7 @@ public final class CursorCaptureSession
 		clock.reset();
 		coordinates.reset();
 		interactions.reset();
+		ink.reset();
 		sampler.start();
 		helper.start();
 		captureActive = true;
@@ -168,6 +183,20 @@ public final class CursorCaptureSession
 
 	public boolean isPaused() {
 		return clock.isCursorCapturePaused();
+	}
+
+	/**
+	 * The frame the active recording records, in global logical pixels; empty for a window
+	 * recording or when nothing records. Live ink normalizes against it, so ink and cursor share
+	 * one mapping.
+	 */
+	public java.util.Optional<FrameBounds> recordedFrameBounds() {
+		return captureActive ? coordinates.recordedFrameBounds() : java.util.Optional.empty();
+	}
+
+	/** Recording time on the pause-aware capture clock, the time base of every sidecar. */
+	public long captureElapsedMs() {
+		return clock.getCursorCaptureElapsedMs();
 	}
 
 	/** The latest normalized cursor position, for the HUD/UI. */

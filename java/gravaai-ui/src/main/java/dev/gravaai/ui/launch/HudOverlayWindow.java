@@ -83,6 +83,7 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 	private @Nullable HudWebcamPreview webcamPreview;
 	private @Nullable HudMenuWindow menuWindow;
 	private @Nullable AutoCloseable subscription;
+	private @Nullable AutoCloseable drawSubscription;
 	private @Nullable PauseTransition hintTimer;
 	/** A content change arrived while the stage was hidden; re-fit it when shown. */
 	private boolean resizePending;
@@ -157,6 +158,11 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 		bar.setManaged(false);
 		root.getChildren().add(bar);
 		subscription = port.onStateChanged(this::applyState);
+		drawSubscription = port.onDrawStateChanged(draw -> {
+			if (bar != null) {
+				bar.retranslate();
+			}
+		});
 		applyState(port.state());
 		stage.toFront();
 		long built = System.nanoTime();
@@ -190,6 +196,14 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 				LOG.log(System.Logger.Level.DEBUG, "closing the HUD state subscription failed: " + error);
 			}
 			subscription = null;
+		}
+		if (drawSubscription != null) {
+			try {
+				drawSubscription.close();
+			} catch (Exception error) {
+				LOG.log(System.Logger.Level.DEBUG, "closing the HUD draw subscription failed: " + error);
+			}
+			drawSubscription = null;
 		}
 		if (menuWindow != null) {
 			menuWindow.dispose();
@@ -248,6 +262,11 @@ public final class HudOverlayWindow implements GlobalShortcutHud {
 			@Override
 			public void toggleMeetingMode() {
 				port.toggleMeetingMode();
+			}
+
+			@Override
+			public void toggleDraw() {
+				port.toggleDraw();
 			}
 		});
 	}

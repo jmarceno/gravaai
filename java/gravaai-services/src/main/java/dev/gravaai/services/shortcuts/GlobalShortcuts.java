@@ -275,6 +275,7 @@ public final class GlobalShortcuts {
 		bindings.put(GlobalShortcutAction.TOGGLE_PAUSE, superAlt("p"));
 		bindings.put(GlobalShortcutAction.CANCEL_RECORDING, null);
 		bindings.put(GlobalShortcutAction.TOGGLE_MEETING, superAlt("m"));
+		bindings.put(GlobalShortcutAction.TOGGLE_DRAW, superAlt("d"));
 		return new GlobalShortcutsConfig(true, bindings);
 	}
 
@@ -289,6 +290,7 @@ public final class GlobalShortcuts {
 		labels.put(GlobalShortcutAction.TOGGLE_PAUSE, "Pause / resume");
 		labels.put(GlobalShortcutAction.CANCEL_RECORDING, "Cancel recording");
 		labels.put(GlobalShortcutAction.TOGGLE_MEETING, "Start / stop meeting");
+		labels.put(GlobalShortcutAction.TOGGLE_DRAW, "Draw on screen");
 		return Map.copyOf(labels);
 	}
 

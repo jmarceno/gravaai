@@ -68,7 +68,7 @@ class GlobalShortcutsServiceTest {
 		assertEquals(
 				"'/opt/Gravaai/gravaai' --toggle-recording",
 				status.commands().get(GlobalShortcutAction.TOGGLE_RECORDING));
-		assertEquals(4, status.commands().size());
+		assertEquals(5, status.commands().size());
 		assertEquals(1, settings.writes);
 		assertFalse(Files.exists(cosmicPaths(env("GNOME")).custom()));
 	}
@@ -87,7 +87,8 @@ class GlobalShortcutsServiceTest {
 				List.of(
 						GlobalShortcutAction.TOGGLE_RECORDING,
 						GlobalShortcutAction.TOGGLE_PAUSE,
-						GlobalShortcutAction.TOGGLE_MEETING),
+						GlobalShortcutAction.TOGGLE_MEETING,
+						GlobalShortcutAction.TOGGLE_DRAW),
 				List.copyOf(status.registered().keySet()));
 
 		Path installed = Path.of(env.get("XDG_DATA_HOME"), "gravaai", "bin", "gravaai-ctl");
@@ -98,7 +99,7 @@ class GlobalShortcutsServiceTest {
 		String custom = Files.readString(paths.custom(), UTF_8);
 		assertTrue(custom.startsWith("{\n    (\n"), custom);
 		List<CosmicShortcutEntry> entries = CosmicShortcuts.parseCosmicShortcuts(custom).entries();
-		assertEquals(3, entries.size());
+		assertEquals(4, entries.size());
 		for (CosmicShortcutEntry entry : entries) {
 			assertTrue(CosmicShortcuts.isGravaaiEntry(entry));
 			assertTrue(entry.spawnCommand().contains("gravaai-ctl"), entry.spawnCommand());
@@ -115,7 +116,7 @@ class GlobalShortcutsServiceTest {
 		assertTrue(Files.readString(Path.of(paths.custom() + ".gravaai-backup"), UTF_8).contains("Gravaai: "));
 
 		GlobalShortcutsStatus again = service.apply(GlobalShortcuts.DEFAULT_GLOBAL_SHORTCUTS);
-		assertEquals(3, again.registered().size());
+		assertEquals(4, again.registered().size());
 		assertEquals(
 				custom, Files.readString(paths.custom(), UTF_8), "re-enabling writes the same bytes back");
 		assertFalse(Files.exists(Path.of(paths.custom() + ".tmp-gravaai")));
@@ -151,11 +152,12 @@ class GlobalShortcutsServiceTest {
 				"Super + Alt + R is used by COSMIC (Close)",
 				status.conflicts().get(GlobalShortcutAction.TOGGLE_RECORDING));
 		assertEquals(
-				List.of(GlobalShortcutAction.TOGGLE_PAUSE, GlobalShortcutAction.TOGGLE_MEETING),
+				List.of(GlobalShortcutAction.TOGGLE_PAUSE, GlobalShortcutAction.TOGGLE_MEETING,
+						GlobalShortcutAction.TOGGLE_DRAW),
 				List.copyOf(status.registered().keySet()));
 		List<CosmicShortcutEntry> entries =
 				CosmicShortcuts.parseCosmicShortcuts(Files.readString(paths.custom(), UTF_8)).entries();
-		assertEquals(2, entries.size());
+		assertEquals(3, entries.size());
 	}
 
 	@Test
@@ -268,7 +270,7 @@ class GlobalShortcutsServiceTest {
 
 		assertEquals(GlobalShortcutsStatus.Backend.PORTAL, status.backend());
 		List<GlobalShortcutsPortal.Shortcut> shortcuts = portal.bound.get(5, java.util.concurrent.TimeUnit.SECONDS);
-		assertEquals(4, shortcuts.size());
+		assertEquals(5, shortcuts.size());
 		assertEquals("toggle-recording", shortcuts.getFirst().id());
 		assertEquals("Start / stop recording", shortcuts.getFirst().description());
 		assertEquals("ALT+LOGO+r", shortcuts.getFirst().preferredTrigger());

@@ -101,5 +101,14 @@
 		"failedToStart": "录制启动失败：{{error}}",
 		"failedToStartGeneric": "录制启动失败",
 		"pickFailed": "未选择任何屏幕。请重新选择屏幕再试。"
+	},
+	"ink": {
+		"draw": "在屏幕上绘制",
+		"drawUnavailable": "录制屏幕或区域时可以绘制",
+		"stopDrawing": "停止绘制 (Esc)",
+		"undo": "撤销 (Ctrl+Z)",
+		"clear": "清除 (Backspace)",
+		"color": "颜色",
+		"width": "线条粗细"
 	}
 }

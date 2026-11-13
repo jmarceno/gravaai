@@ -89,6 +89,19 @@ public final class StoreTimelineDataSource implements TimelineDataSource {
 		return eyeContactStrip.get();
 	}
 
+	private volatile Supplier<List<InkMark>> inkMarks = List::of;
+
+	/** Supplies the pen bands of the clip row (the app reads the recording's ink sidecar). */
+	public StoreTimelineDataSource inkMarks(Supplier<List<InkMark>> marks) {
+		this.inkMarks = Objects.requireNonNull(marks, "marks");
+		return this;
+	}
+
+	@Override
+	public List<InkMark> inkMarks() {
+		return inkMarks.get();
+	}
+
 	private volatile java.util.function.Function<String, String> cleanupRenderStatus = id -> "";
 
 	/** Supplies the render state of each cleaned lane's denoised copy (the app owns the cache). */

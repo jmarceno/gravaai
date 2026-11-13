@@ -209,6 +209,10 @@ public final class TimelineView extends Region {
 	private static final Color SMART_FRAMING_RETURN_BAND = Color.web("#9fb3bd", 0.18);
 	/** Eye-contact strip: corrected, faded, analysing (track + progress) and failed. */
 	private static final Color EYE_CONTACT_ON = Color.web("#7aa2ff");
+	/** The pen bands of the clip row (live ink drawn while recording). */
+	private static final Color INK_BAND = Color.web("#ffb020");
+	private static final Color INK_BAND_FILL = Color.web("#ffb020", 0.16);
+	private static final Color INK_TAG_TEXT = Color.web("#1b1407");
 	private static final Color EYE_CONTACT_FADED = Color.web("#7aa2ff", 0.35);
 	private static final Color EYE_CONTACT_TRACK = Color.web("#9fb3bd", 0.25);
 	private static final Color EYE_CONTACT_PROGRESS = Color.web("#9fb3bd", 0.8);
@@ -385,6 +389,9 @@ public final class TimelineView extends Region {
 	private List<MarkerTimeline.Fragment> markerFragments = List.of();
 	/** Marker id → ruler flag bounds, for the ruler hit test and the drag ghost. */
 	private final Map<String, BlockBounds> markerBounds = new LinkedHashMap<>();
+	/** Hit boxes of the pen bands, by index into {@link TimelineDataSource#inkMarks()}. */
+	private final Map<Integer, BlockBounds> inkBounds = new LinkedHashMap<>();
+	private int hoveredInkIndex = -1;
 	private @Nullable String dragMarkerId;
 	private double dragMarkerMs;
 	private boolean markerDragged;
@@ -1007,6 +1014,12 @@ public final class TimelineView extends Region {
 			redraw();
 			return;
 		}
+		Optional<InkMark> ink = inkMarkAt(x, y);
+		if (ink.isPresent()) {
+			commands.seek(ink.get().startMs());
+			setCurrentTimeMs(ink.get().startMs());
+			return;
+		}
 		Optional<String> cameraSwitch = cameraSwitchAt(x, y);
 		if (cameraSwitch.isPresent()) {
 			commands.toggleCameraLayoutTransition(cameraSwitch.get());
@@ -1610,6 +1623,15 @@ public final class TimelineView extends Region {
 		}
 		if (overMarker != null) {
 			canvas.setCursor(Cursor.H_RESIZE);
+			return;
+		}
+		int overInk = inkIndexAt(x, y);
+		if (overInk != hoveredInkIndex) {
+			hoveredInkIndex = overInk;
+			redraw();
+		}
+		if (overInk >= 0) {
+			canvas.setCursor(Cursor.HAND);
 			return;
 		}
 		boolean overPlayhead = isOnPlayhead(x, y);
@@ -2405,6 +2427,7 @@ public final class TimelineView extends Region {
 		drawCutPreview(graphics, width);
 		drawSmartFramingMoves(graphics, width);
 		drawEyeContactStrip(graphics, width);
+		drawInkMarks(graphics, width);
 		graphics.restore();
 		// Track headers (mock .tlheads) live in the fixed gutter and scroll with the lanes.
 		graphics.save();
@@ -3288,6 +3311,78 @@ public final class TimelineView extends Region {
 				graphics.fillPolygon(xs, ys, 4);
 			}
 		}
+	}
+
+	/**
+	 * The pen bands over the clip row: where the presenter drew on screen while recording. An
+	 * amber line along the top of the clips with a light wash under it, and a pen tag at the start
+	 * that names the span and its strokes when hovered. Clicking the band seeks to its start.
+	 */
+	private void drawInkMarks(GraphicsContext graphics, double width) {
+		inkBounds.clear();
+		List<InkMark> marks = dataSource.inkMarks();
+		RowLayout row = rowById(TimelineConstants.CLIP_ROW_ID);
+		if (marks.isEmpty() || row == null) {
+			return;
+		}
+		double top = row.top() + 5;
+		double height = row.height() - 10;
+		for (int index = 0; index < marks.size(); index++) {
+			InkMark mark = marks.get(index);
+			double x0 = Math.max(GUTTER_WIDTH, xForTime(mark.startMs()));
+			double x1 = Math.min(width, xForTime(mark.endMs()));
+			if (x1 <= x0) {
+				continue;
+			}
+			double bandWidth = Math.max(2, x1 - x0);
+			graphics.setFill(INK_BAND_FILL);
+			graphics.fillRect(x0, top, bandWidth, height);
+			graphics.setFill(INK_BAND);
+			graphics.fillRect(x0, top, bandWidth, 2.5);
+			boolean hovered = index == hoveredInkIndex;
+			String label = hovered ? inkLabel(mark) : "✎";
+			graphics.setFont(SMALL_FONT);
+			double tagWidth = textWidth(label, SMALL_FONT) + 8;
+			double tagHeight = 13;
+			graphics.setFill(INK_BAND);
+			graphics.fillRoundRect(x0, top + 3, tagWidth, tagHeight, 3, 3);
+			graphics.setFill(INK_TAG_TEXT);
+			graphics.fillText(label, x0 + 4, top + 3 + tagHeight - 3.5);
+			// Only the tag is clickable: the band lies over the clips, which keep their own clicks.
+			inkBounds.put(index, new BlockBounds(x0, top + 3, tagWidth, tagHeight));
+		}
+	}
+
+	private static String inkLabel(InkMark mark) {
+		return dev.gravaai.ui.i18n.UiI18n.t("editor:timeline.inkBand", java.util.Map.of(
+				"start", formatClock(mark.startMs()),
+				"end", formatClock(mark.endMs()),
+				"count", String.valueOf(mark.strokes())));
+	}
+
+	private static String formatClock(long ms) {
+		long seconds = Math.max(0, ms) / 1000;
+		return (seconds / 60) + ":" + String.format(java.util.Locale.ROOT, "%02d", seconds % 60);
+	}
+
+	/** The pen band under a content point, if any. */
+	private Optional<InkMark> inkMarkAt(double x, double y) {
+		List<InkMark> marks = dataSource.inkMarks();
+		for (Map.Entry<Integer, BlockBounds> entry : inkBounds.entrySet()) {
+			if (entry.getValue().contains(x, y) && entry.getKey() < marks.size()) {
+				return Optional.of(marks.get(entry.getKey()));
+			}
+		}
+		return Optional.empty();
+	}
+
+	private int inkIndexAt(double x, double y) {
+		for (Map.Entry<Integer, BlockBounds> entry : inkBounds.entrySet()) {
+			if (entry.getValue().contains(x, y)) {
+				return entry.getKey();
+			}
+		}
+		return -1;
 	}
 
 	/**

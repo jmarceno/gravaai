@@ -87,6 +87,32 @@ public interface HudRecordingPort {
 
 	void cancelRecording();
 
+	// ── draw mode (live ink) ───────────────────────────────────────────────
+
+	/**
+	 * The pen button's state.
+	 *
+	 * @param available a screen or area is recording, so ink can be drawn (never for a window)
+	 * @param drawing the ink overlay is up
+	 */
+	record DrawState(boolean available, boolean drawing) {
+		public static final DrawState UNAVAILABLE = new DrawState(false, false);
+	}
+
+	/** The pen state; a port without draw mode reports it unavailable. */
+	default DrawState drawState() {
+		return DrawState.UNAVAILABLE;
+	}
+
+	/** Pushes pen state changes to the HUD (FX thread). Close the handle to unsubscribe. */
+	default AutoCloseable onDrawStateChanged(Consumer<DrawState> listener) {
+		return () -> { };
+	}
+
+	/** Enters or leaves draw mode; ignored when it is unavailable. */
+	default void toggleDraw() {
+	}
+
 	// ── launch options (persisted by the app) ──────────────────────────────
 	void toggleMeetingMode();
 

@@ -101,5 +101,14 @@
 		"failedToStart": "Error al iniciar la grabación: {{error}}",
 		"failedToStartGeneric": "Error al iniciar la grabación",
 		"pickFailed": "No se seleccionó ninguna pantalla. Elige pantalla para intentarlo de nuevo."
+	},
+	"ink": {
+		"draw": "Dibujar en la pantalla",
+		"drawUnavailable": "El dibujo funciona al grabar una pantalla o un área",
+		"stopDrawing": "Dejar de dibujar (Esc)",
+		"undo": "Deshacer (Ctrl+Z)",
+		"clear": "Borrar (Retroceso)",
+		"color": "Color",
+		"width": "Grosor de línea"
 	}
 }

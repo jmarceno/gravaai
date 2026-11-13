@@ -377,6 +377,11 @@ public final class RecordingWiring implements AutoCloseable {
 		return recording;
 	}
 
+	/** The pointer telemetry of the recording in progress, which also carries its live ink. */
+	public CursorCaptureSession cursorSession() {
+		return cursorSession;
+	}
+
 	public SourceService sources() {
 		return sources;
 	}

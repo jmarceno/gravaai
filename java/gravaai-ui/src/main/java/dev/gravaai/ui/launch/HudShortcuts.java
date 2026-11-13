@@ -25,6 +25,9 @@ public final class HudShortcuts {
 		void requestSourcePick();
 
 		void toggleMeetingMode();
+
+		/** Enters or leaves draw mode (the live ink overlay). */
+		void toggleDraw();
 	}
 
 	private HudShortcuts() {}
@@ -66,6 +69,11 @@ public final class HudShortcuts {
 				}
 			}
 			case TOGGLE_MEETING -> actions.toggleMeetingMode();
+			case TOGGLE_DRAW -> {
+				if (state.recording()) {
+					actions.toggleDraw();
+				}
+			}
 		}
 	}
 }

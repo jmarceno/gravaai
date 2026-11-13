@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import dev.gravaai.core.json.Json;
+import dev.gravaai.core.storage.StorageFiles;
 
 /**
  * Recordings library listing and reversible removal, ported from
@@ -139,6 +140,7 @@ public final class RecordingLibrary {
 		return name.equals(video)
 				|| name.equals(video + ".cursor.json")
 				|| name.equals(video + ".keys.json")
+				|| name.equals(video + StorageFiles.INK_TELEMETRY_SUFFIX)
 				|| (name.startsWith(stem + ".") && COMPANION_NAME.matcher(name).find())
 				|| name.equals(stem + RecordingAudioManifest.SUFFIX)
 				|| name.equals(stem + ".gravaai-session.json")

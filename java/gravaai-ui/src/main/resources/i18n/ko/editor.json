@@ -143,7 +143,8 @@
 	},
 	"timeline": {
 		"expand": "타임라인 펼치기",
-		"collapse": "타임라인 접기"
+		"collapse": "타임라인 접기",
+		"inkBand": "그리기 {{start}}–{{end}} · 획 {{count}}개"
 	},
 	"openRecordingsFolder": "녹화 폴더 열기"
 }

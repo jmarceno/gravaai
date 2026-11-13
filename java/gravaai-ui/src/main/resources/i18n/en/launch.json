@@ -101,5 +101,14 @@
 		"failedToStart": "Failed to start recording: {{error}}",
 		"failedToStartGeneric": "Failed to start recording",
 		"pickFailed": "No screen was selected. Pick screen to try again."
+	},
+	"ink": {
+		"draw": "Draw on screen",
+		"drawUnavailable": "Drawing works when you record a screen or an area",
+		"stopDrawing": "Stop drawing (Esc)",
+		"undo": "Undo (Ctrl+Z)",
+		"clear": "Clear (Backspace)",
+		"color": "Colour",
+		"width": "Line width"
 	}
 }

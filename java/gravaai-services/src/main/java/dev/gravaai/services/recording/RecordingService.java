@@ -235,7 +235,9 @@ public final class RecordingService {
 		try {
 			String content = Files.readString(
 					Path.of(RecordingPaths.getTelemetryPathForVideo(target)), StandardCharsets.UTF_8);
-			return CursorTelemetry.normalizeCursorTelemetrySamples(Json.parseJsonWithByteOrderMark(content));
+			// Pen presses on the live ink overlay are strokes, not clicks: no zoom on them.
+			return InkTelemetry.cursorTelemetryWithoutInkClicks(target,
+					CursorTelemetry.normalizeCursorTelemetrySamples(Json.parseJsonWithByteOrderMark(content)));
 		} catch (IOException error) {
 			return List.of();
 		}

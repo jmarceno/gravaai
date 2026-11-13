@@ -207,7 +207,8 @@
 			"actionToggleRecording": "Начать / остановить запись",
 			"actionTogglePause": "Пауза / продолжить",
 			"actionCancelRecording": "Отменить запись",
-			"actionToggleMeeting": "Начать / остановить встречу"
+			"actionToggleMeeting": "Начать / остановить встречу",
+			"actionToggleDraw": "Рисовать на экране"
 		}
 	}
 }

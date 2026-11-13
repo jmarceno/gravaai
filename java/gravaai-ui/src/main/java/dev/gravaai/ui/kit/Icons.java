@@ -19,6 +19,8 @@ public final class Icons {
 	public static final String ArrowClockwise = "solar/refresh";
 	public static final String ArrowClockwiseIcon = "solar/refresh";
 	public static final String ArrowCounterClockwise = "solar/restart";
+	/** The live ink pen (draw on screen while recording). */
+	public static final String Pen = "solar/pen-2";
 	public static final String ArrowLeft = "solar/arrow-left";
 	public static final String ArrowRight = "solar/arrow-right";
 	public static final String ArrowsMerge = "solar/branching-paths-up";

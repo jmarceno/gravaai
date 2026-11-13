@@ -101,5 +101,14 @@
 		"failedToStart": "Opname starten mislukt: {{error}}",
 		"failedToStartGeneric": "Opname starten mislukt",
 		"pickFailed": "Er is geen scherm geselecteerd. Kies een scherm om het opnieuw te proberen."
+	},
+	"ink": {
+		"draw": "Op het scherm tekenen",
+		"drawUnavailable": "Tekenen werkt bij het opnemen van een scherm of gebied",
+		"stopDrawing": "Stoppen met tekenen (Esc)",
+		"undo": "Ongedaan maken (Ctrl+Z)",
+		"clear": "Wissen (Backspace)",
+		"color": "Kleur",
+		"width": "Lijndikte"
 	}
 }

@@ -101,5 +101,14 @@
 		"failedToStart": "Échec du démarrage de l’enregistrement : {{error}}",
 		"failedToStartGeneric": "Échec du démarrage de l’enregistrement",
 		"pickFailed": "Aucun écran n'a été sélectionné. Choisissez un écran pour réessayer."
+	},
+	"ink": {
+		"draw": "Dessiner à l'écran",
+		"drawUnavailable": "Le dessin fonctionne quand vous enregistrez un écran ou une zone",
+		"stopDrawing": "Arrêter de dessiner (Échap)",
+		"undo": "Annuler (Ctrl+Z)",
+		"clear": "Effacer (Retour arrière)",
+		"color": "Couleur",
+		"width": "Épaisseur du trait"
 	}
 }

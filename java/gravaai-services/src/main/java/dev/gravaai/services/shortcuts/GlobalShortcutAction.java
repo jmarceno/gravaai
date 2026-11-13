@@ -11,7 +11,9 @@ public enum GlobalShortcutAction {
 	TOGGLE_RECORDING("toggle-recording"),
 	TOGGLE_PAUSE("toggle-pause"),
 	CANCEL_RECORDING("cancel-recording"),
-	TOGGLE_MEETING("toggle-meeting");
+	TOGGLE_MEETING("toggle-meeting"),
+	/** Enters or leaves draw mode (the live ink overlay) while recording a screen or an area. */
+	TOGGLE_DRAW("toggle-draw");
 
 	private final String wire;
 

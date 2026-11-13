@@ -60,6 +60,11 @@ public interface TimelineDataSource {
 		return FilmstripProvider.empty();
 	}
 
+	/** Where the presenter drew on screen while recording, on the edited timeline. */
+	default java.util.List<InkMark> inkMarks() {
+		return java.util.List.of();
+	}
+
 	/** Agent highlight spans (shell for {@code AgentTimelineHighlights.tsx}, P3 fills it). */
 	default java.util.List<AgentHighlight> agentHighlights() {
 		return java.util.List.of();

@@ -36,6 +36,7 @@ import dev.gravaai.services.recording.ports.PlatformRecordingEnvironment;
 import dev.gravaai.services.recording.ports.PlatformRecordingProcesses;
 import dev.gravaai.services.sources.SelectedSource;
 import dev.gravaai.services.sources.SourceService;
+import dev.gravaai.platform.compositor.DesktopSession;
 import dev.gravaai.ui.launch.HudRecordingPort;
 import tools.jackson.databind.JsonNode;
 
@@ -106,6 +107,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	private final Navigation navigation;
 	private final RecordingPreferencesStore preferencesStore;
 	private final CountdownDelayStore countdownDelayStore;
+	private final DrawModeController drawMode;
 	/** Devices are enumerated lazily and cached briefly: the HUD menu is the only consumer. */
 	private record CachedDevices(long atMs, List<MicDevice> microphones, List<CameraDevice> cameras) {
 	}
@@ -143,6 +145,10 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		this.preferencesStore = new RecordingPreferencesStore(userData.recordingsSettingsFile());
 		this.countdownDelayStore = wiring.countdownDelay();
 		this.countdownDelay = (int) Math.round(countdownDelayStore.getCountdownDelay());
+		this.drawMode = new DrawModeController(wiring.cursorSession(),
+				() -> wiring.recording().isRecordingActive(),
+				() -> wiring.sources().getSelectedSource(),
+				DesktopSession.current());
 	}
 
 	/** Builds the adapter on the FX thread; loads preferences and subscriptions asynchronously. */
@@ -388,6 +394,9 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 	}
 
 	private void stopRecording() {
+		// The ink leaves the screen before the capture stops, so the draw session ends inside
+		// the recording.
+		onFx(drawMode::close);
 		finalizing = true;
 		paused = false;
 		navigation.recordingFinalizing(true);
@@ -514,6 +523,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 		if (finalizing || !wiring.recording().isRecordingActive()) {
 			return;
 		}
+		onFx(drawMode::close);
 		WebcamRecordingService.WebcamRecording webcam = webcamRecording;
 		webcamRecording = null;
 		if (webcam != null) {
@@ -787,6 +797,7 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 
 	private void subscribe() {
 		subscriptions.add(wiring.events().onRecordingStateChanged(state -> {
+			onFx(drawMode::recordingChanged);
 			if (!state.recording()) {
 				paused = false;
 				if (!finalizing) {
@@ -828,6 +839,31 @@ public final class HudRecordingPortAdapter implements HudRecordingPort, AutoClos
 				LOG.log(System.Logger.Level.WARNING, "could not load recording preferences: " + error);
 			}
 		});
+	}
+
+	private static void onFx(Runnable action) {
+		if (Platform.isFxApplicationThread()) {
+			action.run();
+		} else {
+			Platform.runLater(action);
+		}
+	}
+
+	// ── draw mode ─────────────────────────────────────────────────────────
+
+	@Override
+	public DrawState drawState() {
+		return drawMode.state();
+	}
+
+	@Override
+	public AutoCloseable onDrawStateChanged(Consumer<DrawState> listener) {
+		return drawMode.onDrawStateChanged(listener);
+	}
+
+	@Override
+	public void toggleDraw() {
+		onFx(drawMode::toggle);
 	}
 
 	private void publish() {

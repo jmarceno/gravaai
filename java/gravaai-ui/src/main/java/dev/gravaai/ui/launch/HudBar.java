@@ -295,6 +295,18 @@ public final class HudBar extends HBox {
 				});
 		row.getChildren().add(pauseResume);
 
+		HudRecordingPort.DrawState draw = port.drawState();
+		Button pen = iconButton(Icons.Pen, draw.drawing() ? "fill" : "regular", 16,
+				draw.available() ? t("launch:ink.draw") : t("launch:ink.drawUnavailable"),
+				draw.drawing() ? "hud-pen--active" : null, port::toggleDraw);
+		pen.setAriaPressed(draw.drawing());
+		// A disabled button shows no tooltip in JavaFX, so an unavailable pen stays enabled and
+		// explains itself instead; toggleDraw() ignores it.
+		if (!draw.available()) {
+			pen.setOpacity(0.45);
+		}
+		row.getChildren().add(pen);
+
 		Button stop = new Button("", Button.Variant.DESTRUCTIVE, Button.Size.ICON);
 		stop.setGraphic(region(STOP_SQUARE));
 		stop.setOnAction(event -> port.toggleRecording());

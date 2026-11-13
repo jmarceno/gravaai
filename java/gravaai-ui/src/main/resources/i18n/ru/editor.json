@@ -143,7 +143,8 @@
 	},
 	"timeline": {
 		"expand": "Развернуть таймлайн",
-		"collapse": "Свернуть таймлайн"
+		"collapse": "Свернуть таймлайн",
+		"inkBand": "Рисунок {{start}}–{{end}} · штрихов: {{count}}"
 	},
 	"openRecordingsFolder": "Открыть папку с записями"
 }

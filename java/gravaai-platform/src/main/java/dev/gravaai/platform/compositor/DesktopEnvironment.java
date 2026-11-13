@@ -7,9 +7,10 @@ import java.util.Map;
  * The Linux desktop environments and compositors Gravaai knows how to behave differently on.
  *
  * <p>This enum is the single list of desktop names, and each constant declares its own
- * {@link DesktopProfile} right next to it: which capture mechanism, which pointer source and which
- * shortcut registration strategy that desktop needs. Adding a desktop is one constant with its
- * profile and its {@code XDG_CURRENT_DESKTOP} aliases — not a branch to add to five classes.
+ * {@link DesktopProfile} right next to it: which capture mechanism, which pointer source, which
+ * shortcut registration strategy and which overlay stacking that desktop needs. Adding a desktop
+ * is one constant with its profile and its {@code XDG_CURRENT_DESKTOP} aliases — not a branch to
+ * add to five classes.
  *
  * <p>The name list is intentionally explicit. Each entry needs evidence about the mechanisms it
  * exposes, so a new desktop is a deliberate decision rather than a substring-heuristics accident.
@@ -27,14 +28,16 @@ public enum DesktopEnvironment {
 	 * shortcuts written into COSMIC's RON config files.
 	 */
 	COSMIC(new DesktopProfile(
-			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.COSMIC_CONFIG),
+			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.COSMIC_CONFIG,
+			OverlayStacking.REFRONT_ON_FOCUS_LOSS),
 			"cosmic"),
 
 	/**
 	 * KDE Plasma (KWin): xdg-desktop-portal capture and a KWin script for the pointer.
 	 */
 	KDE(new DesktopProfile(
-			CaptureBackend.PORTAL, CursorBackend.KWIN_SCRIPT, ShortcutStrategy.PORTAL),
+			CaptureBackend.PORTAL, CursorBackend.KWIN_SCRIPT, ShortcutStrategy.PORTAL,
+			OverlayStacking.KEEP_ABOVE),
 			"kde", "plasma"),
 
 	/**
@@ -42,7 +45,8 @@ public enum DesktopEnvironment {
 	 * pointer.
 	 */
 	GNOME(new DesktopProfile(
-			CaptureBackend.PORTAL, CursorBackend.GNOME_BRIDGE, ShortcutStrategy.PORTAL),
+			CaptureBackend.PORTAL, CursorBackend.GNOME_BRIDGE, ShortcutStrategy.PORTAL,
+			OverlayStacking.KEEP_ABOVE),
 			"gnome", "unity"),
 
 	/** Sway: wlroots, portal capture, no pointer bridge. */
@@ -80,7 +84,8 @@ public enum DesktopEnvironment {
 
 	/** No name matched: the historical direct-capture behaviour. */
 	OTHER(new DesktopProfile(
-			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL));
+			CaptureBackend.EXT_IMAGE_COPY, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL,
+			OverlayStacking.KEEP_ABOVE));
 
 	/**
 	 * The profile of a desktop known only through the portal: portal capture, the direct cursor
@@ -93,7 +98,8 @@ public enum DesktopEnvironment {
 	 */
 	private static DesktopProfile portalOnly() {
 		return new DesktopProfile(
-				CaptureBackend.PORTAL, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL);
+				CaptureBackend.PORTAL, CursorBackend.EXT_IMAGE_COPY, ShortcutStrategy.PORTAL,
+				OverlayStacking.KEEP_ABOVE);
 	}
 
 	/** The desktops that can be named; {@link #OTHER} has no aliases and is never matched. */

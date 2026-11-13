@@ -26,6 +26,8 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 	private static final System.Logger LOG = System.getLogger("gravaai.hud.lazy");
 
 	private final List<Consumer<State>> listeners = new CopyOnWriteArrayList<>();
+	private final List<Consumer<DrawState>> drawListeners = new CopyOnWriteArrayList<>();
+	private final AtomicReference<@Nullable AutoCloseable> drawSubscription = new AtomicReference<>();
 	private final List<Runnable> queuedActions = new ArrayList<>();
 	private final AtomicReference<Runnable> onHudReady = new AtomicReference<>();
 	private final AtomicBoolean hudReadyCalled = new AtomicBoolean();
@@ -60,6 +62,7 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 			}
 			AutoCloseable subscription = realPort.onStateChanged(this::deliver);
 			delegateSubscription.set(subscription);
+			drawSubscription.set(realPort.onDrawStateChanged(this::deliverDraw));
 			deliver(realPort.state());
 			if (hudReadyCalled.get()) {
 				fireHudReady();
@@ -157,6 +160,41 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 	@Override
 	public void toggleMeetingMode() {
 		invoke(() -> delegate("toggleMeetingMode").toggleMeetingMode());
+	}
+
+	@Override
+	public DrawState drawState() {
+		HudRecordingPort real = delegate.get();
+		return real == null ? DrawState.UNAVAILABLE : real.drawState();
+	}
+
+	/**
+	 * The HUD subscribes before the real port is attached; the listener is kept here and the real
+	 * port's changes are forwarded to it once attached.
+	 */
+	@Override
+	public AutoCloseable onDrawStateChanged(Consumer<DrawState> listener) {
+		drawListeners.add(listener);
+		return () -> drawListeners.remove(listener);
+	}
+
+	@Override
+	public void toggleDraw() {
+		HudRecordingPort real = delegate.get();
+		// Nothing records before the real port exists, so there is nothing to draw on.
+		if (real != null) {
+			real.toggleDraw();
+		}
+	}
+
+	private void deliverDraw(DrawState state) {
+		for (Consumer<DrawState> listener : drawListeners) {
+			try {
+				listener.accept(state);
+			} catch (RuntimeException error) {
+				LOG.log(System.Logger.Level.WARNING, "HUD draw state listener failed: " + error);
+			}
+		}
 	}
 
 	@Override
@@ -266,6 +304,15 @@ public final class LazyHudRecordingPort implements HudRecordingPort, AutoCloseab
 				LOG.log(System.Logger.Level.WARNING, "could not close the HUD state subscription: " + error);
 			}
 		}
+		AutoCloseable draw = drawSubscription.getAndSet(null);
+		if (draw != null) {
+			try {
+				draw.close();
+			} catch (Exception error) {
+				LOG.log(System.Logger.Level.WARNING, "could not close the HUD draw subscription: " + error);
+			}
+		}
+		drawListeners.clear();
 		HudRecordingPort real = delegate.getAndSet(null);
 		if (real instanceof AutoCloseable closeable) {
 			try {

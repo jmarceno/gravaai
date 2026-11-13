@@ -207,7 +207,8 @@
 			"actionToggleRecording": "开始 / 停止录制",
 			"actionTogglePause": "暂停 / 继续",
 			"actionCancelRecording": "取消录制",
-			"actionToggleMeeting": "开始 / 停止会议"
+			"actionToggleMeeting": "开始 / 停止会议",
+			"actionToggleDraw": "在屏幕上绘制"
 		}
 	}
 }
